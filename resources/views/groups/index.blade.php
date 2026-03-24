@@ -17,13 +17,6 @@
             Cari room chat...
         </div>
 
-        {{-- Success/info messages --}}
-        @if(session('success'))
-            <div class="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
-                {{ session('success') }}
-            </div>
-        @endif
-
         {{-- Group list --}}
         <div class="space-y-3">
             @forelse ($groups as $group)
@@ -32,12 +25,22 @@
                         <h2 class="text-base font-bold text-slate-900"># {{ $group->name }}</h2>
                         <p class="mt-0.5 text-xs text-slate-500">
                             {{ $group->members_count }} member •
-                            AI {{ $group->aiConnections->where('active', true)->count() > 0 ? 'aktif' : 'nonaktif' }}
+                            AI {{ $group->aiConnections->count() > 0 ? 'aktif' : 'nonaktif' }}
                         </p>
                     </a>
                     <div class="panel-card-muted mt-3 flex items-center justify-between px-3 py-2 text-xs text-slate-600">
                         <span>Share ID: <span class="font-bold text-slate-800">{{ $group->share_id }}</span></span>
-                        <button onclick="navigator.clipboard.writeText('{{ $group->share_id }}')" class="text-blue-500 font-semibold hover:text-blue-700">Copy</button>
+                        <div class="flex items-center gap-3">
+                            <button type="button" class="text-blue-500 font-semibold hover:text-blue-700" data-copy-share-id="{{ $group->share_id }}">Copy</button>
+                            <button
+                                type="button"
+                                class="text-emerald-600 font-semibold hover:text-emerald-700"
+                                data-share-group-url="{{ route('groups.join', $group->share_id) }}"
+                                data-share-group-name="{{ $group->name }}"
+                            >
+                                Share
+                            </button>
+                        </div>
                     </div>
                 </div>
             @empty

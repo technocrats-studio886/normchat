@@ -32,15 +32,29 @@
                             'gemini' => 'bg-[#4285F4]',
                             default => 'bg-slate-500',
                         };
+                        $providerLogoPng = "provider-logos/{$provider}.png";
+                        $providerLogoSvg = "provider-logos/{$provider}.svg";
+                        $providerLogoFile = file_exists(public_path($providerLogoPng))
+                            ? $providerLogoPng
+                            : (file_exists(public_path($providerLogoSvg)) ? $providerLogoSvg : null);
+                        $isApiKeyAccount = in_array($provider, ['chatgpt', 'claude'], true)
+                            && str_ends_with((string) $email, '@normchat.local');
+                        $identityText = $isApiKeyAccount
+                            ? 'Email akun tidak tersedia dari API key provider'
+                            : $email;
                     @endphp
-                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-md {{ $providerColor }} text-white">
-                        <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 24C12 24 12 12 24 12C12 12 12 0 12 0C12 0 12 12 0 12C12 12 12 24 12 24Z"/>
-                        </svg>
-                    </span>
+                    @if($providerLogoFile)
+                        <img src="{{ asset($providerLogoFile) }}" alt="{{ $providerLabel }} Logo" class="h-6 w-6 rounded-md object-contain" />
+                    @else
+                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md {{ $providerColor }} text-white">
+                            <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 24C12 24 12 12 24 12C12 12 12 0 12 0C12 0 12 12 0 12C12 12 12 24 12 24Z"/>
+                            </svg>
+                        </span>
+                    @endif
                     <div>
                         <p class="text-sm font-semibold text-slate-700">{{ $providerLabel }}</p>
-                        <p class="text-xs text-slate-400">{{ $email }}</p>
+                        <p class="text-xs text-slate-400">{{ $identityText }}</p>
                     </div>
                     <span class="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">Connected</span>
                 </div>

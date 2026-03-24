@@ -22,14 +22,11 @@
                 </span>
             </div>
 
-            {{-- AI Login Sessions --}}
+            {{-- AI Provider --}}
             <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3.5">
-                <span class="text-sm text-slate-700">AI Login Sessions</span>
-                <span class="text-sm font-bold text-blue-600">
-                    @php
-                        $aiSessionCount = \App\Models\AiConnection::whereHas('group', fn($q) => $q->where('owner_id', $user->id))->where('active', true)->count();
-                    @endphp
-                    {{ $aiSessionCount }} aktif
+                <span class="text-sm text-slate-700">AI Provider</span>
+                <span class="text-sm font-bold {{ $user->aiConnection ? 'text-emerald-600' : 'text-slate-400' }}">
+                    {{ $user->aiConnection ? ucfirst($user->aiConnection->provider) . ' — Connected' : 'Belum connect' }}
                 </span>
             </div>
 

@@ -45,7 +45,7 @@
                     </h1>
 
                     <p class="mt-5 max-w-2xl text-base leading-relaxed text-slate-200 md:text-lg">
-                        Normchat membantu tim menjaga percakapan tetap fokus: chat real-time, akses berbasis undangan,
+                        Normchat membantu tim menjaga percakapan tetap fokus: chat real-time, akses berbasis Share ID,
                         kontrol penuh untuk owner, dan ekspor histori yang rapi dalam satu tempat.
                     </p>
 
@@ -57,7 +57,7 @@
                     </div>
 
                     <div class="mt-10 flex flex-wrap items-center gap-4">
-                        <a href="{{ $pricingUrl }}" class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#1d4ed8] to-[#0f766e] px-8 py-4 text-sm font-extrabold uppercase tracking-wide text-white shadow-lg shadow-cyan-900/35 transition hover:brightness-105">
+                        <a href="{{ $pricingUrl }}" class="inline-flex items-center justify-center rounded-2xl bg-linear-to-r from-[#1d4ed8] to-[#0f766e] px-8 py-4 text-sm font-extrabold uppercase tracking-wide text-white shadow-lg shadow-cyan-900/35 transition hover:brightness-105">
                             Lihat Paket
                         </a>
                         <a href="{{ $pricingUrl }}" class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-8 py-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
@@ -84,7 +84,7 @@
                             AI hadir saat dibutuhkan: untuk ringkasan, drafting, dan respons cepat.
                         </div>
                         <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                            Akses lebih aman karena member masuk lewat link undangan, bukan publik terbuka.
+                            Akses lebih aman karena member masuk lewat Share ID + password, bukan publik terbuka.
                         </div>
                     </div>
                 </div>
@@ -115,7 +115,7 @@
         </section>
 
         <section class="mx-auto w-full max-w-6xl px-6 pb-24 lg:px-10">
-            <div class="rounded-3xl border border-cyan-300/25 bg-gradient-to-r from-[#0b223d] to-[#0f3043] p-8 md:p-10">
+            <div class="rounded-3xl border border-cyan-300/25 bg-linear-to-r from-[#0b223d] to-[#0f3043] p-8 md:p-10">
                 <div class="grid gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-center">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Pricing Overview</p>

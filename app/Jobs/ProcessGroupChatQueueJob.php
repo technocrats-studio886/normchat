@@ -136,10 +136,14 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
         event(new MessageSent($message->group_id, [
             'id' => $aiMessage->id,
+            'message_type' => $aiMessage->message_type,
             'sender_type' => $aiMessage->sender_type,
             'sender_id' => $aiMessage->sender_id,
             'sender_name' => 'NormAI',
             'content' => $aiMessage->content,
+            'attachment_url' => null,
+            'attachment_mime' => null,
+            'attachment_original_name' => null,
             'created_at' => optional($aiMessage->created_at)->toIso8601String(),
         ]));
     }

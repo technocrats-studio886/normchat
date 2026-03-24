@@ -19,7 +19,6 @@
 
             @php
                 $providerLabel = $provider === 'chatgpt' ? 'ChatGPT' : 'Claude';
-                $providerColor = $provider === 'chatgpt' ? 'emerald' : 'amber';
                 $keyPlaceholder = $provider === 'chatgpt' ? 'sk-...' : 'sk-ant-...';
                 $keyHelp = $provider === 'chatgpt'
                     ? 'Dapatkan API key dari platform.openai.com/api-keys'
@@ -33,28 +32,14 @@
                 Masukkan API key {{ $providerLabel }} kamu untuk login dan menggunakan AI di grup.
             </p>
 
+            @if($errors->any())
+                <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+                    {{ $errors->first() }}
+                </div>
+            @endif
+
             <form method="POST" action="{{ route('auth.connect.' . $provider . '.store') }}" class="mt-6 space-y-4">
                 @csrf
-
-                <div>
-                    <label for="name" class="block text-xs font-semibold text-slate-700">Nama</label>
-                    <input type="text" name="name" id="name" required value="{{ old('name') }}"
-                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
-                        placeholder="Nama kamu" />
-                    @error('name')
-                        <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="email" class="block text-xs font-semibold text-slate-700">Email</label>
-                    <input type="email" name="email" id="email" required value="{{ old('email') }}"
-                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
-                        placeholder="email@contoh.com" />
-                    @error('email')
-                        <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                    @enderror
-                </div>
 
                 <div>
                     <label for="api_key" class="block text-xs font-semibold text-slate-700">API Key {{ $providerLabel }}</label>
@@ -62,13 +47,10 @@
                         class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
                         placeholder="{{ $keyPlaceholder }}" />
                     <p class="mt-1 text-[11px] text-slate-400">{{ $keyHelp }}</p>
-                    @error('api_key')
-                        <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                    @enderror
                 </div>
 
                 <button type="submit"
-                    class="w-full rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110">
+                    class="w-full rounded-2xl bg-linear-to-r from-slate-800 to-slate-900 px-4 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110">
                     Connect {{ $providerLabel }}
                 </button>
             </form>

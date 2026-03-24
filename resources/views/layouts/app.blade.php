@@ -83,6 +83,9 @@
         @auth
             @php
                 $currentGroup = $group ?? null;
+                $chatTargetUrl = $currentGroup
+                    ? route('chat.show', $currentGroup)
+                    : route('chat.last');
                 $isHome = request()->routeIs('groups.index');
                 $isChat = request()->routeIs('chat.*');
                 $isProfile = request()->routeIs('profile.*');
@@ -90,7 +93,8 @@
                     || request()->routeIs('subscription.pricing')
                     || request()->routeIs('subscription.payment.*')
                     || request()->routeIs('subscription.checkout')
-                    || request()->routeIs('subscription.success');
+                    || request()->routeIs('subscription.success')
+                    || request()->routeIs('settings.*');
             @endphp
             @unless($hideBottomNav)
                 <nav class="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3">
@@ -99,7 +103,7 @@
                             <a href="{{ route('groups.index') }}" class="{{ $isHome ? 'nav-pill-active-outline' : 'nav-pill' }}">HOME</a>
                         </li>
                         <li>
-                            <a href="{{ $currentGroup ? route('chat.show', $currentGroup) : route('groups.index') }}" class="{{ $isChat ? 'nav-pill-chat-active' : 'nav-pill-chat' }}">CHAT</a>
+                            <a href="{{ $chatTargetUrl }}" class="{{ $isChat ? 'nav-pill-chat-active' : 'nav-pill-chat' }}">CHAT</a>
                         </li>
                         <li>
                             <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nav-pill-active-outline' : 'nav-pill' }}">PROFILE</a>

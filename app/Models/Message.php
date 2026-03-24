@@ -11,7 +11,18 @@ class Message extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['group_id', 'sender_type', 'sender_id', 'content'];
+    protected $fillable = [
+        'group_id',
+        'message_type',
+        'sender_type',
+        'sender_id',
+        'content',
+        'attachment_disk',
+        'attachment_path',
+        'attachment_mime',
+        'attachment_original_name',
+        'attachment_size',
+    ];
 
     public function group(): BelongsTo
     {

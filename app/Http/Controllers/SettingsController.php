@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SettingsController extends Controller
 {
@@ -42,7 +43,7 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function createExport(Request $request, Group $group): RedirectResponse
+    public function createExport(Request $request, Group $group): RedirectResponse|StreamedResponse
     {
         $this->authorize('exportChat', $group);
 
@@ -60,9 +61,16 @@ class SettingsController extends Controller
             'created_at' => now(),
         ]);
 
-        GenerateExportJob::dispatch($export->id);
+        // Generate immediately so user gets direct download on button click.
+        (new GenerateExportJob($export->id))->handle();
 
-        return back()->with('success', 'Job export dikirim ke queue Redis.');
+        $export->refresh();
+        if ($export->status === 'done' && $export->storage_path && Storage::disk('normchat_exports')->exists($export->storage_path)) {
+            $downloadName = sprintf('normchat-group-%d-export-%d.%s', $group->id, $export->id, $validated['file_type']);
+            return Storage::disk('normchat_exports')->download($export->storage_path, $downloadName);
+        }
+
+        return back()->withErrors(['export' => 'Export belum berhasil diproses. Coba ulangi beberapa saat lagi.']);
     }
 
     public function historyExport(Group $group): View

@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Subscription;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -58,48 +59,27 @@ class AuthController extends Controller
         abort_unless(in_array($provider, self::APIKEY_PROVIDERS, true), 404);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:255'],
             'api_key' => ['required', 'string', 'min:10', 'max:8192'],
         ]);
 
         // Validate API key with the provider
         $keyValid = $this->validateApiKey($provider, $validated['api_key']);
         if (! $keyValid) {
-            return back()->withInput($request->except('api_key'))
+            return back()
                 ->withErrors(['api_key' => "API key tidak valid. Pastikan key dari $provider aktif dan benar."]);
         }
 
         // Generate a stable provider_user_id from the API key (hash to avoid storing raw key as ID)
         $providerUserId = hash('sha256', $provider . ':' . $validated['api_key']);
 
-        // Find existing user by provider+hash or by email+provider
+        // Find existing user by provider+hash
         $user = User::query()
             ->where('auth_provider', $provider)
             ->where('provider_user_id', $providerUserId)
             ->first();
 
         if (! $user) {
-            // Check if email already exists with same provider
-            $user = User::query()
-                ->where('auth_provider', $provider)
-                ->where('email', $validated['email'])
-                ->first();
-        }
-
-        if (! $user) {
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'auth_provider' => $provider,
-                'provider_user_id' => $providerUserId,
-                'email_verified_at' => now(),
-            ]);
-        } else {
-            $user->update([
-                'name' => $validated['name'],
-                'provider_user_id' => $providerUserId,
-            ]);
+            $user = $this->createApiKeyUserWithUniqueEmail($provider, $providerUserId);
         }
 
         // Store API key encrypted on user
@@ -288,8 +268,8 @@ class AuthController extends Controller
     {
         try {
             if ($provider === 'chatgpt') {
-                // Validate OpenAI API key by listing models
-                $response = Http::withHeaders([
+                // Validate OpenAI API key by listing models (10s timeout)
+                $response = Http::timeout(10)->withHeaders([
                     'Authorization' => 'Bearer ' . $apiKey,
                 ])->get('https://api.openai.com/v1/models', ['limit' => 1]);
 
@@ -297,8 +277,8 @@ class AuthController extends Controller
             }
 
             if ($provider === 'claude') {
-                // Validate Anthropic API key by sending a minimal request
-                $response = Http::withHeaders([
+                // Validate Anthropic API key by sending a minimal request (10s timeout)
+                $response = Http::timeout(10)->withHeaders([
                     'x-api-key' => $apiKey,
                     'anthropic-version' => '2023-06-01',
                     'Content-Type' => 'application/json',
@@ -382,10 +362,15 @@ class AuthController extends Controller
             ->where('provider_user_id', $profile['id'])
             ->first();
 
+        if (! $user && ! empty($profile['email'])) {
+            // Merge account when the same person connects with another provider.
+            $user = User::query()->where('email', $profile['email'])->first();
+        }
+
         if (! $user) {
             $user = User::create([
                 'name' => $profile['name'],
-                'email' => $profile['email'] ?? $provider . '-' . Str::random(8) . '@normchat.local',
+                'email' => $profile['email'] ?? $this->makeUniqueNormchatEmail($provider, $profile['id']),
                 'avatar_url' => $profile['avatar'] ?? null,
                 'auth_provider' => $provider,
                 'provider_user_id' => $profile['id'],
@@ -394,7 +379,10 @@ class AuthController extends Controller
         } else {
             $user->update([
                 'name' => $profile['name'] ?: $user->name,
+                'email' => $profile['email'] ?: $user->email,
                 'avatar_url' => $profile['avatar'] ?? $user->avatar_url,
+                'auth_provider' => $provider,
+                'provider_user_id' => $profile['id'],
             ]);
         }
 
@@ -410,5 +398,47 @@ class AuthController extends Controller
         );
 
         return $user;
+    }
+
+    private function createApiKeyUserWithUniqueEmail(string $provider, string $providerUserId): User
+    {
+        $email = $this->makeUniqueNormchatEmail($provider, $providerUserId);
+
+        try {
+            return User::create([
+                'name' => ucfirst($provider) . ' User',
+                'email' => $email,
+                'auth_provider' => $provider,
+                'provider_user_id' => $providerUserId,
+                'email_verified_at' => now(),
+            ]);
+        } catch (QueryException $e) {
+            // Handle race condition on unique email generation by retrying once.
+            if ((string) $e->getCode() !== '23505') {
+                throw $e;
+            }
+
+            return User::create([
+                'name' => ucfirst($provider) . ' User',
+                'email' => $this->makeUniqueNormchatEmail($provider, $providerUserId),
+                'auth_provider' => $provider,
+                'provider_user_id' => $providerUserId,
+                'email_verified_at' => now(),
+            ]);
+        }
+    }
+
+    private function makeUniqueNormchatEmail(string $provider, string $seed): string
+    {
+        $base = $provider . '-' . substr(hash('sha256', $provider . ':' . $seed), 0, 12);
+        $candidate = $base . '@normchat.local';
+        $counter = 2;
+
+        while (User::query()->where('email', $candidate)->exists()) {
+            $candidate = $base . '-' . $counter . '@normchat.local';
+            $counter++;
+        }
+
+        return $candidate;
     }
 }

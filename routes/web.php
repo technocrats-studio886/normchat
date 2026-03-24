@@ -43,8 +43,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/groups', [GroupController::class, 'store'])->middleware('user.llm.connected')->name('groups.store');
 
     // Chat
+    Route::get('/chat/last', [ChatController::class, 'openLast'])->name('chat.last');
     Route::get('/groups/{group}/chat', [ChatController::class, 'show'])->middleware('group.permission')->name('chat.show');
     Route::post('/groups/{group}/messages', [ChatController::class, 'store'])->middleware('group.permission')->name('chat.store');
+    Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
 
     // Settings
     Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->middleware('group.permission')->name('settings.show');
