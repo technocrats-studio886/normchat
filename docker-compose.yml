@@ -1,0 +1,187 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: normchat-app
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - normchat_storage:/opt/normchat/storage
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      MARKETING_URL: ${MARKETING_URL:-http://localhost:8000}
+      NORMCHAT_APP_URL: ${NORMCHAT_APP_URL:-http://localhost:8000}
+      NORMCHAT_MARKETING_PATH: ${NORMCHAT_MARKETING_PATH:-/normchat}
+      DB_CONNECTION: pgsql
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE:-normchat}
+      DB_USERNAME: ${DB_USERNAME:-normchat}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
+      CACHE_STORE: ${CACHE_STORE:-redis}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
+      BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-reverb}
+      REDIS_CLIENT: ${REDIS_CLIENT:-phpredis}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_QUEUE: ${REDIS_QUEUE:-default}
+      REDIS_QUEUE_CONNECTION: ${REDIS_QUEUE_CONNECTION:-default}
+      NORMCHAT_STORAGE_ROOT: ${NORMCHAT_STORAGE_ROOT:-/opt/normchat/storage}
+      REVERB_APP_ID: ${REVERB_APP_ID:-normchat}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-normchat-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-normchat-secret}
+      REVERB_HOST: ${REVERB_HOST:-reverb}
+      REVERB_PORT: ${REVERB_PORT:-8080}
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      REVERB_SERVER_HOST: ${REVERB_SERVER_HOST:-0.0.0.0}
+      REVERB_SERVER_PORT: ${REVERB_SERVER_PORT:-8080}
+      VITE_REVERB_APP_KEY: ${VITE_REVERB_APP_KEY:-normchat-key}
+      VITE_REVERB_HOST: ${VITE_REVERB_HOST:-localhost}
+      VITE_REVERB_PORT: ${VITE_REVERB_PORT:-18080}
+      VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-http}
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-normchat_attachments}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: sh -lc "php artisan migrate --force && php -S 0.0.0.0:8000 -t public"
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: normchat-queue
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - normchat_storage:/opt/normchat/storage
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      MARKETING_URL: ${MARKETING_URL:-http://localhost:8000}
+      NORMCHAT_APP_URL: ${NORMCHAT_APP_URL:-http://localhost:8000}
+      NORMCHAT_MARKETING_PATH: ${NORMCHAT_MARKETING_PATH:-/normchat}
+      DB_CONNECTION: pgsql
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE:-normchat}
+      DB_USERNAME: ${DB_USERNAME:-normchat}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
+      CACHE_STORE: ${CACHE_STORE:-redis}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
+      BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-reverb}
+      REDIS_CLIENT: ${REDIS_CLIENT:-phpredis}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_QUEUE: ${REDIS_QUEUE:-default}
+      REDIS_QUEUE_CONNECTION: ${REDIS_QUEUE_CONNECTION:-default}
+      NORMCHAT_STORAGE_ROOT: ${NORMCHAT_STORAGE_ROOT:-/opt/normchat/storage}
+      REVERB_APP_ID: ${REVERB_APP_ID:-normchat}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-normchat-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-normchat-secret}
+      REVERB_HOST: ${REVERB_HOST:-reverb}
+      REVERB_PORT: ${REVERB_PORT:-8080}
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      REVERB_SERVER_HOST: ${REVERB_SERVER_HOST:-0.0.0.0}
+      REVERB_SERVER_PORT: ${REVERB_SERVER_PORT:-8080}
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-normchat_attachments}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -lc "php artisan queue:work redis --queue=default --tries=3 --sleep=1"
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: normchat-reverb
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - normchat_storage:/opt/normchat/storage
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      MARKETING_URL: ${MARKETING_URL:-http://localhost:8000}
+      NORMCHAT_APP_URL: ${NORMCHAT_APP_URL:-http://localhost:8000}
+      NORMCHAT_MARKETING_PATH: ${NORMCHAT_MARKETING_PATH:-/normchat}
+      DB_CONNECTION: pgsql
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE:-normchat}
+      DB_USERNAME: ${DB_USERNAME:-normchat}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
+      CACHE_STORE: ${CACHE_STORE:-redis}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
+      BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-reverb}
+      REDIS_CLIENT: ${REDIS_CLIENT:-phpredis}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_QUEUE: ${REDIS_QUEUE:-default}
+      REDIS_QUEUE_CONNECTION: ${REDIS_QUEUE_CONNECTION:-default}
+      NORMCHAT_STORAGE_ROOT: ${NORMCHAT_STORAGE_ROOT:-/opt/normchat/storage}
+      REVERB_APP_ID: ${REVERB_APP_ID:-normchat}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-normchat-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-normchat-secret}
+      REVERB_HOST: ${REVERB_HOST:-reverb}
+      REVERB_PORT: ${REVERB_PORT:-8080}
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      REVERB_SERVER_HOST: ${REVERB_SERVER_HOST:-0.0.0.0}
+      REVERB_SERVER_PORT: ${REVERB_SERVER_PORT:-8080}
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-normchat_attachments}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "18080:8080"
+    command: sh -lc "php artisan reverb:start --host=0.0.0.0 --port=8080"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: normchat-postgres
+    environment:
+      POSTGRES_DB: normchat
+      POSTGRES_USER: normchat
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U normchat -d normchat"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: normchat-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres_data:
+  redis_data:
+  normchat_storage:

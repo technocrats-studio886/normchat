@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+vendor
+storage/logs
+storage/framework/cache
+docker_data
+.env
+.env.*
+public/build
