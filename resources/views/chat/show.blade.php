@@ -31,20 +31,22 @@
             <h2 class="text-lg font-bold text-slate-900"># {{ $group->name }}</h2>
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 @php
-                    $hasActiveAi = isset($activeAi) && (is_countable($activeAi) ? count($activeAi) > 0 : !empty($activeAi));
+                    $gt = $group->groupToken;
+                    $credits = $gt ? $gt->credits : 0;
+                    $modelLabel = config("ai_models.providers.{$group->ai_provider}.models.{$group->ai_model}.label", $group->ai_model ?? 'N/A');
+                    $multiplier = $group->getModelMultiplier();
                 @endphp
-                <span class="rounded-full {{ $hasActiveAi ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }} px-2.5 py-1 text-[11px] font-semibold">
-                    AI {{ $hasActiveAi ? 'online' : 'offline' }}
-                </span>
-                @if(isset($activeGroupAi) && $activeGroupAi)
+                @if($group->ai_provider)
                     <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
-                        Provider: {{ strtoupper($activeGroupAi->provider) }}
+                        {{ $modelLabel }} ({{ $multiplier }}x)
                     </span>
                 @endif
                 <span class="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
                     {{ $group->members->count() }} members
                 </span>
-                <span class="text-[11px] text-slate-400">Realtime: connected</span>
+                <span class="rounded-full {{ $credits > 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600' }} px-2.5 py-1 text-[11px] font-semibold">
+                    {{ number_format($credits, 1) }} normkredit
+                </span>
             </div>
         </div>
 

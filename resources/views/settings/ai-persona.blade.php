@@ -13,35 +13,34 @@
 
         <p class="mb-4 text-sm text-[#64748B]">Atur gaya bicara AI agar jawaban lebih relevan dengan budaya tim dan konteks proyek.</p>
 
-        @if($group->aiConnections->count() === 0)
+        @if(!$group->ai_provider)
             <div class="rounded-xl border border-dashed border-[#CBD5E1] bg-white p-5 text-sm text-[#64748B]">
-                Belum ada AI aktif. Owner perlu set provider + token AI dari halaman Owner Controls terlebih dahulu.
-                <a href="{{ route('settings.show', $group) }}#ai-provider" class="mt-3 inline-flex text-xs font-bold text-blue-600 hover:text-blue-700">
-                    Buka Add AI Provider
-                </a>
+                Belum ada AI aktif. Provider dipilih saat membuat grup.
             </div>
         @else
+            @php
+                $providerLabel = config("ai_models.providers.{$group->ai_provider}.label", strtoupper($group->ai_provider));
+                $modelLabel = config("ai_models.providers.{$group->ai_provider}.models.{$group->ai_model}.label", $group->ai_model ?? '-');
+            @endphp
             <div class="space-y-3">
-                @foreach($group->aiConnections as $ai)
-                    <div class="panel-card p-4">
-                        <div class="mb-3 flex items-center justify-between">
-                            <p class="text-sm font-bold text-[#0F172A]">{{ strtoupper($ai->provider) }}</p>
-                            <span class="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                                Active
-                            </span>
-                        </div>
-
-                        <label class="mb-1 block text-xs font-semibold text-[#64748B]">Persona Style</label>
-                        <textarea rows="3" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none" placeholder="Contoh: ringkas, to-the-point, fokus solusi praktis."></textarea>
-
-                        <label class="mb-1 mt-3 block text-xs font-semibold text-[#64748B]">Guardrails</label>
-                        <textarea rows="2" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none" placeholder="Contoh: hindari jawaban di luar scope grup."></textarea>
-
-                        <button type="button" class="btn-cta mt-3 py-2.5 normal-case tracking-normal">
-                            Simpan Persona
-                        </button>
+                <div class="panel-card p-4">
+                    <div class="mb-3 flex items-center justify-between">
+                        <p class="text-sm font-bold text-[#0F172A]">{{ $providerLabel }} — {{ $modelLabel }}</p>
+                        <span class="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                            Active
+                        </span>
                     </div>
-                @endforeach
+
+                    <label class="mb-1 block text-xs font-semibold text-[#64748B]">Persona Style</label>
+                    <textarea rows="3" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none" placeholder="Contoh: ringkas, to-the-point, fokus solusi praktis."></textarea>
+
+                    <label class="mb-1 mt-3 block text-xs font-semibold text-[#64748B]">Guardrails</label>
+                    <textarea rows="2" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none" placeholder="Contoh: hindari jawaban di luar scope grup."></textarea>
+
+                    <button type="button" class="btn-cta mt-3 py-2.5 normal-case tracking-normal">
+                        Simpan Persona
+                    </button>
+                </div>
             </div>
         @endif
     </section>

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Group;
+use App\Models\GroupToken;
+use App\Models\GroupTokenContribution;
 use App\Models\Subscription;
 use App\Models\SubscriptionPayment;
 use Illuminate\Http\RedirectResponse;
@@ -13,7 +15,11 @@ use Illuminate\View\View;
 
 class SubscriptionController extends Controller
 {
+    private const PLAN_PRICE = 25000;
+    private const INCLUDED_TOKENS = 10_000; // 10K tokens = 10 normkredit
+    private const PRICE_PER_CREDIT = 1000; // Rp1.000 per normkredit (1K token)
     private const ADD_SEAT_PRICE = 4000;
+    private const JOIN_MIN_PATUNGAN = 10000; // Rp10.000 minimum patungan join
 
     public function landing(): View
     {
@@ -25,25 +31,29 @@ class SubscriptionController extends Controller
         return view('subscription.pricing');
     }
 
+    // ── Payment Detail (Subscription) ────────────────────────
+
     public function paymentDetail(): View|RedirectResponse
     {
         $user = Auth::user();
 
-        // Already has active subscription → skip to home
         $hasActive = Subscription::query()
             ->whereHas('group', fn ($q) => $q->where('owner_id', $user->id))
             ->where('status', 'active')
             ->exists();
 
-        if ($hasActive || session('subscription_paid')) {
+        if (session('subscription_paid')) {
+            return redirect()->route('groups.create');
+        }
+
+        if ($hasActive) {
             return redirect()->route('groups.index');
         }
 
         return view('subscription.payment-detail', [
             'user' => $user,
-            'provider' => $user->auth_provider,
-            'email' => $user->email,
-            'planPrice' => 15000,
+            'planPrice' => self::PLAN_PRICE,
+            'includedTokens' => self::INCLUDED_TOKENS,
         ]);
     }
 
@@ -53,8 +63,11 @@ class SubscriptionController extends Controller
             'plan' => ['required', 'in:normchat-pro'],
         ]);
 
-        // Dummy payment. Mark as paid for first group creation.
-        session(['subscription_paid' => true]);
+        // Dummy payment: mark as paid, tokens will be allocated when group is created
+        session([
+            'subscription_paid' => true,
+            'subscription_tokens' => self::INCLUDED_TOKENS,
+        ]);
 
         return redirect()->route('subscription.payment.success');
     }
@@ -63,6 +76,99 @@ class SubscriptionController extends Controller
     {
         return view('subscription.payment-success');
     }
+
+    // ── Token Purchase ───────────────────────────────────────
+
+    public function buyTokensForm(): View
+    {
+        $user = Auth::user();
+
+        // Get user's groups (owned or member)
+        $groups = Group::query()
+            ->where('owner_id', $user->id)
+            ->orWhereHas('members', fn ($q) => $q->where('user_id', $user->id)->where('status', 'active'))
+            ->with('groupToken')
+            ->get();
+
+        return view('subscription.buy-tokens', [
+            'groups' => $groups,
+            'pricePerCredit' => self::PRICE_PER_CREDIT,
+        ]);
+    }
+
+    public function buyTokens(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'group_id' => ['required', 'exists:groups,id'],
+            'mode' => ['required', 'in:by_credits,by_price'],
+            'credit_amount' => ['required_if:mode,by_credits', 'nullable', 'numeric', 'min:1'],
+            'price_amount' => ['required_if:mode,by_price', 'nullable', 'integer', 'min:1000'],
+        ]);
+
+        $user = Auth::user();
+        $group = Group::findOrFail($validated['group_id']);
+
+        // Verify user has access to this group
+        $isMember = $group->owner_id === $user->id
+            || $group->members()->where('user_id', $user->id)->where('status', 'active')->exists();
+        abort_unless($isMember, 403);
+
+        if ($validated['mode'] === 'by_credits') {
+            $credits = (float) $validated['credit_amount'];
+            $tokenAmount = (int) ($credits * 1000);
+            $price = (int) ceil($credits * self::PRICE_PER_CREDIT);
+        } else {
+            $price = (int) $validated['price_amount'];
+            $credits = $price / self::PRICE_PER_CREDIT;
+            $tokenAmount = (int) floor($credits * 1000);
+        }
+
+        if ($tokenAmount < 1000) {
+            return back()->withErrors(['credit_amount' => 'Minimal pembelian 1 normkredit (1.000 token).']);
+        }
+
+        $paymentRef = 'TOKEN-' . strtoupper(Str::random(10));
+
+        // Add tokens to group
+        $groupToken = GroupToken::firstOrCreate(
+            ['group_id' => $group->id],
+            ['total_tokens' => 0, 'used_tokens' => 0, 'remaining_tokens' => 0]
+        );
+        $groupToken->addTokens($tokenAmount);
+
+        // Record contribution
+        GroupTokenContribution::create([
+            'group_id' => $group->id,
+            'user_id' => $user->id,
+            'source' => 'topup',
+            'token_amount' => $tokenAmount,
+            'price_paid' => $price,
+            'payment_reference' => $paymentRef,
+        ]);
+
+        session([
+            'token_purchase' => [
+                'reference' => $paymentRef,
+                'tokens' => $tokenAmount,
+                'price' => $price,
+                'group_name' => $group->name,
+            ],
+        ]);
+
+        return redirect()->route('subscription.tokens.buy.success')
+            ->with('success', 'Token berhasil ditambahkan ke grup ' . $group->name);
+    }
+
+    public function buyTokensSuccess(): View
+    {
+        $purchase = session('token_purchase');
+
+        return view('subscription.buy-tokens-success', [
+            'purchase' => is_array($purchase) ? $purchase : null,
+        ]);
+    }
+
+    // ── Seat Management ──────────────────────────────────────
 
     public function addSeatForm(Group $group): View
     {
@@ -93,9 +199,8 @@ class SubscriptionController extends Controller
 
         $seatCount = (int) $validated['seat_count'];
         $totalAmount = $seatCount * self::ADD_SEAT_PRICE;
-        $paymentRef = 'DUMMY-SEAT-'.strtoupper(Str::random(10));
+        $paymentRef = 'DUMMY-SEAT-' . strtoupper(Str::random(10));
 
-        // Dummy payment marked as successful: increase seat capacity directly.
         $subscription->included_seats = (int) $subscription->included_seats + $seatCount;
         $subscription->save();
 
@@ -124,7 +229,8 @@ class SubscriptionController extends Controller
             ],
         ]);
 
-        return redirect()->route('subscription.add-seat.success', $group)->with('success', 'Pembayaran dummy berhasil. Seat tambahan aktif.');
+        return redirect()->route('subscription.add-seat.success', $group)
+            ->with('success', 'Pembayaran dummy berhasil. Seat tambahan aktif.');
     }
 
     public function addSeatSuccess(Group $group): View

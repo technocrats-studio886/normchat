@@ -15,18 +15,13 @@ Route::get('/normchat', [SubscriptionController::class, 'landing'])->name('landi
 Route::get('/pricing', [SubscriptionController::class, 'pricing'])->name('subscription.pricing');
 Route::get('/login', [AuthController::class, 'landing'])->name('login');
 
-// API key-based connect (ChatGPT & Claude)
-Route::get('/connect/chatgpt', [AuthController::class, 'showApiKeyForm'])->defaults('provider', 'chatgpt')->name('auth.connect.chatgpt');
-Route::post('/connect/chatgpt', [AuthController::class, 'handleApiKeyConnect'])->defaults('provider', 'chatgpt')->name('auth.connect.chatgpt.store');
-Route::get('/connect/claude', [AuthController::class, 'showApiKeyForm'])->defaults('provider', 'claude')->name('auth.connect.claude');
-Route::post('/connect/claude', [AuthController::class, 'handleApiKeyConnect'])->defaults('provider', 'claude')->name('auth.connect.claude.store');
+// Google SSO
+Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
-// OAuth-based connect (Gemini/Google only)
-Route::get('/connect/{provider}', [AuthController::class, 'connectProvider'])->name('auth.connect');
-Route::get('/oauth/callback/{provider}', [AuthController::class, 'handleCallback'])->name('auth.callback');
-// Join group via share ID — must connect LLM first
-Route::get('/join/{shareId}', [GroupController::class, 'showJoin'])->middleware(['auth', 'llm.connected'])->name('groups.join');
-Route::post('/join/{shareId}', [GroupController::class, 'joinViaShareId'])->middleware(['auth', 'llm.connected'])->name('groups.join.submit');
+// Join group via share ID
+Route::get('/join/{shareId}', [GroupController::class, 'showJoin'])->middleware(['auth'])->name('groups.join');
+Route::post('/join/{shareId}', [GroupController::class, 'joinViaShareId'])->middleware(['auth'])->name('groups.join.submit');
 
 // ── Authenticated ────────────────────────────────────────────
 Route::middleware('auth')->group(function () {
@@ -37,10 +32,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/payment/detail', [SubscriptionController::class, 'pay'])->name('subscription.pay');
     Route::get('/payment/success', [SubscriptionController::class, 'paymentSuccess'])->name('subscription.payment.success');
 
+    // Token purchase
+    Route::get('/tokens/buy', [SubscriptionController::class, 'buyTokensForm'])->name('subscription.tokens.buy');
+    Route::post('/tokens/buy', [SubscriptionController::class, 'buyTokens'])->name('subscription.tokens.buy.process');
+    Route::get('/tokens/buy/success', [SubscriptionController::class, 'buyTokensSuccess'])->name('subscription.tokens.buy.success');
+
     // Groups
     Route::get('/groups', [GroupController::class, 'index'])->name('groups.index');
-    Route::get('/groups/create', [GroupController::class, 'create'])->middleware('user.llm.connected')->name('groups.create');
-    Route::post('/groups', [GroupController::class, 'store'])->middleware('user.llm.connected')->name('groups.store');
+    Route::get('/groups/create', [GroupController::class, 'create'])->name('groups.create');
+    Route::post('/groups', [GroupController::class, 'store'])->name('groups.store');
 
     // Chat
     Route::get('/chat/last', [ChatController::class, 'openLast'])->name('chat.last');

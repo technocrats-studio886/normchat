@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
-    command: sh -lc "php artisan migrate --force && php -S 0.0.0.0:8000 -t public"
+    command: sh -lc "php artisan migrate --force && php -d opcache.enable_cli=1 -d opcache.validate_timestamps=1 -S 0.0.0.0:8000 -t public"
 
   queue:
     build:

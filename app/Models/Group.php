@@ -20,6 +20,8 @@ class Group extends Model
         'password_hash',
         'approval_enabled',
         'share_id',
+        'ai_provider',
+        'ai_model',
     ];
 
     protected $casts = [
@@ -77,5 +79,42 @@ class Group extends Model
     public function subscription(): HasOne
     {
         return $this->hasOne(Subscription::class);
+    }
+
+    public function groupToken(): HasOne
+    {
+        return $this->hasOne(GroupToken::class);
+    }
+
+    public function tokenContributions(): HasMany
+    {
+        return $this->hasMany(GroupTokenContribution::class);
+    }
+
+    public function getModelMultiplier(): float
+    {
+        $provider = $this->ai_provider;
+        $model = $this->ai_model;
+
+        if (! $provider || ! $model) {
+            return 1.0;
+        }
+
+        return (float) config("ai_models.providers.{$provider}.models.{$model}.multiplier", 1.0);
+    }
+
+    public function getModelLabel(): string
+    {
+        $provider = $this->ai_provider;
+        $model = $this->ai_model;
+
+        if (! $provider || ! $model) {
+            return 'Belum dipilih';
+        }
+
+        $providerLabel = config("ai_models.providers.{$provider}.label", ucfirst($provider));
+        $modelLabel = config("ai_models.providers.{$provider}.models.{$model}.label", $model);
+
+        return "{$providerLabel} - {$modelLabel}";
     }
 }

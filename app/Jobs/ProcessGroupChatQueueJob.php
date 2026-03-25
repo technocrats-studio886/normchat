@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Events\MessageSent;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
+use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -75,24 +76,26 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             return;
         }
 
-        $group = Group::query()->with(['aiConnections' => fn ($q) => $q->latest('created_at')])->find($message->group_id);
+        $group = Group::query()
+            ->with(['groupToken'])
+            ->find($message->group_id);
         if (! $group) {
             return;
         }
 
-        // Resolve owner and provider source (group-level connection preferred)
         $owner = User::find($group->owner_id);
         if (! $owner) {
             return;
         }
 
-        $activeConnection = $group->aiConnections->first();
-        $provider = $this->normalizeProvider($activeConnection?->provider ?: $owner->auth_provider);
+        // Use group's configured provider/model
+        $provider = $group->ai_provider ?: $this->normalizeProvider($owner->auth_provider);
+        $model = $group->ai_model ?: config("ai_models.defaults.{$provider}");
+        $multiplier = $group->getModelMultiplier();
         $content = strtolower((string) $message->content);
 
         // Check if message mentions AI
         $triggers = $this->buildMentionTriggers($provider);
-
         $isAiRequest = false;
         foreach ($triggers as $trigger) {
             if (str_contains($content, $trigger)) {
@@ -105,6 +108,20 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             return;
         }
 
+        // Check token balance before calling AI
+        $groupToken = $group->groupToken;
+        if (! $groupToken || $groupToken->remaining_tokens <= 0) {
+            $this->sendSystemMessage($group, 'Saldo token grup habis. Minta owner atau member untuk top-up normkredit agar bisa menggunakan AI.');
+            return;
+        }
+
+        // Estimate minimum needed (at least 1000 tokens * multiplier)
+        $minEstimate = (int) ceil(1000 * $multiplier);
+        if ($groupToken->remaining_tokens < $minEstimate) {
+            $this->sendSystemMessage($group, 'Saldo token grup tidak cukup untuk request ini. Sisa: ' . $groupToken->formattedRemaining() . ' token. Top-up normkredit untuk melanjutkan.');
+            return;
+        }
+
         $recentMessages = Message::query()
             ->where('group_id', $group->id)
             ->orderByDesc('id')
@@ -113,18 +130,42 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             ->reverse()
             ->values();
 
-        $credentials = $this->resolveCredentials($activeConnection, $owner);
+        $credentials = $this->resolveCredentials($owner);
 
         $responseText = null;
+        $usageTokens = 0;
+
         if ($credentials !== null) {
-            $responseText = $this->generateProviderResponse($provider, $credentials, $message->content, $recentMessages->all());
+            [$responseText, $usageTokens] = $this->generateProviderResponse(
+                $provider, $model, $credentials, $message->content, $recentMessages->all()
+            );
         }
 
         if (! $responseText) {
             $responseText = sprintf(
-                'Provider %s aktif, tapi respons AI belum tersedia saat ini. Coba lagi beberapa saat atau perbarui koneksi AI owner.',
+                'Provider %s aktif, tapi respons AI belum tersedia saat ini. Coba lagi beberapa saat.',
                 strtoupper($provider)
             );
+            // Don't charge tokens if response failed
+            $usageTokens = 0;
+        }
+
+        // Consume tokens with multiplier
+        if ($usageTokens > 0 && $groupToken) {
+            $effectiveTokens = $groupToken->consumeTokens($usageTokens, $multiplier);
+
+            if ($effectiveTokens === false) {
+                // Not enough tokens - still send the response but warn
+                $remaining = $groupToken->formattedRemaining();
+                $needed = number_format((int) ceil($usageTokens * $multiplier));
+                $responseText .= "\n\n---\nSaldo token grup tidak mencukupi. Sisa: {$remaining} token, dibutuhkan: {$needed} token. Top-up normkredit untuk melanjutkan penggunaan AI.";
+
+                // Force consume whatever is left
+                if ($groupToken->remaining_tokens > 0) {
+                    $groupToken->increment('used_tokens', $groupToken->remaining_tokens);
+                    $groupToken->update(['remaining_tokens' => 0]);
+                }
+            }
         }
 
         $aiMessage = Message::create([
@@ -136,7 +177,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
         event(new MessageSent($message->group_id, [
             'id' => $aiMessage->id,
-            'message_type' => $aiMessage->message_type,
+            'message_type' => $aiMessage->message_type ?? 'text',
             'sender_type' => $aiMessage->sender_type,
             'sender_id' => $aiMessage->sender_id,
             'sender_name' => 'NormAI',
@@ -145,6 +186,29 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'attachment_mime' => null,
             'attachment_original_name' => null,
             'created_at' => optional($aiMessage->created_at)->toIso8601String(),
+        ]));
+    }
+
+    private function sendSystemMessage(Group $group, string $text): void
+    {
+        $msg = Message::create([
+            'group_id' => $group->id,
+            'sender_type' => 'ai',
+            'sender_id' => null,
+            'content' => $text,
+        ]);
+
+        event(new MessageSent($group->id, [
+            'id' => $msg->id,
+            'message_type' => 'text',
+            'sender_type' => 'ai',
+            'sender_id' => null,
+            'sender_name' => 'NormAI',
+            'content' => $msg->content,
+            'attachment_url' => null,
+            'attachment_mime' => null,
+            'attachment_original_name' => null,
+            'created_at' => optional($msg->created_at)->toIso8601String(),
         ]));
     }
 
@@ -172,15 +236,8 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         };
     }
 
-    private function resolveCredentials($activeConnection, User $owner): ?string
+    private function resolveCredentials(User $owner): ?string
     {
-        if ($activeConnection) {
-            $token = $activeConnection->decryptedAccessToken();
-            if ($token !== null && $token !== '') {
-                return $token;
-            }
-        }
-
         if (! $owner->hasValidCredentials()) {
             return null;
         }
@@ -188,46 +245,54 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         return $owner->getAccessToken() ?? $owner->getApiKey();
     }
 
-    private function generateProviderResponse(string $provider, string $credential, string $latestPrompt, array $recentMessages): ?string
+    /**
+     * Returns [responseText, actualTokensUsed]
+     */
+    private function generateProviderResponse(string $provider, string $model, string $credential, string $latestPrompt, array $recentMessages): array
     {
         try {
             return match ($provider) {
-                'openai' => $this->callOpenAi($credential, $latestPrompt, $recentMessages),
-                'claude' => $this->callClaude($credential, $latestPrompt, $recentMessages),
-                'gemini' => $this->callGemini($credential, $latestPrompt, $recentMessages),
-                default => null,
+                'openai' => $this->callOpenAi($credential, $model, $latestPrompt, $recentMessages),
+                'claude' => $this->callClaude($credential, $model, $latestPrompt, $recentMessages),
+                'gemini' => $this->callGemini($credential, $model, $latestPrompt, $recentMessages),
+                default => [null, 0],
             };
         } catch (Throwable $e) {
             Log::error('AI provider call failed.', [
                 'provider' => $provider,
+                'model' => $model,
                 'error' => $e->getMessage(),
             ]);
 
-            return null;
+            return [null, 0];
         }
     }
 
-    private function callOpenAi(string $token, string $latestPrompt, array $recentMessages): ?string
+    private function callOpenAi(string $token, string $model, string $latestPrompt, array $recentMessages): array
     {
         $messages = $this->toChatMessages($recentMessages, $latestPrompt);
 
         $response = Http::withToken($token)
             ->timeout(30)
             ->post('https://api.openai.com/v1/chat/completions', [
-                'model' => env('OPENAI_CHAT_MODEL', 'gpt-4o-mini'),
+                'model' => $model,
                 'messages' => $messages,
                 'temperature' => 0.4,
             ]);
 
         if ($response->failed()) {
             Log::warning('OpenAI response failed.', ['status' => $response->status(), 'body' => $response->body()]);
-            return null;
+            return [null, 0];
         }
 
-        return $response->json('choices.0.message.content');
+        $text = $response->json('choices.0.message.content');
+        $usage = $response->json('usage', []);
+        $totalTokens = (int) ($usage['total_tokens'] ?? 0);
+
+        return [$text, $totalTokens];
     }
 
-    private function callClaude(string $token, string $latestPrompt, array $recentMessages): ?string
+    private function callClaude(string $token, string $model, string $latestPrompt, array $recentMessages): array
     {
         $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt);
 
@@ -237,7 +302,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
                 'anthropic-version' => '2023-06-01',
             ])
             ->post('https://api.anthropic.com/v1/messages', [
-                'model' => env('ANTHROPIC_CHAT_MODEL', 'claude-3-5-sonnet-latest'),
+                'model' => $model,
                 'max_tokens' => 700,
                 'messages' => [
                     ['role' => 'user', 'content' => $prompt],
@@ -246,30 +311,33 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
         if ($response->failed()) {
             Log::warning('Anthropic response failed.', ['status' => $response->status(), 'body' => $response->body()]);
-            return null;
+            return [null, 0];
         }
 
         $parts = $response->json('content', []);
-        if (! is_array($parts)) {
-            return null;
-        }
-
-        foreach ($parts as $part) {
-            if (($part['type'] ?? null) === 'text' && ! empty($part['text'])) {
-                return (string) $part['text'];
+        $text = null;
+        if (is_array($parts)) {
+            foreach ($parts as $part) {
+                if (($part['type'] ?? null) === 'text' && ! empty($part['text'])) {
+                    $text = (string) $part['text'];
+                    break;
+                }
             }
         }
 
-        return null;
+        $usage = $response->json('usage', []);
+        $totalTokens = (int) (($usage['input_tokens'] ?? 0) + ($usage['output_tokens'] ?? 0));
+
+        return [$text, $totalTokens];
     }
 
-    private function callGemini(string $token, string $latestPrompt, array $recentMessages): ?string
+    private function callGemini(string $token, string $model, string $latestPrompt, array $recentMessages): array
     {
         $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt);
 
         $response = Http::withToken($token)
             ->timeout(30)
-            ->post('https://generativelanguage.googleapis.com/v1beta/models/'.env('GEMINI_CHAT_MODEL', 'gemini-2.0-flash').':generateContent', [
+            ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
                 'contents' => [
                     [
                         'role' => 'user',
@@ -285,10 +353,14 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
         if ($response->failed()) {
             Log::warning('Gemini response failed.', ['status' => $response->status(), 'body' => $response->body()]);
-            return null;
+            return [null, 0];
         }
 
-        return $response->json('candidates.0.content.parts.0.text');
+        $text = $response->json('candidates.0.content.parts.0.text');
+        $usageMetadata = $response->json('usageMetadata', []);
+        $totalTokens = (int) (($usageMetadata['promptTokenCount'] ?? 0) + ($usageMetadata['candidatesTokenCount'] ?? 0));
+
+        return [$text, $totalTokens];
     }
 
     private function toChatMessages(array $recentMessages, string $latestPrompt): array

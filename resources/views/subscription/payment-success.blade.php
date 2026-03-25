@@ -10,19 +10,40 @@
             </svg>
         </div>
 
-        <h1 class="mt-6 text-center font-display text-3xl font-extrabold text-emerald-900">Payment Success</h1>
-        <p class="mx-auto mt-3 max-w-[28ch] text-center text-sm text-emerald-700">
-            Langganan aktif. Anda langsung masuk ke home untuk mulai membuat grup.
+        <h1 class="mt-6 text-center font-display text-3xl font-extrabold text-emerald-900">Payment Success!</h1>
+        <p class="mx-auto mt-3 max-w-xs text-center text-sm text-emerald-700">
+            Langganan aktif! Sekarang buat grup pertama kamu agar normkredit bisa langsung dialokasikan.
         </p>
 
-        <a href="{{ route('groups.index') }}" class="btn-cta mt-auto py-4">
-            Masuk ke Home
+        <div class="mx-auto mt-6 w-full max-w-sm rounded-2xl bg-white/80 p-5 shadow-sm">
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-emerald-700">Paket</span>
+                    <span class="font-bold text-emerald-900">Normchat Pro</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-emerald-700">Normkredit</span>
+                    <span class="font-bold text-emerald-900">10 normkredit (10.000 token)</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-emerald-700">Status</span>
+                    <span class="font-bold text-emerald-600">Aktif</span>
+                </div>
+            </div>
+        </div>
+
+        <a href="{{ route('groups.create') }}" class="btn-cta mt-auto py-4">
+            Buat Group Sekarang
         </a>
+
+        <p class="mt-3 text-center text-[11px] text-emerald-600/70">
+            Normkredit akan dialokasikan ke grup saat grup dibuat.
+        </p>
 
         <script>
             setTimeout(() => {
-                window.location.href = @json(route('groups.index'));
-            }, 2000);
+                window.location.href = @json(route('groups.create'));
+            }, 3000);
         </script>
     </section>
 @endsection

@@ -29,7 +29,7 @@ class SettingsController extends Controller
     {
         $this->authorize('manageSettings', $group);
 
-        $group->load(['aiConnections', 'exports', 'backups.creator']);
+        $group->load(['groupToken', 'exports', 'backups.creator']);
 
         $auditLogs = AuditLog::query()
             ->where('group_id', $group->id)
@@ -90,8 +90,6 @@ class SettingsController extends Controller
     public function aiPersonaEditor(Group $group): View
     {
         $this->authorize('manageSettings', $group);
-
-        $group->load(['aiConnections' => fn ($query) => $query->latest('created_at')]);
 
         return view('settings.ai-persona', [
             'group' => $group,

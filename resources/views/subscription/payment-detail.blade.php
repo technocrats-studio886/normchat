@@ -11,53 +11,21 @@
 
         {{-- Account Info --}}
         <div class="panel-card mt-6 rounded-2xl p-5 space-y-4">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nama</p>
-                <p class="mt-0.5 text-sm font-bold text-slate-900">{{ $user->name }}</p>
-            </div>
-
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Akun AI Provider</p>
-                <div class="mt-1 flex items-center gap-2">
-                    @php
-                        $providerLabel = match($provider) {
-                            'chatgpt' => 'ChatGPT (OpenAI)',
-                            'claude' => 'Claude (Anthropic)',
-                            'gemini' => 'Gemini (Google)',
-                            default => ucfirst($provider),
-                        };
-                        $providerColor = match($provider) {
-                            'chatgpt' => 'bg-[#10A37F]',
-                            'claude' => 'bg-[#D97706]',
-                            'gemini' => 'bg-[#4285F4]',
-                            default => 'bg-slate-500',
-                        };
-                        $providerLogoPng = "provider-logos/{$provider}.png";
-                        $providerLogoSvg = "provider-logos/{$provider}.svg";
-                        $providerLogoFile = file_exists(public_path($providerLogoPng))
-                            ? $providerLogoPng
-                            : (file_exists(public_path($providerLogoSvg)) ? $providerLogoSvg : null);
-                        $isApiKeyAccount = in_array($provider, ['chatgpt', 'claude'], true)
-                            && str_ends_with((string) $email, '@normchat.local');
-                        $identityText = $isApiKeyAccount
-                            ? 'Email akun tidak tersedia dari API key provider'
-                            : $email;
-                    @endphp
-                    @if($providerLogoFile)
-                        <img src="{{ asset($providerLogoFile) }}" alt="{{ $providerLabel }} Logo" class="h-6 w-6 rounded-md object-contain" />
-                    @else
-                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md {{ $providerColor }} text-white">
-                            <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 24C12 24 12 12 24 12C12 12 12 0 12 0C12 0 12 12 0 12C12 12 12 24 12 24Z"/>
-                            </svg>
-                        </span>
-                    @endif
-                    <div>
-                        <p class="text-sm font-semibold text-slate-700">{{ $providerLabel }}</p>
-                        <p class="text-xs text-slate-400">{{ $identityText }}</p>
+            <div class="flex items-center gap-3">
+                @if($user->avatar_url)
+                    <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-10 w-10 rounded-full object-cover" referrerpolicy="no-referrer" />
+                @else
+                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
+                        {{ strtoupper(substr($user->name, 0, 1)) }}
                     </div>
-                    <span class="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">Connected</span>
+                @endif
+                <div>
+                    <p class="text-sm font-bold text-slate-900">{{ $user->name }}</p>
+                    <p class="text-xs text-slate-500">{{ $user->email }}</p>
                 </div>
+                <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+                    Google SSO
+                </span>
             </div>
 
             <div>
@@ -76,6 +44,14 @@
                     <p class="text-xs text-slate-400">Bulanan</p>
                     <p class="text-xl font-extrabold text-slate-900">Rp{{ number_format($planPrice, 0, ',', '.') }}</p>
                 </div>
+            </div>
+
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p class="text-xs font-semibold text-emerald-700">Termasuk dalam paket:</p>
+                <ul class="mt-1 space-y-0.5 text-xs text-emerald-600">
+                    <li>&#10003; Full akses semua fitur</li>
+                    <li>&#10003; 1 normkredit ({{ number_format($includedTokens) }} token AI, dialokasikan ke grup)</li>
+                </ul>
             </div>
         </div>
 

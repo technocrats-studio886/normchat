@@ -87,71 +87,45 @@
             </div>
         </div>
 
-        {{-- AI Management section --}}
+        {{-- AI & Normkredit Info --}}
         <div id="ai-provider" class="mt-8">
-            <h2 class="mb-4 text-xl font-extrabold text-slate-900 font-display">Add AI Provider</h2>
+            <h2 class="mb-4 text-xl font-extrabold text-slate-900 font-display">AI & Normkredit</h2>
 
             @php
-                $activeGroupAi = $group->aiConnections->first();
+                $providerLabel = config("ai_models.providers.{$group->ai_provider}.label", 'Belum dipilih');
+                $modelLabel = config("ai_models.providers.{$group->ai_provider}.models.{$group->ai_model}.label", $group->ai_model ?? '-');
+                $multiplier = $group->getModelMultiplier();
+                $gt = $group->groupToken;
+                $credits = $gt ? $gt->credits : 0;
             @endphp
 
-            @if ((int) $group->owner_id === (int) auth()->id())
-                <form method="POST" action="{{ route('settings.ai', $group) }}" class="panel-card mb-4 space-y-3 px-4 py-4">
-                    @csrf
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Konfigurasi provider utama grup</p>
-                    <select name="provider_name" required class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none">
-                        <option value="">Pilih Provider</option>
-                        <option value="openai" @selected(old('provider_name', $activeGroupAi?->provider) === 'openai')>OpenAI</option>
-                        <option value="claude" @selected(old('provider_name', $activeGroupAi?->provider) === 'claude')>Claude</option>
-                        <option value="gemini" @selected(old('provider_name', $activeGroupAi?->provider) === 'gemini')>Gemini</option>
-                    </select>
-                    <input type="password" name="access_token" placeholder="Masukkan token API owner" required class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none" />
-                    <button type="submit" class="btn-cta py-3 normal-case tracking-normal">Simpan Provider Grup</button>
-                </form>
-            @endif
-
             <div class="space-y-3">
-                @php
-                    $providers = [
-                        ['key' => 'openai', 'label' => 'OpenAI'],
-                        ['key' => 'claude', 'label' => 'Claude'],
-                        ['key' => 'gemini', 'label' => 'Gemini'],
-                    ];
-                @endphp
-                @foreach($providers as $provider)
-                    @php
-                        $connected = $group->aiConnections->first(fn ($ai) => $ai->provider === $provider['key']);
-                    @endphp
-                    <div class="panel-card flex items-center justify-between gap-3 px-4 py-3.5">
-                        <div>
-                            <span class="text-sm font-semibold text-slate-900">{{ $provider['label'] }}</span>
-                            <p class="mt-0.5 text-xs {{ $connected ? 'text-emerald-600' : 'text-slate-500' }}">
-                                {{ $connected ? 'Connected' : 'Belum terhubung' }}
-                            </p>
-                        </div>
-
-                        <span class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                            {{ $connected ? 'Aktif dipakai grup' : 'Tidak aktif' }}
-                        </span>
+                <div class="panel-card px-4 py-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-700">Provider</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $providerLabel }}</span>
                     </div>
-                @endforeach
+                    <div class="mt-2 flex items-center justify-between">
+                        <span class="text-sm text-slate-700">Model</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $modelLabel }} <span class="text-xs font-semibold text-blue-500">({{ $multiplier }}x)</span></span>
+                    </div>
+                </div>
+
+                <div class="panel-card px-4 py-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-700">Saldo Normkredit</span>
+                        <span class="text-sm font-bold {{ $credits > 0 ? 'text-emerald-600' : 'text-rose-500' }}">{{ number_format($credits, 1) }} normkredit</span>
+                    </div>
+                    <p class="mt-0.5 text-[11px] text-slate-400">1 normkredit = 1.000 token = Rp1.000</p>
+                    <a href="{{ route('subscription.tokens.buy') }}" class="mt-2 block text-xs font-semibold text-blue-500 hover:text-blue-700">
+                        Top-up Normkredit &rarr;
+                    </a>
+                </div>
 
                 <div class="rounded-xl bg-blue-50 px-4 py-3 text-xs text-blue-600">
-                    Semua member grup wajib login dengan provider yang aktif dipakai owner pada grup ini.
+                    Normkredit milik grup. Semua member bisa patungan top-up.
                 </div>
             </div>
-
-            {{-- Connected AIs --}}
-            @if($group->aiConnections && $group->aiConnections->count() > 0)
-                <div class="mt-3 space-y-2">
-                    @foreach ($group->aiConnections as $ai)
-                        <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-sm">
-                            <span class="font-semibold">{{ strtoupper($ai->provider) }}</span>
-                            <span class="text-xs text-emerald-600">Active</span>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
         </div>
     </section>
 @endsection

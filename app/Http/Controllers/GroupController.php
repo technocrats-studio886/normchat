@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Group;
 use App\Models\GroupMember;
+use App\Models\GroupToken;
+use App\Models\GroupTokenContribution;
 use App\Models\Role;
 use App\Models\Subscription;
 use Illuminate\Http\RedirectResponse;
@@ -15,6 +17,10 @@ use Illuminate\View\View;
 
 class GroupController extends Controller
 {
+    private const INCLUDED_CREDITS = 10; // 10 normkredit included in subscription
+    private const TOKENS_PER_CREDIT = 1_000;
+    private const PLAN_PRICE = 25000;
+
     public function index(): View|RedirectResponse
     {
         $user = Auth::user();
@@ -22,7 +28,7 @@ class GroupController extends Controller
         $groups = Group::query()
             ->where('owner_id', $user->id)
             ->orWhereHas('members', fn ($q) => $q->where('user_id', $user->id)->where('status', 'active'))
-            ->with(['aiConnections', 'members'])
+            ->with(['members', 'groupToken'])
             ->withCount('members')
             ->latest()
             ->get();
@@ -34,12 +40,7 @@ class GroupController extends Controller
     {
         $user = Auth::user();
 
-        if (! $user->aiConnection || $user->aiConnection->decryptedAccessToken() === null) {
-            return redirect()->route('login')
-                ->withErrors(['llm' => 'You must connect an LLM before creating a group']);
-        }
-
-        // 4.2 & 4.5: Must have active subscription to create group
+        // Must have paid subscription to create group
         $hasActive = Subscription::query()
             ->whereHas('group', fn ($q) => $q->where('owner_id', $user->id))
             ->where('status', 'active')
@@ -55,18 +56,29 @@ class GroupController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // Build valid model list for validation
+        $validModels = [];
+        foreach (config('ai_models.providers', []) as $providerKey => $provider) {
+            foreach (array_keys($provider['models'] ?? []) as $modelKey) {
+                $validModels[] = $modelKey;
+            }
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:500'],
             'password' => ['required', 'string', 'min:4', 'max:100'],
             'approval_enabled' => ['nullable'],
+            'ai_provider' => ['required', 'string', 'in:' . implode(',', array_keys(config('ai_models.providers', [])))],
+            'ai_model' => ['required', 'string', 'in:' . implode(',', $validModels)],
         ]);
 
         $user = Auth::user();
 
-        if (! $user->aiConnection || $user->aiConnection->decryptedAccessToken() === null) {
-            return redirect()->route('login')
-                ->withErrors(['llm' => 'You must connect an LLM before creating a group']);
+        // Verify the selected model belongs to the selected provider
+        $providerModels = config("ai_models.providers.{$validated['ai_provider']}.models", []);
+        if (! array_key_exists($validated['ai_model'], $providerModels)) {
+            return back()->withErrors(['ai_model' => 'Model tidak valid untuk provider yang dipilih.'])->withInput();
         }
 
         $group = Group::create([
@@ -75,6 +87,8 @@ class GroupController extends Controller
             'owner_id' => $user->id,
             'password_hash' => Hash::make($validated['password']),
             'approval_enabled' => (bool) ($validated['approval_enabled'] ?? false),
+            'ai_provider' => $validated['ai_provider'],
+            'ai_model' => $validated['ai_model'],
         ]);
 
         $ownerRole = Role::firstWhere('key', 'owner');
@@ -92,11 +106,28 @@ class GroupController extends Controller
             'plan_name' => 'normchat-pro',
             'status' => 'active',
             'billing_cycle' => 'monthly',
-            'main_price' => 15000,
+            'main_price' => self::PLAN_PRICE,
             'included_seats' => 2,
         ]);
 
-        session()->forget('subscription_paid');
+        // Allocate subscription credits to the group
+        $includedTokens = self::INCLUDED_CREDITS * self::TOKENS_PER_CREDIT;
+        GroupToken::create([
+            'group_id' => $group->id,
+            'total_tokens' => $includedTokens,
+            'used_tokens' => 0,
+            'remaining_tokens' => $includedTokens,
+        ]);
+
+        GroupTokenContribution::create([
+            'group_id' => $group->id,
+            'user_id' => $user->id,
+            'source' => 'subscription',
+            'token_amount' => $includedTokens,
+            'price_paid' => self::PLAN_PRICE,
+        ]);
+
+        session()->forget(['subscription_paid', 'subscription_tokens']);
 
         AuditLog::create([
             'group_id' => $group->id,
@@ -104,19 +135,26 @@ class GroupController extends Controller
             'action' => 'group.create',
             'target_type' => Group::class,
             'target_id' => $group->id,
+            'metadata_json' => [
+                'ai_provider' => $validated['ai_provider'],
+                'ai_model' => $validated['ai_model'],
+            ],
             'created_at' => now(),
         ]);
 
-        return redirect()->route('groups.index')->with('success', 'Group "' . $group->name . '" berhasil dibuat!');
+        return redirect()->route('chat.show', $group)->with('success', 'Group "' . $group->name . '" berhasil dibuat!');
     }
 
-    // ── Join via share ID: show form ───────────────────────
+    private const SEAT_PRICE = 4000;
+    private const MIN_PATUNGAN = 10000;
+    private const PRICE_PER_NORMKREDIT = 1000;
+
+    // ── Join via share ID: show patungan form ───────────────
 
     public function showJoin(string $shareId): View|RedirectResponse
     {
-        $group = Group::where('share_id', $shareId)->firstOrFail();
+        $group = Group::where('share_id', $shareId)->with('groupToken')->firstOrFail();
 
-        // If already a member, redirect to chat
         $existing = GroupMember::where('group_id', $group->id)
             ->where('user_id', Auth::id())
             ->where('status', 'active')
@@ -132,21 +170,22 @@ class GroupController extends Controller
         return view('groups.join', [
             'group' => $group,
             'alreadyMember' => false,
+            'seatPrice' => self::SEAT_PRICE,
+            'minPatungan' => self::MIN_PATUNGAN,
+            'pricePerNormkredit' => self::PRICE_PER_NORMKREDIT,
         ]);
     }
 
-    // ── Join via share ID: verify password, auto member ──────
+    // ── Join via share ID: pay + join ──────────────────────
 
     public function joinViaShareId(Request $request, string $shareId): RedirectResponse
     {
         $group = Group::where('share_id', $shareId)->firstOrFail();
 
-        // Owner → straight to chat
         if ((int) $group->owner_id === (int) Auth::id()) {
             return redirect()->route('chat.show', $group);
         }
 
-        // Already active member → straight to chat
         $existing = GroupMember::where('group_id', $group->id)
             ->where('user_id', Auth::id())
             ->where('status', 'active')
@@ -157,33 +196,73 @@ class GroupController extends Controller
                 ->with('info', 'Anda sudah menjadi member group ini.');
         }
 
-        $request->validate(['password' => 'required|string']);
+        $request->validate([
+            'password' => 'required|string',
+            'patungan_amount' => ['required', 'integer', 'min:' . self::MIN_PATUNGAN],
+        ]);
 
         if (! Hash::check($request->input('password'), $group->password_hash)) {
-            return back()->withErrors(['password' => 'Password grup salah.']);
+            return back()->withErrors(['password' => 'Password grup salah.'])->withInput();
         }
 
-        // Auto-join as member
+        $user = Auth::user();
+        $patunganAmount = (int) $request->input('patungan_amount');
+        $totalPay = $patunganAmount + self::SEAT_PRICE;
+
+        // Calculate normkredit from patungan
+        $normkredit = $patunganAmount / self::PRICE_PER_NORMKREDIT;
+        $tokenAmount = (int) ($normkredit * self::TOKENS_PER_CREDIT);
+
+        // Add tokens to group
+        $groupToken = GroupToken::firstOrCreate(
+            ['group_id' => $group->id],
+            ['total_tokens' => 0, 'used_tokens' => 0, 'remaining_tokens' => 0]
+        );
+        $groupToken->addTokens($tokenAmount);
+
+        // Record contribution
+        GroupTokenContribution::create([
+            'group_id' => $group->id,
+            'user_id' => $user->id,
+            'source' => 'patungan',
+            'token_amount' => $tokenAmount,
+            'price_paid' => $totalPay,
+            'payment_reference' => 'JOIN-' . strtoupper(\Illuminate\Support\Str::random(10)),
+        ]);
+
+        // Add seat to subscription
+        $subscription = $group->subscription;
+        if ($subscription) {
+            $subscription->included_seats = (int) $subscription->included_seats + 1;
+            $subscription->save();
+        }
+
+        // Join as member
         $memberRole = Role::firstWhere('key', 'member')
             ?: Role::firstWhere('key', 'admin')
             ?: Role::firstWhere('key', 'owner');
 
         GroupMember::updateOrCreate(
-            ['group_id' => $group->id, 'user_id' => Auth::id()],
+            ['group_id' => $group->id, 'user_id' => $user->id],
             ['role_id' => $memberRole?->id, 'status' => 'active', 'joined_at' => now()]
         );
 
         AuditLog::create([
             'group_id' => $group->id,
-            'actor_id' => Auth::id(),
+            'actor_id' => $user->id,
             'action' => 'group.member_joined',
             'target_type' => Group::class,
             'target_id' => $group->id,
+            'metadata_json' => [
+                'patungan' => $patunganAmount,
+                'seat_fee' => self::SEAT_PRICE,
+                'normkredit' => $normkredit,
+            ],
             'created_at' => now(),
         ]);
 
         return redirect()->route('chat.show', $group)
-            ->with('success', 'Berhasil bergabung ke group "' . $group->name . '"!');
+            ->with('success', 'Berhasil bergabung ke group "' . $group->name . '"! ' . number_format($normkredit, 0) . ' normkredit ditambahkan ke grup.');
     }
 
     public function promoteMember(Request $request, Group $group, GroupMember $member): RedirectResponse
@@ -204,7 +283,7 @@ class GroupController extends Controller
 
         $targetRole = Role::firstWhere('key', $validated['role']);
         if (! $targetRole) {
-            return back()->withErrors(['member' => 'Role tujuan tidak ditemukan. Jalankan seeder roles terbaru.']);
+            return back()->withErrors(['member' => 'Role tujuan tidak ditemukan.']);
         }
 
         $member->role_id = $targetRole->id;

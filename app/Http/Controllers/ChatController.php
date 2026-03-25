@@ -60,7 +60,7 @@ class ChatController extends Controller
 
         session(['last_chat_group_id' => $group->id]);
 
-        $group->load(['owner', 'members.user', 'aiConnections']);
+        $group->load(['owner', 'members.user', 'groupToken']);
 
         $messages = Message::query()
             ->where('group_id', $group->id)
@@ -71,16 +71,14 @@ class ChatController extends Controller
             ->reverse()
             ->values();
 
-        $activeGroupAi = $group->aiConnections->first();
-        $ownerProvider = $activeGroupAi ? ucfirst((string) $activeGroupAi->provider) : null;
-        $mentionSuggestions = $this->buildMentionSuggestions($group, $activeGroupAi?->provider);
+        $ownerProvider = $group->ai_provider ? ucfirst((string) $group->ai_provider) : null;
+        $mentionSuggestions = $this->buildMentionSuggestions($group, $group->ai_provider);
 
         return view('chat.show', [
             'group' => $group,
             'messages' => $messages,
             'ownerProvider' => $ownerProvider,
             'activeAi' => $ownerProvider ? collect([$ownerProvider]) : collect(),
-            'activeGroupAi' => $activeGroupAi,
             'mentionSuggestions' => $mentionSuggestions,
         ]);
     }
@@ -278,12 +276,7 @@ class ChatController extends Controller
             ])
             ->values();
 
-        $providerKey = match (strtolower((string) $activeProvider)) {
-            'chatgpt' => 'openai',
-            'anthropic' => 'claude',
-            'google' => 'gemini',
-            default => strtolower((string) $activeProvider),
-        };
+        $providerKey = strtolower((string) $activeProvider);
         $aiMentions = match ($providerKey) {
             'openai' => [
                 ['type' => 'ai', 'label' => 'AI (OpenAI)', 'insert' => '@ai'],
