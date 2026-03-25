@@ -7,7 +7,7 @@ set -Eeuo pipefail
 # Example:
 #   ./deploy-server.sh main
 
-BRANCH="${1:-main}"
+BRANCH="${1:-neon}"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log() {
