@@ -2,51 +2,57 @@
 
 @section('content')
     <section class="page-shell pt-4">
-        <h1 class="mb-5 text-xl font-extrabold text-slate-900 font-display">Owner Controls</h1>
+        <h1 class="mb-5 text-xl font-extrabold text-slate-900 font-display">Group Settings</h1>
 
         <div class="space-y-3">
-            {{-- Edit Group --}}
+            {{-- Group Info --}}
             <div class="panel-card px-4 py-3.5">
-                <h3 class="text-sm font-bold text-slate-900">Edit Group</h3>
-                <p class="text-xs text-slate-500">Ubah nama dan deskripsi group</p>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">{{ $group->name }}</h3>
+                        <p class="text-xs text-slate-500">{{ $group->description ?: 'Tidak ada deskripsi' }}</p>
+                    </div>
+                    <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Active</span>
+                </div>
             </div>
 
             {{-- Approve Join Request --}}
             <div class="panel-card flex items-center justify-between px-4 py-3.5">
-                <span class="text-sm text-slate-700">Approve Join Request</span>
-                <span class="text-xs font-bold {{ $group->approval_enabled ? 'text-emerald-600' : 'text-slate-400' }}">
+                <div>
+                    <span class="text-sm text-slate-700">Approve Join Request</span>
+                    <p class="text-[11px] text-slate-400">Wajib approve sebelum member baru masuk</p>
+                </div>
+                <span class="rounded-full px-2.5 py-1 text-[10px] font-bold {{ $group->approval_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">
                     {{ $group->approval_enabled ? 'ON' : 'OFF' }}
                 </span>
             </div>
 
-            {{-- Transfer Ownership --}}
-            <a href="#" class="panel-card flex items-center justify-between px-4 py-3.5">
-                <span class="text-sm text-slate-700">Transfer Ownership</span>
-                <span class="text-xs text-slate-400">›</span>
-            </a>
-
             {{-- History & Export --}}
             <a href="{{ route('settings.history', $group) }}" class="panel-card flex items-center justify-between px-4 py-3.5">
-                <span class="text-sm text-slate-700">History & Export</span>
-                <span class="text-xs text-slate-400">›</span>
+                <div>
+                    <span class="text-sm text-slate-700">History & Export</span>
+                    <p class="text-[11px] text-slate-400">Backup, export PDF/DOCX</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
             </a>
 
             {{-- Seat Management --}}
             <a href="{{ route('settings.seats', $group) }}" class="panel-card flex items-center justify-between px-4 py-3.5">
-                <span class="text-sm text-slate-700">Seat Management</span>
-                <span class="text-xs text-slate-400">›</span>
+                <div>
+                    <span class="text-sm text-slate-700">Seat Management</span>
+                    <p class="text-[11px] text-slate-400">Kelola kapasitas anggota grup</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
             </a>
 
             {{-- AI Persona Editor --}}
             <a href="{{ route('settings.ai.persona', $group) }}" class="panel-card flex items-center justify-between px-4 py-3.5">
-                <span class="text-sm text-slate-700">AI Persona Editor</span>
-                <span class="text-xs text-slate-400">›</span>
+                <div>
+                    <span class="text-sm text-slate-700">AI Persona Editor</span>
+                    <p class="text-[11px] text-slate-400">Atur gaya bicara AI untuk grup ini</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
             </a>
-
-            {{-- Delete Group --}}
-            <button class="w-full rounded-xl bg-rose-50 py-3.5 text-center text-sm font-semibold text-red-500 transition hover:bg-rose-100">
-                Delete Group
-            </button>
         </div>
 
         {{-- History & Export section --}}
@@ -57,7 +63,7 @@
                 @forelse ($group->backups as $backup)
                     <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
                         <h3 class="text-sm font-bold text-slate-900">Snapshot #{{ $backup->id }}</h3>
-                        <p class="text-xs text-slate-500">{{ $backup->created_at?->diffForHumans() }} • by {{ $backup->creator->name ?? 'System' }}</p>
+                        <p class="text-xs text-slate-500">{{ $backup->created_at?->diffForHumans() }} &middot; by {{ $backup->creator->name ?? 'System' }}</p>
                     </div>
                 @empty
                     <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
@@ -127,5 +133,7 @@
                 </div>
             </div>
         </div>
+
+        <div class="h-6"></div>
     </section>
 @endsection

@@ -41,4 +41,15 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/auth/google/callback'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Trakteer Payment Gateway
+    |--------------------------------------------------------------------------
+    */
+
+    'trakteer' => [
+        'webhook_token' => env('TRAKTEER_WEBHOOK_TOKEN'),
+        'page_url' => env('TRAKTEER_PAGE_URL', 'https://trakteer.id/normchat'),
+    ],
+
 ];

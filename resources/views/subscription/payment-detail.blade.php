@@ -30,7 +30,7 @@
 
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Metode Pembayaran</p>
-                <p class="mt-0.5 text-sm text-slate-700">Virtual Account (Dummy)</p>
+                <p class="mt-0.5 text-sm text-slate-700">Trakteer (QRIS, VA, E-Wallet)</p>
             </div>
 
             <hr class="border-slate-100" />
@@ -55,17 +55,29 @@
             </div>
         </div>
 
+        @if($pendingPayment)
+            <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p class="text-xs font-semibold text-amber-700">Kamu sudah punya order aktif:</p>
+                <p class="mt-1 font-mono text-sm font-bold text-amber-900">{{ $pendingPayment->order_id }}</p>
+                <p class="mt-1 text-xs text-amber-600">Lanjutkan pembayaran atau buat order baru.</p>
+                <a href="{{ route('subscription.payment.waiting', ['order_id' => $pendingPayment->order_id]) }}"
+                   class="mt-2 inline-block rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700">
+                    Lanjutkan Pembayaran
+                </a>
+            </div>
+        @endif
+
         {{-- Pay Button --}}
         <form method="POST" action="{{ route('subscription.pay') }}" class="mt-6">
             @csrf
             <input type="hidden" name="plan" value="normchat-pro" />
             <button type="submit" class="btn-cta w-full py-4 text-sm font-extrabold uppercase tracking-wide">
-                Bayar Sekarang
+                {{ $pendingPayment ? 'Buat Order Baru' : 'Bayar via Trakteer' }}
             </button>
         </form>
 
         <p class="mt-4 pb-4 text-center text-[11px] text-slate-400">
-            Pembayaran aman. Bisa batal kapan saja.
+            Pembayaran aman melalui Trakteer. Bisa batal kapan saja.
         </p>
     </section>
 @endsection

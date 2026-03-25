@@ -6,8 +6,12 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\TrakteerWebhookController;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
+
+// ── Trakteer Webhook (no CSRF, no auth) ─────────────────────
+Route::post('/webhooks/trakteer', [TrakteerWebhookController::class, 'handle'])->name('webhooks.trakteer');
 
 // ── Public / Auth ────────────────────────────────────────────
 Route::get('/', [SubscriptionController::class, 'landing'])->name('landing');
@@ -30,6 +34,8 @@ Route::middleware('auth')->group(function () {
     // Payment flow
     Route::get('/payment/detail', [SubscriptionController::class, 'paymentDetail'])->name('subscription.payment.detail');
     Route::post('/payment/detail', [SubscriptionController::class, 'pay'])->name('subscription.pay');
+    Route::get('/payment/waiting', [SubscriptionController::class, 'paymentWaiting'])->name('subscription.payment.waiting');
+    Route::get('/payment/status', [SubscriptionController::class, 'paymentStatus'])->name('subscription.payment.status');
     Route::get('/payment/success', [SubscriptionController::class, 'paymentSuccess'])->name('subscription.payment.success');
 
     // Token purchase
@@ -48,11 +54,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/groups/{group}/messages', [ChatController::class, 'store'])->middleware('group.permission')->name('chat.store');
     Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
 
-    // Settings
-    Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->middleware('group.permission')->name('settings.show');
-    Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->middleware('group.permission')->name('settings.history');
-    Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->middleware('group.permission')->name('settings.ai.persona');
-    Route::get('/groups/{group}/settings/seat-management', [SettingsController::class, 'seatManagement'])->middleware('group.permission')->name('settings.seats');
+    // Settings (owner/manage_billing only)
+    Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->middleware('group.permission:manage_billing')->name('settings.show');
+    Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->middleware('group.permission:manage_billing')->name('settings.history');
+    Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->middleware('group.permission:manage_billing')->name('settings.ai.persona');
+    Route::post('/groups/{group}/settings/ai-persona', [SettingsController::class, 'saveAiPersona'])->middleware('group.permission:manage_billing')->name('settings.ai.persona.save');
+    Route::get('/groups/{group}/settings/seat-management', [SettingsController::class, 'seatManagement'])->middleware('group.permission:manage_billing')->name('settings.seats');
     Route::post('/groups/{group}/settings/ai', [SettingsController::class, 'createAiConnection'])->middleware('group.permission:manage_billing')->name('settings.ai');
     Route::post('/groups/{group}/settings/export', [SettingsController::class, 'createExport'])->middleware('group.permission:export_chat')->name('settings.export');
     Route::post('/groups/{group}/settings/backup', [SettingsController::class, 'createBackup'])->middleware('group.permission:recover_history')->name('settings.backup');

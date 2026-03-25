@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Group;
 use App\Models\GroupToken;
 use App\Models\GroupTokenContribution;
+use App\Models\PendingPayment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPayment;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +22,7 @@ class SubscriptionController extends Controller
     private const PRICE_PER_CREDIT = 1000; // Rp1.000 per normkredit (1K token)
     private const ADD_SEAT_PRICE = 4000;
     private const JOIN_MIN_PATUNGAN = 10000; // Rp10.000 minimum patungan join
+    private const PAYMENT_EXPIRY_HOURS = 24;
 
     public function landing(): View
     {
@@ -42,7 +45,13 @@ class SubscriptionController extends Controller
             ->where('status', 'active')
             ->exists();
 
-        if (session('subscription_paid')) {
+        // Check if there's already a paid pending payment (webhook fulfilled)
+        $paidPending = PendingPayment::where('user_id', $user->id)
+            ->where('payment_type', 'subscription')
+            ->where('status', 'paid')
+            ->first();
+
+        if ($paidPending || session('subscription_paid')) {
             return redirect()->route('groups.create');
         }
 
@@ -50,10 +59,19 @@ class SubscriptionController extends Controller
             return redirect()->route('groups.index');
         }
 
+        // Check for existing pending payment (not expired)
+        $existingPending = PendingPayment::where('user_id', $user->id)
+            ->where('payment_type', 'subscription')
+            ->where('status', 'pending')
+            ->where('expires_at', '>', now())
+            ->first();
+
         return view('subscription.payment-detail', [
             'user' => $user,
             'planPrice' => self::PLAN_PRICE,
             'includedTokens' => self::INCLUDED_TOKENS,
+            'pendingPayment' => $existingPending,
+            'trakteerUrl' => config('services.trakteer.page_url'),
         ]);
     }
 
@@ -63,13 +81,88 @@ class SubscriptionController extends Controller
             'plan' => ['required', 'in:normchat-pro'],
         ]);
 
-        // Dummy payment: mark as paid, tokens will be allocated when group is created
-        session([
-            'subscription_paid' => true,
-            'subscription_tokens' => self::INCLUDED_TOKENS,
+        $user = Auth::user();
+
+        // Expire any old pending subscription payments
+        PendingPayment::where('user_id', $user->id)
+            ->where('payment_type', 'subscription')
+            ->where('status', 'pending')
+            ->update(['status' => 'expired']);
+
+        $orderId = 'NC-SUB-' . strtoupper(Str::random(8));
+
+        PendingPayment::create([
+            'user_id' => $user->id,
+            'order_id' => $orderId,
+            'payment_type' => 'subscription',
+            'expected_amount' => self::PLAN_PRICE,
+            'status' => 'pending',
+            'metadata_json' => [
+                'plan' => 'normchat-pro',
+                'included_tokens' => self::INCLUDED_TOKENS,
+            ],
+            'expires_at' => now()->addHours(self::PAYMENT_EXPIRY_HOURS),
         ]);
 
-        return redirect()->route('subscription.payment.success');
+        return redirect()->route('subscription.payment.waiting', ['order_id' => $orderId]);
+    }
+
+    public function paymentWaiting(Request $request): View|RedirectResponse
+    {
+        $orderId = $request->query('order_id');
+        $user = Auth::user();
+
+        $pending = PendingPayment::where('order_id', $orderId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $pending) {
+            return redirect()->route('subscription.payment.detail')
+                ->with('error', 'Order tidak ditemukan.');
+        }
+
+        if ($pending->isPaid()) {
+            $this->setSessionFromPaidPending($pending);
+            return redirect($this->getSuccessRedirect($pending));
+        }
+
+        return view('subscription.payment-waiting', [
+            'pending' => $pending,
+            'trakteerUrl' => config('services.trakteer.page_url'),
+        ]);
+    }
+
+    /**
+     * AJAX polling endpoint: check if pending payment has been fulfilled by webhook.
+     */
+    public function paymentStatus(Request $request): JsonResponse
+    {
+        $orderId = $request->query('order_id');
+        $user = Auth::user();
+
+        $pending = PendingPayment::where('order_id', $orderId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $pending) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        if ($pending->isExpired()) {
+            $pending->update(['status' => 'expired']);
+            return response()->json(['status' => 'expired']);
+        }
+
+        if ($pending->isPaid()) {
+            $this->setSessionFromPaidPending($pending);
+
+            return response()->json([
+                'status' => 'paid',
+                'redirect' => $this->getSuccessRedirect($pending),
+            ]);
+        }
+
+        return response()->json(['status' => 'pending']);
     }
 
     public function paymentSuccess(): View
@@ -83,7 +176,6 @@ class SubscriptionController extends Controller
     {
         $user = Auth::user();
 
-        // Get user's groups (owned or member)
         $groups = Group::query()
             ->where('owner_id', $user->id)
             ->orWhereHas('members', fn ($q) => $q->where('user_id', $user->id)->where('status', 'active'))
@@ -93,6 +185,7 @@ class SubscriptionController extends Controller
         return view('subscription.buy-tokens', [
             'groups' => $groups,
             'pricePerCredit' => self::PRICE_PER_CREDIT,
+            'trakteerUrl' => config('services.trakteer.page_url'),
         ]);
     }
 
@@ -108,7 +201,6 @@ class SubscriptionController extends Controller
         $user = Auth::user();
         $group = Group::findOrFail($validated['group_id']);
 
-        // Verify user has access to this group
         $isMember = $group->owner_id === $user->id
             || $group->members()->where('user_id', $user->id)->where('status', 'active')->exists();
         abort_unless($isMember, 403);
@@ -127,36 +219,24 @@ class SubscriptionController extends Controller
             return back()->withErrors(['credit_amount' => 'Minimal pembelian 1 normkredit (1.000 token).']);
         }
 
-        $paymentRef = 'TOKEN-' . strtoupper(Str::random(10));
+        $orderId = 'NC-TOKEN-' . strtoupper(Str::random(8));
 
-        // Add tokens to group
-        $groupToken = GroupToken::firstOrCreate(
-            ['group_id' => $group->id],
-            ['total_tokens' => 0, 'used_tokens' => 0, 'remaining_tokens' => 0]
-        );
-        $groupToken->addTokens($tokenAmount);
-
-        // Record contribution
-        GroupTokenContribution::create([
-            'group_id' => $group->id,
+        PendingPayment::create([
             'user_id' => $user->id,
-            'source' => 'topup',
-            'token_amount' => $tokenAmount,
-            'price_paid' => $price,
-            'payment_reference' => $paymentRef,
-        ]);
-
-        session([
-            'token_purchase' => [
-                'reference' => $paymentRef,
-                'tokens' => $tokenAmount,
-                'price' => $price,
+            'group_id' => $group->id,
+            'order_id' => $orderId,
+            'payment_type' => 'topup',
+            'expected_amount' => $price,
+            'status' => 'pending',
+            'metadata_json' => [
+                'token_amount' => $tokenAmount,
+                'credits' => $credits,
                 'group_name' => $group->name,
             ],
+            'expires_at' => now()->addHours(self::PAYMENT_EXPIRY_HOURS),
         ]);
 
-        return redirect()->route('subscription.tokens.buy.success')
-            ->with('success', 'Token berhasil ditambahkan ke grup ' . $group->name);
+        return redirect()->route('subscription.payment.waiting', ['order_id' => $orderId]);
     }
 
     public function buyTokensSuccess(): View
@@ -179,6 +259,7 @@ class SubscriptionController extends Controller
         return view('subscription.add-seat', [
             'group' => $group,
             'seatPrice' => self::ADD_SEAT_PRICE,
+            'trakteerUrl' => config('services.trakteer.page_url'),
         ]);
     }
 
@@ -190,8 +271,6 @@ class SubscriptionController extends Controller
 
         $validated = $request->validate([
             'seat_count' => ['required', 'integer', 'min:1', 'max:20'],
-            'payment_method' => ['required', 'in:dummy_va'],
-            'payment_confirmed' => ['required', 'accepted'],
         ]);
 
         $subscription = $group->subscription;
@@ -199,38 +278,25 @@ class SubscriptionController extends Controller
 
         $seatCount = (int) $validated['seat_count'];
         $totalAmount = $seatCount * self::ADD_SEAT_PRICE;
-        $paymentRef = 'DUMMY-SEAT-' . strtoupper(Str::random(10));
 
-        $subscription->included_seats = (int) $subscription->included_seats + $seatCount;
-        $subscription->save();
+        $orderId = 'NC-SEAT-' . strtoupper(Str::random(8));
 
-        $payment = SubscriptionPayment::query()->create([
-            'subscription_id' => $subscription->id,
+        PendingPayment::create([
+            'user_id' => Auth::id(),
             'group_id' => $group->id,
-            'created_by' => (int) Auth::id(),
-            'payment_type' => 'add_seat_dummy',
-            'reference' => $paymentRef,
-            'seat_count' => $seatCount,
-            'unit_price' => self::ADD_SEAT_PRICE,
-            'total_amount' => $totalAmount,
-            'status' => 'paid',
+            'order_id' => $orderId,
+            'payment_type' => 'add_seat',
+            'expected_amount' => $totalAmount,
+            'status' => 'pending',
             'metadata_json' => [
-                'payment_method' => $validated['payment_method'],
-                'note' => 'Dummy seat payment success',
-            ],
-        ]);
-
-        session([
-            'add_seat_payment' => [
-                'reference' => $payment->reference,
                 'seat_count' => $seatCount,
-                'amount' => $totalAmount,
                 'unit_price' => self::ADD_SEAT_PRICE,
+                'subscription_id' => $subscription->id,
             ],
+            'expires_at' => now()->addHours(self::PAYMENT_EXPIRY_HOURS),
         ]);
 
-        return redirect()->route('subscription.add-seat.success', $group)
-            ->with('success', 'Pembayaran dummy berhasil. Seat tambahan aktif.');
+        return redirect()->route('subscription.payment.waiting', ['order_id' => $orderId]);
     }
 
     public function addSeatSuccess(Group $group): View
@@ -259,5 +325,46 @@ class SubscriptionController extends Controller
             'group' => $group,
             'payments' => $group->subscription?->payments ?? collect(),
         ]);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────
+
+    private function setSessionFromPaidPending(PendingPayment $pending): void
+    {
+        match ($pending->payment_type) {
+            'subscription' => session([
+                'subscription_paid' => true,
+                'subscription_tokens' => self::INCLUDED_TOKENS,
+            ]),
+            'topup' => session([
+                'token_purchase' => [
+                    'reference' => $pending->order_id,
+                    'tokens' => $pending->metadata_json['token_amount'] ?? 0,
+                    'price' => $pending->expected_amount,
+                    'group_name' => $pending->metadata_json['group_name'] ?? '',
+                ],
+            ]),
+            'add_seat' => session([
+                'add_seat_payment' => [
+                    'reference' => $pending->order_id,
+                    'seat_count' => $pending->metadata_json['seat_count'] ?? 0,
+                    'amount' => $pending->expected_amount,
+                    'unit_price' => $pending->metadata_json['unit_price'] ?? self::ADD_SEAT_PRICE,
+                ],
+            ]),
+            default => null,
+        };
+    }
+
+    private function getSuccessRedirect(PendingPayment $pending): string
+    {
+        return match ($pending->payment_type) {
+            'subscription' => route('subscription.payment.success'),
+            'topup' => route('subscription.tokens.buy.success'),
+            'add_seat' => $pending->group_id
+                ? route('subscription.add-seat.success', $pending->group_id)
+                : route('groups.index'),
+            default => route('groups.index'),
+        };
     }
 }

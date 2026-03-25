@@ -137,7 +137,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
         if ($credentials !== null) {
             [$responseText, $usageTokens] = $this->generateProviderResponse(
-                $provider, $model, $credentials, $message->content, $recentMessages->all()
+                $provider, $model, $credentials, $message->content, $recentMessages->all(), $group
             );
         }
 
@@ -248,13 +248,13 @@ class ProcessGroupChatQueueJob implements ShouldQueue
     /**
      * Returns [responseText, actualTokensUsed]
      */
-    private function generateProviderResponse(string $provider, string $model, string $credential, string $latestPrompt, array $recentMessages): array
+    private function generateProviderResponse(string $provider, string $model, string $credential, string $latestPrompt, array $recentMessages, ?Group $group = null): array
     {
         try {
             return match ($provider) {
-                'openai' => $this->callOpenAi($credential, $model, $latestPrompt, $recentMessages),
-                'claude' => $this->callClaude($credential, $model, $latestPrompt, $recentMessages),
-                'gemini' => $this->callGemini($credential, $model, $latestPrompt, $recentMessages),
+                'openai' => $this->callOpenAi($credential, $model, $latestPrompt, $recentMessages, $group),
+                'claude' => $this->callClaude($credential, $model, $latestPrompt, $recentMessages, $group),
+                'gemini' => $this->callGemini($credential, $model, $latestPrompt, $recentMessages, $group),
                 default => [null, 0],
             };
         } catch (Throwable $e) {
@@ -268,9 +268,9 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         }
     }
 
-    private function callOpenAi(string $token, string $model, string $latestPrompt, array $recentMessages): array
+    private function callOpenAi(string $token, string $model, string $latestPrompt, array $recentMessages, ?Group $group = null): array
     {
-        $messages = $this->toChatMessages($recentMessages, $latestPrompt);
+        $messages = $this->toChatMessages($recentMessages, $latestPrompt, $group);
 
         $response = Http::withToken($token)
             ->timeout(30)
@@ -292,9 +292,9 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         return [$text, $totalTokens];
     }
 
-    private function callClaude(string $token, string $model, string $latestPrompt, array $recentMessages): array
+    private function callClaude(string $token, string $model, string $latestPrompt, array $recentMessages, ?Group $group = null): array
     {
-        $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt);
+        $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt, $group);
 
         $response = Http::timeout(30)
             ->withHeaders([
@@ -331,9 +331,9 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         return [$text, $totalTokens];
     }
 
-    private function callGemini(string $token, string $model, string $latestPrompt, array $recentMessages): array
+    private function callGemini(string $token, string $model, string $latestPrompt, array $recentMessages, ?Group $group = null): array
     {
-        $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt);
+        $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt, $group);
 
         $response = Http::withToken($token)
             ->timeout(30)
@@ -363,12 +363,23 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         return [$text, $totalTokens];
     }
 
-    private function toChatMessages(array $recentMessages, string $latestPrompt): array
+    private function toChatMessages(array $recentMessages, string $latestPrompt, ?Group $group = null): array
     {
+        $systemPrompt = 'Kamu adalah AI participant untuk group chat Normchat. Jawab singkat, jelas, relevan konteks grup, dan gunakan Bahasa Indonesia.';
+
+        if ($group) {
+            if ($group->ai_persona_style) {
+                $systemPrompt .= "\n\nPersona style: " . $group->ai_persona_style;
+            }
+            if ($group->ai_persona_guardrails) {
+                $systemPrompt .= "\n\nGuardrails: " . $group->ai_persona_guardrails;
+            }
+        }
+
         $messages = [
             [
                 'role' => 'system',
-                'content' => 'Kamu adalah AI participant untuk group chat Normchat. Jawab singkat, jelas, relevan konteks grup, dan gunakan Bahasa Indonesia.',
+                'content' => $systemPrompt,
             ],
         ];
 
@@ -384,13 +395,21 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         return $messages;
     }
 
-    private function toPlainTranscriptPrompt(array $recentMessages, string $latestPrompt): string
+    private function toPlainTranscriptPrompt(array $recentMessages, string $latestPrompt, ?Group $group = null): string
     {
         $lines = [
             'Kamu adalah AI participant untuk group chat Normchat.',
             'Jawab dalam Bahasa Indonesia, ringkas dan actionable.',
-            'Konteks percakapan terbaru:',
         ];
+
+        if ($group?->ai_persona_style) {
+            $lines[] = 'Persona style: ' . $group->ai_persona_style;
+        }
+        if ($group?->ai_persona_guardrails) {
+            $lines[] = 'Guardrails: ' . $group->ai_persona_guardrails;
+        }
+
+        $lines[] = 'Konteks percakapan terbaru:';
 
         foreach ($recentMessages as $row) {
             $speaker = strtoupper((string) ($row['sender_type'] ?? 'user'));

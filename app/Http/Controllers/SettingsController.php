@@ -96,6 +96,30 @@ class SettingsController extends Controller
         ]);
     }
 
+    public function saveAiPersona(Request $request, Group $group): RedirectResponse
+    {
+        $this->authorize('manageSettings', $group);
+
+        $validated = $request->validate([
+            'ai_persona_style' => ['nullable', 'string', 'max:1000'],
+            'ai_persona_guardrails' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $group->update($validated);
+
+        AuditLog::create([
+            'group_id' => $group->id,
+            'actor_id' => Auth::id(),
+            'action' => 'settings.update_ai_persona',
+            'target_type' => Group::class,
+            'target_id' => $group->id,
+            'metadata_json' => ['updated_fields' => array_keys($validated)],
+            'created_at' => now(),
+        ]);
+
+        return back()->with('success', 'AI Persona berhasil disimpan.');
+    }
+
     public function seatManagement(Group $group): View
     {
         $this->authorize('manageSettings', $group);

@@ -7,6 +7,7 @@ use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\GroupTokenContribution;
+use App\Models\PendingPayment;
 use App\Models\Role;
 use App\Models\Subscription;
 use Illuminate\Http\RedirectResponse;
@@ -46,7 +47,12 @@ class GroupController extends Controller
             ->where('status', 'active')
             ->exists();
 
-        if (! $hasActive && ! session('subscription_paid')) {
+        $hasPaidPending = PendingPayment::where('user_id', $user->id)
+            ->where('payment_type', 'subscription')
+            ->where('status', 'paid')
+            ->exists();
+
+        if (! $hasActive && ! session('subscription_paid') && ! $hasPaidPending) {
             return redirect()->route('subscription.pricing')
                 ->with('info', 'Aktifkan paket dulu sebelum membuat grup.');
         }

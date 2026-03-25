@@ -11,7 +11,7 @@
             <h1 class="font-display text-xl font-extrabold text-[#0F172A]">Riwayat Payment Seat</h1>
         </div>
 
-        <p class="mb-4 text-sm text-[#64748B]">Histori transaksi add-seat dummy untuk audit internal.</p>
+        <p class="mb-4 text-sm text-[#64748B]">Histori transaksi penambahan seat untuk audit internal.</p>
 
         <div class="space-y-3">
             @forelse($payments as $payment)

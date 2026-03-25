@@ -84,7 +84,7 @@ else
 fi
 
 log "Build + jalankan semua service"
-"${COMPOSE[@]}" up -d --build --remove-orphans postgres redis app queue reverb
+"${COMPOSE[@]}" up -d --build --remove-orphans postgres redis app queue reverb nginx
 
 log "Jalankan migrasi + optimize cache Laravel"
 "${COMPOSE[@]}" exec -T app php artisan migrate --force
@@ -98,7 +98,7 @@ log "Health checks container"
 "${COMPOSE[@]}" exec -T app php -r 'exit(extension_loaded("redis") ? 0 : 1);'
 
 if command -v curl >/dev/null 2>&1; then
-  APP_HEALTH_URL="${APP_URL:-http://127.0.0.1:8000}/login"
+  APP_HEALTH_URL="${APP_URL:-http://127.0.0.1}/up"
   if curl -fsS --max-time 10 "$APP_HEALTH_URL" >/dev/null; then
     log "HTTP check OK: ${APP_HEALTH_URL}"
   else

@@ -22,6 +22,8 @@ class Group extends Model
         'share_id',
         'ai_provider',
         'ai_model',
+        'ai_persona_style',
+        'ai_persona_guardrails',
     ];
 
     protected $casts = [

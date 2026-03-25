@@ -15,10 +15,10 @@
 
         @if($paymentSummary)
             <div class="panel-card mt-4 p-4">
-                <p class="text-xs text-[#64748B]">Dummy Payment Reference</p>
+                <p class="text-xs text-[#64748B]">Payment Reference</p>
                 <p class="mt-1 text-sm font-bold text-[#0F172A]">{{ $paymentSummary['reference'] ?? '-' }}</p>
                 <p class="mt-2 text-xs text-[#64748B]">Seat dibeli: {{ $paymentSummary['seat_count'] ?? 0 }} x Rp{{ number_format((int) ($paymentSummary['unit_price'] ?? 0), 0, ',', '.') }}</p>
-                <p class="mt-1 text-sm font-semibold text-emerald-700">Total dibayar: Rp{{ number_format((int) ($paymentSummary['amount'] ?? 0), 0, ',', '.') }} (dummy)</p>
+                <p class="mt-1 text-sm font-semibold text-emerald-700">Total dibayar: Rp{{ number_format((int) ($paymentSummary['amount'] ?? 0), 0, ',', '.') }}</p>
             </div>
         @endif
 

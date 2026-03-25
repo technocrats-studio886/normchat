@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AiConnection;
 use App\Models\AuditLog;
+use App\Models\PendingPayment;
 use App\Models\Subscription;
 use App\Models\User;
 use Carbon\Carbon;
@@ -155,7 +156,12 @@ class AuthController extends Controller
                 ->where('status', 'active')
                 ->exists();
 
-            if (session('subscription_paid')) {
+            $hasPaidPending = PendingPayment::where('user_id', $user->id)
+                ->where('payment_type', 'subscription')
+                ->where('status', 'paid')
+                ->exists();
+
+            if (session('subscription_paid') || $hasPaidPending) {
                 return route('groups.create');
             }
 

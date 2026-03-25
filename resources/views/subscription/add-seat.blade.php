@@ -25,23 +25,17 @@
                 </div>
 
                 <div class="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800">
-                    <p class="font-semibold">Total Payment Dummy</p>
+                    <p class="font-semibold">Total Pembayaran</p>
                     <p class="mt-1 text-sm font-bold" data-total-display="1">Rp{{ number_format($seatPrice, 0, ',', '.') }}</p>
                 </div>
 
-                <div class="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-                    <p class="font-semibold text-slate-700">Metode pembayaran dummy</p>
-                    <p class="mt-1">Virtual Account simulasi. Tidak ada charge nyata.</p>
+                <div class="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">
+                    <p class="font-semibold text-blue-800">Pembayaran via Trakteer</p>
+                    <p class="mt-1">Kamu akan diarahkan ke halaman instruksi pembayaran Trakteer.</p>
                 </div>
 
-                <input type="hidden" name="payment_method" value="dummy_va" />
-                <label class="flex items-center gap-2 text-xs text-[#334155]">
-                    <input type="checkbox" name="payment_confirmed" value="1" class="rounded border-slate-300" required>
-                    Saya konfirmasi pembayaran dummy Rp4.000 per seat
-                </label>
-
                 <button type="submit" class="btn-cta py-3 normal-case tracking-normal">
-                    Bayar & Tambahkan Seat
+                    Bayar via Trakteer
                 </button>
             </form>
         </div>

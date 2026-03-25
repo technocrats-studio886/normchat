@@ -106,13 +106,13 @@
 
             @if($groups->isNotEmpty())
                 <button type="submit" class="btn-cta w-full py-4 text-sm font-extrabold uppercase tracking-wide">
-                    Top-up Normkredit Sekarang
+                    Top-up via Trakteer
                 </button>
             @endif
         </form>
 
         <p class="mt-4 pb-4 text-center text-[11px] text-slate-400">
-            Normkredit langsung masuk ke saldo grup. Semua member bisa patungan top-up.
+            Pembayaran via Trakteer. Normkredit masuk setelah pembayaran dikonfirmasi.
         </p>
     </section>
 
