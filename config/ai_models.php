@@ -44,18 +44,18 @@ return [
             'label' => 'Claude (Anthropic)',
             'color' => '#D97706',
             'models' => [
-                'claude-3-5-haiku-latest' => [
-                    'label' => 'Claude 3.5 Haiku',
+                'claude-haiku-4-5' => [
+                    'label' => 'Claude Haiku 4.5',
                     'multiplier' => 1.0,
                     'description' => 'Cepat & hemat',
                 ],
-                'claude-sonnet-4-20250514' => [
-                    'label' => 'Claude Sonnet 4',
+                'claude-sonnet-4-6' => [
+                    'label' => 'Claude Sonnet 4.6',
                     'multiplier' => 1.5,
                     'description' => 'Balanced & smart',
                 ],
-                'claude-opus-4-20250514' => [
-                    'label' => 'Claude Opus 4',
+                'claude-opus-4-6' => [
+                    'label' => 'Claude Opus 4.6',
                     'multiplier' => 2.0,
                     'description' => 'Paling canggih',
                 ],
@@ -66,18 +66,18 @@ return [
             'label' => 'Gemini (Google)',
             'color' => '#4285F4',
             'models' => [
-                'gemini-2.0-flash' => [
-                    'label' => 'Gemini 2.0 Flash',
+                'gemini-2.5-flash' => [
+                    'label' => 'Gemini 2.5 Flash',
                     'multiplier' => 1.0,
                     'description' => 'Cepat & hemat',
                 ],
-                'gemini-2.5-flash-preview-05-20' => [
-                    'label' => 'Gemini 2.5 Flash',
+                'gemini-3-flash-preview' => [
+                    'label' => 'Gemini 3 Flash',
                     'multiplier' => 2.0,
                     'description' => 'Balanced & smart',
                 ],
-                'gemini-2.5-pro-preview-05-06' => [
-                    'label' => 'Gemini 2.5 Pro',
+                'gemini-3.1-pro-preview' => [
+                    'label' => 'Gemini 3.1 Pro',
                     'multiplier' => 2.5,
                     'description' => 'Paling canggih',
                 ],
@@ -89,8 +89,8 @@ return [
     // Default model per provider (used as fallback)
     'defaults' => [
         'openai' => 'gpt-4o-mini',
-        'claude' => 'claude-3-5-haiku-latest',
-        'gemini' => 'gemini-2.0-flash',
+        'claude' => 'claude-haiku-4-5',
+        'gemini' => 'gemini-2.5-flash',
     ],
 
 ];

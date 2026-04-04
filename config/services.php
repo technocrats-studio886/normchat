@@ -52,4 +52,22 @@ return [
         'page_url' => env('TRAKTEER_PAGE_URL', 'https://trakteer.id/normchat'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI Provider API Keys (server-side fallback)
+    |--------------------------------------------------------------------------
+    */
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+    ],
+
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
+
 ];

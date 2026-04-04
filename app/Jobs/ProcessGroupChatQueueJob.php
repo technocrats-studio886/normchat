@@ -130,7 +130,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             ->reverse()
             ->values();
 
-        $credentials = $this->resolveCredentials($owner);
+        $credentials = $this->resolveCredentials($owner, $provider);
 
         $responseText = null;
         $usageTokens = 0;
@@ -236,13 +236,25 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         };
     }
 
-    private function resolveCredentials(User $owner): ?string
+    private function resolveCredentials(User $owner, string $provider = 'openai'): ?string
     {
-        if (! $owner->hasValidCredentials()) {
-            return null;
+        // 1. Try user-level credentials first (OAuth token or user-provided API key)
+        if ($owner->hasValidCredentials()) {
+            $credential = $owner->getAccessToken() ?? $owner->getApiKey();
+            if ($credential) {
+                return $credential;
+            }
         }
 
-        return $owner->getAccessToken() ?? $owner->getApiKey();
+        // 2. Fallback to server-side API key from .env
+        $envKey = match ($provider) {
+            'openai' => config('services.openai.api_key'),
+            'claude' => config('services.anthropic.api_key'),
+            'gemini' => config('services.gemini.api_key'),
+            default => null,
+        };
+
+        return $envKey ?: null;
     }
 
     /**

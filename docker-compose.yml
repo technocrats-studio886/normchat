@@ -10,9 +10,11 @@ services:
         condition: service_started
       reverb:
         condition: service_started
+    ports:
+      - "127.0.0.1:8082:80"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/up || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/up || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
