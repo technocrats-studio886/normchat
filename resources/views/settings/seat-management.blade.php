@@ -83,11 +83,11 @@
         </div>
 
         <a href="{{ route('subscription.add-seat', $group) }}" class="btn-cta py-3 normal-case tracking-normal">
-            Tambah Seat
+            Tambah Seat Instan
         </a>
 
         <a href="{{ route('subscription.add-seat.payments', $group) }}" class="mt-3 block w-full rounded-xl border border-[#CBD5E1] bg-white py-3 text-center text-sm font-semibold text-[#0F172A] transition hover:bg-slate-50">
-            Lihat Riwayat Payment Seat
+            Lihat Riwayat Penambahan Seat
         </a>
     </section>
 @endsection

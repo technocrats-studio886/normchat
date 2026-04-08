@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Events\MessageSent;
+use App\Events\TypingStatus;
+use App\Models\AiConnection;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
 use App\Models\GroupToken;
@@ -13,6 +15,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class ProcessGroupChatQueueJob implements ShouldQueue
@@ -71,7 +74,10 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
     private function processQueueItem(ChatMessageQueue $queueItem): void
     {
-        $message = Message::query()->whereKey($queueItem->message_id)->first();
+        $message = Message::query()
+            ->with(['replyToMessage.sender:id,name'])
+            ->whereKey($queueItem->message_id)
+            ->first();
         if (! $message) {
             return;
         }
@@ -88,11 +94,12 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             return;
         }
 
-        // Use group's configured provider/model
-        $provider = $group->ai_provider ?: $this->normalizeProvider($owner->auth_provider);
-        $model = $group->ai_model ?: config("ai_models.defaults.{$provider}");
+        // AI stack is fixed to OpenAI for now (provider/model hidden from end users).
+        $provider = 'openai';
+        $model = (string) config('ai_models.defaults.openai', 'gpt-5');
         $multiplier = $group->getModelMultiplier();
         $content = strtolower((string) $message->content);
+        $replyTarget = $message->replyToMessage;
 
         // Check if message mentions AI
         $triggers = $this->buildMentionTriggers($provider);
@@ -102,6 +109,10 @@ class ProcessGroupChatQueueJob implements ShouldQueue
                 $isAiRequest = true;
                 break;
             }
+        }
+
+        if (! $isAiRequest && $replyTarget?->sender_type === 'ai') {
+            $isAiRequest = true;
         }
 
         if (! $isAiRequest) {
@@ -126,26 +137,47 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             ->where('group_id', $group->id)
             ->orderByDesc('id')
             ->take(16)
-            ->get(['sender_type', 'content'])
+            ->get([
+                'id',
+                'sender_type',
+                'sender_id',
+                'message_type',
+                'content',
+                'attachment_disk',
+                'attachment_path',
+                'attachment_mime',
+                'attachment_original_name',
+                'reply_to_message_id',
+            ])
             ->reverse()
             ->values();
 
         $credentials = $this->resolveCredentials($owner, $provider);
 
+        if ($credentials === null) {
+            $this->sendSystemMessage($group, 'AI belum dikonfigurasi. Hubungi admin untuk mengisi OPENAI_API_KEY agar fitur @ai aktif.');
+            return;
+        }
+
         $responseText = null;
         $usageTokens = 0;
 
-        if ($credentials !== null) {
+        event(new TypingStatus($group->id, 'ai', null, 'NormAI', true));
+        try {
             [$responseText, $usageTokens] = $this->generateProviderResponse(
-                $provider, $model, $credentials, $message->content, $recentMessages->all(), $group
+                $provider,
+                $model,
+                $credentials,
+                $message,
+                $recentMessages->all(),
+                $group
             );
+        } finally {
+            event(new TypingStatus($group->id, 'ai', null, 'NormAI', false));
         }
 
         if (! $responseText) {
-            $responseText = sprintf(
-                'Provider %s aktif, tapi respons AI belum tersedia saat ini. Coba lagi beberapa saat.',
-                strtoupper($provider)
-            );
+            $responseText = 'AI sedang sibuk dan belum bisa merespons saat ini. Coba lagi beberapa saat.';
             // Don't charge tokens if response failed
             $usageTokens = 0;
         }
@@ -175,6 +207,8 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'content' => $responseText,
         ]);
 
+        $groupToken?->refresh();
+
         event(new MessageSent($message->group_id, [
             'id' => $aiMessage->id,
             'message_type' => $aiMessage->message_type ?? 'text',
@@ -186,6 +220,9 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'attachment_mime' => null,
             'attachment_original_name' => null,
             'created_at' => optional($aiMessage->created_at)->toIso8601String(),
+            'reply_to' => null,
+            'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
+            'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 1000, 1),
         ]));
     }
 
@@ -212,63 +249,43 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         ]));
     }
 
-    private function normalizeProvider(?string $provider): string
-    {
-        $key = strtolower((string) $provider);
-
-        return match ($key) {
-            'chatgpt' => 'openai',
-            'anthropic' => 'claude',
-            'google' => 'gemini',
-            default => in_array($key, ['openai', 'claude', 'gemini'], true) ? $key : 'openai',
-        };
-    }
-
     private function buildMentionTriggers(string $provider): array
     {
-        $base = ['@ai'];
-
-        return match ($provider) {
-            'openai' => array_merge($base, ['@openai', '@chatgpt']),
-            'claude' => array_merge($base, ['@claude', '@anthropic']),
-            'gemini' => array_merge($base, ['@gemini', '@google']),
-            default => $base,
-        };
+        return ['@ai', '@openai', '@chatgpt'];
     }
 
     private function resolveCredentials(User $owner, string $provider = 'openai'): ?string
     {
-        // 1. Try user-level credentials first (OAuth token or user-provided API key)
-        if ($owner->hasValidCredentials()) {
-            $credential = $owner->getAccessToken() ?? $owner->getApiKey();
-            if ($credential) {
-                return $credential;
-            }
+        // 1) User-level OpenAI token from explicit AI connection
+        $aiConnection = AiConnection::query()
+            ->where('user_id', $owner->id)
+            ->where('provider', 'openai')
+            ->first();
+
+        $connectionToken = $aiConnection?->decryptedAccessToken();
+        if (is_string($connectionToken) && $connectionToken !== '') {
+            return $connectionToken;
         }
 
-        // 2. Fallback to server-side API key from .env
-        $envKey = match ($provider) {
-            'openai' => config('services.openai.api_key'),
-            'claude' => config('services.anthropic.api_key'),
-            'gemini' => config('services.gemini.api_key'),
-            default => null,
-        };
+        // 2) User-level API key
+        $apiKey = $owner->getApiKey();
+        if (is_string($apiKey) && $apiKey !== '') {
+            return $apiKey;
+        }
 
-        return $envKey ?: null;
+        // 3) Server-side API key
+        $envKey = config('services.openai.api_key');
+
+        return (is_string($envKey) && $envKey !== '') ? $envKey : null;
     }
 
     /**
      * Returns [responseText, actualTokensUsed]
      */
-    private function generateProviderResponse(string $provider, string $model, string $credential, string $latestPrompt, array $recentMessages, ?Group $group = null): array
+    private function generateProviderResponse(string $provider, string $model, string $credential, Message $requestMessage, array $recentMessages, ?Group $group = null): array
     {
         try {
-            return match ($provider) {
-                'openai' => $this->callOpenAi($credential, $model, $latestPrompt, $recentMessages, $group),
-                'claude' => $this->callClaude($credential, $model, $latestPrompt, $recentMessages, $group),
-                'gemini' => $this->callGemini($credential, $model, $latestPrompt, $recentMessages, $group),
-                default => [null, 0],
-            };
+            return $this->callOpenAi($credential, $model, $requestMessage, $recentMessages, $group);
         } catch (Throwable $e) {
             Log::error('AI provider call failed.', [
                 'provider' => $provider,
@@ -280,17 +297,30 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         }
     }
 
-    private function callOpenAi(string $token, string $model, string $latestPrompt, array $recentMessages, ?Group $group = null): array
+    private function callOpenAi(string $token, string $model, Message $requestMessage, array $recentMessages, ?Group $group = null): array
     {
-        $messages = $this->toChatMessages($recentMessages, $latestPrompt, $group);
+        $messages = $this->toChatMessages($recentMessages, $requestMessage, $token, $group);
+
+        $payload = [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => 0.4,
+        ];
 
         $response = Http::withToken($token)
             ->timeout(30)
-            ->post('https://api.openai.com/v1/chat/completions', [
-                'model' => $model,
-                'messages' => $messages,
-                'temperature' => 0.4,
-            ]);
+            ->post('https://api.openai.com/v1/chat/completions', $payload);
+
+        if ($response->failed()) {
+            $body = (string) $response->body();
+            $mightBeModelIssue = str_contains(strtolower($body), 'model') || $response->status() === 404;
+            if ($mightBeModelIssue && $model !== 'gpt-4.1') {
+                $payload['model'] = 'gpt-4.1';
+                $response = Http::withToken($token)
+                    ->timeout(30)
+                    ->post('https://api.openai.com/v1/chat/completions', $payload);
+            }
+        }
 
         if ($response->failed()) {
             Log::warning('OpenAI response failed.', ['status' => $response->status(), 'body' => $response->body()]);
@@ -304,78 +334,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         return [$text, $totalTokens];
     }
 
-    private function callClaude(string $token, string $model, string $latestPrompt, array $recentMessages, ?Group $group = null): array
-    {
-        $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt, $group);
-
-        $response = Http::timeout(30)
-            ->withHeaders([
-                'x-api-key' => $token,
-                'anthropic-version' => '2023-06-01',
-            ])
-            ->post('https://api.anthropic.com/v1/messages', [
-                'model' => $model,
-                'max_tokens' => 700,
-                'messages' => [
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-            ]);
-
-        if ($response->failed()) {
-            Log::warning('Anthropic response failed.', ['status' => $response->status(), 'body' => $response->body()]);
-            return [null, 0];
-        }
-
-        $parts = $response->json('content', []);
-        $text = null;
-        if (is_array($parts)) {
-            foreach ($parts as $part) {
-                if (($part['type'] ?? null) === 'text' && ! empty($part['text'])) {
-                    $text = (string) $part['text'];
-                    break;
-                }
-            }
-        }
-
-        $usage = $response->json('usage', []);
-        $totalTokens = (int) (($usage['input_tokens'] ?? 0) + ($usage['output_tokens'] ?? 0));
-
-        return [$text, $totalTokens];
-    }
-
-    private function callGemini(string $token, string $model, string $latestPrompt, array $recentMessages, ?Group $group = null): array
-    {
-        $prompt = $this->toPlainTranscriptPrompt($recentMessages, $latestPrompt, $group);
-
-        $response = Http::withToken($token)
-            ->timeout(30)
-            ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
-                'contents' => [
-                    [
-                        'role' => 'user',
-                        'parts' => [
-                            ['text' => $prompt],
-                        ],
-                    ],
-                ],
-                'generationConfig' => [
-                    'temperature' => 0.4,
-                ],
-            ]);
-
-        if ($response->failed()) {
-            Log::warning('Gemini response failed.', ['status' => $response->status(), 'body' => $response->body()]);
-            return [null, 0];
-        }
-
-        $text = $response->json('candidates.0.content.parts.0.text');
-        $usageMetadata = $response->json('usageMetadata', []);
-        $totalTokens = (int) (($usageMetadata['promptTokenCount'] ?? 0) + ($usageMetadata['candidatesTokenCount'] ?? 0));
-
-        return [$text, $totalTokens];
-    }
-
-    private function toChatMessages(array $recentMessages, string $latestPrompt, ?Group $group = null): array
+    private function toChatMessages(array $recentMessages, Message $requestMessage, string $token, ?Group $group = null): array
     {
         $systemPrompt = 'Kamu adalah AI participant untuk group chat Normchat. Jawab singkat, jelas, relevan konteks grup, dan gunakan Bahasa Indonesia.';
 
@@ -396,41 +355,256 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         ];
 
         foreach ($recentMessages as $row) {
+            if ((int) ($row['id'] ?? 0) === (int) $requestMessage->id) {
+                continue;
+            }
+
+            $rowText = $this->messageToContextLine($row, $token);
             $messages[] = [
                 'role' => (($row['sender_type'] ?? 'user') === 'ai') ? 'assistant' : 'user',
-                'content' => (string) ($row['content'] ?? ''),
+                'content' => $rowText,
             ];
         }
 
-        $messages[] = ['role' => 'user', 'content' => $latestPrompt];
+        $latestPrompt = $this->buildLatestPromptText($requestMessage, $token);
+        $latestParts = [
+            ['type' => 'text', 'text' => $latestPrompt],
+        ];
+
+        $latestImageDataUri = $this->attachmentImageDataUri($requestMessage);
+        if ($latestImageDataUri !== null) {
+            $latestParts[] = [
+                'type' => 'image_url',
+                'image_url' => ['url' => $latestImageDataUri],
+            ];
+        }
+
+        $replyImageDataUri = $this->attachmentImageDataUri($requestMessage->replyToMessage);
+        if ($replyImageDataUri !== null) {
+            $latestParts[] = [
+                'type' => 'image_url',
+                'image_url' => ['url' => $replyImageDataUri],
+            ];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $latestParts];
 
         return $messages;
     }
 
-    private function toPlainTranscriptPrompt(array $recentMessages, string $latestPrompt, ?Group $group = null): string
+    private function buildLatestPromptText(Message $requestMessage, string $token): string
     {
-        $lines = [
-            'Kamu adalah AI participant untuk group chat Normchat.',
-            'Jawab dalam Bahasa Indonesia, ringkas dan actionable.',
-        ];
+        $parts = [];
 
-        if ($group?->ai_persona_style) {
-            $lines[] = 'Persona style: ' . $group->ai_persona_style;
-        }
-        if ($group?->ai_persona_guardrails) {
-            $lines[] = 'Guardrails: ' . $group->ai_persona_guardrails;
+        $baseContent = trim((string) $requestMessage->content);
+        if ($baseContent !== '') {
+            $parts[] = $baseContent;
         }
 
-        $lines[] = 'Konteks percakapan terbaru:';
-
-        foreach ($recentMessages as $row) {
-            $speaker = strtoupper((string) ($row['sender_type'] ?? 'user'));
-            $lines[] = sprintf('%s: %s', $speaker, (string) ($row['content'] ?? ''));
+        if ($this->isAudioMessage($requestMessage)) {
+            $transcript = $this->transcribeAudioAttachment($requestMessage, $token);
+            if ($transcript !== null && $transcript !== '') {
+                $parts[] = 'Transkrip audio dari pesan ini: ' . $transcript;
+            } else {
+                $parts[] = 'Pesan ini memiliki lampiran audio namun transkrip tidak tersedia.';
+            }
+        } elseif ($this->isImageMessage($requestMessage)) {
+            $parts[] = 'Pesan ini menyertakan gambar. Gunakan gambar tersebut untuk menjawab.';
         }
 
-        $lines[] = 'Pertanyaan terakhir user:';
-        $lines[] = $latestPrompt;
+        $replyTarget = $requestMessage->replyToMessage;
+        if ($replyTarget) {
+            $replySender = $replyTarget->sender_type === 'ai'
+                ? 'NormAI'
+                : ($replyTarget->sender?->name ?? 'User');
 
-        return implode("\n", $lines);
+            $replySummary = trim((string) $replyTarget->content);
+            if ($replySummary === '') {
+                $replySummary = $this->isImageMessage($replyTarget)
+                    ? '[lampiran gambar]'
+                    : ($this->isAudioMessage($replyTarget)
+                        ? '[lampiran audio]'
+                        : '[lampiran file]');
+            }
+
+            $parts[] = "Kamu sedang membalas (reply) pesan dari {$replySender}: {$replySummary}";
+
+            if ($this->isAudioMessage($replyTarget)) {
+                $replyTranscript = $this->transcribeAudioAttachment($replyTarget, $token);
+                if ($replyTranscript !== null && $replyTranscript !== '') {
+                    $parts[] = 'Transkrip audio dari pesan yang direply: ' . $replyTranscript;
+                }
+            }
+
+            if ($this->isImageMessage($replyTarget)) {
+                $parts[] = 'Ada gambar pada pesan yang direply. Perhatikan gambar tersebut dalam jawabanmu.';
+            }
+        }
+
+        if ($parts === []) {
+            return 'Bantu user berdasarkan konteks percakapan terbaru.';
+        }
+
+        return implode("\n\n", $parts);
     }
+
+    private function messageToContextLine(array $row, string $token): string
+    {
+        $content = trim((string) ($row['content'] ?? ''));
+        if ($content !== '') {
+            return $content;
+        }
+
+        $messageType = strtolower((string) ($row['message_type'] ?? 'text'));
+        if ($messageType === 'image') {
+            return '[Pesan sebelumnya berisi gambar]';
+        }
+
+        if ($messageType === 'voice') {
+            $audioMessage = new Message([
+                'message_type' => $row['message_type'] ?? 'voice',
+                'attachment_disk' => $row['attachment_disk'] ?? null,
+                'attachment_path' => $row['attachment_path'] ?? null,
+                'attachment_mime' => $row['attachment_mime'] ?? null,
+                'attachment_original_name' => $row['attachment_original_name'] ?? null,
+            ]);
+            $audioMessage->id = (int) ($row['id'] ?? 0);
+
+            $transcript = $this->transcribeAudioAttachment($audioMessage, $token);
+            if ($transcript !== null && $transcript !== '') {
+                return '[Transkrip audio] ' . $transcript;
+            }
+
+            return '[Pesan sebelumnya berisi audio]';
+        }
+
+        return '[Pesan sebelumnya berisi lampiran]';
+    }
+
+    private function isImageMessage(?Message $message): bool
+    {
+        if (! $message) {
+            return false;
+        }
+
+        $mime = strtolower((string) $message->attachment_mime);
+        return strtolower((string) $message->message_type) === 'image' || str_starts_with($mime, 'image/');
+    }
+
+    private function isAudioMessage(?Message $message): bool
+    {
+        if (! $message) {
+            return false;
+        }
+
+        $mime = strtolower((string) $message->attachment_mime);
+        return strtolower((string) $message->message_type) === 'voice'
+            || str_starts_with($mime, 'audio/')
+            || $mime === 'video/webm';
+    }
+
+    private function attachmentImageDataUri(?Message $message): ?string
+    {
+        if (! $this->isImageMessage($message) || ! $message?->attachment_disk || ! $message->attachment_path) {
+            return null;
+        }
+
+        try {
+            $disk = Storage::disk($message->attachment_disk);
+            if (! $disk->exists($message->attachment_path)) {
+                return null;
+            }
+
+            $size = (int) $disk->size($message->attachment_path);
+            if ($size <= 0 || $size > 4 * 1024 * 1024) {
+                return null;
+            }
+
+            $binary = $disk->get($message->attachment_path);
+            $mime = $message->attachment_mime ?: 'image/jpeg';
+
+            return 'data:'.$mime.';base64,'.base64_encode($binary);
+        } catch (Throwable $e) {
+            Log::warning('Failed to load image attachment for AI context.', [
+                'message_id' => $message?->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function transcribeAudioAttachment(?Message $message, string $token): ?string
+    {
+        if (! $this->isAudioMessage($message) || ! $message?->attachment_disk || ! $message->attachment_path) {
+            return null;
+        }
+
+        $cacheKey = 'msg-audio-transcript:'.$message->id;
+        return Cache::remember($cacheKey, now()->addHours(12), function () use ($message, $token) {
+            $tmpPath = null;
+            $stream = null;
+
+            try {
+                $disk = Storage::disk($message->attachment_disk);
+                if (! $disk->exists($message->attachment_path)) {
+                    return null;
+                }
+
+                $binary = $disk->get($message->attachment_path);
+                if ($binary === '' || $binary === null) {
+                    return null;
+                }
+
+                $tmpPath = tempnam(sys_get_temp_dir(), 'normchat-audio-');
+                if (! $tmpPath) {
+                    return null;
+                }
+
+                file_put_contents($tmpPath, $binary);
+                $stream = fopen($tmpPath, 'r');
+                if ($stream === false) {
+                    return null;
+                }
+
+                $filename = $message->attachment_original_name ?: basename($message->attachment_path);
+                $response = Http::withToken($token)
+                    ->timeout(90)
+                    ->attach('file', $stream, $filename)
+                    ->post('https://api.openai.com/v1/audio/transcriptions', [
+                        'model' => 'whisper-1',
+                        'response_format' => 'json',
+                        'language' => 'id',
+                    ]);
+
+                if ($response->failed()) {
+                    Log::warning('Audio transcription failed.', [
+                        'message_id' => $message->id,
+                        'status' => $response->status(),
+                    ]);
+
+                    return null;
+                }
+
+                $text = trim((string) ($response->json('text') ?? ''));
+                return $text !== '' ? $text : null;
+            } catch (Throwable $e) {
+                Log::warning('Audio transcription exception.', [
+                    'message_id' => $message?->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+
+                if ($tmpPath && file_exists($tmpPath)) {
+                    @unlink($tmpPath);
+                }
+            }
+        });
+    }
+
 }

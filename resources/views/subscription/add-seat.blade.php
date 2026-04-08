@@ -8,7 +8,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
             </a>
-            <h1 class="font-display text-xl font-extrabold text-[#0F172A]">Add Seat - Payment</h1>
+            <h1 class="font-display text-xl font-extrabold text-[#0F172A]">Add Seat</h1>
         </div>
 
         <p class="mb-4 text-sm text-[#64748B]">Tambah kapasitas user aktif untuk tim yang tumbuh lebih cepat tanpa mengganggu percakapan berjalan.</p>
@@ -30,12 +30,12 @@
                 </div>
 
                 <div class="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">
-                    <p class="font-semibold text-blue-800">Pembayaran via Trakteer</p>
-                    <p class="mt-1">Kamu akan diarahkan ke halaman instruksi pembayaran Trakteer.</p>
+                    <p class="font-semibold text-blue-800">Aktivasi Instan</p>
+                    <p class="mt-1">Tidak ada payment gateway. Seat langsung ditambahkan setelah klik tombol.</p>
                 </div>
 
                 <button type="submit" class="btn-cta py-3 normal-case tracking-normal">
-                    Bayar via Trakteer
+                    Tambah Seat Sekarang
                 </button>
             </form>
         </div>

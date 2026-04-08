@@ -7,7 +7,6 @@ use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\GroupTokenContribution;
-use App\Models\PendingPayment;
 use App\Models\Role;
 use App\Models\Subscription;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +20,8 @@ class GroupController extends Controller
     private const INCLUDED_CREDITS = 10; // 10 normkredit included in subscription
     private const TOKENS_PER_CREDIT = 1_000;
     private const PLAN_PRICE = 25000;
+    private const DEFAULT_AI_PROVIDER = 'openai';
+    private const DEFAULT_AI_MODEL = 'gpt-5';
 
     public function index(): View|RedirectResponse
     {
@@ -47,12 +48,7 @@ class GroupController extends Controller
             ->where('status', 'active')
             ->exists();
 
-        $hasPaidPending = PendingPayment::where('user_id', $user->id)
-            ->where('payment_type', 'subscription')
-            ->where('status', 'paid')
-            ->exists();
-
-        if (! $hasActive && ! session('subscription_paid') && ! $hasPaidPending) {
+        if (! $hasActive && ! session('subscription_paid')) {
             return redirect()->route('subscription.pricing')
                 ->with('info', 'Aktifkan paket dulu sebelum membuat grup.');
         }
@@ -62,30 +58,14 @@ class GroupController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        // Build valid model list for validation
-        $validModels = [];
-        foreach (config('ai_models.providers', []) as $providerKey => $provider) {
-            foreach (array_keys($provider['models'] ?? []) as $modelKey) {
-                $validModels[] = $modelKey;
-            }
-        }
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:500'],
             'password' => ['required', 'string', 'min:4', 'max:100'],
             'approval_enabled' => ['nullable'],
-            'ai_provider' => ['required', 'string', 'in:' . implode(',', array_keys(config('ai_models.providers', [])))],
-            'ai_model' => ['required', 'string', 'in:' . implode(',', $validModels)],
         ]);
 
         $user = Auth::user();
-
-        // Verify the selected model belongs to the selected provider
-        $providerModels = config("ai_models.providers.{$validated['ai_provider']}.models", []);
-        if (! array_key_exists($validated['ai_model'], $providerModels)) {
-            return back()->withErrors(['ai_model' => 'Model tidak valid untuk provider yang dipilih.'])->withInput();
-        }
 
         $group = Group::create([
             'name' => $validated['name'],
@@ -93,18 +73,15 @@ class GroupController extends Controller
             'owner_id' => $user->id,
             'password_hash' => Hash::make($validated['password']),
             'approval_enabled' => (bool) ($validated['approval_enabled'] ?? false),
-            'ai_provider' => $validated['ai_provider'],
-            'ai_model' => $validated['ai_model'],
+            'ai_provider' => self::DEFAULT_AI_PROVIDER,
+            'ai_model' => self::DEFAULT_AI_MODEL,
         ]);
 
-        $ownerRole = Role::firstWhere('key', 'owner');
-
-        if ($ownerRole) {
-            GroupMember::updateOrCreate(
-                ['group_id' => $group->id, 'user_id' => $user->id],
-                ['role_id' => $ownerRole->id, 'status' => 'active', 'joined_at' => now()]
-            );
-        }
+        $ownerRoleId = $this->ensureRoleId('owner', 'Owner', 'Group owner');
+        GroupMember::updateOrCreate(
+            ['group_id' => $group->id, 'user_id' => $user->id],
+            ['role_id' => $ownerRoleId, 'status' => 'active', 'joined_at' => now()]
+        );
 
         // Create subscription for the new group
         Subscription::create([
@@ -142,8 +119,8 @@ class GroupController extends Controller
             'target_type' => Group::class,
             'target_id' => $group->id,
             'metadata_json' => [
-                'ai_provider' => $validated['ai_provider'],
-                'ai_model' => $validated['ai_model'],
+                'ai_provider' => self::DEFAULT_AI_PROVIDER,
+                'ai_model' => self::DEFAULT_AI_MODEL,
             ],
             'created_at' => now(),
         ]);
@@ -182,7 +159,7 @@ class GroupController extends Controller
         ]);
     }
 
-    // ── Join via share ID: pay + join ──────────────────────
+    // ── Join via share ID: instant join + simulated contribution ───────
 
     public function joinViaShareId(Request $request, string $shareId): RedirectResponse
     {
@@ -204,7 +181,7 @@ class GroupController extends Controller
 
         $request->validate([
             'password' => 'required|string',
-            'patungan_amount' => ['required', 'integer', 'min:' . self::MIN_PATUNGAN],
+            'patungan_amount' => ['nullable', 'integer', 'min:0'],
         ]);
 
         if (! Hash::check($request->input('password'), $group->password_hash)) {
@@ -212,8 +189,7 @@ class GroupController extends Controller
         }
 
         $user = Auth::user();
-        $patunganAmount = (int) $request->input('patungan_amount');
-        $totalPay = $patunganAmount + self::SEAT_PRICE;
+        $patunganAmount = max((int) $request->input('patungan_amount', self::MIN_PATUNGAN), 0);
 
         // Calculate normkredit from patungan
         $normkredit = $patunganAmount / self::PRICE_PER_NORMKREDIT;
@@ -232,8 +208,8 @@ class GroupController extends Controller
             'user_id' => $user->id,
             'source' => 'patungan',
             'token_amount' => $tokenAmount,
-            'price_paid' => $totalPay,
-            'payment_reference' => 'JOIN-' . strtoupper(\Illuminate\Support\Str::random(10)),
+            'price_paid' => 0,
+            'payment_reference' => 'SIM-JOIN-' . strtoupper(\Illuminate\Support\Str::random(8)),
         ]);
 
         // Add seat to subscription
@@ -244,13 +220,11 @@ class GroupController extends Controller
         }
 
         // Join as member
-        $memberRole = Role::firstWhere('key', 'member')
-            ?: Role::firstWhere('key', 'admin')
-            ?: Role::firstWhere('key', 'owner');
+        $memberRoleId = $this->ensureRoleId('member', 'Member', 'Group member');
 
         GroupMember::updateOrCreate(
             ['group_id' => $group->id, 'user_id' => $user->id],
-            ['role_id' => $memberRole?->id, 'status' => 'active', 'joined_at' => now()]
+            ['role_id' => $memberRoleId, 'status' => 'active', 'joined_at' => now()]
         );
 
         AuditLog::create([
@@ -263,12 +237,13 @@ class GroupController extends Controller
                 'patungan' => $patunganAmount,
                 'seat_fee' => self::SEAT_PRICE,
                 'normkredit' => $normkredit,
+                'simulated' => true,
             ],
             'created_at' => now(),
         ]);
 
         return redirect()->route('chat.show', $group)
-            ->with('success', 'Berhasil bergabung ke group "' . $group->name . '"! ' . number_format($normkredit, 0) . ' normkredit ditambahkan ke grup.');
+            ->with('success', 'Berhasil bergabung ke group "' . $group->name . '"! ' . number_format($normkredit, 0) . ' normkredit langsung ditambahkan ke grup.');
     }
 
     public function promoteMember(Request $request, Group $group, GroupMember $member): RedirectResponse
@@ -287,7 +262,9 @@ class GroupController extends Controller
             'role' => ['required', 'in:admin,member'],
         ]);
 
-        $targetRole = Role::firstWhere('key', $validated['role']);
+        $targetRole = $validated['role'] === 'admin'
+            ? Role::find($this->ensureRoleId('admin', 'Admin', 'Group administrator'))
+            : Role::find($this->ensureRoleId('member', 'Member', 'Group member'));
         if (! $targetRole) {
             return back()->withErrors(['member' => 'Role tujuan tidak ditemukan.']);
         }
@@ -332,5 +309,13 @@ class GroupController extends Controller
         ]);
 
         return back()->with('success', 'Member berhasil dihapus dari group.');
+    }
+
+    private function ensureRoleId(string $key, string $name, string $description): int
+    {
+        return (int) Role::firstOrCreate(
+            ['key' => $key],
+            ['name' => $name, 'description' => $description]
+        )->id;
     }
 }

@@ -24,13 +24,13 @@
                     <p class="text-xs text-slate-500">{{ $user->email }}</p>
                 </div>
                 <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
-                    Google SSO
+                    Interdotz SSO
                 </span>
             </div>
 
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Metode Pembayaran</p>
-                <p class="mt-0.5 text-sm text-slate-700">Trakteer (QRIS, VA, E-Wallet)</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Status Aktivasi</p>
+                <p class="mt-0.5 text-sm text-slate-700">Aktif instan setelah kamu lanjutkan.</p>
             </div>
 
             <hr class="border-slate-100" />
@@ -50,34 +50,22 @@
                 <p class="text-xs font-semibold text-emerald-700">Termasuk dalam paket:</p>
                 <ul class="mt-1 space-y-0.5 text-xs text-emerald-600">
                     <li>&#10003; Full akses semua fitur</li>
-                    <li>&#10003; 1 normkredit ({{ number_format($includedTokens) }} token AI, dialokasikan ke grup)</li>
+                    <li>&#10003; 10 normkredit ({{ number_format($includedTokens) }} token AI, dialokasikan ke grup)</li>
                 </ul>
             </div>
         </div>
-
-        @if($pendingPayment)
-            <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <p class="text-xs font-semibold text-amber-700">Kamu sudah punya order aktif:</p>
-                <p class="mt-1 font-mono text-sm font-bold text-amber-900">{{ $pendingPayment->order_id }}</p>
-                <p class="mt-1 text-xs text-amber-600">Lanjutkan pembayaran atau buat order baru.</p>
-                <a href="{{ route('subscription.payment.waiting', ['order_id' => $pendingPayment->order_id]) }}"
-                   class="mt-2 inline-block rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700">
-                    Lanjutkan Pembayaran
-                </a>
-            </div>
-        @endif
 
         {{-- Pay Button --}}
         <form method="POST" action="{{ route('subscription.pay') }}" class="mt-6">
             @csrf
             <input type="hidden" name="plan" value="normchat-pro" />
             <button type="submit" class="btn-cta w-full py-4 text-sm font-extrabold uppercase tracking-wide">
-                {{ $pendingPayment ? 'Buat Order Baru' : 'Bayar via Trakteer' }}
+                Aktifkan Paket & Masuk Grup
             </button>
         </form>
 
         <p class="mt-4 pb-4 text-center text-[11px] text-slate-400">
-            Pembayaran aman melalui Trakteer. Bisa batal kapan saja.
+            Ini simulasi aktivasi UI. Setelah klik, kamu langsung diarahkan ke workspace grup.
         </p>
     </section>
 @endsection

@@ -19,24 +19,15 @@
             </div>
         @endif
 
-        @if(!$group->ai_provider)
-            <div class="rounded-xl border border-dashed border-[#CBD5E1] bg-white p-5 text-sm text-[#64748B]">
-                Belum ada AI aktif. Provider dipilih saat membuat grup.
-            </div>
-        @else
-            @php
-                $providerLabel = config("ai_models.providers.{$group->ai_provider}.label", strtoupper($group->ai_provider));
-                $modelLabel = config("ai_models.providers.{$group->ai_provider}.models.{$group->ai_model}.label", $group->ai_model ?? '-');
-            @endphp
-            <form method="POST" action="{{ route('settings.ai.persona.save', $group) }}" class="space-y-3">
-                @csrf
-                <div class="panel-card p-4">
-                    <div class="mb-3 flex items-center justify-between">
-                        <p class="text-sm font-bold text-[#0F172A]">{{ $providerLabel }} &mdash; {{ $modelLabel }}</p>
-                        <span class="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                            Active
-                        </span>
-                    </div>
+        <form method="POST" action="{{ route('settings.ai.persona.save', $group) }}" class="space-y-3">
+            @csrf
+            <div class="panel-card p-4">
+                <div class="mb-3 flex items-center justify-between">
+                    <p class="text-sm font-bold text-[#0F172A]">NormAI Persona</p>
+                    <span class="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                        Active
+                    </span>
+                </div>
 
                     <label for="ai_persona_style" class="mb-1 block text-xs font-semibold text-[#64748B]">Persona Style</label>
                     <textarea id="ai_persona_style" name="ai_persona_style" rows="3"
@@ -55,11 +46,10 @@
                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                     @enderror
 
-                    <button type="submit" class="btn-cta mt-3 py-2.5 normal-case tracking-normal">
-                        Simpan Persona
-                    </button>
-                </div>
-            </form>
-        @endif
+                <button type="submit" class="btn-cta mt-3 py-2.5 normal-case tracking-normal">
+                    Simpan Persona
+                </button>
+            </div>
+        </form>
     </section>
 @endsection

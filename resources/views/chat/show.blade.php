@@ -27,25 +27,24 @@
         </div>
 
         {{-- Group info card --}}
-        <div class="mx-5 mb-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <h2 class="text-lg font-bold text-slate-900"># {{ $group->name }}</h2>
+        <div class="mx-5 mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
+            <h2 class="text-lg font-extrabold text-slate-900"># {{ $group->name }}</h2>
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 @php
                     $gt = $group->groupToken;
                     $credits = $gt ? $gt->credits : 0;
-                    $modelLabel = config("ai_models.providers.{$group->ai_provider}.models.{$group->ai_model}.label", $group->ai_model ?? 'N/A');
-                    $multiplier = $group->getModelMultiplier();
+                    $activeMembers = $group->members->where('status', 'active');
+                    $ownerInMembers = $activeMembers->contains('user_id', $group->owner_id);
+                    $memberCount = $activeMembers->count() + ($ownerInMembers ? 0 : 1);
                 @endphp
-                @if($group->ai_provider)
-                    <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
-                        {{ $modelLabel }} ({{ $multiplier }}x)
-                    </span>
-                @endif
+                <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
+                    NormAI aktif
+                </span>
                 <span class="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                    {{ $group->members->count() }} members
+                    {{ $memberCount }} members
                 </span>
                 <span class="rounded-full {{ $credits > 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600' }} px-2.5 py-1 text-[11px] font-semibold">
-                    {{ number_format($credits, 1) }} normkredit
+                    <span data-group-credits-badge="1">{{ number_format($credits, 1) }}</span> normkredit
                 </span>
             </div>
         </div>
@@ -65,13 +64,31 @@
                         || str_starts_with($attachmentMime, 'audio/')
                         || $attachmentMime === 'video/webm'
                     );
+                    $previewContent = $message->content
+                        ? \Illuminate\Support\Str::limit((string) $message->content, 120)
+                        : ($isImage ? '[Gambar]' : ($isVoice ? '[Voice note]' : '[Lampiran]'));
+                    $replyTarget = $message->replyToMessage;
+                    $replySender = $replyTarget
+                        ? ($replyTarget->sender_type === 'ai' ? 'NormAI' : ($replyTarget->sender->name ?? 'User'))
+                        : null;
+                    $replyPreview = $replyTarget
+                        ? ($replyTarget->content
+                            ? \Illuminate\Support\Str::limit((string) $replyTarget->content, 100)
+                            : (($replyTarget->message_type === 'image') ? '[Gambar]' : (($replyTarget->message_type === 'voice') ? '[Voice note]' : '[Lampiran]')))
+                        : null;
                     $audioSourceMime = $attachmentMime === 'video/webm' ? 'audio/webm' : ($message->attachment_mime ?? 'audio/webm');
                 @endphp
 
                 @if($isMine)
                     {{-- User's own message - right aligned, blue --}}
-                    <div class="flex justify-end" data-message-id="{{ $message->id }}">
+                    <div id="message-{{ $message->id }}" class="flex justify-end" data-message-id="{{ $message->id }}" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         <div class="max-w-[75%]">
+                            @if($replyTarget)
+                                <div class="mb-1 rounded-xl border border-blue-200/70 bg-blue-300/20 px-3 py-1.5 text-xs text-blue-50">
+                                    <p class="font-semibold">Reply to {{ $replySender }}</p>
+                                    <p class="truncate">{{ $replyPreview }}</p>
+                                </div>
+                            @endif
                             @if($isImage)
                                 <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener" class="mb-2 block overflow-hidden rounded-2xl border border-blue-200 bg-blue-50">
                                     <img src="{{ $attachmentUrl }}" alt="Gambar" class="h-auto max-h-64 w-full object-cover" />
@@ -111,7 +128,13 @@
                     </div>
                 @elseif($isAi)
                     {{-- AI message - left aligned, green tinted --}}
-                    <div class="max-w-[80%]" data-message-id="{{ $message->id }}">
+                    <div id="message-{{ $message->id }}" class="max-w-[80%]" data-message-id="{{ $message->id }}" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
+                        @if($replyTarget)
+                            <div class="mb-1 rounded-xl border border-emerald-200 bg-emerald-100/70 px-3 py-1.5 text-xs text-emerald-700">
+                                <p class="font-semibold">Reply to {{ $replySender }}</p>
+                                <p class="truncate">{{ $replyPreview }}</p>
+                            </div>
+                        @endif
                         @if($isImage)
                             <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener" class="mb-2 block overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50">
                                 <img src="{{ $attachmentUrl }}" alt="Gambar AI" class="h-auto max-h-64 w-full object-cover" />
@@ -150,8 +173,14 @@
                     </div>
                 @else
                     {{-- Other user message - left aligned, white --}}
-                    <div class="max-w-[75%]" data-message-id="{{ $message->id }}">
+                    <div id="message-{{ $message->id }}" class="max-w-[75%]" data-message-id="{{ $message->id }}" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         <p class="mb-1 text-[11px] text-slate-500">{{ $senderName }}</p>
+                        @if($replyTarget)
+                            <div class="mb-1 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
+                                <p class="font-semibold">Reply to {{ $replySender }}</p>
+                                <p class="truncate">{{ $replyPreview }}</p>
+                            </div>
+                        @endif
                         @if($isImage)
                             <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener" class="mb-2 block overflow-hidden rounded-2xl border border-slate-200 bg-white">
                                 <img src="{{ $attachmentUrl }}" alt="Gambar" class="h-auto max-h-64 w-full object-cover" />
@@ -194,6 +223,7 @@
                     Belum ada pesan. Mulai percakapan sekarang.
                 </div>
             @endforelse
+            <div class="hidden pb-2 text-[11px] text-slate-400" data-typing-indicator="1"></div>
         </div>
 
         {{-- Input bar --}}
@@ -202,6 +232,17 @@
                 @csrf
                 <input type="file" name="attachment" accept="image/*,audio/*" class="hidden" data-chat-attachment="1" />
                 <input type="file" accept="image/*" capture="environment" class="hidden" data-chat-camera-input="1" />
+                <input type="hidden" name="reply_to_message_id" value="" data-reply-to-input="1" />
+
+                <div class="mb-2 hidden items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 py-2" data-reply-preview="1">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold text-blue-700" data-reply-preview-sender="1">Reply</p>
+                        <p class="truncate text-xs text-blue-600" data-reply-preview-content="1"></p>
+                    </div>
+                    <button type="button" class="rounded-md p-1 text-blue-500 hover:bg-blue-100" data-reply-clear="1" aria-label="Batalkan reply">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd" /></svg>
+                    </button>
+                </div>
 
                 <div class="relative flex items-end gap-2" data-composer-main="1">
                     <button type="button" class="rounded-full p-2 text-slate-500 transition hover:bg-slate-100" data-open-emoji="1" title="Emoji" aria-label="Emoji">

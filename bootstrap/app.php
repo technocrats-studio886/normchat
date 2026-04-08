@@ -18,10 +18,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.llm.connected' => \App\Http\Middleware\EnsureUserHasLlmConnection::class,
         ]);
 
-        $middleware->validateCsrfTokens(except: [
-            'webhooks/trakteer',
-        ]);
-
         // Trust Nginx reverse proxy
         $middleware->trustProxies(at: '*');
     })

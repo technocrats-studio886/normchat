@@ -16,6 +16,7 @@ class Message extends Model
         'message_type',
         'sender_type',
         'sender_id',
+        'reply_to_message_id',
         'content',
         'attachment_disk',
         'attachment_path',
@@ -37,5 +38,15 @@ class Message extends Model
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function replyToMessage(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reply_to_message_id');
+    }
+
+    public function replies(): HasMany
+    {
+        return $this->hasMany(self::class, 'reply_to_message_id');
     }
 }

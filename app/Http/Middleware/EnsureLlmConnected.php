@@ -23,7 +23,7 @@ class EnsureLlmConnected
         if (! $user->hasValidCredentials()) {
             session()->put('url.intended', $request->fullUrl());
             return redirect()->route('login')
-                ->with('info', 'Silakan connect ulang provider AI kamu.');
+                ->with('info', 'Silakan sambungkan ulang akses AI kamu.');
         }
 
         return $next($request);

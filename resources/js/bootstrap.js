@@ -26,5 +26,10 @@ if (reverbKey) {
 		wssPort: Number(import.meta.env.VITE_REVERB_PORT || 8080),
 		forceTLS: (import.meta.env.VITE_REVERB_SCHEME || 'http') === 'https',
 		enabledTransports: ['ws', 'wss'],
+		authEndpoint: '/broadcasting/auth',
+		withCredentials: true,
+		auth: {
+			headers: csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {},
+		},
 	});
 }

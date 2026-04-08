@@ -4,6 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @auth
+        <meta name="auth-user-id" content="{{ auth()->id() }}">
+        <meta name="auth-user-name" content="{{ auth()->user()->name }}">
+    @endauth
     <meta name="theme-color" content="#1d4ed8">
     <link rel="manifest" href="{{ route('pwa.manifest') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">

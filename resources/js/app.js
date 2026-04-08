@@ -2,9 +2,34 @@ import './bootstrap';
 
 const chatFeed = document.querySelector('[data-chat-feed]');
 const groupId = chatFeed?.getAttribute('data-chat-group-id');
-const authUserId = Number(chatFeed?.getAttribute('data-auth-user-id') || 0);
+const authUserIdFromFeed = Number(chatFeed?.getAttribute('data-auth-user-id') || 0);
+const authUserIdFromMeta = Number(document.querySelector('meta[name="auth-user-id"]')?.getAttribute('content') || 0);
+const authUserId = authUserIdFromFeed || authUserIdFromMeta;
 const pendingMessagesByLocalId = new Map();
 let pendingLocalMessageCounter = 0;
+let chatSubmitInFlight = false;
+
+const scrollChatToBottom = (behavior = 'auto') => {
+	if (!chatFeed) {
+		return;
+	}
+
+	chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior });
+};
+
+const updateCreditsBadge = (payload) => {
+	const creditsEl = document.querySelector('[data-group-credits-badge]');
+	if (!creditsEl) {
+		return;
+	}
+
+	const credits = Number(payload?.group_credits_remaining);
+	if (!Number.isFinite(credits)) {
+		return;
+	}
+
+	creditsEl.textContent = credits.toFixed(1);
+};
 
 const escapeHtml = (text) => String(text)
 	.replace(/&/g, '&amp;')
@@ -100,6 +125,34 @@ const renderAttachment = (message, palette = 'slate') => {
 	`;
 };
 
+const renderReplyPreview = (message, palette = 'slate') => {
+	const replyTo = message?.reply_to;
+	if (!replyTo || !replyTo.id) {
+		return '';
+	}
+
+	const sender = escapeHtml(replyTo.sender_name || 'User');
+	let summary = String(replyTo.content || '').trim();
+	if (!summary) {
+		const replyType = String(replyTo.message_type || '').toLowerCase();
+		summary = replyType === 'image' ? '[Gambar]' : (replyType === 'voice' ? '[Voice note]' : '[Lampiran]');
+	}
+
+	const safeSummary = escapeHtml(summary.slice(0, 120));
+	const boxClass = palette === 'blue'
+		? 'border-blue-200/70 bg-blue-300/20 text-blue-50'
+		: (palette === 'emerald'
+			? 'border-emerald-200 bg-emerald-100/70 text-emerald-700'
+			: 'border-slate-200 bg-slate-100 text-slate-600');
+
+	return `
+		<a href="#message-${replyTo.id}" class="mb-1 block rounded-xl border px-3 py-1.5 text-xs ${boxClass}">
+			<p class="font-semibold">Reply to ${sender}</p>
+			<p class="truncate">${safeSummary}</p>
+		</a>
+	`;
+};
+
 const buildMessageNode = (message) => {
 	const createdAt = message?.created_at ? new Date(message.created_at) : null;
 	const timeText = createdAt && !Number.isNaN(createdAt.valueOf())
@@ -114,6 +167,7 @@ const buildMessageNode = (message) => {
 	const isPending = message?.is_pending === true;
 
 	if (isMine) {
+		const replyBlock = renderReplyPreview(message, 'blue');
 		const attachmentBlock = renderAttachment(message, 'blue');
 		const textBlock = content
 			? `<div class="rounded-2xl rounded-tr-sm bg-[#2563EB] px-4 py-2.5 text-sm text-white">${content}</div>`
@@ -125,15 +179,20 @@ const buildMessageNode = (message) => {
 		wrapper.className = 'flex justify-end';
 		wrapper.innerHTML = `
 			<div class="max-w-[75%]">
+				${replyBlock}
 				${attachmentBlock}
 				${textBlock}
 				<p class="mt-1 text-right text-[11px] text-slate-400">${labelText}</p>
 			</div>
 		`;
+		wrapper.dataset.messageSenderName = String(message?.sender_name || 'You');
+		wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
+		wrapper.dataset.messageType = String(message?.message_type || 'text');
 		return wrapper;
 	}
 
 	if (isAi) {
+		const replyBlock = renderReplyPreview(message, 'emerald');
 		const aiName = escapeHtml(message?.sender_name || 'NormAI');
 		const attachmentBlock = renderAttachment(message, 'emerald');
 		const textBlock = content
@@ -142,13 +201,18 @@ const buildMessageNode = (message) => {
 
 		wrapper.className = 'max-w-[80%]';
 		wrapper.innerHTML = `
+			${replyBlock}
 			${attachmentBlock}
 			${textBlock}
 			<p class="mt-1 text-[11px] font-medium text-emerald-700">${aiName}${timeText ? ` • ${timeText}` : ''}</p>
 		`;
+		wrapper.dataset.messageSenderName = String(message?.sender_name || 'NormAI');
+		wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
+		wrapper.dataset.messageType = String(message?.message_type || 'text');
 		return wrapper;
 	}
 
+	const replyBlock = renderReplyPreview(message, 'slate');
 	const senderName = escapeHtml(message?.sender_name || 'User');
 	const attachmentBlock = renderAttachment(message, 'slate');
 	const textBlock = content
@@ -158,10 +222,14 @@ const buildMessageNode = (message) => {
 	wrapper.className = 'max-w-[75%]';
 	wrapper.innerHTML = `
 		<p class="mb-1 text-[11px] text-slate-500">${senderName}</p>
+		${replyBlock}
 		${attachmentBlock}
 		${textBlock}
 		<p class="mt-1 text-[11px] text-slate-400">${senderName}${timeText ? ` • ${timeText}` : ''}</p>
 	`;
+	wrapper.dataset.messageSenderName = String(message?.sender_name || 'User');
+	wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
+	wrapper.dataset.messageType = String(message?.message_type || 'text');
 
 	return wrapper;
 };
@@ -346,12 +414,191 @@ const initVoicePlayers = (root = document) => {
 
 localizeExistingMessageTimes();
 initVoicePlayers(document);
+requestAnimationFrame(() => scrollChatToBottom('auto'));
+
+const ensureMentionToastStack = () => {
+	let stack = document.querySelector('[data-mention-toast-stack]');
+	if (stack) {
+		return stack;
+	}
+
+	stack = document.createElement('div');
+	stack.setAttribute('data-mention-toast-stack', '1');
+	stack.className = 'pointer-events-none fixed right-3 top-3 z-[70] flex w-[calc(100%-1.5rem)] max-w-sm flex-col gap-2';
+	document.body.appendChild(stack);
+	return stack;
+};
+
+const highlightMessageInFeed = (messageId) => {
+	if (!messageId) {
+		return false;
+	}
+
+	const target = document.getElementById(`message-${messageId}`)
+		|| chatFeed?.querySelector(`[data-message-id="${messageId}"]`);
+	if (!(target instanceof HTMLElement)) {
+		return false;
+	}
+
+	target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	target.classList.add('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-[#F7F7F7]', 'rounded-2xl');
+	window.setTimeout(() => {
+		target.classList.remove('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-[#F7F7F7]', 'rounded-2xl');
+	}, 2600);
+
+	return true;
+};
+
+const showMentionToast = (payload) => {
+	const stack = ensureMentionToastStack();
+	const senderName = escapeHtml(payload?.sender_name || 'Seseorang');
+	const groupName = escapeHtml(payload?.group_name || 'group');
+	const previewText = escapeHtml(String(payload?.content || '').slice(0, 80));
+	const messageId = Number(payload?.message_id || 0);
+	const targetGroupId = Number(payload?.group_id || 0);
+	const currentGroupId = Number(groupId || 0);
+	const isCurrentGroupOpen = currentGroupId > 0 && targetGroupId > 0 && currentGroupId === targetGroupId;
+
+	const toast = document.createElement('button');
+	toast.type = 'button';
+	toast.className = 'pointer-events-auto rounded-2xl border border-amber-200 bg-white px-3 py-2 text-left shadow-lg shadow-slate-900/10 transition hover:bg-amber-50';
+	toast.innerHTML = `
+		<p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Tag Masuk</p>
+		<p class="mt-0.5 text-sm font-semibold text-slate-800">${senderName} men-tag kamu di #${groupName}</p>
+		<p class="mt-0.5 text-xs text-slate-500">${previewText}</p>
+	`;
+
+	toast.addEventListener('click', () => {
+		if (isCurrentGroupOpen && highlightMessageInFeed(messageId)) {
+			toast.remove();
+			return;
+		}
+
+		window.location.href = String(payload?.chat_url || `/groups/${targetGroupId}/chat`);
+	});
+
+	stack.appendChild(toast);
+	window.setTimeout(() => {
+		if (toast.isConnected) {
+			toast.remove();
+		}
+	}, 6500);
+
+	if (isCurrentGroupOpen) {
+		highlightMessageInFeed(messageId);
+	}
+
+	if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+		try {
+			new Notification('Normchat mention', {
+				body: `${payload?.sender_name || 'Seseorang'} men-tag kamu di #${payload?.group_name || 'group'}`,
+			});
+		} catch (_error) {
+			// Ignore notification API failures in restricted browsers.
+		}
+	}
+};
+
+const seenMentionKeys = new Set();
+
+if (window.Echo && authUserId > 0) {
+	window.Echo.private(`App.Models.User.${authUserId}`).listen('.mention.tagged', (payload) => {
+		if (!payload) {
+			return;
+		}
+
+		if (Number(payload.sender_id || 0) === authUserId) {
+			return;
+		}
+
+		const dedupeKey = `${payload.group_id || 0}:${payload.message_id || 0}:${authUserId}`;
+		if (seenMentionKeys.has(dedupeKey)) {
+			return;
+		}
+
+		seenMentionKeys.add(dedupeKey);
+		if (seenMentionKeys.size > 250) {
+			const firstKey = seenMentionKeys.values().next().value;
+			if (firstKey) {
+				seenMentionKeys.delete(firstKey);
+			}
+		}
+
+		showMentionToast(payload);
+	});
+}
+
+let groupChannel = null;
 
 if (window.Echo && groupId) {
-	window.Echo.private(`group.${groupId}`).listen('.message.sent', (payload) => {
+	groupChannel = window.Echo.private(`group.${groupId}`);
+
+	const typingIndicator = document.querySelector('[data-typing-indicator]');
+	const activeTypingUsers = new Map();
+
+	const renderTypingIndicator = () => {
+		if (!(typingIndicator instanceof HTMLElement)) {
+			return;
+		}
+
+		const labels = Array.from(activeTypingUsers.values());
+		if (!labels.length) {
+			typingIndicator.classList.add('hidden');
+			typingIndicator.textContent = '';
+			return;
+		}
+
+		typingIndicator.classList.remove('hidden');
+		if (labels.length === 1) {
+			typingIndicator.textContent = `${labels[0]} sedang mengetik...`;
+			return;
+		}
+
+		typingIndicator.textContent = `${labels.length} orang sedang mengetik...`;
+	};
+
+	const updateTypingState = (key, label, isTyping) => {
+		if (!key) {
+			return;
+		}
+
+		if (isTyping) {
+			activeTypingUsers.set(key, label || 'User');
+		} else {
+			activeTypingUsers.delete(key);
+		}
+
+		renderTypingIndicator();
+	};
+
+	groupChannel.listenForWhisper('typing', (payload) => {
+		const senderId = Number(payload?.sender_id || 0);
+		if (senderId === authUserId) {
+			return;
+		}
+
+		updateTypingState(
+			`user:${senderId || payload?.sender_name || 'unknown'}`,
+			String(payload?.sender_name || 'User'),
+			Boolean(payload?.is_typing)
+		);
+	});
+
+	groupChannel.listen('.typing.status', (payload) => {
+		const actorType = String(payload?.actor_type || '');
+		if (actorType !== 'ai') {
+			return;
+		}
+
+		updateTypingState('ai', String(payload?.sender_name || 'NormAI'), Boolean(payload?.is_typing));
+	});
+
+	groupChannel.listen('.message.sent', (payload) => {
 		if (!chatFeed || !payload?.message) {
 			return;
 		}
+
+		updateCreditsBadge(payload.message);
 
 		if (
 			payload.message.sender_type === 'user'
@@ -380,6 +627,7 @@ if (window.Echo && groupId) {
 
 				const finalNode = buildMessageNode(payload.message);
 				finalNode.setAttribute('data-message-id', String(payload.message.id));
+				finalNode.id = `message-${payload.message.id}`;
 				pending.node.replaceWith(finalNode);
 				initVoicePlayers(finalNode);
 
@@ -388,7 +636,7 @@ if (window.Echo && groupId) {
 				}
 
 				pendingMessagesByLocalId.delete(localId);
-				chatFeed.scrollTop = chatFeed.scrollHeight;
+				scrollChatToBottom('smooth');
 				return;
 			}
 		}
@@ -400,9 +648,10 @@ if (window.Echo && groupId) {
 
 		const node = buildMessageNode(payload.message);
 		node.setAttribute('data-message-id', String(payload.message.id));
+		node.id = `message-${payload.message.id}`;
 		chatFeed.appendChild(node);
 		initVoicePlayers(node);
-		chatFeed.scrollTop = chatFeed.scrollHeight;
+		scrollChatToBottom('smooth');
 	});
 }
 
@@ -423,6 +672,11 @@ const emojiPanel = chatForm?.querySelector('[data-emoji-panel]');
 const recordingIndicator = chatForm?.querySelector('[data-recording-indicator]');
 const mentionInput = chatForm?.querySelector('[data-mention-input]');
 const sendButton = chatForm?.querySelector('[data-chat-send]');
+const replyToInput = chatForm?.querySelector('[data-reply-to-input]');
+const replyPreview = chatForm?.querySelector('[data-reply-preview]');
+const replyPreviewSender = chatForm?.querySelector('[data-reply-preview-sender]');
+const replyPreviewContent = chatForm?.querySelector('[data-reply-preview-content]');
+const replyClearButton = chatForm?.querySelector('[data-reply-clear]');
 const isDesktopKeyboard = (() => {
 	const hasCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches;
 	const hasTouchPoints = (navigator.maxTouchPoints || 0) > 0;
@@ -487,6 +741,143 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 		attachmentLabel.textContent = file.name;
 		attachmentLabel.classList.remove('hidden');
+	};
+
+	const clearReplyTarget = () => {
+		if (replyToInput instanceof HTMLInputElement) {
+			replyToInput.value = '';
+		}
+
+		if (replyPreview instanceof HTMLElement) {
+			replyPreview.classList.add('hidden');
+			replyPreview.classList.remove('flex');
+		}
+	};
+
+	const setReplyTarget = (messageNode) => {
+		if (!(messageNode instanceof HTMLElement) || !(replyToInput instanceof HTMLInputElement)) {
+			return;
+		}
+
+		const messageId = String(messageNode.getAttribute('data-message-id') || '').trim();
+		if (!messageId) {
+			return;
+		}
+
+		const sender = String(messageNode.dataset.messageSenderName || 'User');
+		const rawContent = String(messageNode.dataset.messageContent || '').trim();
+		const type = String(messageNode.dataset.messageType || 'text').toLowerCase();
+		const fallback = type === 'image' ? '[Gambar]' : (type === 'voice' ? '[Voice note]' : '[Lampiran]');
+		const content = rawContent !== '' ? rawContent : fallback;
+
+		replyToInput.value = messageId;
+		if (replyPreviewSender instanceof HTMLElement) {
+			replyPreviewSender.textContent = `Reply ke ${sender}`;
+		}
+		if (replyPreviewContent instanceof HTMLElement) {
+			replyPreviewContent.textContent = content;
+		}
+		if (replyPreview instanceof HTMLElement) {
+			replyPreview.classList.remove('hidden');
+			replyPreview.classList.add('flex');
+		}
+
+		mentionInput?.focus();
+	};
+
+	replyClearButton?.addEventListener('click', clearReplyTarget);
+
+	if (chatFeed instanceof HTMLElement) {
+		const SWIPE_THRESHOLD = 46;
+		const LONG_PRESS_MS = 520;
+		let startX = 0;
+		let startY = 0;
+		let activeNode = null;
+		let longPressTimer = null;
+
+		const clearLongPress = () => {
+			if (longPressTimer) {
+				window.clearTimeout(longPressTimer);
+				longPressTimer = null;
+			}
+		};
+
+		chatFeed.addEventListener('pointerdown', (event) => {
+			const node = event.target instanceof HTMLElement
+				? event.target.closest('[data-message-id]')
+				: null;
+			if (!(node instanceof HTMLElement)) {
+				activeNode = null;
+				return;
+			}
+
+			activeNode = node;
+			startX = event.clientX;
+			startY = event.clientY;
+			clearLongPress();
+			longPressTimer = window.setTimeout(() => {
+				if (activeNode) {
+					setReplyTarget(activeNode);
+				}
+			}, LONG_PRESS_MS);
+		});
+
+		chatFeed.addEventListener('pointermove', (event) => {
+			if (!activeNode) {
+				return;
+			}
+
+			const deltaX = event.clientX - startX;
+			const deltaY = event.clientY - startY;
+			if (Math.abs(deltaY) > 16 || Math.abs(deltaX) > 12) {
+				clearLongPress();
+			}
+
+			if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+				setReplyTarget(activeNode);
+				activeNode = null;
+				clearLongPress();
+			}
+		});
+
+		chatFeed.addEventListener('pointerup', () => {
+			activeNode = null;
+			clearLongPress();
+		});
+
+		chatFeed.addEventListener('pointercancel', () => {
+			activeNode = null;
+			clearLongPress();
+		});
+
+		chatFeed.addEventListener('dblclick', (event) => {
+			const node = event.target instanceof HTMLElement
+				? event.target.closest('[data-message-id]')
+				: null;
+			if (node instanceof HTMLElement) {
+				setReplyTarget(node);
+			}
+		});
+	}
+
+	let typingStopTimer = null;
+	let lastTypingWhisperAt = 0;
+	const whisperTyping = (isTyping) => {
+		if (!groupChannel || typeof groupChannel.whisper !== 'function' || !authUserId) {
+			return;
+		}
+
+		const now = Date.now();
+		if (isTyping && now - lastTypingWhisperAt < 750) {
+			return;
+		}
+
+		lastTypingWhisperAt = now;
+		groupChannel.whisper('typing', {
+			sender_id: authUserId,
+			sender_name: (document.querySelector('meta[name="auth-user-name"]')?.getAttribute('content') || 'User'),
+			is_typing: isTyping,
+		});
 	};
 
 	cameraButton?.addEventListener('click', () => {
@@ -669,12 +1060,36 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		};
 
 		mentionInput.addEventListener('input', resizeComposerInput);
+		mentionInput.addEventListener('input', () => {
+			const hasText = mentionInput.value.trim().length > 0;
+			if (!hasText) {
+				if (typingStopTimer) {
+					window.clearTimeout(typingStopTimer);
+					typingStopTimer = null;
+				}
+				whisperTyping(false);
+				return;
+			}
+
+			whisperTyping(true);
+			if (typingStopTimer) {
+				window.clearTimeout(typingStopTimer);
+			}
+			typingStopTimer = window.setTimeout(() => {
+				whisperTyping(false);
+			}, 1500);
+		});
 		resizeComposerInput();
 	}
 
 	chatForm.addEventListener('submit', () => {
 		emojiPanel?.classList.add('hidden');
 		recordingIndicator?.classList.add('hidden');
+		if (typingStopTimer) {
+			window.clearTimeout(typingStopTimer);
+			typingStopTimer = null;
+		}
+		whisperTyping(false);
 		if (attachmentLabel) {
 			attachmentLabel.classList.add('hidden');
 		}
@@ -717,7 +1132,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		node.setAttribute('data-pending-message', '1');
 		chatFeed.appendChild(node);
 		initVoicePlayers(node);
-		chatFeed.scrollTop = chatFeed.scrollHeight;
+		scrollChatToBottom('smooth');
 
 		pendingMessagesByLocalId.set(localId, {
 			node,
@@ -754,6 +1169,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 		const finalNode = buildMessageNode(serverMessage);
 		finalNode.setAttribute('data-message-id', String(serverMessage.id));
+		finalNode.id = `message-${serverMessage.id}`;
 		pending.node.replaceWith(finalNode);
 		initVoicePlayers(finalNode);
 
@@ -762,10 +1178,15 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		}
 
 		pendingMessagesByLocalId.delete(localId);
+		scrollChatToBottom('smooth');
 	};
 
 	chatForm.addEventListener('submit', async (event) => {
 		event.preventDefault();
+
+		if (chatSubmitInFlight) {
+			return;
+		}
 
 		const actionUrl = chatForm.getAttribute('action') || '';
 		if (!actionUrl) {
@@ -794,8 +1215,11 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		}
 		attachmentLabel?.classList.add('hidden');
 		emojiPanel?.classList.add('hidden');
+		clearReplyTarget();
+		whisperTyping(false);
 
 		setSendingUi(true);
+		chatSubmitInFlight = true;
 		try {
 			const response = await fetch(actionUrl, {
 				method: 'POST',
@@ -821,7 +1245,13 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			}
 		} finally {
 			setSendingUi(false);
+			chatSubmitInFlight = false;
+			whisperTyping(false);
 		}
+	});
+
+	window.addEventListener('beforeunload', () => {
+		whisperTyping(false);
 	});
 }
 

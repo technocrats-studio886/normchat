@@ -67,8 +67,11 @@ services:
       VITE_REVERB_PORT: ${VITE_REVERB_PORT:-443}
       VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-normchat_attachments}
-      TRAKTEER_WEBHOOK_TOKEN: ${TRAKTEER_WEBHOOK_TOKEN:-}
-      TRAKTEER_PAGE_URL: ${TRAKTEER_PAGE_URL:-https://trakteer.id/normchat}
+      INTERDOTZ_CLIENT_ID: ${INTERDOTZ_CLIENT_ID:-}
+      INTERDOTZ_CLIENT_SECRET: ${INTERDOTZ_CLIENT_SECRET:-}
+      INTERDOTZ_API_BASE: ${INTERDOTZ_API_BASE:-https://api-interdotz.technocrats.studio}
+      INTERDOTZ_SSO_BASE: ${INTERDOTZ_SSO_BASE:-https://interdotz.technocrats.studio}
+      INTERDOTZ_REDIRECT_URI: ${INTERDOTZ_REDIRECT_URI:-https://normchat.technocrats.studio/sso/interdotz/callback}
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,6 +80,9 @@ services:
     restart: unless-stopped
     command: >
       sh -c "
+        mkdir -p /opt/normchat/storage/attachments /opt/normchat/storage/exports /opt/normchat/storage/backups &&
+        chown -R www-data:www-data /opt/normchat/storage &&
+        chmod -R ug+rwX /opt/normchat/storage &&
         php artisan migrate --force &&
         php artisan config:cache &&
         php artisan route:cache &&
@@ -123,15 +129,22 @@ services:
       REVERB_PORT: ${REVERB_PORT:-8080}
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-normchat_attachments}
-      TRAKTEER_WEBHOOK_TOKEN: ${TRAKTEER_WEBHOOK_TOKEN:-}
-      TRAKTEER_PAGE_URL: ${TRAKTEER_PAGE_URL:-https://trakteer.id/normchat}
+      INTERDOTZ_CLIENT_ID: ${INTERDOTZ_CLIENT_ID:-}
+      INTERDOTZ_CLIENT_SECRET: ${INTERDOTZ_CLIENT_SECRET:-}
+      INTERDOTZ_API_BASE: ${INTERDOTZ_API_BASE:-https://api-interdotz.technocrats.studio}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
-    command: php artisan queue:work redis --queue=default --tries=3 --sleep=1 --max-time=3600
+    command: >
+      sh -c "
+        mkdir -p /opt/normchat/storage/attachments /opt/normchat/storage/exports /opt/normchat/storage/backups &&
+        chown -R www-data:www-data /opt/normchat/storage &&
+        chmod -R ug+rwX /opt/normchat/storage &&
+        php artisan queue:work redis --queue=default --tries=3 --sleep=1 --max-time=3600
+      "
 
   reverb:
     build:
@@ -177,7 +190,13 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    command: >
+      sh -c "
+        mkdir -p /opt/normchat/storage/attachments /opt/normchat/storage/exports /opt/normchat/storage/backups &&
+        chown -R www-data:www-data /opt/normchat/storage &&
+        chmod -R ug+rwX /opt/normchat/storage &&
+        php artisan reverb:start --host=0.0.0.0 --port=8080
+      "
 
   postgres:
     image: postgres:16-alpine

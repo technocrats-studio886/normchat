@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Events\MessageSent;
+use App\Events\UserMentioned;
 use App\Models\AuditLog;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
+use App\Models\GroupToken;
 use App\Models\Message;
 use App\Jobs\ProcessGroupChatQueueJob;
 use Illuminate\Http\UploadedFile;
@@ -64,21 +66,18 @@ class ChatController extends Controller
 
         $messages = Message::query()
             ->where('group_id', $group->id)
-            ->with('sender:id,name')
+            ->with(['sender:id,name', 'replyToMessage.sender:id,name'])
             ->orderByDesc('id')
             ->take(80)
             ->get()
             ->reverse()
             ->values();
 
-        $ownerProvider = $group->ai_provider ? ucfirst((string) $group->ai_provider) : null;
-        $mentionSuggestions = $this->buildMentionSuggestions($group, $group->ai_provider);
+        $mentionSuggestions = $this->buildMentionSuggestions($group);
 
         return view('chat.show', [
             'group' => $group,
             'messages' => $messages,
-            'ownerProvider' => $ownerProvider,
-            'activeAi' => $ownerProvider ? collect([$ownerProvider]) : collect(),
             'mentionSuggestions' => $mentionSuggestions,
         ]);
     }
@@ -90,17 +89,19 @@ class ChatController extends Controller
         $validated = $request->validate([
             'content' => ['nullable', 'string', 'max:3000'],
             'attachment' => ['nullable', 'file', 'max:15360', 'mimes:jpg,jpeg,png,webp,gif,heic,heif,mp3,wav,ogg,webm,mp4,aac,m4a'],
+            'reply_to_message_id' => ['nullable', 'integer'],
         ]);
 
         $content = trim((string) ($validated['content'] ?? ''));
         $attachment = $request->file('attachment');
+        $replyToMessageId = (int) ($validated['reply_to_message_id'] ?? 0);
 
         if ($content === '' && ! $attachment instanceof UploadedFile) {
             return back()->withErrors(['content' => 'Kirim teks, gambar, atau voice note.'])->withInput();
         }
 
         try {
-            $message = Cache::lock('group-chat-submit:'.$group->id, 10)->block(3, function () use ($group, $content, $attachment) {
+            $message = Cache::lock('group-chat-submit:'.$group->id, 10)->block(3, function () use ($group, $content, $attachment, $replyToMessageId) {
                 $messageType = $this->resolveMessageType($attachment);
 
                 $attachmentPath = null;
@@ -108,6 +109,14 @@ class ChatController extends Controller
                 $attachmentMime = null;
                 $attachmentSize = null;
                 $attachmentOriginalName = null;
+                $replyTarget = null;
+
+                if ($replyToMessageId > 0) {
+                    $replyTarget = Message::query()
+                        ->where('id', $replyToMessageId)
+                        ->where('group_id', $group->id)
+                        ->first();
+                }
 
                 if ($attachment instanceof UploadedFile) {
                     $attachmentDisk = 'normchat_attachments';
@@ -122,6 +131,11 @@ class ChatController extends Controller
                         $safeExtension
                     );
 
+                    $targetDirectory = dirname($attachmentPath);
+                    if ($targetDirectory !== '.') {
+                        Storage::disk($attachmentDisk)->makeDirectory($targetDirectory);
+                    }
+
                     Storage::disk($attachmentDisk)->put($attachmentPath, file_get_contents($attachment->getRealPath()));
 
                     $attachmentMime = $this->normalizeAttachmentMime($messageType, $clientMime, $safeExtension);
@@ -134,6 +148,7 @@ class ChatController extends Controller
                     'message_type' => $messageType,
                     'sender_type' => 'user',
                     'sender_id' => Auth::id(),
+                    'reply_to_message_id' => $replyTarget?->id,
                     'content' => $content !== '' ? $content : null,
                     'attachment_disk' => $attachmentDisk,
                     'attachment_path' => $attachmentPath,
@@ -142,7 +157,7 @@ class ChatController extends Controller
                     'attachment_size' => $attachmentSize,
                 ]);
 
-                if ($messageType === 'text') {
+                if ($this->shouldQueueAi($content, $replyTarget)) {
                     ChatMessageQueue::create([
                         'group_id' => $group->id,
                         'message_id' => $createdMessage->id,
@@ -166,26 +181,19 @@ class ChatController extends Controller
             return back()->withErrors(['content' => 'Chat sedang sibuk. Coba kirim ulang dalam beberapa detik.']);
         }
 
-        if ($message->message_type === 'text') {
+        $message->loadMissing('replyToMessage.sender:id,name');
+
+        if ($this->shouldQueueAi($content, $message->replyToMessage)) {
             ProcessGroupChatQueueJob::dispatch($group->id);
         }
 
-        $payload = [
-            'id' => $message->id,
-            'message_type' => $message->message_type,
-            'sender_type' => $message->sender_type,
-            'sender_id' => $message->sender_id,
-            'sender_name' => Auth::user()?->name,
-            'content' => $message->content,
-            'attachment_url' => $message->attachment_path
-                ? route('chat.attachment', ['group' => $group->id, 'message' => $message->id])
-                : null,
-            'attachment_mime' => $message->attachment_mime,
-            'attachment_original_name' => $message->attachment_original_name,
-            'created_at' => optional($message->created_at)->toIso8601String(),
-        ];
+        $payload = $this->buildMessagePayload($message, $group, Auth::user()?->name);
 
         event(new MessageSent($group->id, $payload));
+
+        if ($content !== '') {
+            $this->dispatchMentionNotifications($group, $message, $content);
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -195,6 +203,108 @@ class ChatController extends Controller
         }
 
         return redirect()->route('chat.show', $group);
+    }
+
+    private function dispatchMentionNotifications(Group $group, Message $message, string $content): void
+    {
+        $mentionedHandles = $this->extractMentionHandles($content);
+        if ($mentionedHandles === []) {
+            return;
+        }
+
+        $group->loadMissing([
+            'owner:id,name',
+            'members' => fn ($query) => $query
+                ->where('status', 'active')
+                ->with('user:id,name'),
+        ]);
+
+        $handleToUserId = [];
+        collect([$group->owner])
+            ->merge($group->members->pluck('user'))
+            ->filter()
+            ->unique('id')
+            ->each(function ($user) use (&$handleToUserId) {
+                foreach ($this->buildUserMentionHandles((string) $user->name) as $handle) {
+                    $handleToUserId[$handle] = (int) $user->id;
+                }
+            });
+
+        $senderId = (int) $message->sender_id;
+        $targetUserIds = collect($mentionedHandles)
+            ->map(fn ($handle) => $handleToUserId[$handle] ?? null)
+            ->filter(fn ($userId) => is_int($userId) && $userId > 0 && $userId !== $senderId)
+            ->unique()
+            ->values();
+
+        if ($targetUserIds->isEmpty()) {
+            return;
+        }
+
+        $senderName = (string) (Auth::user()?->name ?? 'User');
+        $chatUrl = route('chat.show', $group).'#message-'.$message->id;
+
+        foreach ($targetUserIds as $targetUserId) {
+            event(new UserMentioned((int) $targetUserId, [
+                'group_id' => (int) $group->id,
+                'group_name' => (string) $group->name,
+                'message_id' => (int) $message->id,
+                'sender_id' => $senderId,
+                'sender_name' => $senderName,
+                'content' => mb_substr((string) $content, 0, 240),
+                'chat_url' => $chatUrl,
+                'created_at' => optional($message->created_at)->toIso8601String(),
+            ]));
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extractMentionHandles(string $content): array
+    {
+        if (! preg_match_all('/@([\\p{L}\\p{N}_.]+)/u', $content, $matches)) {
+            return [];
+        }
+
+        return collect($matches[1] ?? [])
+            ->map(fn ($handle) => strtolower(trim((string) $handle)))
+            ->filter(fn ($handle) => $handle !== '' && $handle !== 'ai' && $handle !== 'openai' && $handle !== 'chatgpt')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildUserMentionHandles(string $name): array
+    {
+        $trimmed = trim($name);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $base = strtolower($trimmed);
+        $base = preg_replace('/[^\\p{L}\\p{N} ]+/u', '', $base) ?? '';
+        $base = trim(preg_replace('/\\s+/u', ' ', $base) ?? '');
+
+        if ($base === '') {
+            return [];
+        }
+
+        $handles = [
+            str_replace(' ', '_', $base),
+            str_replace(' ', '.', $base),
+            str_replace(' ', '', $base),
+            $base,
+        ];
+
+        return collect($handles)
+            ->filter(fn ($handle) => $handle !== '')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function attachment(Group $group, Message $message): StreamedResponse
@@ -263,7 +373,7 @@ class ChatController extends Controller
         return $clientMime !== '' ? $clientMime : 'application/octet-stream';
     }
 
-    private function buildMentionSuggestions(Group $group, ?string $activeProvider): array
+    private function buildMentionSuggestions(Group $group): array
     {
         $users = collect([$group->owner])
             ->merge($group->members->pluck('user'))
@@ -276,25 +386,52 @@ class ChatController extends Controller
             ])
             ->values();
 
-        $providerKey = strtolower((string) $activeProvider);
-        $aiMentions = match ($providerKey) {
-            'openai' => [
-                ['type' => 'ai', 'label' => 'AI (OpenAI)', 'insert' => '@ai'],
-                ['type' => 'ai', 'label' => 'ChatGPT', 'insert' => '@chatgpt'],
-            ],
-            'claude' => [
-                ['type' => 'ai', 'label' => 'AI (Claude)', 'insert' => '@ai'],
-                ['type' => 'ai', 'label' => 'Claude', 'insert' => '@claude'],
-            ],
-            'gemini' => [
-                ['type' => 'ai', 'label' => 'AI (Gemini)', 'insert' => '@ai'],
-                ['type' => 'ai', 'label' => 'Gemini', 'insert' => '@gemini'],
-            ],
-            default => [
-                ['type' => 'ai', 'label' => 'AI', 'insert' => '@ai'],
-            ],
-        };
+        $aiMentions = [
+            ['type' => 'ai', 'label' => 'AI Assistant', 'insert' => '@ai'],
+        ];
 
         return collect($aiMentions)->merge($users)->values()->all();
+    }
+
+    private function shouldQueueAi(string $content, ?Message $replyTarget = null): bool
+    {
+        $normalized = strtolower($content);
+        if (str_contains($normalized, '@ai') || str_contains($normalized, '@openai') || str_contains($normalized, '@chatgpt')) {
+            return true;
+        }
+
+        return $replyTarget?->sender_type === 'ai';
+    }
+
+    private function buildMessagePayload(Message $message, Group $group, ?string $senderName = null, ?GroupToken $groupToken = null): array
+    {
+        $groupToken ??= $group->groupToken;
+        $replyTarget = $message->replyToMessage;
+
+        return [
+            'id' => $message->id,
+            'message_type' => $message->message_type,
+            'sender_type' => $message->sender_type,
+            'sender_id' => $message->sender_id,
+            'sender_name' => $senderName ?: ($message->sender?->name ?? ($message->sender_type === 'ai' ? 'NormAI' : 'User')),
+            'content' => $message->content,
+            'attachment_url' => $message->attachment_path
+                ? route('chat.attachment', ['group' => $group->id, 'message' => $message->id])
+                : null,
+            'attachment_mime' => $message->attachment_mime,
+            'attachment_original_name' => $message->attachment_original_name,
+            'created_at' => optional($message->created_at)->toIso8601String(),
+            'reply_to' => $replyTarget ? [
+                'id' => (int) $replyTarget->id,
+                'sender_name' => $replyTarget->sender_type === 'ai'
+                    ? 'NormAI'
+                    : ($replyTarget->sender?->name ?? 'User'),
+                'message_type' => (string) $replyTarget->message_type,
+                'content' => (string) ($replyTarget->content ?? ''),
+                'attachment_original_name' => (string) ($replyTarget->attachment_original_name ?? ''),
+            ] : null,
+            'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
+            'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 1000, 1),
+        ];
     }
 }

@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -25,9 +26,50 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class SettingsController extends Controller
 {
 
-    public function show(Group $group): View
+    public function updateGroupProfile(Request $request, Group $group): RedirectResponse
     {
         $this->authorize('manageSettings', $group);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'approval_enabled' => ['nullable'],
+            'password' => ['nullable', 'string', 'min:4', 'max:100'],
+        ]);
+
+        $updates = [
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'approval_enabled' => (bool) ($validated['approval_enabled'] ?? false),
+        ];
+
+        if (! empty($validated['password'])) {
+            $updates['password_hash'] = Hash::make($validated['password']);
+        }
+
+        $group->update($updates);
+
+        AuditLog::create([
+            'group_id' => $group->id,
+            'actor_id' => Auth::id(),
+            'action' => 'settings.update_group_profile',
+            'target_type' => Group::class,
+            'target_id' => $group->id,
+            'metadata_json' => [
+                'updated_fields' => array_keys($updates),
+                'password_updated' => array_key_exists('password_hash', $updates),
+            ],
+            'created_at' => now(),
+        ]);
+
+        return back()->with('success', 'Pengaturan grup berhasil disimpan.');
+    }
+
+    public function show(Group $group): View
+    {
+        $this->authorize('view', $group);
+
+        $canManageSettings = Auth::user()?->can('manageSettings', $group) ?? false;
 
         $group->load(['groupToken', 'exports', 'backups.creator']);
 
@@ -40,6 +82,7 @@ class SettingsController extends Controller
         return view('settings.show', [
             'group' => $group,
             'auditLogs' => $auditLogs,
+            'canManageSettings' => $canManageSettings,
         ]);
     }
 
@@ -129,6 +172,13 @@ class SettingsController extends Controller
         $subscription = $group->subscription;
         $activeSeatCount = (int) ($subscription?->included_seats ?? 2);
         $activeMemberCount = $group->members()->where('status', 'active')->count();
+        $ownerInActiveMembers = $group->members()
+            ->where('status', 'active')
+            ->where('user_id', $group->owner_id)
+            ->exists();
+        if (! $ownerInActiveMembers) {
+            $activeMemberCount++;
+        }
         $includedSeats = (int) ($subscription?->included_seats ?? 2);
         $extraSeats = max($activeMemberCount - $includedSeats, 0);
 
@@ -156,7 +206,7 @@ class SettingsController extends Controller
         $this->authorize('manageSettings', $group);
 
         $validated = $request->validate([
-            'provider_name' => ['required', 'in:openai,claude,gemini'],
+            'provider_name' => ['required', 'in:openai'],
             'access_token' => ['required', 'string', 'min:20', 'max:4096'],
         ]);
 
@@ -180,7 +230,7 @@ class SettingsController extends Controller
             'created_at' => now(),
         ]);
 
-        return back()->with('success', 'Provider AI grup disimpan: '.strtoupper($validated['provider_name']).'.');
+        return back()->with('success', 'Koneksi AI berhasil disimpan.');
     }
 
     public function restoreBackup(Request $request, Group $group, GroupBackup $backup): RedirectResponse

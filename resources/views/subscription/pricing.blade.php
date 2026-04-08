@@ -27,7 +27,7 @@
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="mt-0.5 text-emerald-500">&#10003;</span>
-                    Pilih AI provider & model (ChatGPT, Claude, Gemini)
+                    AI assistant aktif otomatis untuk semua member
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="mt-0.5 text-emerald-500">&#10003;</span>
@@ -114,13 +114,13 @@
             </p>
         </div>
 
-        <a href="{{ route('login', ['next' => 'subscription.payment.detail']) }}"
+        <a href="{{ route('subscription.payment.detail') }}"
            class="btn-cta mt-6 py-4">
-            Login & Mulai Berlangganan
+            Lanjut Aktivasi Paket
         </a>
 
         <p class="mt-3 text-center text-[11px] text-slate-400">
-            Setelah login Google, bayar, lalu langsung buat grup.
+            Klik lanjut, aktivasi paket, lalu langsung masuk ke workspace grup.
         </p>
     </section>
 

@@ -3,7 +3,7 @@
 @section('content')
     <section class="page-shell">
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Payment Success</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Seat Activated</p>
             <h1 class="font-display mt-2 text-2xl font-extrabold text-[#0F172A]">Add Seat Berhasil</h1>
             <p class="mt-2 text-sm text-[#64748B]">Seat tambahan sudah aktif. Tim Anda bisa menambahkan member baru tanpa menunggu cycle berikutnya.</p>
         </div>
@@ -15,10 +15,10 @@
 
         @if($paymentSummary)
             <div class="panel-card mt-4 p-4">
-                <p class="text-xs text-[#64748B]">Payment Reference</p>
+                <p class="text-xs text-[#64748B]">Activation Reference</p>
                 <p class="mt-1 text-sm font-bold text-[#0F172A]">{{ $paymentSummary['reference'] ?? '-' }}</p>
                 <p class="mt-2 text-xs text-[#64748B]">Seat dibeli: {{ $paymentSummary['seat_count'] ?? 0 }} x Rp{{ number_format((int) ($paymentSummary['unit_price'] ?? 0), 0, ',', '.') }}</p>
-                <p class="mt-1 text-sm font-semibold text-emerald-700">Total dibayar: Rp{{ number_format((int) ($paymentSummary['amount'] ?? 0), 0, ',', '.') }}</p>
+                <p class="mt-1 text-sm font-semibold text-emerald-700">Aktivasi diproses instan (simulasi).</p>
             </div>
         @endif
 

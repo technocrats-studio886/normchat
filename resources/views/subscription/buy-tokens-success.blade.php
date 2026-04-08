@@ -36,7 +36,7 @@
         @endif
 
         <p class="mx-auto mt-4 max-w-[28ch] text-center text-sm text-emerald-700">
-            Token sudah masuk ke saldo grup dan bisa langsung dipakai.
+            Token sudah masuk ke saldo grup dan bisa langsung dipakai (aktivasi instan/simulasi).
         </p>
 
         <a href="{{ route('groups.index') }}" class="btn-cta mt-auto py-4">

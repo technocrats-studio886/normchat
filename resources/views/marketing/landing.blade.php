@@ -15,6 +15,7 @@
 
         $appBase = rtrim((string) config('app.normchat_app_url', config('app.url')), '/');
         $pricingUrl = $appBase.'/pricing';
+        $loginToSubscriptionUrl = $appBase.'/login?next=subscription.payment.detail';
     @endphp
 
     <main class="relative overflow-hidden">
@@ -26,8 +27,8 @@
                 <img src="{{ asset('normchat-logo.svg') }}" alt="Normchat" class="h-9 w-9 rounded-lg bg-white p-1" />
                 <span class="font-display text-xl font-extrabold tracking-tight text-cyan-100">Normchat</span>
             </a>
-            <a href="{{ $pricingUrl }}" class="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:bg-white/10">
-                Lihat Pricing
+            <a href="{{ $loginToSubscriptionUrl }}" class="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:bg-white/10">
+                Login Dulu
             </a>
         </header>
 
@@ -57,11 +58,11 @@
                     </div>
 
                     <div class="mt-10 flex flex-wrap items-center gap-4">
-                        <a href="{{ $pricingUrl }}" class="inline-flex items-center justify-center rounded-2xl bg-linear-to-r from-[#1d4ed8] to-[#0f766e] px-8 py-4 text-sm font-extrabold uppercase tracking-wide text-white shadow-lg shadow-cyan-900/35 transition hover:brightness-105">
-                            Lihat Paket
+                        <a href="{{ $loginToSubscriptionUrl }}" class="inline-flex items-center justify-center rounded-2xl bg-linear-to-r from-[#1d4ed8] to-[#0f766e] px-8 py-4 text-sm font-extrabold uppercase tracking-wide text-white shadow-lg shadow-cyan-900/35 transition hover:brightness-105">
+                            Login & Mulai
                         </a>
-                        <a href="{{ $pricingUrl }}" class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-8 py-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
-                            Buka Pricing Detail
+                        <a href="{{ $loginToSubscriptionUrl }}" class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-8 py-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+                            Login ke Subscription
                         </a>
                     </div>
                 </div>
@@ -127,10 +128,10 @@
                     <div class="rounded-2xl border border-white/15 bg-white/10 p-6">
                         <p class="text-xs font-semibold uppercase tracking-wide text-cyan-100">Mulai dari</p>
                         <p class="mt-2 text-4xl font-extrabold text-white">
-                            Rp15.000<span class="text-base font-medium text-slate-300">/bulan</span>
+                            Rp25.000<span class="text-base font-medium text-slate-300">/bulan</span>
                         </p>
-                        <a href="{{ $pricingUrl }}" class="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-extrabold uppercase tracking-wide text-[#0f1f33] transition hover:bg-slate-100">
-                            Lihat Detail Pricing
+                        <a href="{{ $loginToSubscriptionUrl }}" class="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-extrabold uppercase tracking-wide text-[#0f1f33] transition hover:bg-slate-100">
+                            Login & Lihat Subscription
                         </a>
                     </div>
                 </div>

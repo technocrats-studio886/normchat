@@ -17,7 +17,7 @@
 
         <div class="mt-6 space-y-3">
             <div class="panel-card p-4">
-                <h2 class="text-sm font-bold text-slate-900">Login via Google SSO</h2>
+                <h2 class="text-sm font-bold text-slate-900">Login via Interdotz SSO</h2>
                 <div class="mt-2 flex items-center gap-3">
                     @if($user->avatar_url)
                         <img src="{{ $user->avatar_url }}" alt="" class="h-8 w-8 rounded-full object-cover" referrerpolicy="no-referrer" />
@@ -42,9 +42,9 @@
 
             <div class="panel-card p-4">
                 <h2 class="text-sm font-bold text-slate-900">Informasi Keamanan</h2>
-                <p class="mt-1 text-xs text-slate-500">Akun Anda dilindungi oleh Google SSO. Semua autentikasi dikelola melalui Google.</p>
+                <p class="mt-1 text-xs text-slate-500">Akun Anda dilindungi oleh Interdotz SSO. Semua autentikasi dikelola melalui Interdotz.</p>
                 <div class="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                    Untuk mengubah password atau mengaktifkan 2FA, kelola langsung di akun Google Anda.
+                    Untuk mengubah password atau mengaktifkan 2FA, kelola langsung di akun Interdotz Anda.
                 </div>
             </div>
         </div>

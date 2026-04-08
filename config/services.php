@@ -29,27 +29,12 @@ return [
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Google SSO (Login + AI Provider nanti)
-    |--------------------------------------------------------------------------
-    */
-
-    'google' => [
-        'client_id' => env('GOOGLE_CLIENT_ID'),
-        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/auth/google/callback'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Trakteer Payment Gateway
-    |--------------------------------------------------------------------------
-    */
-
-    'trakteer' => [
-        'webhook_token' => env('TRAKTEER_WEBHOOK_TOKEN'),
-        'page_url' => env('TRAKTEER_PAGE_URL', 'https://trakteer.id/normchat'),
+        'interdotz' => [
+        'client_id' => env('INTERDOTZ_CLIENT_ID'),
+        'client_secret' => env('INTERDOTZ_CLIENT_SECRET'),
+        'api_base' => env('INTERDOTZ_API_BASE', 'https://api-interdotz.technocrats.studio'),
+        'sso_base' => env('INTERDOTZ_SSO_BASE', 'https://interdotz.technocrats.studio'),
+        'redirect_uri' => env('INTERDOTZ_REDIRECT_URI', env('APP_URL') . '/sso/interdotz/callback'),
     ],
 
     /*

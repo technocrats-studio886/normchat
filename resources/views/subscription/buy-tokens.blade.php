@@ -106,13 +106,13 @@
 
             @if($groups->isNotEmpty())
                 <button type="submit" class="btn-cta w-full py-4 text-sm font-extrabold uppercase tracking-wide">
-                    Top-up via Trakteer
+                    Top-up Instan
                 </button>
             @endif
         </form>
 
         <p class="mt-4 pb-4 text-center text-[11px] text-slate-400">
-            Pembayaran via Trakteer. Normkredit masuk setelah pembayaran dikonfirmasi.
+            Tidak ada payment gateway. Normkredit langsung masuk ke saldo grup.
         </p>
     </section>
 

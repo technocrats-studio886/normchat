@@ -6,22 +6,18 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
-use App\Http\Controllers\TrakteerWebhookController;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
-
-// ── Trakteer Webhook (no CSRF, no auth) ─────────────────────
-Route::post('/webhooks/trakteer', [TrakteerWebhookController::class, 'handle'])->name('webhooks.trakteer');
 
 // ── Public / Auth ────────────────────────────────────────────
 Route::get('/', [SubscriptionController::class, 'landing'])->name('landing');
 Route::get('/normchat', [SubscriptionController::class, 'landing'])->name('landing.path');
-Route::get('/pricing', [SubscriptionController::class, 'pricing'])->name('subscription.pricing');
 Route::get('/login', [AuthController::class, 'landing'])->name('login');
 
-// Google SSO
-Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
-Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+// Interdotz SSO
+Route::get('/auth/interdotz/login', [AuthController::class, 'redirectToInterdotz'])->name('auth.interdotz.login');
+Route::get('/auth/interdotz/register', [AuthController::class, 'registerAtInterdotz'])->name('auth.interdotz.register');
+Route::get('/sso/interdotz/callback', [AuthController::class, 'handleInterdotzCallback'])->name('auth.interdotz.callback');
 
 // Join group via share ID
 Route::get('/join/{shareId}', [GroupController::class, 'showJoin'])->middleware(['auth'])->name('groups.join');
@@ -30,6 +26,7 @@ Route::post('/join/{shareId}', [GroupController::class, 'joinViaShareId'])->midd
 // ── Authenticated ────────────────────────────────────────────
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/pricing', [SubscriptionController::class, 'pricing'])->name('subscription.pricing');
 
     // Payment flow
     Route::get('/payment/detail', [SubscriptionController::class, 'paymentDetail'])->name('subscription.payment.detail');
@@ -54,8 +51,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/groups/{group}/messages', [ChatController::class, 'store'])->middleware('group.permission')->name('chat.store');
     Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
 
-    // Settings (owner/manage_billing only)
-    Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->middleware('group.permission:manage_billing')->name('settings.show');
+    // Settings (view for active members, write actions restricted by permission)
+    Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->middleware('group.permission')->name('settings.show');
+    Route::post('/groups/{group}/settings/profile', [SettingsController::class, 'updateGroupProfile'])->middleware('group.permission:manage_billing')->name('settings.profile.update');
     Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->middleware('group.permission:manage_billing')->name('settings.history');
     Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->middleware('group.permission:manage_billing')->name('settings.ai.persona');
     Route::post('/groups/{group}/settings/ai-persona', [SettingsController::class, 'saveAiPersona'])->middleware('group.permission:manage_billing')->name('settings.ai.persona.save');

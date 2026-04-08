@@ -25,9 +25,9 @@
                     $gt = $group->groupToken;
                     $credits = $gt ? $gt->credits : 0;
                     $remaining = $gt ? $gt->remaining_tokens : 0;
-                    $providerLabel = config("ai_models.providers.{$group->ai_provider}.label", 'Belum dipilih');
-                    $modelLabel = config("ai_models.providers.{$group->ai_provider}.models.{$group->ai_model}.label", $group->ai_model ?? '-');
-                    $multiplier = $group->getModelMultiplier();
+                    $activeMembers = $group->members->where('status', 'active');
+                    $ownerInMembers = $activeMembers->contains('user_id', $group->owner_id);
+                    $memberCount = $activeMembers->count() + ($ownerInMembers ? 0 : 1);
                 @endphp
                 <div class="panel-card overflow-hidden">
                     <a href="{{ route('chat.show', $group) }}" class="block px-4 py-3.5 transition active:scale-[0.98]">
@@ -38,7 +38,7 @@
                             </span>
                         </div>
                         <p class="mt-1 text-xs text-slate-500">
-                            {{ $group->members_count }} member &middot; {{ $modelLabel }} ({{ $multiplier }}x)
+                            {{ $memberCount }} member &middot; NormAI aktif
                         </p>
                     </a>
                     <div class="border-t border-slate-100 bg-slate-50/50 flex items-center justify-between px-4 py-2 text-xs text-slate-600">
