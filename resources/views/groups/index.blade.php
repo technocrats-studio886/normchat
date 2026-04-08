@@ -72,5 +72,38 @@
         <a href="{{ route('groups.create') }}" class="btn-cta mt-4 py-3">
             Tambah Group Chat Baru
         </a>
+
+        {{-- Join existing group by ID --}}
+        <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 class="text-sm font-bold text-slate-900">Gabung Group dengan ID</h3>
+            <p class="mt-0.5 text-[11px] text-slate-500">Masukkan share ID grup yang sudah ada. Kamu akan diarahkan ke halaman patungan & password.</p>
+            <form method="GET" action="" class="mt-3 flex items-center gap-2" data-join-by-id-form="1">
+                <input
+                    type="text"
+                    name="share_id"
+                    placeholder="contoh: abc123"
+                    required
+                    autocomplete="off"
+                    class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    data-join-by-id-input="1"
+                />
+                <button type="submit" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                    Gabung
+                </button>
+            </form>
+        </div>
+        <script>
+            (function () {
+                const form = document.querySelector('[data-join-by-id-form]');
+                const input = document.querySelector('[data-join-by-id-input]');
+                if (!form || !input) return;
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const id = String(input.value || '').trim();
+                    if (!id) return;
+                    window.location.href = '{{ url('/join') }}/' + encodeURIComponent(id);
+                });
+            })();
+        </script>
     </section>
 @endsection

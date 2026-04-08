@@ -28,7 +28,7 @@ class SettingsController extends Controller
 
     public function updateGroupProfile(Request $request, Group $group): RedirectResponse
     {
-        $this->authorize('manageSettings', $group);
+        $this->authorize('editGroupProfile', $group);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -69,7 +69,13 @@ class SettingsController extends Controller
     {
         $this->authorize('view', $group);
 
-        $canManageSettings = Auth::user()?->can('manageSettings', $group) ?? false;
+        $user = Auth::user();
+        $canEditProfile = $user?->can('editGroupProfile', $group) ?? false;
+        $canManageBilling = $user?->can('manageBilling', $group) ?? false;
+        $canManageAiPersona = $user?->can('manageAiPersona', $group) ?? false;
+        $canManageMembers = $user?->can('manageMembers', $group) ?? false;
+        $canExportChat = $user?->can('exportChat', $group) ?? false;
+        $canCreateBackup = $user?->can('createBackup', $group) ?? false;
 
         $group->load(['groupToken', 'exports', 'backups.creator']);
 
@@ -82,7 +88,14 @@ class SettingsController extends Controller
         return view('settings.show', [
             'group' => $group,
             'auditLogs' => $auditLogs,
-            'canManageSettings' => $canManageSettings,
+            // legacy flag = true if user can edit anything (owner)
+            'canManageSettings' => $canEditProfile,
+            'canEditProfile' => $canEditProfile,
+            'canManageBilling' => $canManageBilling,
+            'canManageAiPersona' => $canManageAiPersona,
+            'canManageMembers' => $canManageMembers,
+            'canExportChat' => $canExportChat,
+            'canCreateBackup' => $canCreateBackup,
         ]);
     }
 
@@ -118,7 +131,7 @@ class SettingsController extends Controller
 
     public function historyExport(Group $group): View
     {
-        $this->authorize('manageSettings', $group);
+        $this->authorize('manageBilling', $group);
 
         $group->load([
             'exports' => fn ($query) => $query->latest('created_at'),
@@ -132,7 +145,7 @@ class SettingsController extends Controller
 
     public function aiPersonaEditor(Group $group): View
     {
-        $this->authorize('manageSettings', $group);
+        $this->authorize('manageAiPersona', $group);
 
         return view('settings.ai-persona', [
             'group' => $group,
@@ -141,7 +154,7 @@ class SettingsController extends Controller
 
     public function saveAiPersona(Request $request, Group $group): RedirectResponse
     {
-        $this->authorize('manageSettings', $group);
+        $this->authorize('manageAiPersona', $group);
 
         $validated = $request->validate([
             'ai_persona_style' => ['nullable', 'string', 'max:1000'],
@@ -165,7 +178,7 @@ class SettingsController extends Controller
 
     public function seatManagement(Group $group): View
     {
-        $this->authorize('manageSettings', $group);
+        $this->authorize('manageBilling', $group);
 
         $group->load(['subscription.seats', 'members.user', 'members.role']);
 
@@ -203,7 +216,7 @@ class SettingsController extends Controller
 
     public function createAiConnection(Request $request, Group $group): RedirectResponse
     {
-        $this->authorize('manageSettings', $group);
+        $this->authorize('manageAiPersona', $group);
 
         $validated = $request->validate([
             'provider_name' => ['required', 'in:openai'],

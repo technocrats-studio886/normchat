@@ -164,6 +164,10 @@ const buildMessageNode = (message) => {
 	const content = escapeHtml(message?.content || '');
 
 	const wrapper = document.createElement('div');
+	wrapper.setAttribute('data-message-id', String(message?.id ?? ''));
+	wrapper.style.touchAction = 'pan-y';
+	wrapper.style.userSelect = 'none';
+	wrapper.style.webkitUserSelect = 'none';
 	const isPending = message?.is_pending === true;
 
 	if (isMine) {
@@ -732,15 +736,74 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		attachmentInput.files = transfer.files;
 	};
 
+	let attachmentPreviewUrl = null;
+	const ensureAttachmentPreviewEl = () => {
+		let el = chatForm.querySelector('[data-attachment-preview]');
+		if (el) return el;
+		el = document.createElement('div');
+		el.setAttribute('data-attachment-preview', '1');
+		el.className = 'mb-2 hidden items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-2 py-2';
+		el.innerHTML = `
+			<img data-attachment-preview-img class="h-14 w-14 rounded-lg object-cover" alt="preview" />
+			<div class="min-w-0 flex-1">
+				<p class="truncate text-xs font-semibold text-blue-700" data-attachment-preview-name></p>
+				<p class="text-[10px] text-blue-500">Siap dikirim</p>
+			</div>
+			<button type="button" class="rounded-md p-1 text-blue-500 hover:bg-blue-100" data-attachment-preview-clear aria-label="Hapus lampiran">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
+			</button>
+		`;
+		const composer = chatForm.querySelector('[data-composer-main]');
+		if (composer && composer.parentNode) {
+			composer.parentNode.insertBefore(el, composer);
+		} else {
+			chatForm.appendChild(el);
+		}
+		el.querySelector('[data-attachment-preview-clear]')?.addEventListener('click', () => {
+			attachmentInput.value = '';
+			if (cameraInput instanceof HTMLInputElement) cameraInput.value = '';
+			refreshAttachmentLabel();
+		});
+		return el;
+	};
+
 	const refreshAttachmentLabel = () => {
 		const file = attachmentInput.files?.[0];
-		if (!file || !attachmentLabel) {
+		const previewEl = ensureAttachmentPreviewEl();
+		const previewImg = previewEl.querySelector('[data-attachment-preview-img]');
+		const previewName = previewEl.querySelector('[data-attachment-preview-name]');
+
+		if (attachmentPreviewUrl) {
+			URL.revokeObjectURL(attachmentPreviewUrl);
+			attachmentPreviewUrl = null;
+		}
+
+		if (!file) {
+			attachmentLabel?.classList.add('hidden');
+			previewEl.classList.add('hidden');
+			previewEl.classList.remove('flex');
+			return;
+		}
+
+		const isImage = String(file.type || '').toLowerCase().startsWith('image/');
+		if (isImage && previewImg instanceof HTMLImageElement) {
+			attachmentPreviewUrl = URL.createObjectURL(file);
+			previewImg.src = attachmentPreviewUrl;
+			previewImg.classList.remove('hidden');
+			if (previewName) previewName.textContent = file.name;
+			previewEl.classList.remove('hidden');
+			previewEl.classList.add('flex');
 			attachmentLabel?.classList.add('hidden');
 			return;
 		}
 
-		attachmentLabel.textContent = file.name;
-		attachmentLabel.classList.remove('hidden');
+		// non-image: fallback ke label teks lama
+		previewEl.classList.add('hidden');
+		previewEl.classList.remove('flex');
+		if (attachmentLabel) {
+			attachmentLabel.textContent = file.name;
+			attachmentLabel.classList.remove('hidden');
+		}
 	};
 
 	const clearReplyTarget = () => {
@@ -802,6 +865,20 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			}
 		};
 
+		const resetTransform = (node) => {
+			if (node instanceof HTMLElement) {
+				node.style.transform = '';
+				node.style.transition = 'transform 180ms ease';
+				window.setTimeout(() => { node.style.transition = ''; }, 200);
+			}
+		};
+
+		const clearActive = () => {
+			if (activeNode) resetTransform(activeNode);
+			activeNode = null;
+			clearLongPress();
+		};
+
 		chatFeed.addEventListener('pointerdown', (event) => {
 			const node = event.target instanceof HTMLElement
 				? event.target.closest('[data-message-id]')
@@ -811,13 +888,23 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				return;
 			}
 
+			// jangan ganggu klik link/tombol di dalam bubble
+			if (event.target.closest('a, button, input, textarea, [data-voice-toggle]')) {
+				activeNode = null;
+				return;
+			}
+
 			activeNode = node;
 			startX = event.clientX;
 			startY = event.clientY;
+			node.style.transition = '';
 			clearLongPress();
 			longPressTimer = window.setTimeout(() => {
 				if (activeNode) {
+					try { navigator.vibrate?.(15); } catch (_) {}
 					setReplyTarget(activeNode);
+					resetTransform(activeNode);
+					activeNode = null;
 				}
 			}, LONG_PRESS_MS);
 		});
@@ -829,25 +916,39 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 			const deltaX = event.clientX - startX;
 			const deltaY = event.clientY - startY;
-			if (Math.abs(deltaY) > 16 || Math.abs(deltaX) > 12) {
+
+			if (Math.abs(deltaY) > 18) {
+				clearActive();
+				return;
+			}
+
+			if (Math.abs(deltaX) > 6) {
 				clearLongPress();
+				// visual drag (clamp 0..80px)
+				const dragX = Math.max(-90, Math.min(90, deltaX));
+				activeNode.style.transform = `translateX(${dragX}px)`;
+				if (event.cancelable) event.preventDefault();
 			}
 
 			if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+				try { navigator.vibrate?.(10); } catch (_) {}
 				setReplyTarget(activeNode);
+				resetTransform(activeNode);
 				activeNode = null;
 				clearLongPress();
 			}
-		});
+		}, { passive: false });
 
-		chatFeed.addEventListener('pointerup', () => {
-			activeNode = null;
-			clearLongPress();
-		});
+		chatFeed.addEventListener('pointerup', clearActive);
+		chatFeed.addEventListener('pointercancel', clearActive);
+		chatFeed.addEventListener('pointerleave', clearActive);
 
-		chatFeed.addEventListener('pointercancel', () => {
-			activeNode = null;
-			clearLongPress();
+		// suppress native context menu untuk message bubble (long-press iOS/Android)
+		chatFeed.addEventListener('contextmenu', (event) => {
+			const node = event.target instanceof HTMLElement
+				? event.target.closest('[data-message-id]')
+				: null;
+			if (node) event.preventDefault();
 		});
 
 		chatFeed.addEventListener('dblclick', (event) => {

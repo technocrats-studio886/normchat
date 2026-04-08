@@ -2,7 +2,14 @@
 
 @section('content')
     <section class="page-shell pt-4">
-        @php($isReadOnly = !($canManageSettings ?? false))
+        @php
+            $canEditProfile = $canEditProfile ?? ($canManageSettings ?? false);
+            $canManageBilling = $canManageBilling ?? false;
+            $canManageAiPersona = $canManageAiPersona ?? false;
+            $canExportChat = $canExportChat ?? false;
+            $canCreateBackup = $canCreateBackup ?? false;
+            $isReadOnly = ! $canEditProfile;
+        @endphp
 
         <h1 class="mb-5 text-xl font-extrabold text-slate-900 font-display">Group Settings</h1>
 
@@ -76,7 +83,7 @@
             </form>
 
             {{-- History & Export --}}
-            @if($canManageSettings)
+            @if($canManageBilling)
             <a href="{{ route('settings.history', $group) }}" class="panel-card flex items-center justify-between px-4 py-3.5">
                 <div>
                     <span class="text-sm text-slate-700">History & Export</span>
@@ -95,7 +102,7 @@
             @endif
 
             {{-- Seat Management --}}
-            @if($canManageSettings)
+            @if($canManageBilling)
             <a href="{{ route('settings.seats', $group) }}" class="panel-card flex items-center justify-between px-4 py-3.5">
                 <div>
                     <span class="text-sm text-slate-700">Seat Management</span>
@@ -114,7 +121,7 @@
             @endif
 
             {{-- AI Persona Editor --}}
-            @if($canManageSettings)
+            @if($canManageAiPersona)
             <a href="{{ route('settings.ai.persona', $group) }}" class="panel-card flex items-center justify-between px-4 py-3.5">
                 <div>
                     <span class="text-sm text-slate-700">AI Persona Editor</span>
@@ -151,7 +158,7 @@
 
                 <form method="POST" action="{{ route('settings.backup', $group) }}">
                     @csrf
-                    <button type="submit" class="w-full rounded-xl py-3 text-sm font-semibold transition {{ $canManageSettings ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'cursor-not-allowed bg-slate-200 text-slate-500' }}" @if(! $canManageSettings) disabled @endif>
+                    <button type="submit" class="w-full rounded-xl py-3 text-sm font-semibold transition {{ $canCreateBackup ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'cursor-not-allowed bg-slate-200 text-slate-500' }}" @if(! $canCreateBackup) disabled @endif>
                         Buat Backup Snapshot
                     </button>
                 </form>
@@ -161,12 +168,12 @@
                 <form method="POST" action="{{ route('settings.export', $group) }}">
                     @csrf
                     <input type="hidden" name="file_type" value="pdf">
-                    <button type="submit" class="w-full rounded-xl py-3 text-sm font-bold transition {{ $canManageSettings ? 'bg-red-500 text-white hover:bg-red-600' : 'cursor-not-allowed bg-slate-200 text-slate-500' }}" @if(! $canManageSettings) disabled @endif>Export PDF</button>
+                    <button type="submit" class="w-full rounded-xl py-3 text-sm font-bold transition {{ $canExportChat ? 'bg-red-500 text-white hover:bg-red-600' : 'cursor-not-allowed bg-slate-200 text-slate-500' }}" @if(! $canExportChat) disabled @endif>Export PDF</button>
                 </form>
                 <form method="POST" action="{{ route('settings.export', $group) }}">
                     @csrf
                     <input type="hidden" name="file_type" value="docx">
-                    <button type="submit" class="w-full rounded-xl border py-3 text-sm font-bold transition {{ $canManageSettings ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500' }}" @if(! $canManageSettings) disabled @endif>Export DOCX</button>
+                    <button type="submit" class="w-full rounded-xl border py-3 text-sm font-bold transition {{ $canExportChat ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500' }}" @if(! $canExportChat) disabled @endif>Export DOCX</button>
                 </form>
             </div>
         </div>
@@ -194,7 +201,7 @@
                         <span class="text-sm font-bold {{ $credits > 0 ? 'text-emerald-600' : 'text-rose-500' }}">{{ number_format($credits, 1) }} normkredit</span>
                     </div>
                     <p class="mt-0.5 text-[11px] text-slate-400">1 normkredit = 1.000 token = Rp1.000</p>
-                    @if($canManageSettings)
+                    @if($canManageBilling)
                         <a href="{{ route('subscription.tokens.buy') }}" class="mt-2 block text-xs font-semibold text-blue-500 hover:text-blue-700">
                             Top-up Normkredit &rarr;
                         </a>

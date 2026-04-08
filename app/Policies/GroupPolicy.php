@@ -18,34 +18,72 @@ class GroupPolicy
         return $this->view($user, $group);
     }
 
-    public function manageSettings(User $user, Group $group): bool
+    /**
+     * Membuka halaman settings (read-only untuk semua active member, edit terbatas per role).
+     */
+    public function viewSettings(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group) || $this->hasPermission($user, $group, 'manage_billing');
+        return $this->view($user, $group);
+    }
+
+    /**
+     * Edit profil grup, password, approval, billing, backup, export — owner only.
+     */
+    public function editGroupProfile(User $user, Group $group): bool
+    {
+        return $this->isOwner($user, $group);
+    }
+
+    public function manageBilling(User $user, Group $group): bool
+    {
+        return $this->isOwner($user, $group);
     }
 
     public function exportChat(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group) || $this->hasPermission($user, $group, 'export_chat');
+        return $this->isOwner($user, $group);
     }
 
     public function createBackup(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group) || $this->hasPermission($user, $group, 'recover_history');
+        return $this->isOwner($user, $group);
     }
 
     public function restoreBackup(User $user, Group $group): bool
     {
-        return $this->createBackup($user, $group);
+        return $this->isOwner($user, $group);
     }
 
+    /**
+     * AI persona — owner OR admin.
+     */
+    public function manageAiPersona(User $user, Group $group): bool
+    {
+        return $this->isOwner($user, $group) || $this->hasRoleKey($user, $group, 'admin');
+    }
+
+    /**
+     * Invite & accept member — owner OR admin.
+     */
     public function manageMembers(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group) || $this->hasPermission($user, $group, 'remove_member');
+        return $this->isOwner($user, $group) || $this->hasRoleKey($user, $group, 'admin');
     }
 
+    /**
+     * Promote/demote member role — owner only.
+     */
     public function promoteMember(User $user, Group $group): bool
     {
         return $this->isOwner($user, $group);
+    }
+
+    /**
+     * Backwards-compat alias dipakai SettingsController lama.
+     */
+    public function manageSettings(User $user, Group $group): bool
+    {
+        return $this->editGroupProfile($user, $group);
     }
 
     private function isOwner(User $user, Group $group): bool
@@ -62,19 +100,14 @@ class GroupPolicy
             ->exists();
     }
 
-    private function hasPermission(User $user, Group $group, string $permissionKey): bool
+    private function hasRoleKey(User $user, Group $group, string $roleKey): bool
     {
-        $membership = GroupMember::query()
-            ->with('role.permissions')
+        return GroupMember::query()
+            ->with('role')
             ->where('group_id', $group->id)
             ->where('user_id', $user->id)
             ->where('status', 'active')
-            ->first();
-
-        if (! $membership || ! $membership->role) {
-            return false;
-        }
-
-        return $membership->role->permissions->contains('key', $permissionKey);
+            ->get()
+            ->contains(fn ($m) => $m->role && $m->role->key === $roleKey);
     }
 }

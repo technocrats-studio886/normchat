@@ -81,7 +81,7 @@
 
                 @if($isMine)
                     {{-- User's own message - right aligned, blue --}}
-                    <div id="message-{{ $message->id }}" class="flex justify-end" data-message-id="{{ $message->id }}" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
+                    <div id="message-{{ $message->id }}" class="flex justify-end" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         <div class="max-w-[75%]">
                             @if($replyTarget)
                                 <div class="mb-1 rounded-xl border border-blue-200/70 bg-blue-300/20 px-3 py-1.5 text-xs text-blue-50">
@@ -128,7 +128,7 @@
                     </div>
                 @elseif($isAi)
                     {{-- AI message - left aligned, green tinted --}}
-                    <div id="message-{{ $message->id }}" class="max-w-[80%]" data-message-id="{{ $message->id }}" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
+                    <div id="message-{{ $message->id }}" class="max-w-[80%]" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         @if($replyTarget)
                             <div class="mb-1 rounded-xl border border-emerald-200 bg-emerald-100/70 px-3 py-1.5 text-xs text-emerald-700">
                                 <p class="font-semibold">Reply to {{ $replySender }}</p>
@@ -173,7 +173,7 @@
                     </div>
                 @else
                     {{-- Other user message - left aligned, white --}}
-                    <div id="message-{{ $message->id }}" class="max-w-[75%]" data-message-id="{{ $message->id }}" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
+                    <div id="message-{{ $message->id }}" class="max-w-[75%]" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         <p class="mb-1 text-[11px] text-slate-500">{{ $senderName }}</p>
                         @if($replyTarget)
                             <div class="mb-1 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs text-slate-600">

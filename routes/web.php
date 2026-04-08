@@ -53,19 +53,19 @@ Route::middleware('auth')->group(function () {
 
     // Settings (view for active members, write actions restricted by permission)
     Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->middleware('group.permission')->name('settings.show');
-    Route::post('/groups/{group}/settings/profile', [SettingsController::class, 'updateGroupProfile'])->middleware('group.permission:manage_billing')->name('settings.profile.update');
-    Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->middleware('group.permission:manage_billing')->name('settings.history');
-    Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->middleware('group.permission:manage_billing')->name('settings.ai.persona');
-    Route::post('/groups/{group}/settings/ai-persona', [SettingsController::class, 'saveAiPersona'])->middleware('group.permission:manage_billing')->name('settings.ai.persona.save');
-    Route::get('/groups/{group}/settings/seat-management', [SettingsController::class, 'seatManagement'])->middleware('group.permission:manage_billing')->name('settings.seats');
-    Route::post('/groups/{group}/settings/ai', [SettingsController::class, 'createAiConnection'])->middleware('group.permission:manage_billing')->name('settings.ai');
-    Route::post('/groups/{group}/settings/export', [SettingsController::class, 'createExport'])->middleware('group.permission:export_chat')->name('settings.export');
-    Route::post('/groups/{group}/settings/backup', [SettingsController::class, 'createBackup'])->middleware('group.permission:recover_history')->name('settings.backup');
-    Route::post('/groups/{group}/settings/backup/{backup}/restore', [SettingsController::class, 'restoreBackup'])->middleware('group.permission:recover_history')->name('settings.backup.restore');
+    Route::post('/groups/{group}/settings/profile', [SettingsController::class, 'updateGroupProfile'])->middleware('group.permission')->name('settings.profile.update');
+    Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->middleware('group.permission')->name('settings.history');
+    Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->middleware('group.permission')->name('settings.ai.persona');
+    Route::post('/groups/{group}/settings/ai-persona', [SettingsController::class, 'saveAiPersona'])->middleware('group.permission')->name('settings.ai.persona.save');
+    Route::get('/groups/{group}/settings/seat-management', [SettingsController::class, 'seatManagement'])->middleware('group.permission')->name('settings.seats');
+    Route::post('/groups/{group}/settings/ai', [SettingsController::class, 'createAiConnection'])->middleware('group.permission')->name('settings.ai');
+    Route::post('/groups/{group}/settings/export', [SettingsController::class, 'createExport'])->middleware('group.permission')->name('settings.export');
+    Route::post('/groups/{group}/settings/backup', [SettingsController::class, 'createBackup'])->middleware('group.permission')->name('settings.backup');
+    Route::post('/groups/{group}/settings/backup/{backup}/restore', [SettingsController::class, 'restoreBackup'])->middleware('group.permission')->name('settings.backup.restore');
 
     // Members
-    Route::post('/groups/{group}/members/{member}/promote', [GroupController::class, 'promoteMember'])->middleware('group.permission:add_member')->name('groups.members.promote');
-    Route::post('/groups/{group}/members/{member}/remove', [GroupController::class, 'removeMember'])->middleware('group.permission:remove_member')->name('groups.members.remove');
+    Route::post('/groups/{group}/members/{member}/promote', [GroupController::class, 'promoteMember'])->middleware('group.permission')->name('groups.members.promote');
+    Route::post('/groups/{group}/members/{member}/remove', [GroupController::class, 'removeMember'])->middleware('group.permission')->name('groups.members.remove');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
