@@ -131,7 +131,12 @@ class SettingsController extends Controller
 
     public function historyExport(Group $group): View
     {
-        $this->authorize('manageBilling', $group);
+        $this->authorize('view', $group);
+
+        $user = Auth::user();
+        $canExportChat = $user?->can('exportChat', $group) ?? false;
+        $canCreateBackup = $user?->can('createBackup', $group) ?? false;
+        $canRestoreBackup = $user?->can('restoreBackup', $group) ?? false;
 
         $group->load([
             'exports' => fn ($query) => $query->latest('created_at'),
@@ -140,15 +145,21 @@ class SettingsController extends Controller
 
         return view('settings.history-export', [
             'group' => $group,
+            'canExportChat' => $canExportChat,
+            'canCreateBackup' => $canCreateBackup,
+            'canRestoreBackup' => $canRestoreBackup,
         ]);
     }
 
     public function aiPersonaEditor(Group $group): View
     {
-        $this->authorize('manageAiPersona', $group);
+        $this->authorize('view', $group);
+
+        $canManageAiPersona = Auth::user()?->can('manageAiPersona', $group) ?? false;
 
         return view('settings.ai-persona', [
             'group' => $group,
+            'canManageAiPersona' => $canManageAiPersona,
         ]);
     }
 
@@ -178,7 +189,12 @@ class SettingsController extends Controller
 
     public function seatManagement(Group $group): View
     {
-        $this->authorize('manageBilling', $group);
+        $this->authorize('view', $group);
+
+        $user = Auth::user();
+        $canManageBilling = $user?->can('manageBilling', $group) ?? false;
+        $canManageMembers = $user?->can('manageMembers', $group) ?? false;
+        $canPromoteMember = $user?->can('promoteMember', $group) ?? false;
 
         $group->load(['subscription.seats', 'members.user', 'members.role']);
 
@@ -202,6 +218,9 @@ class SettingsController extends Controller
             'activeMemberCount' => $activeMemberCount,
             'includedSeats' => $includedSeats,
             'extraSeats' => $extraSeats,
+            'canManageBilling' => $canManageBilling,
+            'canManageMembers' => $canManageMembers,
+            'canPromoteMember' => $canPromoteMember,
         ]);
     }
 

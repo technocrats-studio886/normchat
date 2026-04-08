@@ -50,12 +50,12 @@
         </style>
     @endif
 </head>
-<body class="normchat-bg min-h-screen text-slate-900 antialiased">
-    <div class="mx-auto min-h-screen w-full max-w-md bg-[#F7F7F7] shadow-xl shadow-slate-900/10">
-        <main class="pb-24">
+<body class="normchat-bg min-h-screen antialiased">
+    <div class="mx-auto min-h-screen w-full max-w-md">
+        <main class="pb-32">
             @if (session('success'))
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm">
                         {{ session('success') }}
                     </div>
                 </div>
@@ -63,7 +63,7 @@
 
             @if (session('info'))
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                    <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700 shadow-sm">
                         {{ session('info') }}
                     </div>
                 </div>
@@ -71,7 +71,7 @@
 
             @if ($errors->any())
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
                         <ul class="space-y-1">
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -86,14 +86,11 @@
 
         @auth
             @php
-                $currentGroup = $group ?? null;
-                $chatTargetUrl = $currentGroup
-                    ? route('chat.show', $currentGroup)
-                    : route('chat.last');
                 $isHome = request()->routeIs('groups.index');
-                $isChat = request()->routeIs('chat.*');
+                $isCreate = request()->routeIs('groups.create');
                 $isProfile = request()->routeIs('profile.*');
-                $hideBottomNav = request()->routeIs('groups.create')
+                $hideBottomNav = request()->routeIs('chat.*')
+                    || request()->routeIs('groups.create')
                     || request()->routeIs('subscription.pricing')
                     || request()->routeIs('subscription.payment.*')
                     || request()->routeIs('subscription.checkout')
@@ -101,18 +98,21 @@
                     || request()->routeIs('settings.*');
             @endphp
             @unless($hideBottomNav)
-                <nav class="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3">
-                    <ul class="flex items-center justify-center gap-2 text-xs font-semibold">
-                        <li>
-                            <a href="{{ route('groups.index') }}" class="{{ $isHome ? 'nav-pill-active-outline' : 'nav-pill' }}">HOME</a>
-                        </li>
-                        <li>
-                            <a href="{{ $chatTargetUrl }}" class="{{ $isChat ? 'nav-pill-chat-active' : 'nav-pill-chat' }}">CHAT</a>
-                        </li>
-                        <li>
-                            <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nav-pill-active-outline' : 'nav-pill' }}">PROFILE</a>
-                        </li>
-                    </ul>
+                <nav class="nc-bottom-nav">
+                    <div class="nc-bottom-nav-inner">
+                        <a href="{{ route('groups.index') }}" class="{{ $isHome ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Home">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
+                            HOME
+                        </a>
+                        <a href="{{ route('groups.create') }}" class="{{ $isCreate ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Buat Grup">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+                            BUAT
+                        </a>
+                        <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Profile">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
+                            PROFIL
+                        </a>
+                    </div>
                 </nav>
             @endunless
         @endauth

@@ -52,12 +52,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
 
     // Settings (view for active members, write actions restricted by permission)
-    Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->middleware('group.permission')->name('settings.show');
+    Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->name('settings.show');
     Route::post('/groups/{group}/settings/profile', [SettingsController::class, 'updateGroupProfile'])->middleware('group.permission')->name('settings.profile.update');
-    Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->middleware('group.permission')->name('settings.history');
-    Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->middleware('group.permission')->name('settings.ai.persona');
+    Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->name('settings.history');
+    Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->name('settings.ai.persona');
     Route::post('/groups/{group}/settings/ai-persona', [SettingsController::class, 'saveAiPersona'])->middleware('group.permission')->name('settings.ai.persona.save');
-    Route::get('/groups/{group}/settings/seat-management', [SettingsController::class, 'seatManagement'])->middleware('group.permission')->name('settings.seats');
+    Route::get('/groups/{group}/settings/seat-management', [SettingsController::class, 'seatManagement'])->name('settings.seats');
     Route::post('/groups/{group}/settings/ai', [SettingsController::class, 'createAiConnection'])->middleware('group.permission')->name('settings.ai');
     Route::post('/groups/{group}/settings/export', [SettingsController::class, 'createExport'])->middleware('group.permission')->name('settings.export');
     Route::post('/groups/{group}/settings/backup', [SettingsController::class, 'createBackup'])->middleware('group.permission')->name('settings.backup');

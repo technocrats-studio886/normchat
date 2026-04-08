@@ -448,7 +448,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         return implode("\n\n", $parts);
     }
 
-    private function messageToContextLine(array $row, string $token): string
+    private function messageToContextLine($row, string $token): string
     {
         $content = trim((string) ($row['content'] ?? ''));
         if ($content !== '') {
