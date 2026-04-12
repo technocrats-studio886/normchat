@@ -23,7 +23,7 @@
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="mt-0.5 text-emerald-500">&#10003;</span>
-                    12 normkredit included (30.000 token AI)
+                    12 normkredit included
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="mt-0.5 text-emerald-500">&#10003;</span>
@@ -43,7 +43,7 @@
         {{-- Extra Normkredit --}}
         <div class="panel-card mt-4 rounded-3xl p-5">
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-500">Tambah Normkredit?</p>
-            <p class="mt-1 text-xs text-slate-500">Opsional. 1 normkredit = 2.500 token = Rp2.500</p>
+            <p class="mt-1 text-xs text-slate-500">Opsional. 1 normkredit = Rp2.500</p>
 
             {{-- Mode Toggle --}}
             <div class="mt-3 flex gap-2">
@@ -67,7 +67,7 @@
                            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-bold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                            oninput="calc()" />
                     <p class="mt-1 text-right text-xs text-slate-400">
-                        = <span id="creditResult" class="font-semibold text-slate-600">Rp0 &middot; 0 token</span>
+                        = <span id="creditResult" class="font-semibold text-slate-600">Rp0</span>
                     </p>
                 </div>
 
@@ -77,14 +77,14 @@
                            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-bold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                            oninput="calc()" />
                     <p class="mt-1 text-right text-xs text-slate-400">
-                        = <span id="priceResult" class="font-semibold text-slate-600">0 normkredit &middot; 0 token</span>
+                        = <span id="priceResult" class="font-semibold text-slate-600">0 normkredit</span>
                     </p>
                 </div>
             </div>
 
             <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
                 <p class="text-xs text-amber-700">
-                    <span class="font-bold">Model multiplier:</span> Model canggih (misal 2x) pakai 100 token actual = dipotong 200 dari saldo grup.
+                    <span class="font-bold">Info:</span> Pemakaian normkredit tergantung model AI yang digunakan.
                 </p>
             </div>
         </div>
@@ -110,7 +110,7 @@
             </div>
 
             <p class="mt-2 text-[11px] text-slate-400" id="totalSummary">
-                Dapat 12 normkredit (30.000 token) per pembuatan grup.
+                Dapat 12 normkredit per pembuatan grup.
             </p>
         </div>
 
@@ -157,16 +157,12 @@
             if (mode === 'credit') {
                 extraNk = parseFloat(document.getElementById('creditInput').value) || 0;
                 extraRp = Math.ceil(extraNk * PRICE_PER_NK);
-                const tokens = Math.floor(extraNk * TOKENS_PER_NK);
-                document.getElementById('creditResult').innerHTML =
-                    fmt(extraRp) + ' &middot; ' + fmtToken(tokens) + ' token';
+                document.getElementById('creditResult').textContent = fmt(extraRp);
             } else {
                 extraRp = parseInt(document.getElementById('priceInput').value) || 0;
                 extraNk = extraRp / PRICE_PER_NK;
-                const tokens = Math.floor(extraNk * TOKENS_PER_NK);
                 const nkText = extraNk % 1 === 0 ? extraNk : extraNk.toFixed(1);
-                document.getElementById('priceResult').innerHTML =
-                    nkText + ' normkredit &middot; ' + fmtToken(tokens) + ' token';
+                document.getElementById('priceResult').textContent = nkText + ' normkredit';
             }
 
             // Update summary
@@ -177,10 +173,9 @@
             document.getElementById('totalPrice').textContent = fmt(total);
 
             const totalNk = SUB_NK + extraNk;
-            const totalTokens = Math.floor(totalNk * TOKENS_PER_NK);
             document.getElementById('totalSummary').textContent =
                 'Dapat ' + (totalNk % 1 === 0 ? totalNk : totalNk.toFixed(1))
-                + ' normkredit (' + fmtToken(totalTokens) + ' token) total.';
+                + ' normkredit total.';
         }
 
         // Init

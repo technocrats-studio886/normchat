@@ -50,7 +50,7 @@
                 <p class="text-xs font-semibold text-emerald-700">Termasuk dalam paket:</p>
                 <ul class="mt-1 space-y-0.5 text-xs text-emerald-600">
                     <li>&#10003; Full akses semua fitur</li>
-                    <li>&#10003; 12 normkredit ({{ number_format($includedTokens) }} token AI, dialokasikan ke grup)</li>
+                    <li>&#10003; 12 normkredit (dialokasikan ke grup)</li>
                 </ul>
             </div>
         </div>

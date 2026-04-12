@@ -48,7 +48,7 @@
                     <span class="text-sm text-slate-700">Total Normkredit Grup</span>
                     <span class="text-sm font-bold text-blue-600">{{ number_format($totalCredits, 1) }} normkredit</span>
                 </div>
-                <p class="mt-0.5 text-[11px] text-slate-400">1 normkredit = 2.500 token = Rp2.500</p>
+                <p class="mt-0.5 text-[11px] text-slate-400">1 normkredit = Rp2.500</p>
                 <a href="{{ route('subscription.tokens.buy') }}" class="mt-2 block text-xs font-semibold text-blue-500 hover:text-blue-700">
                     Top-up Normkredit &rarr;
                 </a>

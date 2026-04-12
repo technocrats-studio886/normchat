@@ -23,7 +23,7 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-emerald-700">Normkredit</span>
-                    <span class="font-bold text-emerald-900">12 normkredit (30.000 token)</span>
+                    <span class="font-bold text-emerald-900">12 normkredit</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-emerald-700">Status</span>

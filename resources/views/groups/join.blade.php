@@ -20,7 +20,7 @@
             @else
                 <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
                     <p class="text-sm font-semibold text-amber-800">Lengkapi data join, lalu kamu langsung masuk ke grup</p>
-                    <p class="mt-1 text-xs text-amber-600">UI patungan tetap ada, aktivasi seat dan token diproses instan.</p>
+                    <p class="mt-1 text-xs text-amber-600">UI patungan tetap ada, aktivasi seat dan normkredit diproses instan.</p>
                 </div>
 
                 <form method="POST" action="{{ route('groups.join.submit', $group->share_id) }}" class="mt-5 space-y-3">
@@ -54,7 +54,7 @@
                     {{-- Patungan Amount --}}
                     <div class="panel-card px-4 py-4">
                         <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Patungan Normkredit</label>
-                        <p class="mt-1 text-xs text-slate-500">Min. Rp{{ number_format($minPatungan, 0, ',', '.') }} ({{ $minPatungan / $pricePerNormkredit }} normkredit)</p>
+                        <p class="mt-1 text-xs text-slate-500">Min. Rp{{ number_format($minPatungan, 0, ',', '.') }} ({{ (int)($minPatungan / $pricePerNormkredit) }} normkredit)</p>
 
                         <input type="number" name="patungan_amount" id="patunganInput"
                                value="{{ old('patungan_amount', $minPatungan) }}"
@@ -62,9 +62,8 @@
                                class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-bold text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                oninput="calcPatungan()" />
 
-                        <div class="mt-2 flex items-center justify-between text-sm">
-                            <span class="text-slate-600">= <span class="font-bold text-blue-600" id="calcNormkredit">{{ $minPatungan / $pricePerNormkredit }}</span> normkredit</span>
-                            <span class="text-slate-600">(<span class="font-bold text-slate-800" id="calcTokens">{{ number_format($minPatungan / $pricePerNormkredit * 2500) }}</span> token)</span>
+                        <div class="mt-2 flex items-center justify-end text-sm">
+                            <span class="text-slate-600">= <span class="font-bold text-blue-600" id="calcNormkredit">{{ (int)($minPatungan / $pricePerNormkredit) }}</span> normkredit</span>
                         </div>
                     </div>
                     @if($errors->has('patungan_amount'))
@@ -127,11 +126,9 @@
         function calcPatungan() {
             const amount = parseInt(document.getElementById('patunganInput').value) || 0;
             const nk = amount / PRICE_PER_NK;
-            const tokens = Math.floor(nk * TOKENS_PER_NK);
             const total = amount + SEAT_PRICE;
 
             document.getElementById('calcNormkredit').textContent = nk % 1 === 0 ? nk : nk.toFixed(1);
-            document.getElementById('calcTokens').textContent = tokens.toLocaleString('id-ID');
             document.getElementById('summaryPatungan').textContent = 'Rp' + amount.toLocaleString('id-ID');
             document.getElementById('summaryTotal').textContent = 'Rp' + total.toLocaleString('id-ID');
         }

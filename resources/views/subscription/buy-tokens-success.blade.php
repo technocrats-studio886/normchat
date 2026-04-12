@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Token Berhasil - Normchat'])
+@extends('layouts.app', ['title' => 'Normkredit Berhasil - Normchat'])
 
 @section('disableAppJs', '1')
 
@@ -10,7 +10,7 @@
             </svg>
         </div>
 
-        <h1 class="mt-6 text-center font-display text-3xl font-extrabold text-emerald-900">Token Ditambahkan!</h1>
+        <h1 class="mt-6 text-center font-display text-3xl font-extrabold text-emerald-900">Normkredit Ditambahkan!</h1>
 
         @if($purchase)
             <div class="mx-auto mt-6 w-full max-w-sm rounded-2xl bg-white/80 p-5 shadow-sm">
@@ -20,8 +20,8 @@
                         <span class="font-bold text-emerald-900">{{ $purchase['group_name'] }}</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-emerald-700">Token</span>
-                        <span class="font-bold text-emerald-900">{{ number_format($purchase['tokens']) }}</span>
+                        <span class="text-emerald-700">Normkredit</span>
+                        <span class="font-bold text-emerald-900">{{ number_format($purchase['tokens'] / 2500, 1) }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-emerald-700">Harga</span>
@@ -36,7 +36,7 @@
         @endif
 
         <p class="mx-auto mt-4 max-w-[28ch] text-center text-sm text-emerald-700">
-            Token sudah masuk ke saldo grup dan bisa langsung dipakai (aktivasi instan/simulasi).
+            Normkredit sudah masuk ke saldo grup dan bisa langsung dipakai.
         </p>
 
         <a href="{{ route('groups.index') }}" class="btn-cta mt-auto py-4">

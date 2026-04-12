@@ -7,8 +7,8 @@
         </a>
 
         <h1 class="mt-3 font-display text-2xl font-extrabold text-slate-900">Top-up Normkredit</h1>
-        <p class="mt-1 text-sm text-slate-500">Patungan normkredit untuk grup kamu. 1 normkredit = 2.500 token = Rp{{ number_format($pricePerCredit, 0, ',', '.') }}</p>
-        <p class="mt-0.5 text-xs text-slate-400">Rp30.000 = 12 normkredit = 30.000 token (minimum)</p>
+        <p class="mt-1 text-sm text-slate-500">Patungan normkredit untuk grup kamu. 1 normkredit = Rp{{ number_format($pricePerCredit, 0, ',', '.') }}</p>
+        <p class="mt-0.5 text-xs text-slate-400">Rp30.000 = 12 normkredit (minimum)</p>
 
         <form method="POST" action="{{ route('subscription.tokens.buy.process') }}" class="mt-6 space-y-4">
             @csrf
@@ -23,7 +23,7 @@
                         @foreach($groups as $g)
                             @php $gt = $g->groupToken; @endphp
                             <option value="{{ $g->id }}" {{ old('group_id') == $g->id ? 'selected' : '' }}>
-                                {{ $g->name }} — {{ number_format($gt?->credits ?? 0, 1) }} normkredit ({{ $gt ? $gt->formattedRemaining() : '0' }} token)
+                                {{ $g->name }} — {{ number_format($gt?->credits ?? 0, 1) }} normkredit
                             </option>
                         @endforeach
                     </select>
@@ -71,9 +71,8 @@
                        class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                        oninput="calcFromCredits()" />
 
-                <div class="mt-2 flex items-center justify-between text-sm">
-                    <span class="text-slate-600">= <span class="font-bold text-slate-900" id="calcTokensFromCredits">10.000</span> token</span>
-                    <span class="text-slate-600">Harga: <span class="font-bold text-slate-900" id="calcPriceFromCredits">Rp10.000</span></span>
+                <div class="mt-2 flex items-center justify-end text-sm">
+                    <span class="text-slate-600">Harga: <span class="font-bold text-slate-900" id="calcPriceFromCredits">Rp30.000</span></span>
                 </div>
             </div>
 
@@ -98,9 +97,8 @@
                        class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                        oninput="calcFromPrice()" />
 
-                <div class="mt-2 flex items-center justify-between text-sm">
-                    <span class="text-slate-600">= <span class="font-bold text-slate-900" id="calcCreditsFromPrice">10</span> normkredit</span>
-                    <span class="text-slate-600">Dapat: <span class="font-bold text-slate-900" id="calcTokensFromPrice">10.000</span> token</span>
+                <div class="mt-2 flex items-center justify-end text-sm">
+                    <span class="text-slate-600">= <span class="font-bold text-slate-900" id="calcCreditsFromPrice">12</span> normkredit</span>
                 </div>
             </div>
 
@@ -144,17 +142,13 @@
 
         function calcFromCredits() {
             const credits = parseFloat(document.getElementById('creditAmountInput').value) || 0;
-            const tokens = Math.floor(credits * TOKENS_PER_CREDIT);
             const price = Math.ceil(credits * PRICE_PER_CREDIT);
             document.getElementById('calcPriceFromCredits').textContent = 'Rp' + price.toLocaleString('id-ID');
-            document.getElementById('calcTokensFromCredits').textContent = tokens.toLocaleString('id-ID');
         }
 
         function calcFromPrice() {
             const price = parseInt(document.getElementById('priceAmountInput').value) || 0;
             const credits = price / PRICE_PER_CREDIT;
-            const tokens = Math.floor(credits * TOKENS_PER_CREDIT);
-            document.getElementById('calcTokensFromPrice').textContent = tokens.toLocaleString('id-ID');
             document.getElementById('calcCreditsFromPrice').textContent = credits % 1 === 0 ? credits : credits.toFixed(1);
         }
 

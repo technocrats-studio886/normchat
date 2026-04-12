@@ -59,8 +59,6 @@
         <div class="mt-2 space-y-2.5">
             @forelse ($groups as $group)
                 @php
-                    $gt = $group->groupToken;
-                    $credits = $gt ? $gt->credits : 0;
                     $activeMembers = $group->members->where('status', 'active');
                     $ownerInMembers = $activeMembers->contains('user_id', $group->owner_id);
                     $memberCount = $activeMembers->count() + ($ownerInMembers ? 0 : 1);
@@ -74,9 +72,6 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between gap-2">
                                 <h3 class="truncate text-sm font-bold text-slate-900">{{ $group->name }}</h3>
-                                <span class="{{ $credits > 0 ? 'chip-emerald' : 'chip-rose' }}">
-                                    {{ number_format($credits, 1) }} kredit
-                                </span>
                             </div>
                             <p class="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="3.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 20c1.2-3.2 4-5 8-5s6.8 1.8 8 5"/></svg>

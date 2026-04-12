@@ -9,7 +9,7 @@
 | Rp30.000 = 12 normkredit = 30.000 token (minimum per group)
 |
 | multiplier: berapa kali lipat token yang dicharge ke saldo grup.
-|   - Tiap prompt yang di konversi jadi token itu x2.
+|   - Tiap prompt yang di konversi jadi token itu x1.5.
 |   - Output gambar = 8.000 token fixed.
 |
 */
@@ -23,7 +23,7 @@ return [
             'models' => [
                 'gpt-5' => [
                     'label' => 'NormAI',
-                    'multiplier' => 2.0,
+                    'multiplier' => 1.5,
                     'description' => 'Managed by platform',
                 ],
             ],
