@@ -64,7 +64,7 @@
 
                         <div class="mt-2 flex items-center justify-between text-sm">
                             <span class="text-slate-600">= <span class="font-bold text-blue-600" id="calcNormkredit">{{ $minPatungan / $pricePerNormkredit }}</span> normkredit</span>
-                            <span class="text-slate-600">(<span class="font-bold text-slate-800" id="calcTokens">{{ number_format($minPatungan / $pricePerNormkredit * 1000) }}</span> token)</span>
+                            <span class="text-slate-600">(<span class="font-bold text-slate-800" id="calcTokens">{{ number_format($minPatungan / $pricePerNormkredit * 2500) }}</span> token)</span>
                         </div>
                     </div>
                     @if($errors->has('patungan_amount'))
@@ -104,7 +104,7 @@
     <script>
         const PRICE_PER_NK = {{ $pricePerNormkredit }};
         const SEAT_PRICE = {{ $seatPrice }};
-        const TOKENS_PER_NK = 1000;
+        const TOKENS_PER_NK = 2500;
 
         function toggleJoinPassword() {
             const input = document.getElementById('joinGroupPasswordInput');

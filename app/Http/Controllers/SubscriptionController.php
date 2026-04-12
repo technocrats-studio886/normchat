@@ -16,9 +16,9 @@ use Illuminate\View\View;
 
 class SubscriptionController extends Controller
 {
-    private const PLAN_PRICE = 25000;
-    private const INCLUDED_TOKENS = 10_000; // 10K tokens = 10 normkredit
-    private const PRICE_PER_CREDIT = 1000; // Rp1.000 per normkredit (1K token)
+    private const PLAN_PRICE = 30_000;
+    private const INCLUDED_TOKENS = 30_000; // 30K tokens = 12 normkredit
+    private const PRICE_PER_CREDIT = 2_500; // Rp2.500 per normkredit (2.5K token)
     private const ADD_SEAT_PRICE = 4000;
     private const PAYMENT_EXPIRY_HOURS = 24;
 
@@ -104,8 +104,8 @@ class SubscriptionController extends Controller
         $validated = $request->validate([
             'group_id' => ['required', 'exists:groups,id'],
             'mode' => ['required', 'in:by_credits,by_price'],
-            'credit_amount' => ['required_if:mode,by_credits', 'nullable', 'numeric', 'min:1'],
-            'price_amount' => ['required_if:mode,by_price', 'nullable', 'integer', 'min:1000'],
+            'credit_amount' => ['required_if:mode,by_credits', 'nullable', 'numeric', 'min:12'],
+            'price_amount' => ['required_if:mode,by_price', 'nullable', 'integer', 'min:30000'],
         ]);
 
         $user = Auth::user();
@@ -117,16 +117,16 @@ class SubscriptionController extends Controller
 
         if ($validated['mode'] === 'by_credits') {
             $credits = (float) $validated['credit_amount'];
-            $tokenAmount = (int) ($credits * 1000);
+            $tokenAmount = (int) ($credits * 2500);
             $price = (int) ceil($credits * self::PRICE_PER_CREDIT);
         } else {
             $price = (int) $validated['price_amount'];
             $credits = $price / self::PRICE_PER_CREDIT;
-            $tokenAmount = (int) floor($credits * 1000);
+            $tokenAmount = (int) floor($credits * 2500);
         }
 
-        if ($tokenAmount < 1000) {
-            return back()->withErrors(['credit_amount' => 'Minimal pembelian 1 normkredit (1.000 token).']);
+        if ($credits < 12) {
+            return back()->withErrors(['credit_amount' => 'Minimal pembelian 12 normkredit (30.000 token = Rp30.000).']);
         }
 
         $reference = 'SIM-TOKEN-' . strtoupper(Str::random(8));

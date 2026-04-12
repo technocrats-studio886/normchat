@@ -128,7 +128,7 @@
                     <div class="rounded-2xl border border-white/15 bg-white/10 p-6">
                         <p class="text-xs font-semibold uppercase tracking-wide text-cyan-100">Mulai dari</p>
                         <p class="mt-2 text-4xl font-extrabold text-white">
-                            Rp25.000<span class="text-base font-medium text-slate-300">/bulan</span>
+                            Rp30.000<span class="text-base font-medium text-slate-300">/grup</span>
                         </p>
                         <a href="{{ $loginToSubscriptionUrl }}" class="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-extrabold uppercase tracking-wide text-[#0f1f33] transition hover:bg-slate-100">
                             Login & Lihat Subscription

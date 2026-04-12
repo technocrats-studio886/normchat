@@ -5,12 +5,12 @@
 | AI Model Configuration
 |--------------------------------------------------------------------------
 |
-| 1 normkredit = 1.000 token = Rp1.000
+| 1 normkredit = 2.500 token = Rp2.500
+| Rp30.000 = 12 normkredit = 30.000 token (minimum per group)
 |
 | multiplier: berapa kali lipat token yang dicharge ke saldo grup.
-|   - Misal multiplier 2.0: jika LLM pakai 100K token actual,
-|     maka dipotong 200K dari saldo grup.
-|   - Model mahal punya multiplier tinggi agar kita tidak rugi.
+|   - Tiap prompt yang di konversi jadi token itu x2.
+|   - Output gambar = 8.000 token fixed.
 |
 */
 

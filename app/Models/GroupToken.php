@@ -25,16 +25,16 @@ class GroupToken extends Model
         return $this->hasMany(GroupTokenContribution::class, 'group_id', 'group_id');
     }
 
-    // ── Normkredit helpers (1 normkredit = 1.000 token = Rp10.000) ────
+    // ── Normkredit helpers (1 normkredit = 2.500 token = Rp2.500) ────
 
     public function getCreditsAttribute(): float
     {
-        return round($this->remaining_tokens / 1_000, 2);
+        return round($this->remaining_tokens / 2_500, 2);
     }
 
     public function getTotalCreditsAttribute(): float
     {
-        return round($this->total_tokens / 1_000, 2);
+        return round($this->total_tokens / 2_500, 2);
     }
 
     public function addTokens(int $amount): void
@@ -45,7 +45,7 @@ class GroupToken extends Model
 
     public function addCredits(float $credits): void
     {
-        $tokens = (int) ($credits * 1_000);
+        $tokens = (int) ($credits * 2_500);
         $this->addTokens($tokens);
     }
 

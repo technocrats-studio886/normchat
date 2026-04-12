@@ -14,7 +14,7 @@
         {{-- Subscription Plan --}}
         <div class="panel-card mt-6 rounded-3xl p-5">
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-blue-500">Normchat Pro</p>
-            <p class="mt-2 text-4xl font-extrabold text-slate-900">Rp25.000<span class="text-base font-medium text-slate-400">/bulan</span></p>
+            <p class="mt-2 text-4xl font-extrabold text-slate-900">Rp30.000<span class="text-base font-medium text-slate-400">/grup</span></p>
 
             <ul class="mt-5 space-y-2 text-sm text-slate-600">
                 <li class="flex items-start gap-2">
@@ -23,7 +23,7 @@
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="mt-0.5 text-emerald-500">&#10003;</span>
-                    10 normkredit included (10.000 token AI)
+                    12 normkredit included (30.000 token AI)
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="mt-0.5 text-emerald-500">&#10003;</span>
@@ -43,7 +43,7 @@
         {{-- Extra Normkredit --}}
         <div class="panel-card mt-4 rounded-3xl p-5">
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-500">Tambah Normkredit?</p>
-            <p class="mt-1 text-xs text-slate-500">Opsional. 1 normkredit = 1.000 token = Rp1.000</p>
+            <p class="mt-1 text-xs text-slate-500">Opsional. 1 normkredit = 2.500 token = Rp2.500</p>
 
             {{-- Mode Toggle --}}
             <div class="mt-3 flex gap-2">
@@ -95,8 +95,8 @@
 
             <div class="mt-3 space-y-2 text-sm">
                 <div class="flex justify-between">
-                    <span class="text-slate-600">Subscription Normchat Pro</span>
-                    <span class="font-bold text-slate-900">Rp25.000</span>
+                    <span class="text-slate-600">Biaya Pembuatan Grup</span>
+                    <span class="font-bold text-slate-900">Rp30.000</span>
                 </div>
                 <div class="flex justify-between" id="extraRow">
                     <span class="text-slate-600">Tambahan normkredit</span>
@@ -105,12 +105,12 @@
                 <hr class="border-slate-100" />
                 <div class="flex justify-between">
                     <span class="font-bold text-slate-800">Total bayar</span>
-                    <span class="text-xl font-extrabold text-blue-600" id="totalPrice">Rp25.000</span>
+                    <span class="text-xl font-extrabold text-blue-600" id="totalPrice">Rp30.000</span>
                 </div>
             </div>
 
             <p class="mt-2 text-[11px] text-slate-400" id="totalSummary">
-                Dapat 10 normkredit (10.000 token) dari subscription.
+                Dapat 12 normkredit (30.000 token) per pembuatan grup.
             </p>
         </div>
 
@@ -125,10 +125,10 @@
     </section>
 
     <script>
-        const SUB_PRICE = 25000;
-        const PRICE_PER_NK = 1000;
-        const TOKENS_PER_NK = 1000;
-        const SUB_NK = 10;
+        const SUB_PRICE = 30000;
+        const PRICE_PER_NK = 2500;
+        const TOKENS_PER_NK = 2500;
+        const SUB_NK = 12;
 
         let mode = 'credit';
 

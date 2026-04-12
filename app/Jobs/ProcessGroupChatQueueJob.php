@@ -182,7 +182,12 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             $usageTokens = 0;
         }
 
-        // Consume tokens with multiplier
+        // Add fixed 8000 token charge if message includes image input
+        if ($usageTokens > 0 && ($this->isImageMessage($message) || ($replyTarget && $this->isImageMessage($replyTarget)))) {
+            $usageTokens += 8_000;
+        }
+
+        // Consume tokens with multiplier (prompt x2)
         if ($usageTokens > 0 && $groupToken) {
             $effectiveTokens = $groupToken->consumeTokens($usageTokens, $multiplier);
 
@@ -222,7 +227,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'created_at' => optional($aiMessage->created_at)->toIso8601String(),
             'reply_to' => null,
             'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
-            'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 1000, 1),
+            'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 2500, 1),
         ]));
     }
 

@@ -17,9 +17,9 @@ use Illuminate\View\View;
 
 class GroupController extends Controller
 {
-    private const INCLUDED_CREDITS = 10; // 10 normkredit included in subscription
-    private const TOKENS_PER_CREDIT = 1_000;
-    private const PLAN_PRICE = 25000;
+    private const INCLUDED_CREDITS = 12; // 12 normkredit included per group creation
+    private const TOKENS_PER_CREDIT = 2_500;
+    private const PLAN_PRICE = 30_000;
     private const DEFAULT_AI_PROVIDER = 'openai';
     private const DEFAULT_AI_MODEL = 'gpt-5';
 
@@ -40,20 +40,11 @@ class GroupController extends Controller
 
     public function create(): View|RedirectResponse
     {
-        $user = Auth::user();
-
-        // Must have paid subscription to create group
-        $hasActive = Subscription::query()
-            ->whereHas('group', fn ($q) => $q->where('owner_id', $user->id))
-            ->where('status', 'active')
-            ->exists();
-
-        if (! $hasActive && ! session('subscription_paid')) {
-            return redirect()->route('subscription.pricing')
-                ->with('info', 'Aktifkan paket dulu sebelum membuat grup.');
-        }
-
-        return view('groups.create');
+        return view('groups.create', [
+            'planPrice' => self::PLAN_PRICE,
+            'includedCredits' => self::INCLUDED_CREDITS,
+            'tokensPerCredit' => self::TOKENS_PER_CREDIT,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -129,8 +120,8 @@ class GroupController extends Controller
     }
 
     private const SEAT_PRICE = 4000;
-    private const MIN_PATUNGAN = 10000;
-    private const PRICE_PER_NORMKREDIT = 1000;
+    private const MIN_PATUNGAN = 30_000;
+    private const PRICE_PER_NORMKREDIT = 2_500;
 
     // ── Join via share ID: show patungan form ───────────────
 

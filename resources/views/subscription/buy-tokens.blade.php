@@ -7,8 +7,8 @@
         </a>
 
         <h1 class="mt-3 font-display text-2xl font-extrabold text-slate-900">Top-up Normkredit</h1>
-        <p class="mt-1 text-sm text-slate-500">Patungan normkredit untuk grup kamu. 1 normkredit = 1.000 token = Rp{{ number_format($pricePerCredit, 0, ',', '.') }}</p>
-        <p class="mt-0.5 text-xs text-slate-400">Rp10.000 = 10 normkredit = 10.000 token</p>
+        <p class="mt-1 text-sm text-slate-500">Patungan normkredit untuk grup kamu. 1 normkredit = 2.500 token = Rp{{ number_format($pricePerCredit, 0, ',', '.') }}</p>
+        <p class="mt-0.5 text-xs text-slate-400">Rp30.000 = 12 normkredit = 30.000 token (minimum)</p>
 
         <form method="POST" action="{{ route('subscription.tokens.buy.process') }}" class="mt-6 space-y-4">
             @csrf
@@ -55,7 +55,7 @@
                 <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Jumlah Normkredit</label>
 
                 <div class="mt-2 grid grid-cols-3 gap-2">
-                    @foreach([5 => '5', 10 => '10', 20 => '20', 50 => '50', 100 => '100', 200 => '200'] as $opt => $label)
+                    @foreach([12 => '12', 20 => '20', 24 => '24', 50 => '50', 100 => '100', 200 => '200'] as $opt => $label)
                         <button type="button"
                                 class="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-400 hover:bg-blue-50"
                                 onclick="setCreditAmount({{ $opt }})">
@@ -65,9 +65,9 @@
                 </div>
 
                 <input type="number" name="credit_amount" id="creditAmountInput"
-                       value="{{ old('credit_amount', 10) }}"
-                       min="1" step="1"
-                       placeholder="Min. 1 normkredit"
+                       value="{{ old('credit_amount', 12) }}"
+                       min="12" step="1"
+                       placeholder="Min. 12 normkredit"
                        class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                        oninput="calcFromCredits()" />
 
@@ -82,7 +82,7 @@
                 <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nominal Harga (Rp)</label>
 
                 <div class="mt-2 grid grid-cols-3 gap-2">
-                    @foreach([5000, 10000, 20000, 25000, 50000, 100000] as $opt)
+                    @foreach([30000, 50000, 75000, 100000, 150000, 250000] as $opt)
                         <button type="button"
                                 class="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-400 hover:bg-blue-50"
                                 onclick="setPriceAmount({{ $opt }})">
@@ -92,9 +92,9 @@
                 </div>
 
                 <input type="number" name="price_amount" id="priceAmountInput"
-                       value="{{ old('price_amount', 10000) }}"
-                       min="1000" step="1000"
-                       placeholder="Min. Rp1.000"
+                       value="{{ old('price_amount', 30000) }}"
+                       min="30000" step="2500"
+                       placeholder="Min. Rp30.000"
                        class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                        oninput="calcFromPrice()" />
 
@@ -118,7 +118,7 @@
 
     <script>
         const PRICE_PER_CREDIT = {{ $pricePerCredit }};
-        const TOKENS_PER_CREDIT = 1000;
+        const TOKENS_PER_CREDIT = 2500;
 
         function setMode(mode) {
             document.getElementById('modeInput').value = mode;

@@ -431,7 +431,7 @@ class ChatController extends Controller
                 'attachment_original_name' => (string) ($replyTarget->attachment_original_name ?? ''),
             ] : null,
             'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
-            'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 1000, 1),
+            'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 2500, 1),
         ];
     }
 }

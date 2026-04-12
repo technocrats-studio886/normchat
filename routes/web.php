@@ -43,7 +43,7 @@ Route::middleware('auth')->group(function () {
     // Groups
     Route::get('/groups', [GroupController::class, 'index'])->name('groups.index');
     Route::get('/groups/create', [GroupController::class, 'create'])->name('groups.create');
-    Route::post('/groups', [pController::class, 'store'])->name('groups.store');
+    Route::post('/groups', [GroupController::class, 'store'])->name('groups.store');
 
     // Chat
     Route::get('/chat/last', [ChatController::class, 'openLast'])->name('chat.last');
