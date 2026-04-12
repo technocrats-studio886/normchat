@@ -629,11 +629,13 @@ if (window.Echo && groupId) {
 					continue;
 				}
 
-				const finalNode = buildMessageNode(payload.message);
-				finalNode.setAttribute('data-message-id', String(payload.message.id));
-				finalNode.id = `message-${payload.message.id}`;
-				pending.node.replaceWith(finalNode);
-				initVoicePlayers(finalNode);
+				try {
+					const finalNode = buildMessageNode(payload.message);
+					finalNode.setAttribute('data-message-id', String(payload.message.id));
+					finalNode.id = `message-${payload.message.id}`;
+					pending.node.replaceWith(finalNode);
+					initVoicePlayers(finalNode);
+				} catch (_) {}
 
 				if (typeof pending.blobUrl === 'string') {
 					URL.revokeObjectURL(pending.blobUrl);
@@ -1264,7 +1266,8 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 	const replacePendingMessage = (localId, serverMessage) => {
 		const pending = pendingMessagesByLocalId.get(localId);
-		if (!pending?.node) {
+		if (!pending?.node || !pending.node.isConnected) {
+			pendingMessagesByLocalId.delete(localId);
 			return;
 		}
 
