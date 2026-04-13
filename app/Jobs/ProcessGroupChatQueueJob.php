@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ProcessGroupChatQueueJob implements ShouldQueue
@@ -161,33 +162,47 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
         $responseText = null;
         $usageTokens = 0;
+        $generatedImagePath = null;
+        $generatedImageMime = null;
+
+        // Detect if user is requesting image generation
+        $isImageGenRequest = $this->isImageGenerationRequest($content);
 
         event(new TypingStatus($group->id, 'ai', null, 'NormAI', true));
         try {
-            [$responseText, $usageTokens] = $this->generateProviderResponse(
-                $provider,
-                $model,
-                $credentials,
-                $message,
-                $recentMessages->all(),
-                $group
-            );
+            if ($isImageGenRequest) {
+                // Generate image via DALL-E 3 HD
+                [$generatedImagePath, $generatedImageMime, $responseText, $usageTokens] = $this->generateImage(
+                    $credentials,
+                    $message,
+                    $group
+                );
+            } else {
+                [$responseText, $usageTokens] = $this->generateProviderResponse(
+                    $provider,
+                    $model,
+                    $credentials,
+                    $message,
+                    $recentMessages->all(),
+                    $group
+                );
+            }
         } finally {
             event(new TypingStatus($group->id, 'ai', null, 'NormAI', false));
         }
 
-        if (! $responseText) {
+        if (! $responseText && ! $generatedImagePath) {
             $responseText = 'AI sedang sibuk dan belum bisa merespons saat ini. Coba lagi beberapa saat.';
             // Don't charge tokens if response failed
             $usageTokens = 0;
         }
 
         // Add fixed 8000 token charge if message includes image input
-        if ($usageTokens > 0 && ($this->isImageMessage($message) || ($replyTarget && $this->isImageMessage($replyTarget)))) {
+        if ($usageTokens > 0 && ! $isImageGenRequest && ($this->isImageMessage($message) || ($replyTarget && $this->isImageMessage($replyTarget)))) {
             $usageTokens += 8_000;
         }
 
-        // Consume tokens with multiplier (prompt x2)
+        // Consume tokens with multiplier
         if ($usageTokens > 0 && $groupToken) {
             $effectiveTokens = $groupToken->consumeTokens($usageTokens, $multiplier);
 
@@ -195,7 +210,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
                 // Not enough tokens - still send the response but warn
                 $remaining = $groupToken->formattedRemaining();
                 $needed = number_format((int) ceil($usageTokens * $multiplier));
-                $responseText .= "\n\n---\nSaldo token grup tidak mencukupi. Sisa: {$remaining} token, dibutuhkan: {$needed} token. Top-up normkredit untuk melanjutkan penggunaan AI.";
+                $responseText = ($responseText ?? '') . "\n\n---\nSaldo token grup tidak mencukupi. Sisa: {$remaining} token, dibutuhkan: {$needed} token. Top-up normkredit untuk melanjutkan penggunaan AI.";
 
                 // Force consume whatever is left
                 if ($groupToken->remaining_tokens > 0) {
@@ -205,12 +220,26 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             }
         }
 
-        $aiMessage = Message::create([
+        $aiMessageData = [
             'group_id' => $message->group_id,
             'sender_type' => 'ai',
             'sender_id' => null,
             'content' => $responseText,
-        ]);
+        ];
+
+        if ($generatedImagePath) {
+            $aiMessageData['message_type'] = 'image';
+            $aiMessageData['attachment_disk'] = 'normchat_attachments';
+            $aiMessageData['attachment_path'] = $generatedImagePath;
+            $aiMessageData['attachment_mime'] = $generatedImageMime ?? 'image/png';
+            $aiMessageData['attachment_original_name'] = 'normai-generated.png';
+        }
+
+        $aiMessage = Message::create($aiMessageData);
+
+        $attachmentUrl = $aiMessage->attachment_path
+            ? route('chat.attachment', ['group' => $group->id, 'message' => $aiMessage->id])
+            : null;
 
         $groupToken?->refresh();
 
@@ -221,9 +250,9 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'sender_id' => $aiMessage->sender_id,
             'sender_name' => 'NormAI',
             'content' => $aiMessage->content,
-            'attachment_url' => null,
-            'attachment_mime' => null,
-            'attachment_original_name' => null,
+            'attachment_url' => $attachmentUrl,
+            'attachment_mime' => $aiMessage->attachment_mime,
+            'attachment_original_name' => $aiMessage->attachment_original_name,
             'created_at' => optional($aiMessage->created_at)->toIso8601String(),
             'reply_to' => null,
             'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
@@ -341,7 +370,13 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
     private function toChatMessages(array $recentMessages, Message $requestMessage, string $token, ?Group $group = null): array
     {
-        $systemPrompt = 'Kamu adalah AI participant untuk group chat Normchat. Jawab singkat, jelas, relevan konteks grup, dan gunakan Bahasa Indonesia.';
+        $systemPrompt = 'Kamu adalah AI participant untuk group chat Normchat. Jawab singkat, jelas, relevan konteks grup, dan gunakan Bahasa Indonesia.'
+            . "\n\nKamu bisa menggunakan format berikut dalam jawaban:"
+            . "\n- **bold** dan *italic* untuk penekanan"
+            . "\n- Markdown table untuk data tabular (gunakan | header | format |)"
+            . "\n- Mermaid diagram dengan syntax ```mermaid untuk flowchart, sequence diagram, pie chart, dll"
+            . "\n- Numbered list dan bullet list"
+            . "\nGunakan format yang paling sesuai untuk menjawab pertanyaan user.";
 
         if ($group) {
             if ($group->ai_persona_style) {
@@ -536,6 +571,111 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             ]);
 
             return null;
+        }
+    }
+
+    private function isImageGenerationRequest(string $content): bool
+    {
+        $patterns = [
+            'buatkan gambar',
+            'buat gambar',
+            'bikin gambar',
+            'generate gambar',
+            'generate image',
+            'generate an image',
+            'create image',
+            'create an image',
+            'draw ',
+            'gambarkan',
+            'buatkan foto',
+            'buat foto',
+            'bikin foto',
+            'tolong gambar',
+            'coba gambar',
+            'gambarin',
+            'bikinin gambar',
+            'buatin gambar',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (str_contains($content, $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Generate image via DALL-E 3 HD.
+     * Returns [storagePath, mime, captionText, tokenCharge]
+     */
+    private function generateImage(string $token, Message $requestMessage, ?Group $group): array
+    {
+        $prompt = trim(preg_replace('/@\w+\s*/', '', (string) $requestMessage->content));
+        $prompt = preg_replace('/^(buatkan|buat|bikin|generate|create|draw|gambarkan|tolong|coba|gambarin|bikinin|buatin)\s*(gambar|foto|image|an image)?\s*/iu', '', $prompt);
+        $prompt = trim($prompt);
+
+        if ($prompt === '') {
+            $prompt = 'A beautiful creative illustration';
+        }
+
+        try {
+            $response = Http::withToken($token)
+                ->timeout(60)
+                ->post('https://api.openai.com/v1/images/generations', [
+                    'model' => 'dall-e-3',
+                    'prompt' => $prompt,
+                    'n' => 1,
+                    'size' => '1024x1024',
+                    'quality' => 'hd',
+                    'response_format' => 'b64_json',
+                ]);
+
+            if ($response->failed()) {
+                Log::warning('DALL-E image generation failed.', [
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 500),
+                ]);
+
+                $errorCode = $response->json('error.code') ?? '';
+                if ($errorCode === 'content_policy_violation') {
+                    return [null, null, 'Tidak bisa membuat gambar ini karena melanggar kebijakan konten (misalnya: tokoh nyata, konten sensitif). Coba dengan deskripsi lain ya!', 0];
+                }
+
+                return [null, null, 'Gagal membuat gambar, coba lagi nanti.', 0];
+            }
+
+            $b64 = $response->json('data.0.b64_json');
+            $revisedPrompt = $response->json('data.0.revised_prompt');
+
+            if (! $b64) {
+                return [null, null, 'Gagal membuat gambar: response kosong.', 0];
+            }
+
+            $imageData = base64_decode($b64);
+            $disk = 'normchat_attachments';
+            $path = sprintf(
+                'group-%d/%s/ai-%s.png',
+                $requestMessage->group_id,
+                now()->format('Y/m'),
+                (string) Str::uuid()
+            );
+
+            $targetDirectory = dirname($path);
+            Storage::disk($disk)->makeDirectory($targetDirectory);
+            Storage::disk($disk)->put($path, $imageData);
+
+            $caption = $revisedPrompt ? "🎨 {$revisedPrompt}" : null;
+
+            // Fixed 8000 token charge for image output
+            return [$path, 'image/png', $caption, 8_000];
+        } catch (Throwable $e) {
+            Log::error('DALL-E image generation exception.', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [null, null, 'Gagal membuat gambar, coba lagi nanti.', 0];
         }
     }
 

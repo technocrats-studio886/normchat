@@ -22,27 +22,25 @@ class SubscriptionController extends Controller
     private const ADD_SEAT_PRICE = 4000;
     private const PAYMENT_EXPIRY_HOURS = 24;
 
-    public function landing(): View
+    public function landing(): View|RedirectResponse
     {
+        if (Auth::check()) {
+            return redirect()->route('groups.index');
+        }
+
         return view('marketing.landing');
     }
 
-    public function pricing(): View|RedirectResponse
+    public function pricing(): RedirectResponse
     {
-        return view('subscription.pricing');
+        return redirect()->route('groups.index');
     }
 
     // ── Payment Detail (Subscription) ────────────────────────
 
-    public function paymentDetail(): View|RedirectResponse
+    public function paymentDetail(): RedirectResponse
     {
-        $user = Auth::user();
-
-        return view('subscription.payment-detail', [
-            'user' => $user,
-            'planPrice' => self::PLAN_PRICE,
-            'includedTokens' => self::INCLUDED_TOKENS,
-        ]);
+        return redirect()->route('groups.index');
     }
 
     public function pay(Request $request): RedirectResponse

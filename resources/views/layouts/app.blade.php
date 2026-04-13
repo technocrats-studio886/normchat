@@ -14,6 +14,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <title>{{ $title ?? 'Normchat' }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:false,theme:'neutral',securityLevel:'loose'});</script>
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @php
             $viteEntries = ['resources/css/app.css'];
@@ -126,5 +128,18 @@ if ('serviceWorker' in navigator) {
         }).catch(() => {});
     });
 }
+
+window.onerror = function(message) {
+    if (typeof message === 'string' && message.indexOf('removeChild') !== -1) {
+        return true;
+    }
+};
+
+window.addEventListener('unhandledrejection', function(event) {
+    var reason = event.reason;
+    if (reason && typeof reason.message === 'string' && reason.message.indexOf('removeChild') !== -1) {
+        event.preventDefault();
+    }
+});
 </script>
 </html>

@@ -114,7 +114,8 @@
                     </div>
                 @elseif($isAi)
                     {{-- AI message - left aligned, green tinted --}}
-                    <div id="message-{{ $message->id }}" class="max-w-[80%]" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
+                    @php $hasRich = str_contains($message->content ?? '', '|') || str_contains($message->content ?? '', '```mermaid'); @endphp
+                    <div id="message-{{ $message->id }}" class="{{ $hasRich ? 'max-w-[95%]' : 'max-w-[80%]' }}" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         @if($replyTarget)
                             <div class="mb-1 rounded-xl border border-emerald-200 bg-emerald-100/70 px-3 py-1.5 text-xs text-emerald-700">
                                 <p class="font-semibold">Reply to {{ $replySender }}</p>
@@ -151,7 +152,7 @@
                             </div>
                         @endif
                         @if($message->content)
-                            <div class="bubble-ai">
+                            <div class="bubble-ai ai-markdown overflow-hidden" data-ai-raw>
                                 {{ $message->content }}
                             </div>
                         @endif

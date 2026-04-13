@@ -87,13 +87,7 @@ class AuthController extends Controller
             'created_at' => now(),
         ]);
 
-        $redirectUrl = (string) $request->query('redirect_url', $request->query('redirectUrl', ''));
-        $targetPath = parse_url($redirectUrl, PHP_URL_PATH) ?: '';
-        if (is_string($targetPath) && str_starts_with($targetPath, '/')) {
-            return redirect()->to($targetPath);
-        }
-
-        return redirect($this->resolvePostLoginRedirect());
+        return redirect()->route('groups.index');
     }
 
     // ── Logout ───────────────────────────────────────────────
@@ -138,7 +132,7 @@ class AuthController extends Controller
             return $intended;
         }
 
-        return route('subscription.payment.detail');
+        return route('groups.index');
     }
 
     private function ssoUrl(string $page): string

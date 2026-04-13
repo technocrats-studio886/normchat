@@ -307,21 +307,28 @@ class ChatController extends Controller
             ->all();
     }
 
-    public function attachment(Group $group, Message $message): StreamedResponse
+    public function attachment(Group $group, Message $message): StreamedResponse|\Symfony\Component\HttpFoundation\Response
     {
         $this->authorize('chat', $group);
 
         abort_unless((int) $message->group_id === (int) $group->id, 404);
         abort_if(! $message->attachment_path || ! $message->attachment_disk, 404);
 
-        return Storage::disk($message->attachment_disk)->response(
-            $message->attachment_path,
-            $message->attachment_original_name ?? basename($message->attachment_path),
-            [
-                'Content-Type' => $message->attachment_mime ?: 'application/octet-stream',
-                'Cache-Control' => 'private, max-age=3600',
-            ]
-        );
+        $disk = Storage::disk($message->attachment_disk);
+        $mime = $message->attachment_mime ?: 'application/octet-stream';
+        $filename = $message->attachment_original_name ?? basename($message->attachment_path);
+
+        return response()->stream(function () use ($disk, $message) {
+            $stream = $disk->readStream($message->attachment_path);
+            fpassthru($stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
     }
 
     private function resolveMessageType(?UploadedFile $attachment): string
