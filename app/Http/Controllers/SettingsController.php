@@ -10,6 +10,7 @@ use App\Models\Export;
 use App\Models\Group;
 use App\Models\GroupBackup;
 use App\Models\GroupMember;
+use App\Models\GroupTokenContribution;
 use App\Models\Message;
 use App\Models\RecoveryLog;
 use App\Models\Role;
@@ -109,7 +110,7 @@ class SettingsController extends Controller
 
         $export = Export::create([
             'group_id' => $group->id,
-            'file_name' => sprintf('normchat-group-%d.%s', $group->id, $validated['file_type']),
+            'file_name' => sprintf('%s.%s', $group->name, $validated['file_type']),
             'storage_path' => '',
             'file_type' => $validated['file_type'],
             'status' => 'queued',
@@ -122,11 +123,42 @@ class SettingsController extends Controller
 
         $export->refresh();
         if ($export->status === 'done' && $export->storage_path && Storage::disk('normchat_exports')->exists($export->storage_path)) {
-            $downloadName = sprintf('normchat-group-%d-export-%d.%s', $group->id, $export->id, $validated['file_type']);
+            $downloadName = $export->file_name ?: sprintf('%s.%s', $group->name, $validated['file_type']);
             return Storage::disk('normchat_exports')->download($export->storage_path, $downloadName);
         }
 
         return back()->withErrors(['export' => 'Export belum berhasil diproses. Coba ulangi beberapa saat lagi.']);
+    }
+
+    public function downloadExport(Group $group, Export $export): StreamedResponse|RedirectResponse
+    {
+        $this->authorize('exportChat', $group);
+
+        abort_unless((int) $export->group_id === (int) $group->id, 404);
+
+        if ($export->status !== 'done' || ! $export->storage_path || ! Storage::disk('normchat_exports')->exists($export->storage_path)) {
+            return back()->withErrors(['export' => 'File export tidak tersedia.']);
+        }
+
+        $downloadName = $export->file_name ?: sprintf('%s.%s', $group->name, $export->file_type);
+
+        return Storage::disk('normchat_exports')->download($export->storage_path, $downloadName);
+    }
+
+    public function transactionHistory(Group $group): View
+    {
+        $this->authorize('view', $group);
+
+        $contributions = GroupTokenContribution::query()
+            ->where('group_id', $group->id)
+            ->with('user:id,name')
+            ->latest('created_at')
+            ->get();
+
+        return view('settings.transactions', [
+            'group' => $group,
+            'contributions' => $contributions,
+        ]);
     }
 
     public function historyExport(Group $group): View
@@ -185,43 +217,6 @@ class SettingsController extends Controller
         ]);
 
         return back()->with('success', 'AI Persona berhasil disimpan.');
-    }
-
-    public function seatManagement(Group $group): View
-    {
-        $this->authorize('view', $group);
-
-        $user = Auth::user();
-        $canManageBilling = $user?->can('manageBilling', $group) ?? false;
-        $canManageMembers = $user?->can('manageMembers', $group) ?? false;
-        $canPromoteMember = $user?->can('promoteMember', $group) ?? false;
-
-        $group->load(['subscription.seats', 'members.user', 'members.role']);
-
-        $subscription = $group->subscription;
-        $activeSeatCount = (int) ($subscription?->included_seats ?? 2);
-        $activeMemberCount = $group->members()->where('status', 'active')->count();
-        $ownerInActiveMembers = $group->members()
-            ->where('status', 'active')
-            ->where('user_id', $group->owner_id)
-            ->exists();
-        if (! $ownerInActiveMembers) {
-            $activeMemberCount++;
-        }
-        $includedSeats = (int) ($subscription?->included_seats ?? 2);
-        $extraSeats = max($activeMemberCount - $includedSeats, 0);
-
-        return view('settings.seat-management', [
-            'group' => $group,
-            'subscription' => $subscription,
-            'activeSeatCount' => $activeSeatCount,
-            'activeMemberCount' => $activeMemberCount,
-            'includedSeats' => $includedSeats,
-            'extraSeats' => $extraSeats,
-            'canManageBilling' => $canManageBilling,
-            'canManageMembers' => $canManageMembers,
-            'canPromoteMember' => $canPromoteMember,
-        ]);
     }
 
     public function createBackup(Group $group): RedirectResponse

@@ -7,6 +7,7 @@ use App\Models\GroupToken;
 use App\Models\GroupTokenContribution;
 use App\Models\Subscription;
 use App\Models\SubscriptionPayment;
+use App\Services\InterdotzService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,11 +17,15 @@ use Illuminate\View\View;
 
 class SubscriptionController extends Controller
 {
-    private const PLAN_PRICE = 30_000;
-    private const INCLUDED_TOKENS = 30_000; // 30K tokens = 12 normkredit
-    private const PRICE_PER_CREDIT = 2_500; // Rp2.500 per normkredit (2.5K token)
-    private const ADD_SEAT_PRICE = 4000;
-    private const PAYMENT_EXPIRY_HOURS = 24;
+    private const TOKENS_PER_CREDIT = 2_500;
+    private const BYPASS_EMAILS = [
+        'superadmin@interdotz.com',
+    ];
+
+    private function isBypassPayment(): bool
+    {
+        return in_array(Auth::user()?->email, self::BYPASS_EMAILS, true);
+    }
 
     public function landing(): View|RedirectResponse
     {
@@ -36,8 +41,6 @@ class SubscriptionController extends Controller
         return redirect()->route('groups.index');
     }
 
-    // ── Payment Detail (Subscription) ────────────────────────
-
     public function paymentDetail(): RedirectResponse
     {
         return redirect()->route('groups.index');
@@ -45,16 +48,6 @@ class SubscriptionController extends Controller
 
     public function pay(Request $request): RedirectResponse
     {
-        $request->validate([
-            'plan' => ['required', 'in:normchat-pro'],
-        ]);
-
-        // Temporary UI-only flow: skip payment backbone and continue to app.
-        session([
-            'subscription_paid' => true,
-            'subscription_tokens' => self::INCLUDED_TOKENS,
-        ]);
-
         return redirect()->route('groups.index');
     }
 
@@ -63,9 +56,6 @@ class SubscriptionController extends Controller
         return redirect()->route('groups.index');
     }
 
-    /**
-     * AJAX polling endpoint: check if pending payment has been fulfilled by webhook.
-     */
     public function paymentStatus(Request $request): JsonResponse
     {
         return response()->json([
@@ -79,21 +69,25 @@ class SubscriptionController extends Controller
         return redirect()->route('groups.index');
     }
 
-    // ── Token Purchase ───────────────────────────────────────
+    // ── Token Purchase (via DU) ─────────────────────────────
 
     public function buyTokensForm(): View
     {
         $user = Auth::user();
+        $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
 
         $groups = Group::query()
-            ->where('owner_id', $user->id)
-            ->orWhereHas('members', fn ($q) => $q->where('user_id', $user->id)->where('status', 'active'))
+            ->where('status', 'active')
+            ->where(function ($q) use ($user) {
+                $q->where('owner_id', $user->id)
+                  ->orWhereHas('members', fn ($m) => $m->where('user_id', $user->id)->where('status', 'active'));
+            })
             ->with('groupToken')
             ->get();
 
         return view('subscription.buy-tokens', [
             'groups' => $groups,
-            'pricePerCredit' => self::PRICE_PER_CREDIT,
+            'duPer12Nk' => $duPer12Nk,
         ]);
     }
 
@@ -101,9 +95,7 @@ class SubscriptionController extends Controller
     {
         $validated = $request->validate([
             'group_id' => ['required', 'exists:groups,id'],
-            'mode' => ['required', 'in:by_credits,by_price'],
-            'credit_amount' => ['required_if:mode,by_credits', 'nullable', 'numeric', 'min:12'],
-            'price_amount' => ['required_if:mode,by_price', 'nullable', 'integer', 'min:30000'],
+            'package' => ['required', 'in:nk_12,nk_24,nk_48,nk_100'],
         ]);
 
         $user = Auth::user();
@@ -113,47 +105,95 @@ class SubscriptionController extends Controller
             || $group->members()->where('user_id', $user->id)->where('status', 'active')->exists();
         abort_unless($isMember, 403);
 
-        if ($validated['mode'] === 'by_credits') {
-            $credits = (float) $validated['credit_amount'];
-            $tokenAmount = (int) ($credits * 2500);
-            $price = (int) ceil($credits * self::PRICE_PER_CREDIT);
-        } else {
-            $price = (int) $validated['price_amount'];
-            $credits = $price / self::PRICE_PER_CREDIT;
-            $tokenAmount = (int) floor($credits * 2500);
+        $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
+
+        $packages = [
+            'nk_12' => ['normkredits' => 12, 'du' => $duPer12Nk],
+            'nk_24' => ['normkredits' => 24, 'du' => $duPer12Nk * 2],
+            'nk_48' => ['normkredits' => 48, 'du' => $duPer12Nk * 4],
+            'nk_100' => ['normkredits' => 100, 'du' => (int) ceil(($duPer12Nk / 12) * 100)],
+        ];
+
+        $pkg = $packages[$validated['package']];
+        $duAmount = $pkg['du'];
+        $normkredits = $pkg['normkredits'];
+        $tokenAmount = $normkredits * self::TOKENS_PER_CREDIT;
+
+        // Superadmin bypass
+        if ($this->isBypassPayment()) {
+            $this->addTokensToGroup($group, $user, $tokenAmount, 0, 'SA-TOPUP-' . strtoupper(Str::random(8)));
+
+            return redirect()->route('subscription.tokens.buy.success')
+                ->with('token_purchase', [
+                    'normkredits' => $normkredits,
+                    'tokens' => $tokenAmount,
+                    'du_paid' => 0,
+                    'group_name' => $group->name,
+                ]);
         }
 
-        if ($credits < 12) {
-            return back()->withErrors(['credit_amount' => 'Minimal pembelian 12 normkredit (30.000 token = Rp30.000).']);
+        $interdotz = app(InterdotzService::class);
+
+        if (! $interdotz->isConfigured()) {
+            return back()->withErrors(['payment' => 'Sistem pembayaran belum dikonfigurasi.']);
         }
 
-        $reference = 'SIM-TOKEN-' . strtoupper(Str::random(8));
+        $ssoToken = $user->getAccessToken();
+        if (! $ssoToken) {
+            return back()->withErrors(['payment' => 'Sesi login berakhir. Silakan logout dan login kembali.']);
+        }
 
-        $groupToken = GroupToken::firstOrCreate(
-            ['group_id' => $group->id],
-            ['total_tokens' => 0, 'used_tokens' => 0, 'remaining_tokens' => 0]
+        $interdotzUserId = (string) ($user->interdotz_id ?: $user->provider_user_id ?: '');
+
+        $referenceId = "topup_{$group->id}_{$user->id}_" . time();
+        $callbackUrl = url('/api/webhooks/interdotz/charge');
+
+        // Try direct charge first (immediate deduction)
+        $chargeResult = $interdotz->charge($ssoToken, $duAmount, 'normchat_topup', $referenceId, $interdotzUserId);
+
+        if ($chargeResult && isset($chargeResult['payload'])) {
+            $txId = $chargeResult['payload']['transaction_id'] ?? $referenceId;
+            $this->addTokensToGroup($group, $user, $tokenAmount, $duAmount, $txId);
+
+            return redirect()->route('subscription.tokens.buy.success')
+                ->with('token_purchase', [
+                    'normkredits' => $normkredits,
+                    'tokens' => $tokenAmount,
+                    'du_paid' => $duAmount,
+                    'group_name' => $group->name,
+                ]);
+        }
+
+        // Fallback to chargeRequest (redirect flow)
+        $result = $interdotz->chargeRequest(
+            $ssoToken,
+            $duAmount,
+            'normchat_topup',
+            $referenceId,
+            "Top-up {$normkredits} normkredit untuk grup {$group->name} ({$duAmount} DU)",
+            $callbackUrl,
+            $interdotzUserId
         );
-        $groupToken->addTokens($tokenAmount);
 
-        GroupTokenContribution::create([
-            'group_id' => $group->id,
-            'user_id' => $user->id,
-            'source' => 'topup',
-            'token_amount' => $tokenAmount,
-            'price_paid' => 0,
-            'payment_reference' => $reference,
-        ]);
+        $redirectUrl = $result['payload']['redirect_url'] ?? $result['payload']['redirectUrl'] ?? null;
+        if ($result && ! empty($redirectUrl)) {
+            session([
+                'pending_topup_ref' => $referenceId,
+                'pending_topup_group' => $group->id,
+            ]);
 
-        session([
-            'token_purchase' => [
-                'reference' => $reference,
-                'tokens' => $tokenAmount,
-                'price' => $price,
-                'group_name' => $group->name,
-            ],
-        ]);
+            return redirect()->away($redirectUrl);
+        }
 
-        return redirect()->route('subscription.tokens.buy.success');
+        $serviceError = $interdotz->getLastError();
+        $errorMessage = 'Gagal memproses pembayaran.';
+        if ($serviceError) {
+            $errorMessage .= ' ' . $serviceError;
+        } else {
+            $errorMessage .= " Pastikan saldo DU mencukupi ({$duAmount} DU).";
+        }
+
+        return back()->withErrors(['payment' => $errorMessage]);
     }
 
     public function buyTokensSuccess(): View
@@ -165,103 +205,23 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    // ── Seat Management ──────────────────────────────────────
+    // ── Private ─────────────────────────────────────────────────
 
-    public function addSeatForm(Group $group): View
+    private function addTokensToGroup(Group $group, $user, int $tokens, int $duPaid, string $reference): void
     {
-        $group->load('subscription');
+        $groupToken = GroupToken::firstOrCreate(
+            ['group_id' => $group->id],
+            ['total_tokens' => 0, 'used_tokens' => 0, 'remaining_tokens' => 0]
+        );
+        $groupToken->addTokens($tokens);
 
-        abort_unless((int) $group->owner_id === (int) Auth::id(), 403);
-
-        return view('subscription.add-seat', [
-            'group' => $group,
-            'seatPrice' => self::ADD_SEAT_PRICE,
-        ]);
-    }
-
-    public function processAddSeat(Request $request, Group $group): RedirectResponse
-    {
-        $group->load('subscription');
-
-        abort_unless((int) $group->owner_id === (int) Auth::id(), 403);
-
-        $validated = $request->validate([
-            'seat_count' => ['required', 'integer', 'min:1', 'max:20'],
-        ]);
-
-        $subscription = $group->subscription;
-        if (! $subscription) {
-            $subscription = Subscription::create([
-                'group_id' => $group->id,
-                'plan_name' => 'normchat-pro',
-                'status' => 'active',
-                'billing_cycle' => 'monthly',
-                'main_price' => self::PLAN_PRICE,
-                'included_seats' => 2,
-            ]);
-        }
-
-        $seatCount = (int) $validated['seat_count'];
-        $totalAmount = $seatCount * self::ADD_SEAT_PRICE;
-        $reference = 'SIM-SEAT-' . strtoupper(Str::random(8));
-
-        $subscription->included_seats = (int) $subscription->included_seats + $seatCount;
-        $subscription->save();
-
-        SubscriptionPayment::create([
-            'subscription_id' => $subscription->id,
+        GroupTokenContribution::create([
             'group_id' => $group->id,
-            'created_by' => Auth::id(),
-            'payment_type' => 'add_seat',
-            'reference' => $reference,
-            'seat_count' => $seatCount,
-            'unit_price' => self::ADD_SEAT_PRICE,
-            'total_amount' => 0,
-            'status' => 'paid',
-            'metadata_json' => [
-                'simulated' => true,
-                'simulated_amount' => $totalAmount,
-            ],
-        ]);
-
-        session([
-            'add_seat_payment' => [
-                'reference' => $reference,
-                'seat_count' => $seatCount,
-                'amount' => 0,
-                'unit_price' => self::ADD_SEAT_PRICE,
-            ],
-        ]);
-
-        return redirect()->route('subscription.add-seat.success', $group);
-    }
-
-    public function addSeatSuccess(Group $group): View
-    {
-        $group->load('subscription.seats');
-
-        abort_unless((int) $group->owner_id === (int) Auth::id(), 403);
-
-        $activeExtraSeats = max(((int) ($group->subscription?->included_seats ?? 2)) - 2, 0);
-        $paymentSummary = session('add_seat_payment');
-
-        return view('subscription.add-seat-success', [
-            'group' => $group,
-            'activeExtraSeats' => $activeExtraSeats,
-            'paymentSummary' => is_array($paymentSummary) ? $paymentSummary : null,
+            'user_id' => $user->id,
+            'source' => 'topup',
+            'token_amount' => $tokens,
+            'price_paid' => $duPaid,
+            'payment_reference' => $reference,
         ]);
     }
-
-    public function addSeatPaymentHistory(Group $group): View
-    {
-        $group->load(['subscription.payments' => fn ($query) => $query->latest()]);
-
-        abort_unless((int) $group->owner_id === (int) Auth::id(), 403);
-
-        return view('subscription.add-seat-payments', [
-            'group' => $group,
-            'payments' => $group->subscription?->payments ?? collect(),
-        ]);
-    }
-
 }

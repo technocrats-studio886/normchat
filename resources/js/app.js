@@ -5,6 +5,12 @@ const groupId = chatFeed?.getAttribute('data-chat-group-id');
 const authUserIdFromFeed = Number(chatFeed?.getAttribute('data-auth-user-id') || 0);
 const authUserIdFromMeta = Number(document.querySelector('meta[name="auth-user-id"]')?.getAttribute('content') || 0);
 const authUserId = authUserIdFromFeed || authUserIdFromMeta;
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+const lastReadMessageIdFromServer = Number(chatFeed?.getAttribute('data-last-read-message-id') || 0);
+const latestMessageIdFromServer = Number(chatFeed?.getAttribute('data-latest-message-id') || 0);
+const unreadCountFromServer = Number(chatFeed?.getAttribute('data-unread-count') || 0);
+const hasReadBeforeFromServer = String(chatFeed?.getAttribute('data-has-read-before') || '0') === '1';
+const chatReadUrlFromServer = String(chatFeed?.getAttribute('data-chat-read-url') || '');
 const pendingMessagesByLocalId = new Map();
 let pendingLocalMessageCounter = 0;
 let chatSubmitInFlight = false;
@@ -15,6 +21,41 @@ const scrollChatToBottom = (behavior = 'auto') => {
 	}
 
 	chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior });
+};
+
+const chatApiRequest = async (url, { method = 'GET', body } = {}) => {
+	const headers = {
+		'Accept': 'application/json',
+		'X-Requested-With': 'XMLHttpRequest',
+	};
+
+	if (csrfToken) {
+		headers['X-CSRF-TOKEN'] = csrfToken;
+	}
+
+	if (body && !(body instanceof FormData)) {
+		headers['Content-Type'] = 'application/json';
+	}
+
+	const response = await fetch(url, {
+		method,
+		headers,
+		body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
+		credentials: 'same-origin',
+	});
+
+	let payload = null;
+	try {
+		payload = await response.json();
+	} catch (_error) {
+		payload = null;
+	}
+
+	if (!response.ok) {
+		throw new Error(payload?.message || 'request_failed');
+	}
+
+	return payload;
 };
 
 const updateCreditsBadge = (payload) => {
@@ -257,7 +298,7 @@ const renderAttachment = (message, palette = 'slate') => {
 	if (type === 'image' || mime.startsWith('image/')) {
 		const border = palette === 'blue' ? 'border-blue-200 bg-blue-50' : (palette === 'emerald' ? 'border-emerald-100 bg-emerald-50' : 'border-slate-200 bg-white');
 		return `
-			<a href="${safeUrl}" target="_blank" rel="noopener" class="mb-2 block overflow-hidden rounded-2xl border ${border}">
+			<a href="${safeUrl}" target="_blank" rel="noopener" class="mb-2 block overflow-hidden rounded-2xl border ${border}" data-message-body="1">
 				<img src="${safeUrl}" alt="Gambar" class="h-auto max-h-64 w-full object-cover" />
 			</a>
 		`;
@@ -265,12 +306,12 @@ const renderAttachment = (message, palette = 'slate') => {
 
 	if (type === 'voice' || mime.startsWith('audio/') || mime === 'video/webm') {
 		const sourceType = escapeAttr(mime === 'video/webm' ? 'audio/webm' : (message?.attachment_mime || 'audio/webm'));
-		return buildVoicePlayerMarkup(safeUrl, sourceType, palette);
+		return buildVoicePlayerMarkup(safeUrl, sourceType, palette).replace('data-voice-player="1"', 'data-voice-player="1" data-message-body="1"');
 	}
 
 	const attachmentName = escapeHtml(message?.attachment_original_name || 'Lampiran');
 	return `
-		<a href="${safeUrl}" target="_blank" rel="noopener" class="mb-2 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-blue-600 underline">${attachmentName}</a>
+		<a href="${safeUrl}" target="_blank" rel="noopener" class="mb-2 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-blue-600 underline" data-message-body="1">${attachmentName}</a>
 	`;
 };
 
@@ -289,15 +330,17 @@ const renderReplyPreview = (message, palette = 'slate') => {
 
 	const safeSummary = escapeHtml(summary.slice(0, 120));
 	const boxClass = palette === 'blue'
-		? 'border-blue-200/70 bg-blue-300/20 text-blue-50'
+		? 'border-l-[3px] border-blue-500 bg-blue-50 text-slate-700 shadow-sm hover:bg-blue-100'
 		: (palette === 'emerald'
-			? 'border-emerald-200 bg-emerald-100/70 text-emerald-700'
-			: 'border-slate-200 bg-slate-100 text-slate-600');
+			? 'border-l-[3px] border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+			: 'border-l-[3px] border-slate-400 bg-slate-50 text-slate-600 hover:bg-slate-100');
+	const senderClass = palette === 'blue' ? 'text-blue-700' : (palette === 'emerald' ? 'text-emerald-700' : 'text-slate-700');
+	const previewClass = palette === 'blue' ? 'text-slate-600' : '';
 
 	return `
-		<a href="#message-${replyTo.id}" class="mb-1 block rounded-xl border px-3 py-1.5 text-xs ${boxClass}">
-			<p class="font-semibold">Reply to ${sender}</p>
-			<p class="truncate">${safeSummary}</p>
+		<a href="#message-${replyTo.id}" class="mb-1 block rounded-xl px-3 py-1.5 text-xs ${boxClass}">
+			<p class="font-semibold ${senderClass}">Membalas ${sender}</p>
+			<p class="truncate ${previewClass}">${safeSummary}</p>
 		</a>
 	`;
 };
@@ -310,6 +353,21 @@ const buildMessageNode = (message) => {
 
 	const isAi = message?.sender_type === 'ai';
 	const isMine = message?.sender_type === 'user' && Number(message?.sender_id || 0) === authUserId;
+	const buildEditedMarkHtml = (tone) => {
+		if (!message?.is_edited) {
+			return '';
+		}
+
+		const editedAt = message?.edited_at ? new Date(message.edited_at) : null;
+		const editedTitle = editedAt && !Number.isNaN(editedAt.valueOf())
+			? `Diedit ${editedAt.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+			: 'Pesan telah diedit';
+
+		return ` <span class="nc-edited-mark nc-edited-mark--${tone}" title="${escapeAttr(editedTitle)}" aria-label="${escapeAttr(editedTitle)}">diedit</span>`;
+	};
+	const editedMarkForMine = buildEditedMarkHtml('mine');
+	const editedMarkForAi = buildEditedMarkHtml('ai');
+	const editedMarkForOther = buildEditedMarkHtml('other');
 	const content = escapeHtml(message?.content || '');
 
 	const wrapper = document.createElement('div');
@@ -322,12 +380,15 @@ const buildMessageNode = (message) => {
 	if (isMine) {
 		const replyBlock = renderReplyPreview(message, 'blue');
 		const attachmentBlock = renderAttachment(message, 'blue');
-		const textBlock = content
-			? `<div class="rounded-2xl rounded-tr-sm bg-[#2563EB] px-4 py-2.5 text-sm text-white">${content}</div>`
+		const inlineTimeHtml = timeText
+			? `<span class="nc-inline-time">${timeText}${editedMarkForMine}</span>`
 			: '';
-		const labelText = isPending
-			? `You • <span class="inline-flex items-center gap-1"><span class="h-2 w-2 animate-pulse rounded-full bg-amber-400"></span>Mengirim...</span>`
-			: `You${timeText ? ` • ${timeText}` : ''}`;
+		const textBlock = content
+			? `<div class="bubble-mine" data-message-body="1"><span class="whitespace-pre-wrap">${content}</span>${inlineTimeHtml}</div>`
+			: '';
+		const pendingTail = isPending
+			? `<p class="mt-1 text-right text-[11px] text-slate-400"><span class="inline-flex items-center gap-1"><span class="h-2 w-2 animate-pulse rounded-full bg-amber-400"></span>Mengirim...</span></p>`
+			: (content ? '' : `<p class="mt-1 text-right text-[11px] text-slate-400">${timeText}${editedMarkForMine}</p>`);
 
 		wrapper.className = 'flex justify-end';
 		wrapper.innerHTML = `
@@ -335,7 +396,7 @@ const buildMessageNode = (message) => {
 				${replyBlock}
 				${attachmentBlock}
 				${textBlock}
-				<p class="mt-1 text-right text-[11px] text-slate-400">${labelText}</p>
+				${pendingTail}
 			</div>
 		`;
 		wrapper.dataset.messageSenderName = String(message?.sender_name || 'You');
@@ -350,16 +411,20 @@ const buildMessageNode = (message) => {
 		const attachmentBlock = renderAttachment(message, 'emerald');
 		const renderedContent = content ? renderMarkdown(content) : '';
 		const hasRichContent = renderedContent && (renderedContent.includes('<table') || renderedContent.includes('mermaid'));
+		const inlineTimeHtml = timeText
+			? `<span class="nc-inline-time">${timeText}${editedMarkForAi}</span>`
+			: '';
 		const textBlock = renderedContent
-			? `<div class="rounded-2xl rounded-tl-sm border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm text-slate-800 ai-markdown overflow-hidden">${renderedContent}</div>`
+			? `<div class="bubble-ai ai-markdown overflow-hidden" data-message-body="1">${renderedContent}${inlineTimeHtml}</div>`
 			: '';
 
 		wrapper.className = hasRichContent ? 'max-w-[95%]' : 'max-w-[80%]';
 		wrapper.innerHTML = `
+			<p class="mb-1 text-[11px] font-semibold text-emerald-700">${aiName}</p>
 			${replyBlock}
 			${attachmentBlock}
 			${textBlock}
-			<p class="mt-1 text-[11px] font-medium text-emerald-700">${aiName}${timeText ? ` • ${timeText}` : ''}</p>
+			${renderedContent ? '' : `<p class="mt-1 text-[11px] font-medium text-emerald-700">${timeText}${editedMarkForAi}</p>`}
 		`;
 		wrapper.dataset.messageSenderName = String(message?.sender_name || 'NormAI');
 		wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
@@ -370,8 +435,11 @@ const buildMessageNode = (message) => {
 	const replyBlock = renderReplyPreview(message, 'slate');
 	const senderName = escapeHtml(message?.sender_name || 'User');
 	const attachmentBlock = renderAttachment(message, 'slate');
+	const inlineTimeHtml = timeText
+		? `<span class="nc-inline-time">${timeText}${editedMarkForOther}</span>`
+		: '';
 	const textBlock = content
-		? `<div class="rounded-2xl rounded-tl-sm border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800">${content}</div>`
+		? `<div class="bubble-other" data-message-body="1"><span class="whitespace-pre-wrap">${content}</span>${inlineTimeHtml}</div>`
 		: '';
 
 	wrapper.className = 'max-w-[75%]';
@@ -380,7 +448,7 @@ const buildMessageNode = (message) => {
 		${replyBlock}
 		${attachmentBlock}
 		${textBlock}
-		<p class="mt-1 text-[11px] text-slate-400">${senderName}${timeText ? ` • ${timeText}` : ''}</p>
+		${content ? '' : `<p class="mt-1 text-[11px] text-slate-400">${timeText}${editedMarkForOther}</p>`}
 	`;
 	wrapper.dataset.messageSenderName = String(message?.sender_name || 'User');
 	wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
@@ -389,10 +457,94 @@ const buildMessageNode = (message) => {
 	return wrapper;
 };
 
+const replaceRenderedMessageByPayload = (message) => {
+	if (!chatFeed || !message?.id) {
+		return null;
+	}
+
+	const messageId = Number(message.id || 0);
+	if (messageId <= 0) {
+		return null;
+	}
+
+	const currentNode = chatFeed.querySelector(`[data-message-id="${messageId}"]`);
+	if (!(currentNode instanceof HTMLElement)) {
+		return null;
+	}
+
+	const nextNode = buildMessageNode(message);
+	nextNode.setAttribute('data-message-id', String(messageId));
+	nextNode.id = `message-${messageId}`;
+	currentNode.replaceWith(nextNode);
+	initVoicePlayers(nextNode);
+	renderMermaidInNode(nextNode);
+
+	return nextNode;
+};
+
+const resolveEditedFlashTone = (message) => {
+	if (message?.sender_type === 'ai') {
+		return 'ai';
+	}
+
+	if (message?.sender_type === 'user' && Number(message?.sender_id || 0) === authUserId) {
+		return 'mine';
+	}
+
+	return 'other';
+};
+
+const flashEditedMessage = (node, tone = 'other') => {
+	if (!(node instanceof HTMLElement)) {
+		return;
+	}
+	const bodyCandidates = node.querySelectorAll('[data-message-body]');
+	const flashTarget = bodyCandidates.length > 0
+		? bodyCandidates[bodyCandidates.length - 1]
+		: node;
+	const normalizedTone = tone === 'mine' || tone === 'ai' || tone === 'other'
+		? tone
+		: 'other';
+
+	flashTarget.classList.remove(
+		'nc-message-edited-flash',
+		'nc-message-edited-flash--mine',
+		'nc-message-edited-flash--ai',
+		'nc-message-edited-flash--other',
+	);
+	void flashTarget.offsetWidth;
+	flashTarget.classList.add('nc-message-edited-flash', `nc-message-edited-flash--${normalizedTone}`);
+	window.setTimeout(() => {
+		flashTarget.classList.remove(
+			'nc-message-edited-flash',
+			'nc-message-edited-flash--mine',
+			'nc-message-edited-flash--ai',
+			'nc-message-edited-flash--other',
+		);
+	}, 950);
+};
+
+const removeRenderedMessageById = (messageId) => {
+	if (!chatFeed || !messageId) {
+		return false;
+	}
+
+	const target = chatFeed.querySelector(`[data-message-id="${messageId}"]`);
+	if (!(target instanceof HTMLElement)) {
+		return false;
+	}
+
+	target.remove();
+	return true;
+};
+
 const localizeExistingMessageTimes = () => {
 	document.querySelectorAll('[data-message-time]').forEach((el) => {
 		const iso = el.getAttribute('data-message-time') || '';
 		const label = el.getAttribute('data-time-label') || '';
+		const edited = el.getAttribute('data-time-edited') === '1';
+		const editedAtIso = el.getAttribute('data-time-edited-at') || '';
+		const editedTone = el.getAttribute('data-time-tone') || 'other';
 		if (!iso) {
 			return;
 		}
@@ -403,7 +555,18 @@ const localizeExistingMessageTimes = () => {
 		}
 
 		const timeText = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-		el.textContent = label ? `${label} • ${timeText}` : timeText;
+		const editedAt = editedAtIso ? new Date(editedAtIso) : null;
+		const editedTitle = editedAt && !Number.isNaN(editedAt.valueOf())
+			? `Diedit ${editedAt.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+			: 'Pesan telah diedit';
+		const editedMarkHtml = edited
+			? ` <span class="nc-edited-mark nc-edited-mark--${escapeAttr(editedTone)}" title="${escapeAttr(editedTitle)}" aria-label="${escapeAttr(editedTitle)}">diedit</span>`
+			: '';
+		const safeLabel = escapeHtml(label);
+		const showLabel = label && editedTone !== 'other';
+		el.innerHTML = showLabel
+			? `${safeLabel} • ${timeText}${editedMarkHtml}`
+			: `${timeText}${editedMarkHtml}`;
 	});
 };
 
@@ -587,7 +750,167 @@ document.querySelectorAll('[data-ai-raw]').forEach((el) => {
 	}
 });
 
-requestAnimationFrame(() => scrollChatToBottom('auto'));
+const scrollBottomBtn = document.querySelector('[data-scroll-bottom]');
+const scrollBottomCount = scrollBottomBtn?.querySelector('[data-scroll-bottom-count]');
+const initialMessageCount = Number(chatFeed?.getAttribute('data-message-count') || chatFeed?.querySelectorAll('[data-message-id]').length || 0);
+let latestKnownMessageId = latestMessageIdFromServer;
+let serverLastReadMessageId = lastReadMessageIdFromServer;
+let hasVisitedGroupBefore = hasReadBeforeFromServer;
+let firstOpenPendingCount = unreadCountFromServer > 0 ? unreadCountFromServer : initialMessageCount;
+let shouldShowFirstOpenSkip = !hasVisitedGroupBefore && initialMessageCount > 0;
+let markReadInFlight = false;
+let markReadQueued = false;
+
+const extractLatestMessageIdFromDom = () => {
+	if (!chatFeed) {
+		return 0;
+	}
+
+	const nodes = Array.from(chatFeed.querySelectorAll('[data-message-id]'));
+	let maxId = 0;
+	nodes.forEach((node) => {
+		const messageId = Number(node.getAttribute('data-message-id') || 0);
+		if (Number.isFinite(messageId) && messageId > maxId) {
+			maxId = messageId;
+		}
+	});
+
+	return maxId;
+};
+
+latestKnownMessageId = Math.max(latestKnownMessageId, extractLatestMessageIdFromDom());
+
+const markGroupRead = async (targetMessageId = 0) => {
+	if (!chatReadUrlFromServer) {
+		return;
+	}
+
+	if (markReadInFlight) {
+		markReadQueued = true;
+		return;
+	}
+
+	const latestTargetId = targetMessageId > 0
+		? targetMessageId
+		: Math.max(latestKnownMessageId, extractLatestMessageIdFromDom());
+
+	if (latestTargetId <= 0 || latestTargetId <= serverLastReadMessageId) {
+		return;
+	}
+
+	markReadInFlight = true;
+	try {
+		const result = await chatApiRequest(chatReadUrlFromServer, {
+			method: 'POST',
+			body: {
+				last_read_message_id: latestTargetId,
+			},
+		});
+
+		const nextReadId = Number(result?.last_read_message_id || 0);
+		if (Number.isFinite(nextReadId) && nextReadId > 0) {
+			serverLastReadMessageId = Math.max(serverLastReadMessageId, nextReadId);
+		}
+	} catch (_error) {
+		// Ignore read-state sync failures to keep chat usable in flaky networks.
+	} finally {
+		markReadInFlight = false;
+		if (markReadQueued) {
+			markReadQueued = false;
+			markGroupRead();
+		}
+	}
+};
+
+const markGroupVisited = () => {
+	if (!shouldShowFirstOpenSkip && hasVisitedGroupBefore && firstOpenPendingCount <= 0) {
+		return;
+	}
+
+	shouldShowFirstOpenSkip = false;
+	hasVisitedGroupBefore = true;
+	firstOpenPendingCount = 0;
+	markGroupRead();
+};
+
+const syncScrollBottomCount = () => {
+	if (!(scrollBottomCount instanceof HTMLElement)) {
+		return;
+	}
+
+	if (shouldShowFirstOpenSkip && firstOpenPendingCount > 0) {
+		scrollBottomCount.textContent = String(firstOpenPendingCount);
+		scrollBottomCount.classList.remove('hidden');
+		return;
+	}
+
+	scrollBottomCount.classList.add('hidden');
+	scrollBottomCount.textContent = '';
+};
+
+if (chatFeed) {
+	requestAnimationFrame(() => {
+		if (hasVisitedGroupBefore) {
+			scrollChatToBottom('auto');
+			window.setTimeout(() => {
+				markGroupRead();
+			}, 180);
+			return;
+		}
+
+		chatFeed.scrollTo({ top: 0, behavior: 'auto' });
+		syncScrollBottomCount();
+	});
+}
+
+const focusComposerInput = (delay = 0) => {
+	window.setTimeout(() => {
+		const input = document.querySelector('[data-mention-input]');
+		if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+			input.focus();
+		}
+	}, delay);
+};
+
+requestAnimationFrame(() => focusComposerInput(0));
+focusComposerInput(220);
+focusComposerInput(650);
+document.addEventListener('visibilitychange', () => {
+	if (!document.hidden) {
+		focusComposerInput(80);
+	}
+});
+
+let refreshScrollBottomButton = () => {};
+if (chatFeed && scrollBottomBtn) {
+	const checkScrollPos = () => {
+		const distFromBottom = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
+		if (distFromBottom < 64) {
+			markGroupVisited();
+			markGroupRead();
+		}
+
+		syncScrollBottomCount();
+
+		if (distFromBottom > 200 || shouldShowFirstOpenSkip) {
+			scrollBottomBtn.classList.remove('hidden');
+			scrollBottomBtn.classList.add('inline-flex');
+		} else {
+			scrollBottomBtn.classList.add('hidden');
+			scrollBottomBtn.classList.remove('inline-flex');
+		}
+	};
+
+	refreshScrollBottomButton = checkScrollPos;
+	chatFeed.addEventListener('scroll', checkScrollPos, { passive: true });
+	scrollBottomBtn.addEventListener('click', () => {
+		scrollChatToBottom('smooth');
+		markGroupVisited();
+		syncScrollBottomCount();
+		checkScrollPos();
+	});
+	checkScrollPos();
+}
 
 const ensureMentionToastStack = () => {
 	let stack = document.querySelector('[data-mention-toast-stack]');
@@ -703,10 +1026,10 @@ if (window.Echo && authUserId > 0) {
 
 let groupChannel = null;
 
+const typingIndicator = document.querySelector('[data-typing-indicator]');
+
 if (window.Echo && groupId) {
 	groupChannel = window.Echo.private(`group.${groupId}`);
-
-	const typingIndicator = document.querySelector('[data-typing-indicator]');
 	const activeTypingUsers = new Map();
 
 	const renderTypingIndicator = () => {
@@ -771,6 +1094,12 @@ if (window.Echo && groupId) {
 			return;
 		}
 
+		latestKnownMessageId = Math.max(latestKnownMessageId, Number(payload.message.id || 0));
+
+		const distFromBottomBefore = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
+		const senderId = Number(payload.message.sender_id || 0);
+		const isMine = payload.message.sender_type === 'user' && senderId === authUserId;
+
 		updateCreditsBadge(payload.message);
 
 		if (
@@ -812,7 +1141,9 @@ if (window.Echo && groupId) {
 				}
 
 				pendingMessagesByLocalId.delete(localId);
+				markGroupVisited();
 				scrollChatToBottom('smooth');
+				markGroupRead(Number(payload.message.id || 0));
 				return;
 			}
 		}
@@ -825,19 +1156,81 @@ if (window.Echo && groupId) {
 		const node = buildMessageNode(payload.message);
 		node.setAttribute('data-message-id', String(payload.message.id));
 		node.id = `message-${payload.message.id}`;
-		chatFeed.appendChild(node);
+		if (typingIndicator && typingIndicator.parentNode === chatFeed) {
+			chatFeed.insertBefore(node, typingIndicator);
+		} else {
+			chatFeed.appendChild(node);
+		}
 		initVoicePlayers(node);
 		renderMermaidInNode(node);
-		scrollChatToBottom('smooth');
+
+		if (isMine || distFromBottomBefore < 170) {
+			if (isMine) {
+				markGroupVisited();
+			}
+			scrollChatToBottom('smooth');
+			markGroupRead(Number(payload.message.id || 0));
+		} else {
+			if (!isMine) {
+				shouldShowFirstOpenSkip = true;
+				firstOpenPendingCount += 1;
+				syncScrollBottomCount();
+			}
+			refreshScrollBottomButton();
+		}
+	});
+
+	groupChannel.listen('.message.updated', (payload) => {
+		if (!chatFeed || !payload?.message) {
+			return;
+		}
+
+		const messageId = Number(payload.message.id || 0);
+		if (!Number.isFinite(messageId) || messageId <= 0) {
+			return;
+		}
+
+		const updatedNode = replaceRenderedMessageByPayload(payload.message);
+		if (payload.message.is_edited) {
+			const flashTone = resolveEditedFlashTone(payload.message);
+			flashEditedMessage(updatedNode, flashTone);
+		}
+		latestKnownMessageId = Math.max(latestKnownMessageId, messageId);
+		refreshScrollBottomButton();
+	});
+
+	groupChannel.listen('.message.deleted', (payload) => {
+		if (!chatFeed) {
+			return;
+		}
+
+		const messageId = Number(payload?.message_id || 0);
+		if (!Number.isFinite(messageId) || messageId <= 0) {
+			return;
+		}
+
+		removeRenderedMessageById(messageId);
+		latestKnownMessageId = extractLatestMessageIdFromDom();
+		refreshScrollBottomButton();
 	});
 }
 
 const chatForm = document.querySelector('[data-chat-form]');
+const chatMessagesBaseUrl = String(chatForm?.getAttribute('action') || '');
+const buildMessageApiUrl = (messageId) => {
+	if (!chatMessagesBaseUrl || !messageId) {
+		return '';
+	}
+
+	return `${chatMessagesBaseUrl}/${messageId}`;
+};
 const attachmentInput = chatForm?.querySelector('[data-chat-attachment]');
 const cameraInput = chatForm?.querySelector('[data-chat-camera-input]');
 const attachmentLabel = chatForm?.querySelector('[data-attachment-label]');
 const cameraButton = chatForm?.querySelector('[data-open-camera]');
 const voiceButton = chatForm?.querySelector('[data-pick-voice]');
+const attachMenuButton = chatForm?.querySelector('[data-open-attach-menu]');
+const attachMenu = chatForm?.querySelector('[data-attach-menu]');
 const recordVoiceButton = chatForm?.querySelector('[data-record-voice]');
 const voiceRecorderPanel = chatForm?.querySelector('[data-voice-recorder-panel]');
 const voiceCancelButton = chatForm?.querySelector('[data-voice-cancel]');
@@ -979,6 +1372,15 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		}
 	};
 
+	let editingMessageId = 0;
+	const clearEditingState = (clearInput = false) => {
+		editingMessageId = 0;
+		if (clearInput && (mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement)) {
+			mentionInput.value = '';
+			mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+		}
+	};
+
 	const clearReplyTarget = () => {
 		if (replyToInput instanceof HTMLInputElement) {
 			replyToInput.value = '';
@@ -987,6 +1389,10 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		if (replyPreview instanceof HTMLElement) {
 			replyPreview.classList.add('hidden');
 			replyPreview.classList.remove('flex');
+		}
+
+		if (editingMessageId > 0) {
+			clearEditingState();
 		}
 	};
 
@@ -1007,8 +1413,9 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		const content = rawContent !== '' ? rawContent : fallback;
 
 		replyToInput.value = messageId;
+		clearEditingState();
 		if (replyPreviewSender instanceof HTMLElement) {
-			replyPreviewSender.textContent = `Reply ke ${sender}`;
+			replyPreviewSender.textContent = `Membalas ${sender}`;
 		}
 		if (replyPreviewContent instanceof HTMLElement) {
 			replyPreviewContent.textContent = content;
@@ -1023,8 +1430,316 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 	replyClearButton?.addEventListener('click', clearReplyTarget);
 
+	/* ── setReplyTarget with optional partial text ── */
+	const setReplyTargetWithText = (messageNode, selectedText) => {
+		if (!(messageNode instanceof HTMLElement) || !(replyToInput instanceof HTMLInputElement)) return;
+		const messageId = String(messageNode.getAttribute('data-message-id') || '').trim();
+		if (!messageId) return;
+
+		const sender = String(messageNode.dataset.messageSenderName || 'User');
+		const rawContent = String(messageNode.dataset.messageContent || '').trim();
+		const type = String(messageNode.dataset.messageType || 'text').toLowerCase();
+		const fallback = type === 'image' ? '[Gambar]' : (type === 'voice' ? '[Voice note]' : '[Lampiran]');
+		const content = selectedText || (rawContent !== '' ? rawContent : fallback);
+
+		replyToInput.value = messageId;
+		clearEditingState();
+		if (replyPreviewSender instanceof HTMLElement) {
+			replyPreviewSender.textContent = `Membalas ${sender}`;
+		}
+		if (replyPreviewContent instanceof HTMLElement) {
+			replyPreviewContent.textContent = content;
+		}
+		if (replyPreview instanceof HTMLElement) {
+			replyPreview.classList.remove('hidden');
+			replyPreview.classList.add('flex');
+		}
+		mentionInput?.focus();
+	};
+
+	const selectedMessageIds = new Set();
+	const showActionToast = (message) => {
+		if (!message) {
+			return;
+		}
+
+		const toast = document.createElement('div');
+		toast.className = 'fixed left-1/2 bottom-24 z-[75] -translate-x-1/2 rounded-full bg-slate-900/95 px-3 py-1.5 text-xs font-medium text-white shadow-lg';
+		toast.textContent = message;
+		document.body.appendChild(toast);
+		window.setTimeout(() => {
+			if (toast.isConnected) {
+				toast.remove();
+			}
+		}, 1800);
+	};
+
+	const toggleMessageSelection = (messageNode) => {
+		if (!(messageNode instanceof HTMLElement)) {
+			return;
+		}
+
+		const messageId = String(messageNode.getAttribute('data-message-id') || '').trim();
+		if (!messageId) {
+			return;
+		}
+
+		if (selectedMessageIds.has(messageId)) {
+			selectedMessageIds.delete(messageId);
+			messageNode.classList.remove('nc-message-selected');
+			showActionToast('Pilihan pesan dibatalkan');
+			return;
+		}
+
+		selectedMessageIds.add(messageId);
+		messageNode.classList.add('nc-message-selected');
+		showActionToast(`${selectedMessageIds.size} pesan dipilih`);
+	};
+
+	/* ── Message popup (long-press) ── */
+	let activePopup = null;
+	const dismissPopup = () => {
+		if (activePopup) {
+			activePopup.remove();
+			activePopup = null;
+		}
+	};
+
+	const showSelectTextPopup = (messageNode, sender, messageText) => {
+		dismissPopup();
+		const selectOverlay = document.createElement('div');
+		selectOverlay.className = 'nc-popup-overlay';
+		selectOverlay.innerHTML = `
+			<div class="nc-popup-card" onclick="event.stopPropagation()">
+				<div class="nc-popup-header">
+					<span class="nc-popup-sender">${escapeHtml(sender)}</span>
+					<button type="button" class="nc-popup-close" data-popup-close>&times;</button>
+				</div>
+				<div class="nc-popup-body" style="user-select:text;-webkit-user-select:text;">${escapeHtml(messageText)}</div>
+				<div class="nc-popup-actions">
+					<button type="button" class="nc-popup-btn nc-popup-btn-select" data-popup-copy-sel>Salin teks terpilih</button>
+					<button type="button" class="nc-popup-btn" data-popup-reply-sel>Balas teks terpilih</button>
+				</div>
+			</div>
+		`;
+		document.body.appendChild(selectOverlay);
+		activePopup = selectOverlay;
+
+		const btnCopySel = selectOverlay.querySelector('[data-popup-copy-sel]');
+		const btnReplySel = selectOverlay.querySelector('[data-popup-reply-sel]');
+
+		const onSelChange = () => {
+			const sel = window.getSelection();
+			const text = sel ? sel.toString().trim() : '';
+			if (btnCopySel) btnCopySel.disabled = !text;
+			if (btnReplySel) btnReplySel.disabled = !text;
+		};
+
+		document.addEventListener('selectionchange', onSelChange);
+		onSelChange();
+
+		const cleanup = () => {
+			document.removeEventListener('selectionchange', onSelChange);
+			dismissPopup();
+		};
+
+		selectOverlay.addEventListener('click', (e) => {
+			if (e.target === selectOverlay) {
+				cleanup();
+			}
+		});
+		selectOverlay.querySelector('[data-popup-close]')?.addEventListener('click', cleanup);
+		btnCopySel?.addEventListener('click', () => {
+			const sel = window.getSelection();
+			const text = sel ? sel.toString().trim() : '';
+			if (text && navigator.clipboard) {
+				navigator.clipboard.writeText(text).then(() => {
+					showActionToast('Teks terpilih disalin');
+				}).catch(() => {});
+			}
+			cleanup();
+		});
+		btnReplySel?.addEventListener('click', () => {
+			const sel = window.getSelection();
+			const text = sel ? sel.toString().trim() : '';
+			cleanup();
+			if (text) {
+				setReplyTargetWithText(messageNode, text);
+			}
+		});
+	};
+
+	const showMessagePopup = (messageNode) => {
+		dismissPopup();
+		const rawContent = String(messageNode.dataset.messageContent || '').trim();
+		const type = String(messageNode.dataset.messageType || 'text').toLowerCase();
+		const fallback = type === 'image' ? '[Gambar]' : (type === 'voice' ? '[Voice note]' : '[Lampiran]');
+		const messageText = rawContent !== '' ? rawContent : fallback;
+		const sender = String(messageNode.dataset.messageSenderName || 'User');
+		const isMine = messageNode.closest('.flex.justify-end') !== null;
+		const canEdit = isMine && type === 'text' && rawContent !== '';
+
+		const overlay = document.createElement('div');
+		overlay.className = 'nc-popup-overlay';
+		overlay.innerHTML = `
+			<div class="nc-popup-card" onclick="event.stopPropagation()">
+				<div class="nc-popup-preview">${escapeHtml(messageText.length > 200 ? messageText.slice(0, 200) + '...' : messageText)}</div>
+				<div class="nc-popup-menu">
+					<button type="button" class="nc-popup-menu-item" data-popup-reply>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 0 1 0 10H9m-6-10 4-4m-4 4 4 4"/></svg>
+						Quote & Balas
+					</button>
+					<button type="button" class="nc-popup-menu-item" data-popup-copy>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+						Salin ke perangkat
+					</button>
+					<button type="button" class="nc-popup-menu-item" data-popup-select-text>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h10M4 17h12"/></svg>
+						Pilih teks
+					</button>
+					<button type="button" class="nc-popup-menu-item" data-popup-select-message>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M5.25 6.75h13.5A2.25 2.25 0 0 1 21 9v9a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18V9a2.25 2.25 0 0 1 2.25-2.25Z"/></svg>
+						Pilih pesan
+					</button>
+					<button type="button" class="nc-popup-menu-item" data-popup-pin>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 4.5 3.75 3.75m-10.5 9.75 2.625-2.625m0 0 5.625-5.625m-5.625 5.625L3.75 20.25m7.875-4.875 4.875-4.875a2.652 2.652 0 1 0-3.75-3.75L7.875 11.625"/></svg>
+						Sematkan
+					</button>
+					<button type="button" class="nc-popup-menu-item" data-popup-forward>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 10H7a5 5 0 0 0 0 10h4m10-10-4-4m4 4-4 4"/></svg>
+						Teruskan
+					</button>
+					${canEdit ? `<button type="button" class="nc-popup-menu-item" data-popup-edit>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.93Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125 16.875 4.5"/></svg>
+						Edit cepat
+					</button>` : ''}
+					${isMine ? `<button type="button" class="nc-popup-menu-item nc-popup-menu-danger" data-popup-delete>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21A48.1 48.1 0 0 0 12 5.5a48.1 48.1 0 0 0-7.228.29m14.456 0-.263 13.883A2.25 2.25 0 0 1 15.916 21.75H8.084a2.25 2.25 0 0 1-2.244-2.077L5.572 5.79m14.456 0c-.338-.052-.676-.107-1.022-.166m-12 .562c.34-.059.68-.114 1.022-.165"/></svg>
+						Hapus
+					</button>` : ''}
+				</div>
+			</div>
+		`;
+		document.body.appendChild(overlay);
+		activePopup = overlay;
+
+		overlay.addEventListener('click', (e) => {
+			if (e.target === overlay) dismissPopup();
+		});
+		overlay.querySelector('[data-popup-reply]')?.addEventListener('click', () => {
+			dismissPopup();
+			setReplyTarget(messageNode);
+		});
+		overlay.querySelector('[data-popup-copy]')?.addEventListener('click', () => {
+			if (navigator.clipboard) {
+				navigator.clipboard.writeText(messageText).then(() => {
+					showActionToast('Pesan disalin ke perangkat');
+				}).catch(() => {});
+			}
+			dismissPopup();
+		});
+		overlay.querySelector('[data-popup-select-text]')?.addEventListener('click', () => {
+			showSelectTextPopup(messageNode, sender, messageText);
+		});
+		overlay.querySelector('[data-popup-select-message]')?.addEventListener('click', () => {
+			dismissPopup();
+			toggleMessageSelection(messageNode);
+		});
+		overlay.querySelector('[data-popup-pin]')?.addEventListener('click', () => {
+			const messageId = String(messageNode.getAttribute('data-message-id') || '').trim();
+			const deepLink = `${window.location.origin}${window.location.pathname}#message-${messageId}`;
+			if (navigator.clipboard) {
+				navigator.clipboard.writeText(deepLink).then(() => {
+					showActionToast('Tautan pesan disematkan ke clipboard');
+				}).catch(() => {
+					showActionToast('Gagal menyalin tautan pesan');
+				});
+			}
+			highlightMessageInFeed(messageId);
+			dismissPopup();
+		});
+		overlay.querySelector('[data-popup-forward]')?.addEventListener('click', () => {
+			const forwardText = `${sender}: ${messageText}`;
+			if (navigator.share) {
+				navigator.share({ text: forwardText }).catch(() => {
+					if (navigator.clipboard) {
+						navigator.clipboard.writeText(forwardText).then(() => {
+							showActionToast('Pesan disalin untuk diteruskan');
+						}).catch(() => {});
+					}
+				});
+			} else if (navigator.clipboard) {
+				navigator.clipboard.writeText(forwardText).then(() => {
+					showActionToast('Pesan disalin untuk diteruskan');
+				}).catch(() => {});
+			}
+			dismissPopup();
+		});
+		overlay.querySelector('[data-popup-edit]')?.addEventListener('click', () => {
+			dismissPopup();
+			if (!(mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement)) {
+				return;
+			}
+
+			const messageId = Number(messageNode.getAttribute('data-message-id') || 0);
+			if (!Number.isFinite(messageId) || messageId <= 0) {
+				return;
+			}
+
+			editingMessageId = messageId;
+			mentionInput.value = rawContent;
+			mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+			mentionInput.focus();
+			try {
+				const endPos = mentionInput.value.length;
+				mentionInput.setSelectionRange(endPos, endPos);
+			} catch (_error) {
+				// Ignore unsupported selection APIs.
+			}
+			showActionToast('Mode edit aktif. Tekan kirim untuk menyimpan');
+		});
+		overlay.querySelector('[data-popup-delete]')?.addEventListener('click', async () => {
+			dismissPopup();
+
+			const messageId = Number(messageNode.getAttribute('data-message-id') || 0);
+			if (!Number.isFinite(messageId) || messageId <= 0) {
+				return;
+			}
+
+			if (!window.confirm('Hapus pesan ini?')) {
+				return;
+			}
+
+			const deleteUrl = buildMessageApiUrl(messageId);
+			if (!deleteUrl) {
+				showActionToast('URL hapus pesan tidak tersedia');
+				return;
+			}
+
+			try {
+				await chatApiRequest(deleteUrl, { method: 'DELETE' });
+				removeRenderedMessageById(messageId);
+				selectedMessageIds.delete(String(messageId));
+
+				if (replyToInput instanceof HTMLInputElement && Number(replyToInput.value || 0) === messageId) {
+					clearReplyTarget();
+				}
+
+				if (editingMessageId === messageId) {
+					clearEditingState(true);
+				}
+
+				latestKnownMessageId = extractLatestMessageIdFromDom();
+				refreshScrollBottomButton();
+				showActionToast('Pesan dihapus');
+			} catch (_error) {
+				showActionToast('Gagal menghapus pesan');
+			}
+		});
+	};
+
 	if (chatFeed instanceof HTMLElement) {
-		const SWIPE_THRESHOLD = 46;
+		const SWIPE_THRESHOLD = 56;
 		const LONG_PRESS_MS = 520;
 		let startX = 0;
 		let startY = 0;
@@ -1053,6 +1768,11 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		};
 
 		chatFeed.addEventListener('pointerdown', (event) => {
+			if (event.button !== 0) {
+				activeNode = null;
+				return;
+			}
+
 			const node = event.target instanceof HTMLElement
 				? event.target.closest('[data-message-id]')
 				: null;
@@ -1061,8 +1781,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				return;
 			}
 
-			// jangan ganggu klik link/tombol di dalam bubble
-			if (event.target.closest('a, button, input, textarea, [data-voice-toggle]')) {
+			if (event.target.closest('a, button, input, textarea, [data-voice-toggle], [data-voice-progress]')) {
 				activeNode = null;
 				return;
 			}
@@ -1075,7 +1794,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			longPressTimer = window.setTimeout(() => {
 				if (activeNode) {
 					try { navigator.vibrate?.(15); } catch (_) {}
-					setReplyTarget(activeNode);
+					showMessagePopup(activeNode);
 					resetTransform(activeNode);
 					activeNode = null;
 				}
@@ -1083,9 +1802,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		});
 
 		chatFeed.addEventListener('pointermove', (event) => {
-			if (!activeNode) {
-				return;
-			}
+			if (!activeNode) return;
 
 			const deltaX = event.clientX - startX;
 			const deltaY = event.clientY - startY;
@@ -1095,15 +1812,22 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				return;
 			}
 
-			if (Math.abs(deltaX) > 6) {
+			if (Math.abs(deltaX) > 18) {
 				clearLongPress();
-				// visual drag (clamp 0..80px)
-				const dragX = Math.max(-90, Math.min(90, deltaX));
-				activeNode.style.transform = `translateX(${dragX}px)`;
-				if (event.cancelable) event.preventDefault();
 			}
 
-			if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+			// swipe RIGHT only (deltaX > 0)
+			if (deltaX > 6) {
+				const dragX = Math.min(90, deltaX);
+				activeNode.style.transform = `translateX(${dragX}px)`;
+				if (event.cancelable) event.preventDefault();
+			} else if (deltaX < -6) {
+				// block left swipe — just cancel
+				clearActive();
+				return;
+			}
+
+			if (deltaX > SWIPE_THRESHOLD && deltaX > Math.abs(deltaY) + 8) {
 				try { navigator.vibrate?.(10); } catch (_) {}
 				setReplyTarget(activeNode);
 				resetTransform(activeNode);
@@ -1116,7 +1840,6 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		chatFeed.addEventListener('pointercancel', clearActive);
 		chatFeed.addEventListener('pointerleave', clearActive);
 
-		// suppress native context menu untuk message bubble (long-press iOS/Android)
 		chatFeed.addEventListener('contextmenu', (event) => {
 			const node = event.target instanceof HTMLElement
 				? event.target.closest('[data-message-id]')
@@ -1178,8 +1901,50 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		attachmentInput.click();
 	});
 
+	// Attachment menu (Telegram-style sub-menu)
+	attachMenuButton?.addEventListener('click', (event) => {
+		event.preventDefault();
+		emojiPanel?.classList.add('hidden');
+		attachMenu?.classList.toggle('hidden');
+	});
+
+	attachMenu?.querySelector('[data-attach-photo]')?.addEventListener('click', () => {
+		attachMenu.classList.add('hidden');
+		attachmentInput.accept = 'image/*';
+		attachmentInput.removeAttribute('capture');
+		attachmentInput.click();
+	});
+
+	attachMenu?.querySelector('[data-attach-camera]')?.addEventListener('click', () => {
+		attachMenu.classList.add('hidden');
+		if (cameraInput instanceof HTMLInputElement) {
+			cameraInput.click();
+		} else {
+			attachmentInput.accept = 'image/*';
+			attachmentInput.setAttribute('capture', 'environment');
+			attachmentInput.click();
+		}
+	});
+
+	attachMenu?.querySelector('[data-attach-file]')?.addEventListener('click', () => {
+		attachMenu.classList.add('hidden');
+		attachmentInput.accept = '*/*';
+		attachmentInput.removeAttribute('capture');
+		attachmentInput.click();
+	});
+
+	// Close attach menu on outside click
+	document.addEventListener('click', (e) => {
+		if (attachMenu && !attachMenu.classList.contains('hidden')) {
+			if (!attachMenu.contains(e.target) && e.target !== attachMenuButton && !attachMenuButton?.contains(e.target)) {
+				attachMenu.classList.add('hidden');
+			}
+		}
+	});
+
 	emojiButton?.addEventListener('click', (event) => {
 		event.preventDefault();
+		attachMenu?.classList.add('hidden');
 		emojiPanel?.classList.toggle('hidden');
 	});
 
@@ -1333,6 +2098,16 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			mentionInput.style.height = `${Math.min(mentionInput.scrollHeight, 96)}px`;
 		};
 
+		mentionInput.addEventListener('keydown', (event) => {
+			if (event.key !== 'Escape' || editingMessageId <= 0) {
+				return;
+			}
+
+			event.preventDefault();
+			clearEditingState(true);
+			showActionToast('Mode edit dibatalkan');
+		});
+
 		mentionInput.addEventListener('input', resizeComposerInput);
 		mentionInput.addEventListener('input', () => {
 			const hasText = mentionInput.value.trim().length > 0;
@@ -1404,7 +2179,11 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		const node = buildMessageNode(pendingMessage);
 		node.setAttribute('data-local-message-id', localId);
 		node.setAttribute('data-pending-message', '1');
-		chatFeed.appendChild(node);
+		if (typingIndicator && typingIndicator.parentNode === chatFeed) {
+			chatFeed.insertBefore(node, typingIndicator);
+		} else {
+			chatFeed.appendChild(node);
+		}
 		initVoicePlayers(node);
 		scrollChatToBottom('smooth');
 
@@ -1454,7 +2233,9 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		}
 
 		pendingMessagesByLocalId.delete(localId);
+		latestKnownMessageId = Math.max(latestKnownMessageId, Number(serverMessage?.id || 0));
 		scrollChatToBottom('smooth');
+		markGroupRead(Number(serverMessage?.id || 0));
 	};
 
 	chatForm.addEventListener('submit', async (event) => {
@@ -1474,9 +2255,58 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			: '';
 		const selectedFile = attachmentInput.files?.[0] instanceof File ? attachmentInput.files?.[0] : null;
 
+		if (editingMessageId > 0) {
+			if (!contentText) {
+				showActionToast('Isi pesan tidak boleh kosong saat edit');
+				return;
+			}
+
+			if (selectedFile) {
+				showActionToast('Edit teks tidak menerima lampiran baru');
+				return;
+			}
+
+			const updateUrl = buildMessageApiUrl(editingMessageId);
+			if (!updateUrl) {
+				showActionToast('URL edit pesan tidak tersedia');
+				return;
+			}
+
+			setSendingUi(true);
+			chatSubmitInFlight = true;
+			try {
+				const result = await chatApiRequest(updateUrl, {
+					method: 'PATCH',
+					body: {
+						content: contentText,
+					},
+				});
+
+				if (result?.message) {
+					const updatedNode = replaceRenderedMessageByPayload(result.message);
+					if (result.message.is_edited) {
+						const flashTone = resolveEditedFlashTone(result.message);
+						flashEditedMessage(updatedNode, flashTone);
+					}
+				}
+
+				clearEditingState(true);
+				showActionToast('Pesan berhasil diperbarui');
+			} catch (_error) {
+				showActionToast('Gagal memperbarui pesan');
+			} finally {
+				setSendingUi(false);
+				chatSubmitInFlight = false;
+			}
+
+			return;
+		}
+
 		if (!contentText && !selectedFile) {
 			return;
 		}
+
+		markGroupVisited();
 
 		const formData = new FormData(chatForm);
 		const localId = appendPendingMessageNode(contentText, selectedFile);

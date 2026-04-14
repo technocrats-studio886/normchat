@@ -3,11 +3,13 @@
 namespace App\Jobs;
 
 use App\Models\Export;
+use App\Models\Group;
 use App\Models\Message;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use Throwable;
@@ -42,7 +44,10 @@ class GenerateExportJob implements ShouldQueue
             ->get(['sender_type', 'sender_id', 'content', 'created_at']);
 
             $extension = strtolower($export->file_type) === 'pdf' ? 'pdf' : 'docx';
-            $filename = sprintf('group-%d-export-%d.%s', $export->group_id, $export->id, $extension);
+            $groupName = Group::query()->whereKey($export->group_id)->value('name') ?: 'grup';
+            $slug = Str::slug($groupName) ?: 'grup';
+            $storageName = sprintf('%s-%d.%s', $slug, $export->id, $extension);
+            $displayName = sprintf('%s.%s', $groupName, $extension);
 
             if ($extension === 'pdf') {
                 $binary = $this->renderPdf($messages->all(), $export->group_id);
@@ -50,11 +55,11 @@ class GenerateExportJob implements ShouldQueue
                 $binary = $this->renderDocx($messages->all(), $export->group_id);
             }
 
-            Storage::disk('normchat_exports')->put($filename, $binary);
+            Storage::disk('normchat_exports')->put($storageName, $binary);
 
             $export->status = 'done';
-            $export->storage_path = $filename;
-            $export->file_name = $filename;
+            $export->storage_path = $storageName;
+            $export->file_name = $displayName;
             $export->save();
         } catch (Throwable $e) {
             report($e);

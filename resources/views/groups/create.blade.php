@@ -56,12 +56,12 @@
 
             {{-- Credit Info --}}
             <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p class="text-xs font-semibold text-emerald-700">Biaya pembuatan grup: Rp{{ number_format($planPrice, 0, ',', '.') }}</p>
+                <p class="text-xs font-semibold text-emerald-700">Biaya pembuatan grup: {{ $duPrice }} Dots Units (DU)</p>
                 <p class="mt-1 text-xs text-emerald-600">{{ $includedCredits }} normkredit langsung dialokasikan ke grup ini.</p>
                 <p class="mt-1 text-xs text-emerald-600">NormAI aktif otomatis, member bisa langsung pakai AI.</p>
             </div>
 
-            <button type="submit" class="btn-cta" id="submitBtn">Bayar Rp{{ number_format($planPrice, 0, ',', '.') }} & Buat Group</button>
+            <button type="submit" class="btn-cta" id="submitBtn">Bayar {{ $duPrice }} DU & Buat Group</button>
         </form>
     </section>
 

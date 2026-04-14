@@ -273,6 +273,15 @@ class AuthController extends Controller
             $expiresAt,
         );
 
+        // Resolve and store the interdotz internal ID (ULID) for payment API calls
+        if (! $user->interdotz_id) {
+            $interdotz = app(\App\Services\InterdotzService::class);
+            $internalId = $interdotz->resolveInternalUserId($accessToken);
+            if ($internalId) {
+                $user->update(['interdotz_id' => $internalId]);
+            }
+        }
+
         return $user;
     }
 }

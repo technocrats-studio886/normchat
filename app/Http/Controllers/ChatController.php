@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Events\MessageSent;
+use App\Events\MessageDeleted;
+use App\Events\MessageUpdated;
 use App\Events\UserMentioned;
 use App\Models\AuditLog;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
+use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\Message;
+use App\Models\MessageVersion;
 use App\Jobs\ProcessGroupChatQueueJob;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
@@ -67,11 +71,32 @@ class ChatController extends Controller
         $messages = Message::query()
             ->where('group_id', $group->id)
             ->with(['sender:id,name', 'replyToMessage.sender:id,name'])
+            ->withCount('versions')
             ->orderByDesc('id')
             ->take(80)
             ->get()
             ->reverse()
             ->values();
+
+        $latestMessageId = (int) Message::query()
+            ->where('group_id', $group->id)
+            ->max('id');
+
+        $viewerMember = GroupMember::query()
+            ->where('group_id', $group->id)
+            ->where('user_id', Auth::id())
+            ->where('status', 'active')
+            ->first();
+
+        $lastReadMessageId = (int) ($viewerMember?->last_read_message_id ?? 0);
+
+        $unreadCount = 0;
+        if ($latestMessageId > 0) {
+            $unreadCount = (int) Message::query()
+                ->where('group_id', $group->id)
+                ->when($lastReadMessageId > 0, fn ($query) => $query->where('id', '>', $lastReadMessageId))
+                ->count();
+        }
 
         $mentionSuggestions = $this->buildMentionSuggestions($group);
 
@@ -79,6 +104,64 @@ class ChatController extends Controller
             'group' => $group,
             'messages' => $messages,
             'mentionSuggestions' => $mentionSuggestions,
+            'lastReadMessageId' => $lastReadMessageId,
+            'latestMessageId' => $latestMessageId,
+            'unreadCount' => $unreadCount,
+        ]);
+    }
+
+    public function markRead(Request $request, Group $group): JsonResponse
+    {
+        $this->authorize('chat', $group);
+
+        $validated = $request->validate([
+            'last_read_message_id' => ['nullable', 'integer'],
+        ]);
+
+        $member = GroupMember::query()
+            ->where('group_id', $group->id)
+            ->where('user_id', Auth::id())
+            ->where('status', 'active')
+            ->first();
+
+        if (! $member) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'membership_not_found',
+            ], 404);
+        }
+
+        $latestMessageId = (int) Message::query()
+            ->where('group_id', $group->id)
+            ->max('id');
+
+        if ($latestMessageId <= 0) {
+            return response()->json([
+                'ok' => true,
+                'last_read_message_id' => (int) ($member->last_read_message_id ?? 0),
+                'unread_count' => 0,
+            ]);
+        }
+
+        $requestedId = (int) ($validated['last_read_message_id'] ?? 0);
+        $targetReadId = $requestedId > 0
+            ? min($requestedId, $latestMessageId)
+            : $latestMessageId;
+
+        $currentReadId = (int) ($member->last_read_message_id ?? 0);
+        if ($targetReadId > $currentReadId) {
+            $member->last_read_message_id = $targetReadId;
+            $member->last_read_at = now();
+            $member->save();
+        }
+
+        return response()->json([
+            'ok' => true,
+            'last_read_message_id' => (int) ($member->last_read_message_id ?? 0),
+            'unread_count' => (int) Message::query()
+                ->where('group_id', $group->id)
+                ->where('id', '>', (int) ($member->last_read_message_id ?? 0))
+                ->count(),
         ]);
     }
 
@@ -88,7 +171,7 @@ class ChatController extends Controller
 
         $validated = $request->validate([
             'content' => ['nullable', 'string', 'max:3000'],
-            'attachment' => ['nullable', 'file', 'max:15360', 'mimes:jpg,jpeg,png,webp,gif,heic,heif,mp3,wav,ogg,webm,mp4,aac,m4a'],
+            'attachment' => ['nullable', 'file', 'max:15360', 'mimes:jpg,jpeg,png,webp,gif,heic,heif,mp3,wav,ogg,webm,mp4,aac,m4a,pdf,txt,csv,doc,docx,xls,xlsx,ppt,pptx,zip,rar,7z'],
             'reply_to_message_id' => ['nullable', 'integer'],
         ]);
 
@@ -181,7 +264,7 @@ class ChatController extends Controller
             return back()->withErrors(['content' => 'Chat sedang sibuk. Coba kirim ulang dalam beberapa detik.']);
         }
 
-        $message->loadMissing('replyToMessage.sender:id,name');
+        $message->loadMissing('replyToMessage.sender:id,name')->loadCount('versions');
 
         if ($this->shouldQueueAi($content, $message->replyToMessage)) {
             ProcessGroupChatQueueJob::dispatch($group->id);
@@ -203,6 +286,107 @@ class ChatController extends Controller
         }
 
         return redirect()->route('chat.show', $group);
+    }
+
+    public function update(Request $request, Group $group, Message $message): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+
+        $userId = (int) Auth::id();
+        $isSender = $message->sender_type === 'user' && (int) $message->sender_id === $userId;
+        abort_unless($isSender, 403);
+
+        $validated = $request->validate([
+            'content' => ['required', 'string', 'max:3000'],
+        ]);
+
+        $nextContent = trim((string) $validated['content']);
+        if ($nextContent === '') {
+            return response()->json([
+                'ok' => false,
+                'message' => 'content_required',
+            ], 422);
+        }
+
+        $previousContent = (string) ($message->content ?? '');
+        if ($previousContent !== $nextContent) {
+            $nextVersion = ((int) $message->versions()->max('version_number')) + 1;
+
+            MessageVersion::create([
+                'message_id' => $message->id,
+                'version_number' => max($nextVersion, 1),
+                'content_snapshot' => $previousContent,
+                'edited_by' => $userId,
+                'edited_at' => now(),
+            ]);
+
+            $message->content = $nextContent;
+            $message->save();
+
+            AuditLog::create([
+                'group_id' => $group->id,
+                'actor_id' => $userId,
+                'action' => 'chat.edit_message',
+                'target_type' => Message::class,
+                'target_id' => $message->id,
+                'metadata_json' => [
+                    'old_length' => mb_strlen($previousContent),
+                    'new_length' => mb_strlen($nextContent),
+                ],
+                'created_at' => now(),
+            ]);
+        }
+
+        $message->loadMissing('replyToMessage.sender:id,name')->loadCount('versions');
+        $payload = $this->buildMessagePayload($message, $group, Auth::user()?->name);
+
+        event(new MessageUpdated((int) $group->id, $payload));
+
+        return response()->json([
+            'ok' => true,
+            'message' => $payload,
+        ]);
+    }
+
+    public function destroy(Request $request, Group $group, Message $message): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+
+        $userId = (int) Auth::id();
+        $isSender = $message->sender_type === 'user' && (int) $message->sender_id === $userId;
+        $isModerator = $this->isGroupModerator($group, $userId);
+        abort_unless($isSender || $isModerator, 403);
+
+        $messageId = (int) $message->id;
+        $message->delete();
+
+        event(new MessageDeleted(
+            (int) $group->id,
+            $messageId,
+            $userId,
+            (string) (Auth::user()?->name ?? 'User')
+        ));
+
+        AuditLog::create([
+            'group_id' => $group->id,
+            'actor_id' => $userId,
+            'action' => 'chat.delete_message',
+            'target_type' => Message::class,
+            'target_id' => $message->id,
+            'metadata_json' => [
+                'sender_type' => $message->sender_type,
+                'sender_id' => $message->sender_id,
+                'message_type' => $message->message_type,
+            ],
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message_id' => $messageId,
+        ]);
     }
 
     private function dispatchMentionNotifications(Group $group, Message $message, string $content): void
@@ -414,6 +598,10 @@ class ChatController extends Controller
     {
         $groupToken ??= $group->groupToken;
         $replyTarget = $message->replyToMessage;
+        $versionsCount = isset($message->versions_count)
+            ? (int) $message->versions_count
+            : (int) $message->versions()->count();
+        $isEdited = $versionsCount > 0;
 
         return [
             'id' => $message->id,
@@ -428,6 +616,8 @@ class ChatController extends Controller
             'attachment_mime' => $message->attachment_mime,
             'attachment_original_name' => $message->attachment_original_name,
             'created_at' => optional($message->created_at)->toIso8601String(),
+            'is_edited' => $isEdited,
+            'edited_at' => $isEdited ? optional($message->updated_at)->toIso8601String() : null,
             'reply_to' => $replyTarget ? [
                 'id' => (int) $replyTarget->id,
                 'sender_name' => $replyTarget->sender_type === 'ai'
@@ -440,5 +630,19 @@ class ChatController extends Controller
             'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
             'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 2500, 1),
         ];
+    }
+
+    private function isGroupModerator(Group $group, int $userId): bool
+    {
+        if ((int) $group->owner_id === $userId) {
+            return true;
+        }
+
+        return GroupMember::query()
+            ->where('group_id', $group->id)
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->whereHas('role', fn ($query) => $query->whereIn('key', ['owner', 'admin']))
+            ->exists();
     }
 }

@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Crypt;
     'avatar_url',
     'auth_provider',
     'provider_user_id',
+    'interdotz_id',
     'password',
     'access_token_encrypted',
     'refresh_token_encrypted',

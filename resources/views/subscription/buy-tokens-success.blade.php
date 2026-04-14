@@ -21,16 +21,14 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-emerald-700">Normkredit</span>
-                        <span class="font-bold text-emerald-900">{{ number_format($purchase['tokens'] / 2500, 1) }}</span>
+                        <span class="font-bold text-emerald-900">{{ $purchase['normkredits'] }}</span>
                     </div>
+                    @if(($purchase['du_paid'] ?? 0) > 0)
                     <div class="flex justify-between">
-                        <span class="text-emerald-700">Harga</span>
-                        <span class="font-bold text-emerald-900">Rp{{ number_format($purchase['price'], 0, ',', '.') }}</span>
+                        <span class="text-emerald-700">DU dibayar</span>
+                        <span class="font-bold text-emerald-900">{{ $purchase['du_paid'] }} DU</span>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-emerald-700">Referensi</span>
-                        <span class="font-mono text-xs text-emerald-800">{{ $purchase['reference'] }}</span>
-                    </div>
+                    @endif
                 </div>
             </div>
         @endif

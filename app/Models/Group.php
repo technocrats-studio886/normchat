@@ -24,6 +24,7 @@ class Group extends Model
         'ai_model',
         'ai_persona_style',
         'ai_persona_guardrails',
+        'status',
     ];
 
     protected $casts = [

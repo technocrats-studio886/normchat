@@ -27,6 +27,26 @@
 
         <p class="mb-4 text-sm text-[#64748B]">Lihat riwayat snapshot dan unduh percakapan dalam format profesional untuk dokumentasi tim.</p>
 
+        <h2 class="mb-2 mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Riwayat Export</h2>
+        <div class="mb-5 space-y-3">
+            @forelse ($group->exports as $export)
+                <div class="flex items-center justify-between rounded-xl border border-[#CBD5E1] bg-white px-4 py-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-[#0F172A]">{{ $export->file_name ?: 'Export #'.$export->id }}</p>
+                        <p class="mt-1 text-xs text-[#64748B]">{{ $export->created_at?->format('d M Y, H:i') }} • {{ strtoupper($export->file_type) }} • {{ ucfirst($export->status) }}</p>
+                    </div>
+                    @if($export->status === 'done' && $export->storage_path)
+                        <a href="{{ route('settings.export.download', [$group, $export]) }}" class="shrink-0 rounded-lg bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1D4ED8]">Unduh</a>
+                    @endif
+                </div>
+            @empty
+                <div class="rounded-xl border border-dashed border-[#CBD5E1] bg-white p-5 text-center text-sm text-[#64748B]">
+                    Belum ada export tersimpan.
+                </div>
+            @endforelse
+        </div>
+
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Riwayat Backup</h2>
         <div class="space-y-3">
             @forelse ($group->backups as $backup)
                 <div class="rounded-xl border border-[#CBD5E1] bg-white px-4 py-3">

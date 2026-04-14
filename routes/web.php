@@ -44,11 +44,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups', [GroupController::class, 'index'])->name('groups.index');
     Route::get('/groups/create', [GroupController::class, 'create'])->name('groups.create');
     Route::post('/groups', [GroupController::class, 'store'])->name('groups.store');
+    Route::get('/groups/payment-callback', [GroupController::class, 'paymentCallback'])->name('groups.payment.callback');
 
     // Chat
     Route::get('/chat/last', [ChatController::class, 'openLast'])->name('chat.last');
     Route::get('/groups/{group}/chat', [ChatController::class, 'show'])->middleware('group.permission')->name('chat.show');
     Route::post('/groups/{group}/messages', [ChatController::class, 'store'])->middleware('group.permission')->name('chat.store');
+    Route::post('/groups/{group}/messages/read', [ChatController::class, 'markRead'])->middleware('group.permission')->name('chat.read');
+    Route::patch('/groups/{group}/messages/{message}', [ChatController::class, 'update'])->middleware('group.permission')->name('chat.update');
+    Route::delete('/groups/{group}/messages/{message}', [ChatController::class, 'destroy'])->middleware('group.permission')->name('chat.destroy');
     Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
 
     // Settings (view for active members, write actions restricted by permission)
@@ -57,9 +61,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups/{group}/settings/history-export', [SettingsController::class, 'historyExport'])->name('settings.history');
     Route::get('/groups/{group}/settings/ai-persona', [SettingsController::class, 'aiPersonaEditor'])->name('settings.ai.persona');
     Route::post('/groups/{group}/settings/ai-persona', [SettingsController::class, 'saveAiPersona'])->middleware('group.permission')->name('settings.ai.persona.save');
-    Route::get('/groups/{group}/settings/seat-management', [SettingsController::class, 'seatManagement'])->name('settings.seats');
     Route::post('/groups/{group}/settings/ai', [SettingsController::class, 'createAiConnection'])->middleware('group.permission')->name('settings.ai');
     Route::post('/groups/{group}/settings/export', [SettingsController::class, 'createExport'])->middleware('group.permission')->name('settings.export');
+    Route::get('/groups/{group}/settings/export/{export}/download', [SettingsController::class, 'downloadExport'])->name('settings.export.download');
+    Route::get('/groups/{group}/settings/transactions', [SettingsController::class, 'transactionHistory'])->name('settings.transactions');
     Route::post('/groups/{group}/settings/backup', [SettingsController::class, 'createBackup'])->middleware('group.permission')->name('settings.backup');
     Route::post('/groups/{group}/settings/backup/{backup}/restore', [SettingsController::class, 'restoreBackup'])->middleware('group.permission')->name('settings.backup.restore');
 
@@ -70,12 +75,6 @@ Route::middleware('auth')->group(function () {
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/profile/security', [ProfileController::class, 'security'])->name('profile.security');
-
-    // Seat payment flow
-    Route::get('/subscribe/add-seat/{group}', [SubscriptionController::class, 'addSeatForm'])->name('subscription.add-seat');
-    Route::post('/subscribe/add-seat/{group}', [SubscriptionController::class, 'processAddSeat'])->name('subscription.add-seat.process');
-    Route::get('/subscribe/add-seat/{group}/success', [SubscriptionController::class, 'addSeatSuccess'])->name('subscription.add-seat.success');
-    Route::get('/subscribe/add-seat/{group}/payments', [SubscriptionController::class, 'addSeatPaymentHistory'])->name('subscription.add-seat.payments');
 
     Route::redirect('/app', '/groups');
 });

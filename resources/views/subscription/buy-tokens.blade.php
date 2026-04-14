@@ -7,8 +7,13 @@
         </a>
 
         <h1 class="mt-3 font-display text-2xl font-extrabold text-slate-900">Top-up Normkredit</h1>
-        <p class="mt-1 text-sm text-slate-500">Patungan normkredit untuk grup kamu. 1 normkredit = Rp{{ number_format($pricePerCredit, 0, ',', '.') }}</p>
-        <p class="mt-0.5 text-xs text-slate-400">Rp30.000 = 12 normkredit (minimum)</p>
+        <p class="mt-1 text-sm text-slate-500">Tambah normkredit untuk grup kamu menggunakan Dots Units (DU).</p>
+
+        @if($errors->has('payment'))
+            <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {{ $errors->first('payment') }}
+            </div>
+        @endif
 
         <form method="POST" action="{{ route('subscription.tokens.buy.process') }}" class="mt-6 space-y-4">
             @csrf
@@ -30,130 +35,41 @@
                 @endif
             </div>
 
-            {{-- Mode Toggle --}}
+            {{-- Package Selection --}}
             <div class="panel-card rounded-2xl p-4">
-                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Mode Pembelian</label>
-                <div class="mt-2 flex gap-2">
-                    <button type="button"
-                            class="flex-1 rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold transition"
-                            data-mode-btn="by_credits"
-                            onclick="setMode('by_credits')">
-                        By Normkredit
-                    </button>
-                    <button type="button"
-                            class="flex-1 rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold transition"
-                            data-mode-btn="by_price"
-                            onclick="setMode('by_price')">
-                        By Nominal Harga
-                    </button>
-                </div>
-                <input type="hidden" name="mode" id="modeInput" value="by_credits" />
-            </div>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Pilih Paket</label>
 
-            {{-- By Credits Input --}}
-            <div class="panel-card rounded-2xl p-4" id="byCreditsPanel">
-                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Jumlah Normkredit</label>
-
-                <div class="mt-2 grid grid-cols-3 gap-2">
-                    @foreach([12 => '12', 20 => '20', 24 => '24', 50 => '50', 100 => '100', 200 => '200'] as $opt => $label)
-                        <button type="button"
-                                class="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-400 hover:bg-blue-50"
-                                onclick="setCreditAmount({{ $opt }})">
-                            {{ $label }} normkredit
-                        </button>
+                <div class="mt-3 space-y-2">
+                    @php
+                        $packages = [
+                            ['id' => 'nk_12', 'nk' => 12, 'du' => $duPer12Nk],
+                            ['id' => 'nk_24', 'nk' => 24, 'du' => $duPer12Nk * 2],
+                            ['id' => 'nk_48', 'nk' => 48, 'du' => $duPer12Nk * 4],
+                            ['id' => 'nk_100', 'nk' => 100, 'du' => (int) ceil(($duPer12Nk / 12) * 100)],
+                        ];
+                    @endphp
+                    @foreach($packages as $pkg)
+                        <label class="flex cursor-pointer items-center justify-between rounded-xl border-2 px-4 py-3 transition hover:border-blue-300 hover:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="package" value="{{ $pkg['id'] }}" class="accent-blue-600"
+                                       {{ old('package', 'nk_12') === $pkg['id'] ? 'checked' : '' }} />
+                                <p class="text-sm font-bold text-slate-800">{{ $pkg['nk'] }} Normkredit</p>
+                            </div>
+                            <span class="text-sm font-extrabold text-blue-600">{{ $pkg['du'] }} DU</span>
+                        </label>
                     @endforeach
-                </div>
-
-                <input type="number" name="credit_amount" id="creditAmountInput"
-                       value="{{ old('credit_amount', 12) }}"
-                       min="12" step="1"
-                       placeholder="Min. 12 normkredit"
-                       class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                       oninput="calcFromCredits()" />
-
-                <div class="mt-2 flex items-center justify-end text-sm">
-                    <span class="text-slate-600">Harga: <span class="font-bold text-slate-900" id="calcPriceFromCredits">Rp30.000</span></span>
-                </div>
-            </div>
-
-            {{-- By Price Input --}}
-            <div class="panel-card rounded-2xl p-4 hidden" id="byPricePanel">
-                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nominal Harga (Rp)</label>
-
-                <div class="mt-2 grid grid-cols-3 gap-2">
-                    @foreach([30000, 50000, 75000, 100000, 150000, 250000] as $opt)
-                        <button type="button"
-                                class="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-400 hover:bg-blue-50"
-                                onclick="setPriceAmount({{ $opt }})">
-                            Rp{{ number_format($opt, 0, ',', '.') }}
-                        </button>
-                    @endforeach
-                </div>
-
-                <input type="number" name="price_amount" id="priceAmountInput"
-                       value="{{ old('price_amount', 30000) }}"
-                       min="30000" step="2500"
-                       placeholder="Min. Rp30.000"
-                       class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                       oninput="calcFromPrice()" />
-
-                <div class="mt-2 flex items-center justify-end text-sm">
-                    <span class="text-slate-600">= <span class="font-bold text-slate-900" id="calcCreditsFromPrice">12</span> normkredit</span>
                 </div>
             </div>
 
             @if($groups->isNotEmpty())
                 <button type="submit" class="btn-cta w-full py-4 text-sm font-extrabold uppercase tracking-wide">
-                    Top-up Instan
+                    Top-up Normkredit
                 </button>
             @endif
         </form>
 
         <p class="mt-4 pb-4 text-center text-[11px] text-slate-400">
-            Tidak ada payment gateway. Normkredit langsung masuk ke saldo grup.
+            Pembayaran menggunakan Dots Units dari akun Interdotz Anda.
         </p>
     </section>
-
-    <script>
-        const PRICE_PER_CREDIT = {{ $pricePerCredit }};
-        const TOKENS_PER_CREDIT = 2500;
-
-        function setMode(mode) {
-            document.getElementById('modeInput').value = mode;
-            document.getElementById('byCreditsPanel').classList.toggle('hidden', mode !== 'by_credits');
-            document.getElementById('byPricePanel').classList.toggle('hidden', mode !== 'by_price');
-
-            document.querySelectorAll('[data-mode-btn]').forEach(btn => {
-                const isActive = btn.dataset.modeBtn === mode;
-                btn.className = 'flex-1 rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold transition '
-                    + (isActive ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-500');
-            });
-        }
-
-        function setCreditAmount(amount) {
-            document.getElementById('creditAmountInput').value = amount;
-            calcFromCredits();
-        }
-
-        function setPriceAmount(amount) {
-            document.getElementById('priceAmountInput').value = amount;
-            calcFromPrice();
-        }
-
-        function calcFromCredits() {
-            const credits = parseFloat(document.getElementById('creditAmountInput').value) || 0;
-            const price = Math.ceil(credits * PRICE_PER_CREDIT);
-            document.getElementById('calcPriceFromCredits').textContent = 'Rp' + price.toLocaleString('id-ID');
-        }
-
-        function calcFromPrice() {
-            const price = parseInt(document.getElementById('priceAmountInput').value) || 0;
-            const credits = price / PRICE_PER_CREDIT;
-            document.getElementById('calcCreditsFromPrice').textContent = credits % 1 === 0 ? credits : credits.toFixed(1);
-        }
-
-        setMode('by_credits');
-        calcFromCredits();
-        calcFromPrice();
-    </script>
 @endsection

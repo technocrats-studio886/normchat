@@ -18,9 +18,11 @@
                     Masuk ke Chat
                 </a>
             @else
+                {{-- payment errors shown by layout --}}
+
                 <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <p class="text-sm font-semibold text-amber-800">Lengkapi data join, lalu kamu langsung masuk ke grup</p>
-                    <p class="mt-1 text-xs text-amber-600">UI patungan tetap ada, aktivasi seat dan normkredit diproses instan.</p>
+                    <p class="text-sm font-semibold text-amber-800">Bergabung ke grup ini membutuhkan patungan</p>
+                    <p class="mt-1 text-xs text-amber-600">Biaya patungan: <strong>{{ $duPatungan }} Dots Units (DU)</strong></p>
                 </div>
 
                 <form method="POST" action="{{ route('groups.join.submit', $group->share_id) }}" class="mt-5 space-y-3">
@@ -51,48 +53,25 @@
                         <p class="text-xs text-rose-600">{{ $errors->first('password') }}</p>
                     @endif
 
-                    {{-- Patungan Amount --}}
-                    <div class="panel-card px-4 py-4">
-                        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Patungan Normkredit</label>
-                        <p class="mt-1 text-xs text-slate-500">Min. Rp{{ number_format($minPatungan, 0, ',', '.') }} ({{ (int)($minPatungan / $pricePerNormkredit) }} normkredit)</p>
-
-                        <input type="number" name="patungan_amount" id="patunganInput"
-                               value="{{ old('patungan_amount', $minPatungan) }}"
-                               min="{{ $minPatungan }}" step="1000"
-                               class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-bold text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                               oninput="calcPatungan()" />
-
-                        <div class="mt-2 flex items-center justify-end text-sm">
-                            <span class="text-slate-600">= <span class="font-bold text-blue-600" id="calcNormkredit">{{ (int)($minPatungan / $pricePerNormkredit) }}</span> normkredit</span>
-                        </div>
-                    </div>
-                    @if($errors->has('patungan_amount'))
-                        <p class="text-xs text-rose-600">{{ $errors->first('patungan_amount') }}</p>
-                    @endif
-
                     {{-- Summary --}}
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                         <div class="flex justify-between">
-                            <span class="text-slate-600">Patungan normkredit</span>
-                            <span class="font-bold text-slate-900" id="summaryPatungan">Rp{{ number_format($minPatungan, 0, ',', '.') }}</span>
-                        </div>
-                        <div class="mt-1 flex justify-between">
-                            <span class="text-slate-600">Biaya seat</span>
-                            <span class="font-bold text-slate-900">Rp{{ number_format($seatPrice, 0, ',', '.') }}</span>
+                            <span class="text-slate-600">Patungan</span>
+                            <span class="font-bold text-slate-900">{{ $duPatungan }} DU</span>
                         </div>
                         <hr class="my-2 border-slate-200" />
                         <div class="flex justify-between">
                             <span class="font-bold text-slate-800">Total bayar</span>
-                            <span class="text-lg font-extrabold text-blue-600" id="summaryTotal">Rp{{ number_format($minPatungan + $seatPrice, 0, ',', '.') }}</span>
+                            <span class="text-lg font-extrabold text-blue-600">{{ $duPatungan }} DU</span>
                         </div>
                     </div>
 
                     <button type="submit" class="btn-cta w-full py-4">
-                        Masuk & Aktifkan
+                        Bayar {{ $duPatungan }} DU & Bergabung
                     </button>
 
                     <p class="text-center text-[11px] text-slate-400">
-                        Normkredit langsung masuk ke saldo grup. Tidak ada langkah pembayaran tambahan.
+                        Pembayaran menggunakan Dots Units dari akun Interdotz Anda.
                     </p>
                 </form>
             @endif
@@ -101,10 +80,6 @@
 
     @if(!($alreadyMember ?? false))
     <script>
-        const PRICE_PER_NK = {{ $pricePerNormkredit }};
-        const SEAT_PRICE = {{ $seatPrice }};
-        const TOKENS_PER_NK = 2500;
-
         function toggleJoinPassword() {
             const input = document.getElementById('joinGroupPasswordInput');
             const show = document.getElementById('joinPassShow');
@@ -121,16 +96,6 @@
                 show.classList.toggle('hidden', makeVisible);
                 hide.classList.toggle('hidden', !makeVisible);
             }
-        }
-
-        function calcPatungan() {
-            const amount = parseInt(document.getElementById('patunganInput').value) || 0;
-            const nk = amount / PRICE_PER_NK;
-            const total = amount + SEAT_PRICE;
-
-            document.getElementById('calcNormkredit').textContent = nk % 1 === 0 ? nk : nk.toFixed(1);
-            document.getElementById('summaryPatungan').textContent = 'Rp' + amount.toLocaleString('id-ID');
-            document.getElementById('summaryTotal').textContent = 'Rp' + total.toLocaleString('id-ID');
         }
     </script>
     @endif

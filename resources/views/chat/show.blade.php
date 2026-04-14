@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => $group->name.' - Normchat', 'group' => $group])
 
 @section('content')
-    <section class="relative flex min-h-[calc(100vh-5rem)] flex-col" data-chat-shell="1">
+    <section class="relative flex h-[100dvh] flex-col overflow-hidden" data-chat-shell="1">
         @php
             $gt = $group->groupToken;
             $credits = $gt ? $gt->credits : 0;
@@ -11,8 +11,8 @@
             $groupInitial = strtoupper(substr($group->name, 0, 1));
         @endphp
 
-        {{-- Sticky header --}}
-        <div class="sticky top-0 z-20 mx-3 mt-3 flex items-center gap-3 rounded-3xl border border-slate-200 bg-white/85 px-3 py-2.5 shadow-sm backdrop-blur">
+        {{-- Frozen header --}}
+        <div class="shrink-0 z-20 mx-3 mt-3 flex items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 px-3 py-2.5 shadow-sm backdrop-blur">
             <a href="{{ route('groups.index') }}" class="flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 hover:bg-slate-100" aria-label="Kembali">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 19-7-7 7-7"/></svg>
             </a>
@@ -36,7 +36,18 @@
         </div>
 
         {{-- Messages --}}
-        <div class="nc-scroll mt-3 flex-1 space-y-4 overflow-y-auto px-4 py-3 pb-56" data-chat-group-id="{{ $group->id }}" data-auth-user-id="{{ auth()->id() }}" data-chat-feed="1">
+        <div
+            class="nc-scroll mt-3 flex-1 space-y-4 overflow-y-auto px-4 py-3 pb-56"
+            data-chat-group-id="{{ $group->id }}"
+            data-auth-user-id="{{ auth()->id() }}"
+            data-chat-feed="1"
+            data-message-count="{{ $messages->count() }}"
+            data-last-read-message-id="{{ $lastReadMessageId ?? 0 }}"
+            data-latest-message-id="{{ $latestMessageId ?? 0 }}"
+            data-unread-count="{{ $unreadCount ?? 0 }}"
+            data-has-read-before="{{ ($lastReadMessageId ?? 0) > 0 ? '1' : '0' }}"
+            data-chat-read-url="{{ route('chat.read', $group) }}"
+        >
             @forelse ($messages as $message)
                 @php
                     $isMine = $message->sender_type === 'user' && $message->sender_id === auth()->id();
@@ -63,6 +74,11 @@
                             : (($replyTarget->message_type === 'image') ? '[Gambar]' : (($replyTarget->message_type === 'voice') ? '[Voice note]' : '[Lampiran]')))
                         : null;
                     $audioSourceMime = $attachmentMime === 'video/webm' ? 'audio/webm' : ($message->attachment_mime ?? 'audio/webm');
+                    $isEdited = ((int) ($message->versions_count ?? 0)) > 0;
+                        $editedAtIso = $isEdited ? optional($message->updated_at)->toIso8601String() : '';
+                        $editedTitle = $isEdited && $message->updated_at
+                            ? 'Diedit ' . $message->updated_at->timezone(config('app.display_timezone', config('app.timezone')))->format('d M H:i')
+                            : 'Pesan telah diedit';
                 @endphp
 
                 @if($isMine)
@@ -70,10 +86,10 @@
                     <div id="message-{{ $message->id }}" class="flex justify-end" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         <div class="max-w-[75%]">
                             @if($replyTarget)
-                                <div class="mb-1 rounded-xl bg-white/20 px-3 py-1.5 text-xs">
-                                    <p class="font-semibold text-white">Reply to {{ $replySender }}</p>
-                                    <p class="truncate text-white/80">{{ $replyPreview }}</p>
-                                </div>
+                                <a href="#message-{{ $replyTarget->id }}" class="mb-1 block rounded-xl border-l-[3px] border-blue-500 bg-blue-50 px-3 py-1.5 text-xs text-slate-700 shadow-sm hover:bg-blue-100">
+                                    <p class="font-semibold text-blue-700">Membalas {{ $replySender }}</p>
+                                    <p class="truncate text-slate-600">{{ $replyPreview }}</p>
+                                </a>
                             @endif
                             @if($isImage)
                                 <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener" class="mb-2 block overflow-hidden rounded-2xl border border-blue-200 bg-blue-50">
@@ -106,10 +122,11 @@
                             @endif
                             @if($message->content)
                                 <div class="bubble-mine">
-                                    {{ $message->content }}
+                                    <span class="whitespace-pre-wrap">{{ $message->content }}</span><span class="nc-inline-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="mine">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--mine" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</span>
                                 </div>
+                            @else
+                                <p class="mt-1 text-right meta-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="mine">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--mine" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
                             @endif
-                            <p class="mt-1 text-right meta-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="{{ $senderName }}">{{ $senderName }} • {{ $message->created_at?->format('H:i') }}</p>
                         </div>
                     </div>
                 @elseif($isAi)
@@ -117,8 +134,8 @@
                     @php $hasRich = str_contains($message->content ?? '', '|') || str_contains($message->content ?? '', '```mermaid'); @endphp
                     <div id="message-{{ $message->id }}" class="{{ $hasRich ? 'max-w-[95%]' : 'max-w-[80%]' }}" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         @if($replyTarget)
-                            <div class="mb-1 rounded-xl border border-emerald-200 bg-emerald-100/70 px-3 py-1.5 text-xs text-emerald-700">
-                                <p class="font-semibold">Reply to {{ $replySender }}</p>
+                            <div class="mb-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700">
+                                <p class="font-semibold">Membalas {{ $replySender }}</p>
                                 <p class="truncate">{{ $replyPreview }}</p>
                             </div>
                         @endif
@@ -151,20 +168,22 @@
                                 <p class="mt-1 hidden text-[11px] text-slate-500" data-voice-fallback-note>Audio mode kompatibilitas aktif. Tap player native di bawah.</p>
                             </div>
                         @endif
+                        <p class="mb-1 text-[11px] font-semibold text-emerald-700">{{ $senderName }}</p>
                         @if($message->content)
                             <div class="bubble-ai ai-markdown overflow-hidden" data-ai-raw>
-                                {{ $message->content }}
+                                {{ $message->content }}<span class="nc-inline-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="ai">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--ai" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</span>
                             </div>
+                        @else
+                            <p class="mt-1 text-[11px] font-medium text-emerald-700" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="ai">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--ai" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
                         @endif
-                        <p class="mt-1 text-[11px] font-medium text-emerald-700" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="{{ $senderName }}">{{ $senderName }} • {{ $message->created_at?->format('H:i') }}</p>
                     </div>
                 @else
                     {{-- Other user message - left aligned, white --}}
                     <div id="message-{{ $message->id }}" class="max-w-[75%]" data-message-id="{{ $message->id }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}">
                         <p class="mb-1 text-[11px] text-slate-500">{{ $senderName }}</p>
                         @if($replyTarget)
-                            <div class="mb-1 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
-                                <p class="font-semibold">Reply to {{ $replySender }}</p>
+                            <div class="mb-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">
+                                <p class="font-semibold">Membalas {{ $replySender }}</p>
                                 <p class="truncate">{{ $replyPreview }}</p>
                             </div>
                         @endif
@@ -199,10 +218,11 @@
                         @endif
                         @if($message->content)
                             <div class="bubble-other">
-                                {{ $message->content }}
+                                <span class="whitespace-pre-wrap">{{ $message->content }}</span><span class="nc-inline-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="other">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--other" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</span>
                             </div>
+                        @else
+                            <p class="mt-1 meta-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="other">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--other" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
                         @endif
-                        <p class="mt-1 meta-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="{{ $senderName }}">{{ $senderName }} • {{ $message->created_at?->format('H:i') }}</p>
                     </div>
                 @endif
             @empty
@@ -221,12 +241,15 @@
                 <input type="file" accept="image/*" capture="environment" class="hidden" data-chat-camera-input="1" />
                 <input type="hidden" name="reply_to_message_id" value="" data-reply-to-input="1" />
 
-                <div class="hidden items-center justify-between border-b border-indigo-200 bg-indigo-50 px-4 py-2" data-reply-preview="1">
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-bold text-indigo-700" data-reply-preview-sender="1">Reply</p>
-                        <p class="truncate text-xs text-indigo-600" data-reply-preview-content="1"></p>
+                <div class="hidden items-center justify-between border-b border-indigo-100 bg-indigo-50/70 px-4 py-2" data-reply-preview="1">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <div class="h-8 w-1 shrink-0 rounded-full" style="background: var(--nc-primary);"></div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-bold text-slate-700" data-reply-preview-sender="1">Balas pesan</p>
+                            <p class="truncate text-xs text-slate-600" data-reply-preview-content="1"></p>
+                        </div>
                     </div>
-                    <button type="button" class="rounded-md p-1 text-indigo-500 hover:bg-indigo-100" data-reply-clear="1" aria-label="Batalkan reply">
+                    <button type="button" class="rounded-md p-1 text-slate-400 hover:bg-indigo-100" data-reply-clear="1" aria-label="Batalkan balasan">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
                     </button>
                 </div>
@@ -238,12 +261,8 @@
 
                     <textarea name="content" rows="1" placeholder="Ketik pesan" class="composer-input" data-mention-input="1" autocomplete="off"></textarea>
 
-                    <button type="button" class="composer-iconbtn" data-pick-voice="1" aria-label="Lampirkan file">
+                    <button type="button" class="composer-iconbtn" data-open-attach-menu="1" aria-label="Lampiran">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 1 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48"/></svg>
-                    </button>
-
-                    <button type="button" class="composer-iconbtn" data-open-camera="1" aria-label="Kamera">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8.5A2.5 2.5 0 0 1 6.5 6h2.257a2 2 0 0 0 1.743-1.02l.5-.86A1 1 0 0 1 11.866 3h.268a1 1 0 0 1 .866.48l.5.86A2 2 0 0 0 15.243 6H17.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/><circle cx="12" cy="12" r="3"/></svg>
                     </button>
 
                     <button type="button" class="composer-iconbtn" data-record-voice="1" aria-label="Rekam voice">
@@ -253,6 +272,30 @@
                     <button type="submit" class="composer-send" data-chat-send="1" aria-label="Kirim">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12 20 4l-4 16-4.5-6.5L4.5 12Z"/></svg>
                     </button>
+
+                    {{-- Attachment sub-menu (Telegram style) --}}
+                    <div class="absolute bottom-full left-0 right-0 z-30 mb-2 hidden rounded-2xl border border-slate-200 bg-white shadow-lg" data-attach-menu="1">
+                        <div class="p-2 space-y-0.5">
+                            <button type="button" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition" data-attach-photo>
+                                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                                </span>
+                                Foto/Galeri
+                            </button>
+                            <button type="button" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition" data-attach-camera>
+                                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h2.257a2 2 0 0 0 1.743-1.02l.5-.86A1 1 0 0 1 11.866 3h.268a1 1 0 0 1 .866.48l.5.86A2 2 0 0 0 15.243 6H17.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </span>
+                                Kamera
+                            </button>
+                            <button type="button" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition" data-attach-file>
+                                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+                                </span>
+                                Berkas
+                            </button>
+                        </div>
+                    </div>
 
                     <div class="absolute bottom-full left-0 right-0 z-30 mb-2 hidden rounded-2xl border border-slate-200 bg-white shadow-lg" data-mention-menu="1" data-mention-items='@json($mentionSuggestions, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG)'></div>
                     <div class="absolute bottom-full left-0 right-0 z-30 mb-2 hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-lg" data-emoji-panel="1">
@@ -288,6 +331,14 @@
             </form>
         </div>
 
+        {{-- Scroll to bottom button --}}
+        <button type="button" class="fixed z-20 right-4 hidden flex-col items-center gap-1.5 rounded-full bg-transparent text-slate-500 transition" style="bottom: calc(env(safe-area-inset-bottom) + 78px);" data-scroll-bottom="1" aria-label="Lewati ke pesan terbaru">
+            <span class="hidden min-w-10 rounded-full bg-[#2b6cb0] px-2 py-0.5 text-center text-[11px] font-semibold text-white shadow" data-scroll-bottom-count="1"></span>
+            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md hover:bg-slate-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+            </span>
+        </button>
+
         <div class="pointer-events-none fixed inset-0 z-40 bg-slate-900/0 opacity-0 transition duration-300" data-settings-overlay="1"></div>
 
         <aside
@@ -320,8 +371,8 @@
                     <span>Persona AI</span>
                     <span aria-hidden="true">></span>
                 </a>
-                <a href="{{ route('settings.seats', $group) }}" class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
-                    <span>Manajemen Seat</span>
+                <a href="{{ route('settings.transactions', $group) }}" class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                    <span>Riwayat Transaksi</span>
                     <span aria-hidden="true">></span>
                 </a>
             </div>

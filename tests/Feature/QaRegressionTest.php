@@ -47,30 +47,4 @@ class QaRegressionTest extends TestCase
         ], false);
     }
 
-    public function test_whitebox_non_owner_cannot_open_add_seat_payment_history(): void
-    {
-        $owner = User::factory()->create();
-        $intruder = User::factory()->create();
-
-        $group = Group::query()->create([
-            'name' => 'QA Group',
-            'description' => 'Regression',
-            'owner_id' => $owner->id,
-            'password_hash' => Hash::make('1234'),
-            'approval_enabled' => false,
-        ]);
-
-        Subscription::query()->create([
-            'group_id' => $group->id,
-            'plan_name' => 'normchat-pro',
-            'status' => 'active',
-            'billing_cycle' => 'monthly',
-            'main_price' => 15000,
-            'included_seats' => 2,
-        ]);
-
-        $this->actingAs($intruder)
-            ->get(route('subscription.add-seat.payments', $group))
-            ->assertForbidden();
-    }
 }

@@ -110,11 +110,11 @@
                         'accent' => 'indigo',
                     ],
                     [
-                        'canManage' => $canManageBilling,
-                        'href' => route('settings.seats', $group),
-                        'title' => 'Seat Management',
-                        'subtitle' => 'Kelola kapasitas anggota grup',
-                        'icon' => '<circle cx="9" cy="8" r="3.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M2 20c.9-3 3.6-5 7-5s6.1 2 7 5M17 4a3.5 3.5 0 1 1 0 7M22 20c-.5-2-1.8-3.5-3.5-4.3"/>',
+                        'canManage' => true,
+                        'href' => route('settings.transactions', $group),
+                        'title' => 'Riwayat Transaksi',
+                        'subtitle' => 'Patungan, top-up, & kontribusi DU',
+                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.66 0-3 1-3 2.5S10.34 13 12 13s3 1 3 2.5S13.66 18 12 18m0-10V6m0 12v2M4 12h16"/>',
                         'accent' => 'violet',
                     ],
                     [
