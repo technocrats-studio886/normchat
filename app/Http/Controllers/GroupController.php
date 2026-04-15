@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\GroupMembershipChanged;
 use App\Models\AuditLog;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\GroupTokenContribution;
+use App\Models\PendingPayment;
 use App\Models\Role;
 use App\Models\Subscription;
 use App\Services\InterdotzService;
@@ -15,11 +17,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class GroupController extends Controller
 {
-    private const INCLUDED_CREDITS = 12;
     private const TOKENS_PER_CREDIT = 2_500;
     private const DEFAULT_AI_PROVIDER = 'openai';
     private const DEFAULT_AI_MODEL = 'gpt-5';
@@ -53,10 +55,12 @@ class GroupController extends Controller
     public function create(): View|RedirectResponse
     {
         $duPrice = (int) config('normchat.du_group_creation', 175);
+        $idrPrice = (int) config('normchat.idr_group_creation', 35000);
 
         return view('groups.create', [
             'duPrice' => $duPrice,
-            'includedCredits' => self::INCLUDED_CREDITS,
+            'idrPrice' => $idrPrice,
+            'includedCredits' => $this->groupCreationCredits(),
         ]);
     }
 
@@ -67,10 +71,12 @@ class GroupController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'password' => ['required', 'string', 'min:4', 'max:100'],
             'approval_enabled' => ['nullable'],
+            'payment_method' => ['nullable', 'in:du,midtrans'],
         ]);
 
         $user = Auth::user();
         $duPrice = (int) config('normchat.du_group_creation', 175);
+        $paymentMethod = (string) ($validated['payment_method'] ?? 'du');
 
         // Superadmin bypass — free group creation
         if ($this->isBypassPayment()) {
@@ -101,6 +107,10 @@ class GroupController extends Controller
             'ai_model' => self::DEFAULT_AI_MODEL,
             'status' => 'pending_payment',
         ]);
+
+        if ($paymentMethod === 'midtrans') {
+            return $this->initiateGroupMidtransPayment($request, $group, $user);
+        }
 
         // Charge via Interdotz DU
         $interdotz = app(InterdotzService::class);
@@ -169,6 +179,54 @@ class GroupController extends Controller
      */
     public function paymentCallback(Request $request): RedirectResponse
     {
+        $orderId = (string) $request->query('order', '');
+        if ($orderId !== '') {
+            $pendingPayment = PendingPayment::query()
+                ->where('order_id', $orderId)
+                ->where('user_id', (int) Auth::id())
+                ->first();
+
+            if (! $pendingPayment) {
+                return redirect()->route('groups.index')
+                    ->with('info', 'Referensi pembayaran tidak ditemukan.');
+            }
+
+            if ($pendingPayment->status === 'paid') {
+                $meta = (array) ($pendingPayment->metadata_json ?? []);
+                $action = (string) ($meta['action'] ?? '');
+                $group = $pendingPayment->group;
+
+                if (($action === 'group_create_midtrans' || $action === 'group_join_midtrans') && $group) {
+                    return redirect()->route('chat.show', $group)
+                        ->with('success', 'Pembayaran berhasil dikonfirmasi.');
+                }
+
+                if ($action === 'topup_midtrans') {
+                    session(['token_purchase' => [
+                        'group_name' => (string) ($meta['group_name'] ?? ($group?->name ?? 'Grup')),
+                        'normkredits' => (int) ($meta['normkredits'] ?? 0),
+                        'tokens' => (int) ($meta['token_amount'] ?? 0),
+                        'paid_amount' => (int) $pendingPayment->expected_amount,
+                        'payment_method' => 'midtrans',
+                        'payment_unit' => 'IDR',
+                    ]]);
+
+                    return redirect()->route('subscription.tokens.buy.success')
+                        ->with('success', 'Top-up berhasil dikonfirmasi.');
+                }
+
+                return redirect()->route('groups.index')->with('success', 'Pembayaran berhasil dikonfirmasi.');
+            }
+
+            if (in_array($pendingPayment->status, ['failed', 'expired'], true)) {
+                return redirect()->route('groups.index')
+                    ->with('info', 'Pembayaran gagal atau kedaluwarsa. Silakan coba kembali.');
+            }
+
+            return redirect()->route('groups.index')
+                ->with('info', 'Pembayaran sedang diproses. Mohon tunggu beberapa saat.');
+        }
+
         $groupId = session('pending_group_id');
         if (! $groupId) {
             return redirect()->route('groups.index')->with('info', 'Menunggu konfirmasi pembayaran...');
@@ -209,11 +267,13 @@ class GroupController extends Controller
         }
 
         $duPatungan = (int) config('normchat.du_patungan', 25);
+        $idrPatungan = (int) config('normchat.idr_patungan_min', 5000);
 
         return view('groups.join', [
             'group' => $group,
             'alreadyMember' => false,
             'duPatungan' => $duPatungan,
+            'idrPatungan' => $idrPatungan,
         ]);
     }
 
@@ -239,7 +299,10 @@ class GroupController extends Controller
 
         $request->validate([
             'password' => 'required|string',
+            'payment_method' => 'nullable|in:du,midtrans',
         ]);
+
+        $paymentMethod = (string) $request->input('payment_method', 'du');
 
         if (! Hash::check($request->input('password'), $group->password_hash)) {
             return back()->withErrors(['password' => 'Password grup salah.'])->withInput();
@@ -247,6 +310,10 @@ class GroupController extends Controller
 
         $user = Auth::user();
         $duPatungan = (int) config('normchat.du_patungan', 25);
+
+        if ($paymentMethod === 'midtrans') {
+            return $this->initiateJoinMidtransPayment($request, $group, $user, $shareId);
+        }
 
         // Superadmin bypass
         if ($this->isBypassPayment()) {
@@ -327,6 +394,10 @@ class GroupController extends Controller
             return back()->withErrors(['member' => 'Owner tidak dapat diubah rolenya dari menu ini.']);
         }
 
+        if ((int) $member->user_id === (int) Auth::id()) {
+            return back()->withErrors(['member' => 'Kamu tidak dapat mengubah role akun sendiri dari menu ini.']);
+        }
+
         $validated = $request->validate([
             'role' => ['required', 'in:admin,member'],
         ]);
@@ -351,6 +422,13 @@ class GroupController extends Controller
             'created_at' => now(),
         ]);
 
+        event(new GroupMembershipChanged(
+            (int) $group->id,
+            (int) $member->user_id,
+            'role_changed',
+            (string) ($targetRole->key ?? $validated['role'])
+        ));
+
         return back()->with('success', 'Role member berhasil diperbarui.');
     }
 
@@ -366,6 +444,12 @@ class GroupController extends Controller
             return back()->withErrors(['member' => 'Owner tidak dapat dihapus dari group.']);
         }
 
+        if ((int) $member->user_id === (int) Auth::id()) {
+            return back()->withErrors(['member' => 'Kamu tidak dapat menghapus akun sendiri dari group.']);
+        }
+
+        $removedUserId = (int) $member->user_id;
+
         $member->delete();
 
         AuditLog::create([
@@ -377,12 +461,47 @@ class GroupController extends Controller
             'created_at' => now(),
         ]);
 
+        event(new GroupMembershipChanged(
+            (int) $group->id,
+            $removedUserId,
+            'removed',
+            null
+        ));
+
         return back()->with('success', 'Member berhasil dihapus dari group.');
+    }
+
+    public function destroy(Group $group): RedirectResponse
+    {
+        $userId = (int) Auth::id();
+        abort_unless($userId > 0 && (int) $group->owner_id === $userId, 403);
+
+        AuditLog::create([
+            'group_id' => $group->id,
+            'actor_id' => $userId,
+            'action' => 'group.deleted',
+            'target_type' => Group::class,
+            'target_id' => $group->id,
+            'metadata_json' => [
+                'name' => (string) $group->name,
+            ],
+            'created_at' => now(),
+        ]);
+
+        $group->delete();
+
+        return redirect()->route('groups.index')->with('success', 'Grup berhasil dihapus.');
     }
 
     // ── Private helpers ─────────────────────────────────────
 
-    public function activateGroup(Group $group, $user, int $duPaid = 0, ?string $transactionId = null): void
+    public function activateGroup(
+        Group $group,
+        $user,
+        int $paidAmount = 0,
+        ?string $transactionId = null,
+        string $paymentMethod = 'du'
+    ): void
     {
         $group->update(['status' => 'active']);
 
@@ -397,11 +516,12 @@ class GroupController extends Controller
             'plan_name' => 'normchat-pro',
             'status' => 'active',
             'billing_cycle' => 'monthly',
-            'main_price' => $duPaid,
+            'main_price' => $paidAmount,
             'included_seats' => 2,
         ]);
 
-        $includedTokens = self::INCLUDED_CREDITS * self::TOKENS_PER_CREDIT;
+        $includedCredits = $this->groupCreationCredits();
+        $includedTokens = $includedCredits * self::TOKENS_PER_CREDIT;
         GroupToken::create([
             'group_id' => $group->id,
             'total_tokens' => $includedTokens,
@@ -409,12 +529,14 @@ class GroupController extends Controller
             'remaining_tokens' => $includedTokens,
         ]);
 
+        $source = $paymentMethod === 'midtrans' ? 'group_creation_midtrans' : 'group_creation';
+
         GroupTokenContribution::create([
             'group_id' => $group->id,
             'user_id' => $user->id,
-            'source' => 'group_creation',
+            'source' => $source,
             'token_amount' => $includedTokens,
-            'price_paid' => $duPaid,
+            'price_paid' => $paidAmount,
             'payment_reference' => $transactionId,
         ]);
 
@@ -425,15 +547,22 @@ class GroupController extends Controller
             'target_type' => Group::class,
             'target_id' => $group->id,
             'metadata_json' => [
-                'du_paid' => $duPaid,
+                'paid_amount' => $paidAmount,
+                'payment_method' => $paymentMethod,
                 'transaction_id' => $transactionId,
-                'normkredits' => self::INCLUDED_CREDITS,
+                'normkredits' => $includedCredits,
             ],
             'created_at' => now(),
         ]);
     }
 
-    public function activateJoin(Group $group, $user, int $duPaid = 0, ?string $transactionId = null): void
+    public function activateJoin(
+        Group $group,
+        $user,
+        int $paidAmount = 0,
+        ?string $transactionId = null,
+        string $paymentMethod = 'du'
+    ): void
     {
         $memberRoleId = $this->ensureRoleId('member', 'Member', 'Group member');
 
@@ -448,28 +577,25 @@ class GroupController extends Controller
             $subscription->save();
         }
 
-        // Convert DU paid into normkredit tokens using topup rate.
-        $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
-        $tokensFromDu = 0;
-        if ($duPaid > 0 && $duPer12Nk > 0) {
-            $normkredits = (int) floor(($duPaid * 12) / $duPer12Nk);
-            $tokensFromDu = $normkredits * self::TOKENS_PER_CREDIT;
-        }
+        $joinCredits = $this->joinCredits();
+        $tokensFromJoin = $joinCredits * self::TOKENS_PER_CREDIT;
 
-        if ($tokensFromDu > 0) {
+        if ($tokensFromJoin > 0) {
             $groupToken = GroupToken::firstOrCreate(
                 ['group_id' => $group->id],
                 ['total_tokens' => 0, 'used_tokens' => 0, 'remaining_tokens' => 0]
             );
-            $groupToken->addTokens($tokensFromDu);
+            $groupToken->addTokens($tokensFromJoin);
         }
+
+        $source = $paymentMethod === 'midtrans' ? 'patungan_midtrans' : 'patungan';
 
         GroupTokenContribution::create([
             'group_id' => $group->id,
             'user_id' => $user->id,
-            'source' => 'patungan',
-            'token_amount' => $tokensFromDu,
-            'price_paid' => $duPaid,
+            'source' => $source,
+            'token_amount' => $tokensFromJoin,
+            'price_paid' => $paidAmount,
             'payment_reference' => $transactionId,
         ]);
 
@@ -480,9 +606,11 @@ class GroupController extends Controller
             'target_type' => Group::class,
             'target_id' => $group->id,
             'metadata_json' => [
-                'du_paid' => $duPaid,
+                'paid_amount' => $paidAmount,
+                'payment_method' => $paymentMethod,
                 'transaction_id' => $transactionId,
                 'patungan' => true,
+                'normkredits' => $joinCredits,
             ],
             'created_at' => now(),
         ]);
@@ -494,5 +622,168 @@ class GroupController extends Controller
             ['key' => $key],
             ['name' => $name, 'description' => $description]
         )->id;
+    }
+
+    private function groupCreationCredits(): int
+    {
+        return max(0, (int) config('normchat.group_creation_credits', 10));
+    }
+
+    private function joinCredits(): int
+    {
+        return max(0, (int) config('normchat.join_credits', 15));
+    }
+
+    private function createUniqueOrderId(string $prefix): string
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $orderId = strtoupper($prefix) . '-' . now()->format('His') . '-' . strtoupper(Str::random(6));
+            if (! PendingPayment::where('order_id', $orderId)->exists()) {
+                return $orderId;
+            }
+        }
+
+        return strtoupper($prefix) . '-' . now()->format('His') . '-' . strtoupper(Str::random(8));
+    }
+
+    private function initiateGroupMidtransPayment(Request $request, Group $group, $user): RedirectResponse
+    {
+        $interdotz = app(InterdotzService::class);
+        $idrPrice = (int) config('normchat.idr_group_creation', 35000);
+
+        if (! $interdotz->isConfigured()) {
+            $group->forceDelete();
+
+            return back()->withErrors(['payment' => 'Sistem pembayaran belum dikonfigurasi.'])->withInput();
+        }
+
+        $ssoToken = $user->getAccessToken();
+        if (! $ssoToken) {
+            $group->forceDelete();
+
+            return back()->withErrors(['payment' => 'Sesi login berakhir. Silakan logout dan login kembali.'])->withInput();
+        }
+
+        $interdotzUserId = (string) ($user->interdotz_id ?: $user->provider_user_id ?: '');
+        $orderId = $this->createUniqueOrderId('NCGRP');
+        $callbackUrl = route('groups.payment.callback', ['order' => $orderId]);
+
+        $payment = $interdotz->createPayment(
+            $ssoToken,
+            $orderId,
+            $idrPrice,
+            'IDR',
+            $callbackUrl,
+            [
+                'name' => (string) $user->name,
+                'email' => (string) $user->email,
+                'phone' => '',
+            ],
+            [[
+                'id' => 'group-' . $group->id,
+                'name' => 'Pembuatan grup ' . $group->name,
+                'price' => $idrPrice,
+                'quantity' => 1,
+            ]],
+            $interdotzUserId
+        );
+
+        $payload = is_array($payment['payload'] ?? null) ? $payment['payload'] : (is_array($payment) ? $payment : []);
+        $redirectUrl = (string) ($payload['redirect_url'] ?? $payload['redirectUrl'] ?? $payload['checkout_url'] ?? $payload['checkoutUrl'] ?? '');
+        $paymentId = (string) ($payload['id'] ?? $payload['payment_id'] ?? '');
+
+        if ($redirectUrl === '') {
+            $group->forceDelete();
+
+            $errorMessage = $interdotz->getLastError() ?? 'Gagal membuat pembayaran Midtrans.';
+
+            return back()->withErrors(['payment' => $errorMessage])->withInput();
+        }
+
+        PendingPayment::create([
+            'user_id' => (int) $user->id,
+            'group_id' => (int) $group->id,
+            'order_id' => $orderId,
+            'payment_type' => 'group_create_midtrans',
+            'expected_amount' => $idrPrice,
+            'status' => 'pending',
+            'metadata_json' => [
+                'action' => 'group_create_midtrans',
+                'group_name' => $group->name,
+                'payment_method' => 'midtrans',
+                'payment_id' => $paymentId,
+            ],
+            'expires_at' => now()->addHour(),
+        ]);
+
+        return redirect()->away($redirectUrl);
+    }
+
+    private function initiateJoinMidtransPayment(Request $request, Group $group, $user, string $shareId): RedirectResponse
+    {
+        $interdotz = app(InterdotzService::class);
+        $idrPatungan = (int) config('normchat.idr_patungan_min', 5000);
+
+        if (! $interdotz->isConfigured()) {
+            return back()->withErrors(['payment' => 'Sistem pembayaran belum dikonfigurasi.']);
+        }
+
+        $ssoToken = $user->getAccessToken();
+        if (! $ssoToken) {
+            return back()->withErrors(['payment' => 'Sesi login berakhir. Silakan logout dan login kembali.']);
+        }
+
+        $interdotzUserId = (string) ($user->interdotz_id ?: $user->provider_user_id ?: '');
+        $orderId = $this->createUniqueOrderId('NCJOIN');
+        $callbackUrl = route('groups.payment.callback', ['order' => $orderId]);
+
+        $payment = $interdotz->createPayment(
+            $ssoToken,
+            $orderId,
+            $idrPatungan,
+            'IDR',
+            $callbackUrl,
+            [
+                'name' => (string) $user->name,
+                'email' => (string) $user->email,
+                'phone' => '',
+            ],
+            [[
+                'id' => 'join-' . $group->id,
+                'name' => 'Donasi bergabung grup ' . $group->name,
+                'price' => $idrPatungan,
+                'quantity' => 1,
+            ]],
+            $interdotzUserId
+        );
+
+        $payload = is_array($payment['payload'] ?? null) ? $payment['payload'] : (is_array($payment) ? $payment : []);
+        $redirectUrl = (string) ($payload['redirect_url'] ?? $payload['redirectUrl'] ?? $payload['checkout_url'] ?? $payload['checkoutUrl'] ?? '');
+        $paymentId = (string) ($payload['id'] ?? $payload['payment_id'] ?? '');
+
+        if ($redirectUrl === '') {
+            $errorMessage = $interdotz->getLastError() ?? 'Gagal membuat pembayaran Midtrans.';
+
+            return back()->withErrors(['payment' => $errorMessage]);
+        }
+
+        PendingPayment::create([
+            'user_id' => (int) $user->id,
+            'group_id' => (int) $group->id,
+            'order_id' => $orderId,
+            'payment_type' => 'group_join_midtrans',
+            'expected_amount' => $idrPatungan,
+            'status' => 'pending',
+            'metadata_json' => [
+                'action' => 'group_join_midtrans',
+                'group_name' => $group->name,
+                'share_id' => $shareId,
+                'payment_method' => 'midtrans',
+                'payment_id' => $paymentId,
+            ],
+            'expires_at' => now()->addHour(),
+        ]);
+
+        return redirect()->away($redirectUrl);
     }
 }

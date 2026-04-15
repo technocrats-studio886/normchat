@@ -49,4 +49,9 @@ class Message extends Model
     {
         return $this->hasMany(self::class, 'reply_to_message_id');
     }
+
+    public function pollVotes(): HasMany
+    {
+        return $this->hasMany(PollVote::class, 'poll_message_id');
+    }
 }

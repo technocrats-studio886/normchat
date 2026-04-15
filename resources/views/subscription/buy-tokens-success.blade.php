@@ -23,10 +23,16 @@
                         <span class="text-emerald-700">Normkredit</span>
                         <span class="font-bold text-emerald-900">{{ $purchase['normkredits'] }}</span>
                     </div>
-                    @if(($purchase['du_paid'] ?? 0) > 0)
+                    @if(($purchase['paid_amount'] ?? 0) > 0)
                     <div class="flex justify-between">
-                        <span class="text-emerald-700">DU dibayar</span>
-                        <span class="font-bold text-emerald-900">{{ $purchase['du_paid'] }} DU</span>
+                        <span class="text-emerald-700">Dibayar</span>
+                        <span class="font-bold text-emerald-900">
+                            @if(($purchase['payment_unit'] ?? 'DU') === 'IDR')
+                                Rp{{ number_format((int) $purchase['paid_amount'], 0, ',', '.') }}
+                            @else
+                                {{ (int) $purchase['paid_amount'] }} DU
+                            @endif
+                        </span>
                     </div>
                     @endif
                 </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\MessageSent;
 use App\Events\MessageDeleted;
 use App\Events\MessageUpdated;
+use App\Events\PollVoted;
 use App\Events\UserMentioned;
 use App\Models\AuditLog;
 use App\Models\ChatMessageQueue;
@@ -13,6 +14,7 @@ use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\MessageVersion;
+use App\Models\PollVote;
 use App\Jobs\ProcessGroupChatQueueJob;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
@@ -66,7 +68,7 @@ class ChatController extends Controller
 
         session(['last_chat_group_id' => $group->id]);
 
-        $group->load(['owner', 'members.user', 'groupToken']);
+        $group->load(['owner', 'members.user', 'members.role', 'groupToken']);
 
         $messages = Message::query()
             ->where('group_id', $group->id)
@@ -355,11 +357,11 @@ class ChatController extends Controller
         abort_unless((int) $message->group_id === (int) $group->id, 404);
 
         $userId = (int) Auth::id();
-        $isSender = $message->sender_type === 'user' && (int) $message->sender_id === $userId;
         $isModerator = $this->isGroupModerator($group, $userId);
-        abort_unless($isSender || $isModerator, 403);
+        abort_unless($isModerator, 403);
 
         $messageId = (int) $message->id;
+        PollVote::query()->where('poll_message_id', $messageId)->delete();
         $message->delete();
 
         event(new MessageDeleted(
@@ -387,6 +389,236 @@ class ChatController extends Controller
             'ok' => true,
             'message_id' => $messageId,
         ]);
+    }
+
+    public function pollStats(Request $request, Group $group): JsonResponse
+    {
+        $this->authorize('chat', $group);
+
+        $pollMessageIds = collect(explode(',', (string) $request->query('ids', '')))
+            ->map(fn ($id) => (int) trim((string) $id))
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->take(60)
+            ->values()
+            ->all();
+
+        if ($pollMessageIds === []) {
+            return response()->json([
+                'ok' => true,
+                'polls' => [],
+            ]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'polls' => $this->buildPollStatsMap($group, $pollMessageIds, (int) Auth::id()),
+        ]);
+    }
+
+    public function votePoll(Request $request, Group $group, Message $message): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+
+        $validated = $request->validate([
+            'option_number' => ['required', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        $poll = $this->parsePollDefinition((string) ($message->content ?? ''));
+        if (! $poll) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'poll_not_found',
+            ], 422);
+        }
+
+        $optionNumber = (int) $validated['option_number'];
+        $allowedOptions = collect($poll['options'])
+            ->map(fn ($option) => (int) ($option['number'] ?? 0))
+            ->filter(fn ($number) => $number > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (! in_array($optionNumber, $allowedOptions, true)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'poll_option_invalid',
+            ], 422);
+        }
+
+        $userId = (int) Auth::id();
+
+        PollVote::query()->updateOrCreate(
+            [
+                'poll_message_id' => (int) $message->id,
+                'user_id' => $userId,
+            ],
+            [
+                'group_id' => (int) $group->id,
+                'option_number' => $optionNumber,
+                'voted_at' => now(),
+            ]
+        );
+
+        AuditLog::create([
+            'group_id' => $group->id,
+            'actor_id' => $userId,
+            'action' => 'chat.vote_poll',
+            'target_type' => Message::class,
+            'target_id' => $message->id,
+            'metadata_json' => [
+                'option_number' => $optionNumber,
+            ],
+            'created_at' => now(),
+        ]);
+
+        $pollStatsMap = $this->buildPollStatsMap($group, [(int) $message->id], $userId);
+        $pollStats = $pollStatsMap[(string) $message->id] ?? null;
+
+        if (is_array($pollStats)) {
+            event(new PollVoted((int) $group->id, $pollStats));
+        }
+
+        return response()->json([
+            'ok' => true,
+            'poll' => $pollStats,
+        ]);
+    }
+
+    private function buildPollStatsMap(Group $group, array $pollMessageIds, int $viewerUserId): array
+    {
+        if ($pollMessageIds === []) {
+            return [];
+        }
+
+        $pollMessages = Message::query()
+            ->where('group_id', $group->id)
+            ->whereIn('id', $pollMessageIds)
+            ->get(['id', 'content']);
+
+        $pollDefinitions = [];
+        foreach ($pollMessages as $pollMessage) {
+            $poll = $this->parsePollDefinition((string) ($pollMessage->content ?? ''));
+            if (! $poll) {
+                continue;
+            }
+
+            $pollDefinitions[(int) $pollMessage->id] = $poll;
+        }
+
+        $validPollIds = array_keys($pollDefinitions);
+        if ($validPollIds === []) {
+            return [];
+        }
+
+        $countsByPoll = [];
+        PollVote::query()
+            ->selectRaw('poll_message_id, option_number, COUNT(*) as votes_total')
+            ->whereIn('poll_message_id', $validPollIds)
+            ->groupBy('poll_message_id', 'option_number')
+            ->get()
+            ->each(function (PollVote $row) use (&$countsByPoll): void {
+                $pollId = (int) $row->poll_message_id;
+                $optionNumber = (int) $row->option_number;
+                $voteTotal = (int) ($row->getAttribute('votes_total') ?? 0);
+
+                if (! isset($countsByPoll[$pollId])) {
+                    $countsByPoll[$pollId] = [];
+                }
+
+                $countsByPoll[$pollId][$optionNumber] = $voteTotal;
+            });
+
+        $viewerVotes = [];
+        if ($viewerUserId > 0) {
+            PollVote::query()
+                ->where('user_id', $viewerUserId)
+                ->whereIn('poll_message_id', $validPollIds)
+                ->get(['poll_message_id', 'option_number'])
+                ->each(function (PollVote $vote) use (&$viewerVotes): void {
+                    $viewerVotes[(int) $vote->poll_message_id] = (int) $vote->option_number;
+                });
+        }
+
+        $stats = [];
+        foreach ($validPollIds as $pollId) {
+            $definition = $pollDefinitions[$pollId];
+            $optionCounts = [];
+            $totalVotes = 0;
+
+            foreach ($definition['options'] as $option) {
+                $number = (int) ($option['number'] ?? 0);
+                if ($number <= 0) {
+                    continue;
+                }
+
+                $count = (int) ($countsByPoll[$pollId][$number] ?? 0);
+                $optionCounts[(string) $number] = $count;
+                $totalVotes += $count;
+            }
+
+            $stats[(string) $pollId] = [
+                'poll_id' => (int) $pollId,
+                'question' => (string) ($definition['question'] ?? ''),
+                'options' => $definition['options'],
+                'option_counts' => $optionCounts,
+                'total_votes' => $totalVotes,
+                'my_vote_option' => (int) ($viewerVotes[$pollId] ?? 0),
+            ];
+        }
+
+        return $stats;
+    }
+
+    private function parsePollDefinition(?string $content): ?array
+    {
+        $normalized = trim(str_replace(["\r\n", "\r"], "\n", (string) ($content ?? '')));
+        if ($normalized === '' || ! preg_match('/^📊\s*poll:/iu', $normalized)) {
+            return null;
+        }
+
+        $lines = collect(explode("\n", $normalized))
+            ->map(fn ($line) => trim((string) $line))
+            ->filter(fn ($line) => $line !== '')
+            ->values();
+
+        if ($lines->isEmpty()) {
+            return null;
+        }
+
+        $question = trim((string) preg_replace('/^📊\s*poll:\s*/iu', '', (string) $lines->first()));
+        if ($question === '') {
+            return null;
+        }
+
+        $options = [];
+        foreach ($lines->slice(1) as $line) {
+            if (! preg_match('/^(\d+)[\.)]\s+(.+)$/u', (string) $line, $matches)) {
+                continue;
+            }
+
+            $number = (int) ($matches[1] ?? 0);
+            $label = trim((string) ($matches[2] ?? ''));
+            if ($number <= 0 || $label === '') {
+                continue;
+            }
+
+            $options[] = [
+                'number' => $number,
+                'label' => $label,
+            ];
+        }
+
+        if (count($options) < 2) {
+            return null;
+        }
+
+        return [
+            'question' => $question,
+            'options' => array_values(array_slice($options, 0, 8)),
+        ];
     }
 
     private function dispatchMentionNotifications(Group $group, Message $message, string $content): void
@@ -501,6 +733,12 @@ class ChatController extends Controller
         $disk = Storage::disk($message->attachment_disk);
         $mime = $message->attachment_mime ?: 'application/octet-stream';
         $filename = $message->attachment_original_name ?? basename($message->attachment_path);
+        $isInline = str_starts_with((string) $mime, 'image/')
+            || str_starts_with((string) $mime, 'audio/')
+            || str_starts_with((string) $mime, 'video/')
+            || in_array((string) $message->message_type, ['image', 'voice', 'video'], true)
+            || in_array((string) $mime, ['application/pdf'], true);
+        $disposition = $isInline ? 'inline' : 'attachment';
 
         return response()->stream(function () use ($disk, $message) {
             $stream = $disk->readStream($message->attachment_path);
@@ -510,7 +748,7 @@ class ChatController extends Controller
             }
         }, 200, [
             'Content-Type' => $mime,
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Content-Disposition' => $disposition . '; filename="' . $filename . '"',
             'Cache-Control' => 'private, max-age=3600',
         ]);
     }
@@ -532,13 +770,16 @@ class ChatController extends Controller
             return 'voice';
         }
 
-        // Some desktop/mobile browsers return video/webm for microphone recordings.
-        if ($extension === 'webm' && (str_starts_with($mime, 'video/') || str_starts_with($clientMime, 'video/'))) {
-            return 'voice';
+        if (str_starts_with($mime, 'video/') || str_starts_with($clientMime, 'video/')) {
+            return 'video';
         }
 
         if (in_array($extension, ['mp3', 'wav', 'ogg', 'aac', 'm4a'], true)) {
             return 'voice';
+        }
+
+        if (in_array($extension, ['mp4', 'mov', 'm4v', 'webm', '3gp', 'mkv'], true)) {
+            return 'video';
         }
 
         return 'file';
@@ -558,6 +799,21 @@ class ChatController extends Controller
                 'aac' => 'audio/aac',
                 'm4a' => 'audio/m4a',
                 default => 'audio/webm',
+            };
+        }
+
+        if ($messageType === 'video') {
+            if ($clientMime !== '' && str_starts_with($clientMime, 'video/')) {
+                return $clientMime;
+            }
+
+            return match ($extension) {
+                'mov' => 'video/quicktime',
+                'm4v' => 'video/x-m4v',
+                'webm' => 'video/webm',
+                '3gp' => 'video/3gpp',
+                'mkv' => 'video/x-matroska',
+                default => 'video/mp4',
             };
         }
 
@@ -615,6 +871,7 @@ class ChatController extends Controller
                 : null,
             'attachment_mime' => $message->attachment_mime,
             'attachment_original_name' => $message->attachment_original_name,
+            'attachment_size' => $message->attachment_size,
             'created_at' => optional($message->created_at)->toIso8601String(),
             'is_edited' => $isEdited,
             'edited_at' => $isEdited ? optional($message->updated_at)->toIso8601String() : null,

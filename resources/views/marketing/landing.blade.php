@@ -79,7 +79,7 @@
                             Fokus di satu ruang kerja, jadi diskusi tidak tercecer ke banyak tempat.
                         </div>
                         <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                            Owner punya kontrol penuh atas role, seat, akses, dan histori.
+                            Owner punya kontrol penuh atas role, akses, dan histori.
                         </div>
                         <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
                             AI hadir saat dibutuhkan: untuk ringkasan, drafting, dan respons cepat.
@@ -122,7 +122,7 @@
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Pricing Overview</p>
                         <h2 class="mt-3 font-display text-3xl font-extrabold text-white">Normchat Pro</h2>
                         <p class="mt-2 text-sm text-slate-200">
-                            Satu paket untuk akses penuh fitur owner, AI, seat management, dan export histori.
+                            Satu paket untuk akses penuh fitur owner, AI, dan export histori.
                         </p>
                     </div>
                     <div class="rounded-2xl border border-white/15 bg-white/10 p-6">

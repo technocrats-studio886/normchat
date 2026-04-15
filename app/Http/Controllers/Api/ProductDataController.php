@@ -106,6 +106,10 @@ class ProductDataController extends Controller
     private function getTopupPackages(): array
     {
         $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
+        $idr12 = (int) config('normchat.idr_topup_12nk', 35000);
+        $idr24 = (int) config('normchat.idr_topup_24nk', 70000);
+        $idr48 = (int) config('normchat.idr_topup_48nk', 140000);
+        $idr100 = (int) config('normchat.idr_topup_100nk', 280000);
 
         return [
             [
@@ -113,6 +117,7 @@ class ProductDataController extends Controller
                 'name' => '12 Normkredit',
                 'normkredits' => 12,
                 'du_price' => $duPer12Nk,
+                'idr_price' => $idr12,
                 'description' => '12 normkredit',
             ],
             [
@@ -120,6 +125,7 @@ class ProductDataController extends Controller
                 'name' => '24 Normkredit',
                 'normkredits' => 24,
                 'du_price' => $duPer12Nk * 2,
+                'idr_price' => $idr24,
                 'description' => '24 normkredit',
             ],
             [
@@ -127,6 +133,7 @@ class ProductDataController extends Controller
                 'name' => '48 Normkredit',
                 'normkredits' => 48,
                 'du_price' => $duPer12Nk * 4,
+                'idr_price' => $idr48,
                 'description' => '48 normkredit',
             ],
             [
@@ -134,6 +141,7 @@ class ProductDataController extends Controller
                 'name' => '100 Normkredit',
                 'normkredits' => 100,
                 'du_price' => (int) ceil(($duPer12Nk / 12) * 100),
+                'idr_price' => $idr100,
                 'description' => '100 normkredit',
             ],
         ];

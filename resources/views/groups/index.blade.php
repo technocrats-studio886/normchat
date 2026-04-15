@@ -55,6 +55,14 @@
             <a href="{{ route('groups.create') }}" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700">+ Buat baru</a>
         </div>
 
+        {{-- Group search --}}
+        @if(count($groups) > 0)
+            <div class="mt-2 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
+                <input type="text" placeholder="Cari grup..." class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" data-group-search-input="1" autocomplete="off" />
+            </div>
+        @endif
+
         {{-- Group list --}}
         <div class="mt-2 space-y-2.5">
             @forelse ($groups as $group)
@@ -64,7 +72,7 @@
                     $memberCount = $activeMembers->count() + ($ownerInMembers ? 0 : 1);
                     $initial = strtoupper(substr($group->name, 0, 1));
                 @endphp
-                <div class="card-soft overflow-hidden p-0">
+                <div class="card-soft overflow-hidden p-0" data-group-card="1" data-group-search="{{ $group->name }} {{ $group->share_id }}">
                     <a href="{{ route('chat.show', $group) }}" class="flex items-center gap-3 px-4 py-3 transition active:bg-slate-50">
                         <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style="background: var(--nc-primary);">
                             {{ $initial }}
@@ -103,6 +111,9 @@
                     <p class="mt-1 text-xs text-slate-500">Buat grup pertamamu untuk memulai.</p>
                 </div>
             @endforelse
+            <div class="hidden rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-500" data-group-search-empty="1">
+                Tidak ada grup yang cocok dengan pencarian.
+            </div>
         </div>
 
         {{-- Create CTA --}}

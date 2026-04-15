@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Settings - '.$group->name, 'group' => $group])
+@extends('layouts.app', ['title' => 'Group Setting - '.$group->name, 'group' => $group])
 
 @section('content')
     <section class="page-shell">
@@ -8,42 +8,45 @@
             $canManageAiPersona = $canManageAiPersona ?? false;
             $canExportChat = $canExportChat ?? false;
             $canCreateBackup = $canCreateBackup ?? false;
+            $canManageMembers = $canManageMembers ?? false;
             $isReadOnly = ! $canEditProfile;
             $gt = $group->groupToken;
             $credits = $gt ? $gt->credits : 0;
             $groupInitial = strtoupper(substr($group->name, 0, 1));
         @endphp
 
-        {{-- Header --}}
-        <div class="mb-4 flex items-center gap-3">
-            <a href="{{ route('chat.show', $group) }}" class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50" aria-label="Kembali">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 19-7-7 7-7"/></svg>
-            </a>
-            <div>
-                <p class="text-xs font-medium text-slate-500">Group Settings</p>
-                <h1 class="page-title text-xl">{{ $group->name }}</h1>
-            </div>
-        </div>
-
-        {{-- Hero group card --}}
-        <div class="card-glow">
-            <div class="flex items-center gap-3">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-xl font-extrabold backdrop-blur">
-                    {{ $groupInitial }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    <p class="truncate font-display text-lg font-extrabold">{{ $group->name }}</p>
-                    <p class="mt-0.5 text-[11px] text-white/80">ID: <span class="font-mono font-bold">{{ $group->share_id }}</span></p>
-                </div>
-            </div>
-            <div class="mt-4 flex items-center justify-between">
+        <div class="sticky top-0 z-20 -mx-4 mb-4 bg-[var(--nc-bg)] px-4 pb-3 pt-1">
+            {{-- Header --}}
+            <div class="mb-3 flex items-center gap-3">
+                <a href="{{ route('chat.show', $group) }}" class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50" aria-label="Kembali">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 19-7-7 7-7"/></svg>
+                </a>
                 <div>
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-white/70">Normkredit</p>
-                    <p class="font-display text-2xl font-extrabold">{{ number_format($credits, 1) }}</p>
+                    <p class="text-xs font-medium text-slate-500">Group Setting</p>
+                    <h1 class="page-title text-xl">{{ $group->name }}</h1>
                 </div>
-                @if($canManageBilling)
-                    <a href="{{ route('subscription.tokens.buy') }}" class="rounded-2xl bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25">Top-up →</a>
-                @endif
+            </div>
+
+            {{-- Hero group card --}}
+            <div class="card-glow">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-xl font-extrabold backdrop-blur">
+                        {{ $groupInitial }}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate font-display text-lg font-extrabold">{{ $group->name }}</p>
+                        <p class="mt-0.5 text-[11px] text-white/80">ID: <span class="font-mono font-bold">{{ $group->share_id }}</span></p>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-white/70">Normkredit</p>
+                        <p class="font-display text-2xl font-extrabold">{{ number_format($credits, 1) }}</p>
+                    </div>
+                    @if($canManageBilling)
+                        <a href="{{ route('subscription.tokens.buy', ['group' => $group->id]) }}" class="rounded-2xl bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25">Top-up →</a>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -96,97 +99,232 @@
             @endif
         </form>
 
-        {{-- Quick nav cards --}}
-        <h2 class="section-title mt-6">Manajemen</h2>
-        <div class="space-y-2.5">
-            @php
-                $navItems = [
-                    [
-                        'canManage' => $canManageBilling,
-                        'href' => route('settings.history', $group),
-                        'title' => 'History & Export',
-                        'subtitle' => 'Backup, export PDF/DOCX',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/>',
-                        'accent' => 'indigo',
-                    ],
-                    [
-                        'canManage' => true,
-                        'href' => route('settings.transactions', $group),
-                        'title' => 'Riwayat Transaksi',
-                        'subtitle' => 'Patungan, top-up, & kontribusi DU',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.66 0-3 1-3 2.5S10.34 13 12 13s3 1 3 2.5S13.66 18 12 18m0-10V6m0 12v2M4 12h16"/>',
-                        'accent' => 'violet',
-                    ],
-                    [
-                        'canManage' => $canManageAiPersona,
-                        'href' => route('settings.ai.persona', $group),
-                        'title' => 'AI Persona Editor',
-                        'subtitle' => 'Atur gaya bicara NormAI',
-                        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 2 9 6H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-5l-3-4Z"/><circle cx="12" cy="13" r="3"/>',
-                        'accent' => 'emerald',
-                    ],
-                ];
-                $accentClasses = [
-                    'indigo' => 'bg-indigo-50 text-indigo-600',
-                    'violet' => 'bg-violet-50 text-violet-600',
-                    'emerald' => 'bg-emerald-50 text-emerald-600',
-                ];
-            @endphp
-            @foreach($navItems as $item)
-                <a href="{{ $item['href'] }}" class="card-soft flex items-center gap-3 transition active:scale-[0.98]">
-                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl {{ $accentClasses[$item['accent']] }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">{!! $item['icon'] !!}</svg>
+        <h2 class="section-title mt-6">User Management</h2>
+        <div class="card-soft space-y-2.5">
+            @if(($members ?? collect())->isEmpty())
+                <p class="rounded-xl bg-slate-50 px-3 py-3 text-center text-xs text-slate-500">Belum ada anggota aktif.</p>
+            @else
+                @foreach($members as $member)
+                    @php
+                        $memberUser = $member->user;
+                        $roleKey = $member->role->key ?? 'member';
+                        $isOwnerMember = (int) ($member->user_id ?? 0) === (int) $group->owner_id;
+                        $isSelfMember = (int) ($member->user_id ?? 0) === (int) auth()->id();
+                    @endphp
+                    <div class="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-bold text-slate-800">{{ $memberUser?->name ?? 'User' }}</p>
+                                <p class="mt-0.5 text-[11px] text-slate-500">
+                                    @if($isOwnerMember)
+                                        Pemilik Grup
+                                    @elseif($roleKey === 'admin')
+                                        Admin
+                                    @else
+                                        Member
+                                    @endif
+                                    @if($isSelfMember)
+                                        • Kamu
+                                    @endif
+                                </p>
+                            </div>
+
+                            @if($isOwnerMember)
+                                <span class="chip-indigo">Owner</span>
+                            @elseif(! $canManageMembers)
+                                <span class="chip-slate">Read-only</span>
+                            @elseif($isSelfMember)
+                                <span class="chip-slate">Akun kamu</span>
+                            @else
+                                <div class="flex items-center gap-2">
+                                    <form method="POST" action="{{ route('groups.members.promote', ['group' => $group, 'member' => $member]) }}" class="flex items-center gap-1.5">
+                                        @csrf
+                                        <input type="hidden" name="role" value="{{ $roleKey === 'admin' ? 'member' : 'admin' }}" />
+                                        <button type="submit" class="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
+                                            {{ $roleKey === 'admin' ? 'Jadikan Member' : 'Jadikan Admin' }}
+                                        </button>
+                                    </form>
+
+                                    <form method="POST" action="{{ route('groups.members.remove', ['group' => $group, 'member' => $member]) }}" onsubmit="return confirm('Hapus anggota ini dari grup?');">
+                                        @csrf
+                                        <button type="submit" class="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">Keluarkan</button>
+                                    </form>
+                                </div>
+                            @endif
+                        </div>
                     </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-slate-900">{{ $item['title'] }}</p>
-                        <p class="mt-0.5 text-[11px] text-slate-500">{{ $item['subtitle'] }}</p>
-                    </div>
-                    @if($item['canManage'])
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7"/></svg>
-                    @else
-                        <span class="chip-slate">Read-only</span>
-                    @endif
-                </a>
-            @endforeach
+                @endforeach
+            @endif
         </div>
 
-        {{-- Backup & Export actions --}}
-        <h2 class="section-title mt-6">Backup & Export</h2>
-        <div class="card-soft space-y-3">
-            @forelse ($group->backups as $backup)
-                <div class="flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2.5">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-xs font-bold text-slate-800">Snapshot #{{ $backup->id }}</p>
-                        <p class="text-[11px] text-slate-500">{{ $backup->created_at?->diffForHumans() }} · {{ $backup->creator->name ?? 'System' }}</p>
-                    </div>
-                </div>
-            @empty
-                <p class="rounded-2xl bg-slate-50 px-3 py-3 text-center text-[11px] text-slate-500">Belum ada snapshot backup.</p>
-            @endforelse
+        {{-- Media / Tautan / Berkas tabs --}}
+        <h2 class="section-title mt-6">Arsip Grup</h2>
+        <div class="card-soft p-0 overflow-hidden">
+            <div class="flex border-b border-slate-200" role="tablist" data-archive-tabs>
+                <button type="button" role="tab" aria-selected="true" data-archive-tab="media" class="flex-1 px-3 py-2.5 text-xs font-semibold text-slate-700 border-b-2 border-blue-500 bg-blue-50">Media</button>
+                <button type="button" role="tab" aria-selected="false" data-archive-tab="links" class="flex-1 px-3 py-2.5 text-xs font-semibold text-slate-500 border-b-2 border-transparent hover:bg-slate-50">Tautan</button>
+                <button type="button" role="tab" aria-selected="false" data-archive-tab="files" class="flex-1 px-3 py-2.5 text-xs font-semibold text-slate-500 border-b-2 border-transparent hover:bg-slate-50">Berkas</button>
+            </div>
 
-            <form method="POST" action="{{ route('settings.backup', $group) }}">
-                @csrf
-                <button type="submit" class="w-full rounded-2xl py-3 text-sm font-semibold transition {{ $canCreateBackup ? 'bg-slate-900 text-white hover:bg-slate-800' : 'cursor-not-allowed bg-slate-100 text-slate-400' }}" @if(! $canCreateBackup) disabled @endif>
-                    + Buat Backup Snapshot
-                </button>
-            </form>
+            <div class="p-3" data-archive-panel="media">
+                @if($mediaMessages->isEmpty())
+                    <p class="px-1 py-6 text-center text-xs text-slate-400">Belum ada media di grup ini.</p>
+                @else
+                    <div class="grid grid-cols-3 gap-1.5">
+                        @foreach($mediaMessages as $m)
+                            <a href="{{ route('chat.attachment', ['group' => $group->id, 'message' => $m->id]) }}" target="_blank" rel="noopener" class="aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                                <img src="{{ route('chat.attachment', ['group' => $group->id, 'message' => $m->id]) }}" alt="" class="h-full w-full object-cover" loading="lazy" />
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
 
-            <div class="grid grid-cols-2 gap-2.5">
-                <form method="POST" action="{{ route('settings.export', $group) }}">
-                    @csrf
-                    <input type="hidden" name="file_type" value="pdf">
-                    <button type="submit" class="w-full rounded-2xl py-3 text-xs font-bold transition {{ $canExportChat ? 'bg-rose-500 text-white hover:bg-rose-600' : 'cursor-not-allowed bg-slate-100 text-slate-400' }}" @if(! $canExportChat) disabled @endif>Export PDF</button>
-                </form>
-                <form method="POST" action="{{ route('settings.export', $group) }}">
-                    @csrf
-                    <input type="hidden" name="file_type" value="docx">
-                    <button type="submit" class="w-full rounded-2xl border py-3 text-xs font-bold transition {{ $canExportChat ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50' : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400' }}" @if(! $canExportChat) disabled @endif>Export DOCX</button>
-                </form>
+            <div class="hidden p-3" data-archive-panel="links">
+                @if($linkMessages->isEmpty())
+                    <p class="px-1 py-6 text-center text-xs text-slate-400">Belum ada tautan.</p>
+                @else
+                    <ul class="divide-y divide-slate-100">
+                        @foreach($linkMessages as $m)
+                            @foreach($m->extracted_urls as $url)
+                                <li class="py-2.5">
+                                    <a href="{{ $url }}" target="_blank" rel="noopener" class="block truncate text-sm text-blue-600 hover:underline">{{ $url }}</a>
+                                    <p class="mt-0.5 text-[11px] text-slate-400">{{ optional($m->created_at)->format('d M Y H:i') }}</p>
+                                </li>
+                            @endforeach
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+
+            <div class="hidden p-3" data-archive-panel="files">
+                @if($fileMessages->isEmpty())
+                    <p class="px-1 py-6 text-center text-xs text-slate-400">Belum ada berkas.</p>
+                @else
+                    <ul class="divide-y divide-slate-100">
+                        @foreach($fileMessages as $m)
+                            <li class="flex items-center gap-3 py-2.5">
+                                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 2v6h6"/></svg>
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <a href="{{ route('chat.attachment', ['group' => $group->id, 'message' => $m->id]) }}" target="_blank" rel="noopener" class="block truncate text-sm font-medium text-slate-800 hover:underline">{{ $m->attachment_original_name ?? basename($m->attachment_path) }}</a>
+                                    <p class="text-[11px] text-slate-400">{{ optional($m->created_at)->format('d M Y H:i') }}</p>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </div>
         </div>
+
+        <script>
+            (function () {
+                const root = document.querySelector('[data-archive-tabs]');
+                if (!root) return;
+                const tabs = root.querySelectorAll('[data-archive-tab]');
+                const panels = document.querySelectorAll('[data-archive-panel]');
+                tabs.forEach((tab) => {
+                    tab.addEventListener('click', () => {
+                        const target = tab.getAttribute('data-archive-tab');
+                        tabs.forEach((t) => {
+                            const active = t === tab;
+                            t.setAttribute('aria-selected', active ? 'true' : 'false');
+                            t.classList.toggle('text-slate-700', active);
+                            t.classList.toggle('border-blue-500', active);
+                            t.classList.toggle('bg-blue-50', active);
+                            t.classList.toggle('text-slate-500', !active);
+                            t.classList.toggle('border-transparent', !active);
+                        });
+                        panels.forEach((p) => {
+                            p.classList.toggle('hidden', p.getAttribute('data-archive-panel') !== target);
+                        });
+                    });
+                });
+            })();
+        </script>
+
+        <h2 class="section-title mt-6">Ringkasan Grup</h2>
+        <div class="card-soft space-y-2.5">
+            <p class="text-xs text-slate-500">Backup, export, dan AI persona tersedia di menu cepat chat. Theme chat diatur dari halaman ini.</p>
+            <a href="{{ route('settings.transactions', $group) }}" class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                <span>Riwayat Transaksi</span>
+                <span aria-hidden="true">></span>
+            </a>
+        </div>
+
+        <h2 class="section-title mt-6">Theme Chat</h2>
+        <div class="card-soft space-y-3" data-chat-theme-picker="1" data-chat-theme-group-id="{{ (int) $group->id }}">
+            <p class="text-xs text-slate-500">Theme berlaku untuk perangkat ini saat membuka chat grup ini.</p>
+            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4" data-chat-theme-list="1">
+                @foreach ([
+                    ['id' => 'default', 'label' => 'Default', 'color' => '#f5f8ff'],
+                    ['id' => 'midnight', 'label' => 'Midnight', 'color' => '#041126'],
+                    ['id' => 'ocean', 'label' => 'Ocean', 'color' => '#0a4f76'],
+                    ['id' => 'forest', 'label' => 'Forest', 'color' => '#0f5132'],
+                    ['id' => 'sunset', 'label' => 'Sunset', 'color' => '#7c2d12'],
+                    ['id' => 'slate', 'label' => 'Slate', 'color' => '#1e293b'],
+                    ['id' => 'charcoal', 'label' => 'Charcoal', 'color' => '#111827'],
+                ] as $theme)
+                    <button
+                        type="button"
+                        class="overflow-hidden rounded-xl border border-slate-200 text-left text-[11px] font-semibold text-slate-700 transition hover:border-indigo-300"
+                        data-chat-theme-option="{{ $theme['id'] }}"
+                    >
+                        <span class="block h-11 w-full" style="background: {{ $theme['color'] }};"></span>
+                        <span class="block px-2 py-1.5">{{ $theme['label'] }}</span>
+                    </button>
+                @endforeach
+            </div>
+            <p class="text-[11px] text-slate-500" data-chat-theme-status="1">Theme aktif: Default</p>
+            <a href="{{ route('chat.show', $group) }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                Kembali ke chat untuk lihat perubahan
+            </a>
+        </div>
+
+        @if((int) $group->owner_id === (int) auth()->id())
+            <h2 class="section-title mt-6 text-rose-600">Zona Berbahaya</h2>
+            <div class="card-soft space-y-3 border border-rose-200">
+                <p class="text-xs text-slate-600">Menghapus grup akan menghilangkan semua pesan, anggota, dan data terkait secara permanen. Tindakan ini tidak dapat dibatalkan.</p>
+                <button type="button" class="w-full rounded-2xl border border-rose-300 bg-rose-50 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-100" data-open-delete-group="1">
+                    Hapus Grup
+                </button>
+            </div>
+
+            <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-slate-900/45 px-5" data-delete-group-overlay="1">
+                <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+                    <p class="text-sm font-bold text-slate-900">Hapus grup "{{ $group->name }}"?</p>
+                    <p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Semua pesan, anggota, dan backup akan dihapus. Ketik nama grup untuk konfirmasi.</p>
+                    <input type="text" class="input-field mt-3" placeholder="Ketik nama grup persis" data-delete-group-confirm-input="1" autocomplete="off" />
+                    <div class="mt-4 flex items-center justify-end gap-2">
+                        <button type="button" class="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100" data-close-delete-group="1">Batal</button>
+                        <form method="POST" action="{{ route('groups.destroy', $group) }}">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="rounded-xl bg-rose-500 px-3 py-2 text-xs font-bold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50" data-delete-group-submit="1" disabled>Hapus permanen</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                (function () {
+                    const openBtn = document.querySelector('[data-open-delete-group]');
+                    const overlay = document.querySelector('[data-delete-group-overlay]');
+                    const closeBtn = document.querySelector('[data-close-delete-group]');
+                    const input = document.querySelector('[data-delete-group-confirm-input]');
+                    const submit = document.querySelector('[data-delete-group-submit]');
+                    const expected = @json($group->name);
+                    if (!openBtn || !overlay || !closeBtn || !input || !submit) return;
+                    const show = () => { overlay.classList.remove('hidden'); overlay.classList.add('flex'); input.value=''; submit.disabled=true; input.focus(); };
+                    const hide = () => { overlay.classList.add('hidden'); overlay.classList.remove('flex'); };
+                    openBtn.addEventListener('click', show);
+                    closeBtn.addEventListener('click', hide);
+                    overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
+                    input.addEventListener('input', () => { submit.disabled = input.value.trim() !== expected; });
+                })();
+            </script>
+        @endif
 
         <div class="h-6"></div>
     </section>
@@ -204,5 +342,92 @@
                 hide.classList.toggle('hidden', !makeVisible);
             }
         }
+
+        (function () {
+            const picker = document.querySelector('[data-chat-theme-picker="1"]');
+            if (!picker) {
+                return;
+            }
+
+            const groupId = String(picker.getAttribute('data-chat-theme-group-id') || 'global');
+            const storageKey = `nc:chatTheme:${groupId}`;
+            const status = picker.querySelector('[data-chat-theme-status="1"]');
+            const options = Array.from(picker.querySelectorAll('[data-chat-theme-option]'));
+            const names = {
+                default: 'Default',
+                midnight: 'Midnight',
+                ocean: 'Ocean',
+                forest: 'Forest',
+                sunset: 'Sunset',
+                slate: 'Slate',
+                charcoal: 'Charcoal',
+            };
+
+            const setActive = (themeId) => {
+                const selected = names[themeId] ? themeId : 'default';
+                options.forEach((button) => {
+                    const isActive = button.getAttribute('data-chat-theme-option') === selected;
+                    button.classList.toggle('ring-2', isActive);
+                    button.classList.toggle('ring-indigo-500', isActive);
+                    button.classList.toggle('border-indigo-400', isActive);
+                });
+                if (status) {
+                    status.textContent = `Theme aktif: ${names[selected] || 'Default'}`;
+                }
+            };
+
+            let initial = 'default';
+            try {
+                const stored = String(window.localStorage.getItem(storageKey) || '').trim().toLowerCase();
+                if (stored && names[stored]) {
+                    initial = stored;
+                }
+            } catch (_error) {
+                initial = 'default';
+            }
+            setActive(initial);
+
+            options.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const next = String(button.getAttribute('data-chat-theme-option') || 'default').toLowerCase();
+                    try {
+                        if (next === 'default') {
+                            window.localStorage.removeItem(storageKey);
+                        } else {
+                            window.localStorage.setItem(storageKey, next);
+                        }
+                    } catch (_error) {
+                        // Ignore storage failures.
+                    }
+                    setActive(next);
+                });
+            });
+        })();
+
+        (function () {
+            if (!window.Echo) {
+                return;
+            }
+
+            const groupId = Number(@json((int) $group->id));
+            const authUserId = Number(@json((int) auth()->id()));
+            if (!groupId || !authUserId) {
+                return;
+            }
+
+            window.Echo.private(`group.${groupId}`).listen('.group.membership.changed', (payload) => {
+                const targetUserId = Number(payload?.target_user_id || 0);
+                if (!targetUserId || targetUserId !== authUserId) {
+                    return;
+                }
+
+                if (String(payload?.action || '') === 'removed') {
+                    window.location.href = @json(route('groups.index'));
+                    return;
+                }
+
+                window.location.reload();
+            });
+        })();
     </script>
 @endsection

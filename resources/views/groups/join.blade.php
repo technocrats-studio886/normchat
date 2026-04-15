@@ -22,7 +22,7 @@
 
                 <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
                     <p class="text-sm font-semibold text-amber-800">Bergabung ke grup ini membutuhkan patungan</p>
-                    <p class="mt-1 text-xs text-amber-600">Biaya patungan: <strong>{{ $duPatungan }} Dots Units (DU)</strong></p>
+                    <p class="mt-1 text-xs text-amber-600">Anda akan mendapatkan <strong>{{ config('normchat.join_credits', 15) }} Normkredit</strong> setelah pembayaran terkonfirmasi.</p>
                 </div>
 
                 <form method="POST" action="{{ route('groups.join.submit', $group->share_id) }}" class="mt-5 space-y-3">
@@ -53,24 +53,44 @@
                         <p class="text-xs text-rose-600">{{ $errors->first('password') }}</p>
                     @endif
 
+                    <div class="panel-card px-4 py-3">
+                        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Metode Pembayaran</label>
+                        <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="payment_method" value="du" class="mt-0.5 accent-blue-600" {{ old('payment_method', 'du') === 'du' ? 'checked' : '' }}>
+                                <span>
+                                    <span class="block text-sm font-bold text-slate-800">Dots Units (DU)</span>
+                                    <span class="block text-xs text-slate-500">{{ $duPatungan }} DU</span>
+                                </span>
+                            </label>
+                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="payment_method" value="midtrans" class="mt-0.5 accent-blue-600" {{ old('payment_method') === 'midtrans' ? 'checked' : '' }}>
+                                <span>
+                                    <span class="block text-sm font-bold text-slate-800">Midtrans (IDR)</span>
+                                    <span class="block text-xs text-slate-500">Rp{{ number_format($idrPatungan, 0, ',', '.') }}</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
                     {{-- Summary --}}
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                         <div class="flex justify-between">
                             <span class="text-slate-600">Patungan</span>
-                            <span class="font-bold text-slate-900">{{ $duPatungan }} DU</span>
+                            <span class="font-bold text-slate-900" id="joinPatunganValue">{{ $duPatungan }} DU</span>
                         </div>
                         <hr class="my-2 border-slate-200" />
                         <div class="flex justify-between">
                             <span class="font-bold text-slate-800">Total bayar</span>
-                            <span class="text-lg font-extrabold text-blue-600">{{ $duPatungan }} DU</span>
+                            <span class="text-lg font-extrabold text-blue-600" id="joinTotalValue">{{ $duPatungan }} DU</span>
                         </div>
                     </div>
 
-                    <button type="submit" class="btn-cta w-full py-4">
+                    <button type="submit" class="btn-cta w-full py-4" id="joinSubmitButton">
                         Bayar {{ $duPatungan }} DU & Bergabung
                     </button>
 
-                    <p class="text-center text-[11px] text-slate-400">
+                    <p class="text-center text-[11px] text-slate-400" id="joinPaymentHint">
                         Pembayaran menggunakan Dots Units dari akun Interdotz Anda.
                     </p>
                 </form>
@@ -80,6 +100,33 @@
 
     @if(!($alreadyMember ?? false))
     <script>
+        const joinPricing = {
+            du: {
+                value: '{{ $duPatungan }} DU',
+                button: 'Bayar {{ $duPatungan }} DU & Bergabung',
+                hint: 'Pembayaran menggunakan Dots Units dari akun Interdotz Anda.',
+            },
+            midtrans: {
+                value: 'Rp{{ number_format($idrPatungan, 0, ',', '.') }}',
+                button: 'Bayar Rp{{ number_format($idrPatungan, 0, ',', '.') }} & Bergabung',
+                hint: 'Pembayaran diproses via Midtrans (IDR).',
+            },
+        };
+
+        function syncJoinPaymentUi() {
+            const selected = document.querySelector('input[name="payment_method"]:checked')?.value || 'du';
+            const cfg = joinPricing[selected] || joinPricing.du;
+            const value = document.getElementById('joinPatunganValue');
+            const total = document.getElementById('joinTotalValue');
+            const button = document.getElementById('joinSubmitButton');
+            const hint = document.getElementById('joinPaymentHint');
+
+            if (value) value.textContent = cfg.value;
+            if (total) total.textContent = cfg.value;
+            if (button) button.textContent = cfg.button;
+            if (hint) hint.textContent = cfg.hint;
+        }
+
         function toggleJoinPassword() {
             const input = document.getElementById('joinGroupPasswordInput');
             const show = document.getElementById('joinPassShow');
@@ -97,6 +144,11 @@
                 hide.classList.toggle('hidden', !makeVisible);
             }
         }
+
+        document.querySelectorAll('input[name="payment_method"]').forEach((input) => {
+            input.addEventListener('change', syncJoinPaymentUi);
+        });
+        syncJoinPaymentUi();
     </script>
     @endif
 @endsection

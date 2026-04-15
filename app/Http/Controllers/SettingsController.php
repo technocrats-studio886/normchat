@@ -10,6 +10,7 @@ use App\Models\Export;
 use App\Models\Group;
 use App\Models\GroupBackup;
 use App\Models\GroupMember;
+use App\Models\GroupToken;
 use App\Models\GroupTokenContribution;
 use App\Models\Message;
 use App\Models\RecoveryLog;
@@ -78,7 +79,8 @@ class SettingsController extends Controller
         $canExportChat = $user?->can('exportChat', $group) ?? false;
         $canCreateBackup = $user?->can('createBackup', $group) ?? false;
 
-        $group->load(['groupToken', 'exports', 'backups.creator']);
+        $group->load(['groupToken', 'members.user', 'members.role']);
+        $members = $group->members->where('status', 'active')->values();
 
         $auditLogs = AuditLog::query()
             ->where('group_id', $group->id)
@@ -86,9 +88,43 @@ class SettingsController extends Controller
             ->take(15)
             ->get();
 
+        $mediaMessages = Message::query()
+            ->where('group_id', $group->id)
+            ->where('message_type', 'image')
+            ->whereNotNull('attachment_path')
+            ->latest('created_at')
+            ->take(60)
+            ->get();
+
+        $fileMessages = Message::query()
+            ->where('group_id', $group->id)
+            ->whereNotNull('attachment_path')
+            ->whereNotIn('message_type', ['image', 'voice'])
+            ->latest('created_at')
+            ->take(60)
+            ->get();
+
+        $linkMessages = Message::query()
+            ->where('group_id', $group->id)
+            ->where('content', 'like', '%http%')
+            ->latest('created_at')
+            ->take(60)
+            ->get()
+            ->map(function ($m) {
+                preg_match_all('/https?:\/\/[^\s<]+/i', (string) $m->content, $urls);
+                $m->extracted_urls = $urls[0] ?? [];
+                return $m;
+            })
+            ->filter(fn ($m) => count($m->extracted_urls) > 0)
+            ->values();
+
         return view('settings.show', [
             'group' => $group,
             'auditLogs' => $auditLogs,
+            'mediaMessages' => $mediaMessages,
+            'fileMessages' => $fileMessages,
+            'linkMessages' => $linkMessages,
+            'members' => $members,
             // legacy flag = true if user can edit anything (owner)
             'canManageSettings' => $canEditProfile,
             'canEditProfile' => $canEditProfile,
@@ -148,6 +184,8 @@ class SettingsController extends Controller
     public function transactionHistory(Group $group): View
     {
         $this->authorize('view', $group);
+
+        $this->reconcileLegacyMissingTokens($group);
 
         $contributions = GroupTokenContribution::query()
             ->where('group_id', $group->id)
@@ -365,5 +403,76 @@ class SettingsController extends Controller
         });
 
         return back()->with('success', 'Backup berhasil dipulihkan. Riwayat recovery telah dicatat.');
+    }
+
+    private function reconcileLegacyMissingTokens(Group $group): void
+    {
+        $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
+        if ($duPer12Nk <= 0) {
+            return;
+        }
+
+        $legacyRows = GroupTokenContribution::query()
+            ->where('group_id', $group->id)
+            ->where('token_amount', '<=', 0)
+            ->where('price_paid', '>', 0)
+            ->whereIn('source', [
+                'patungan',
+                'topup',
+                'interdotz_topup',
+                'interdotz_charge_topup',
+            ])
+            ->orderBy('id')
+            ->get();
+
+        if ($legacyRows->isEmpty()) {
+            return;
+        }
+
+        $groupToken = GroupToken::firstOrCreate(
+            ['group_id' => $group->id],
+            ['total_tokens' => 0, 'used_tokens' => 0, 'remaining_tokens' => 0]
+        );
+
+        foreach ($legacyRows as $row) {
+            $duPaid = (int) ($row->price_paid ?? 0);
+            $expectedTokens = (int) round(($duPaid * 12 * 2500) / $duPer12Nk);
+            if ($expectedTokens <= 0) {
+                continue;
+            }
+
+            $sameReferenceAlreadyCredited = false;
+            if ($row->payment_reference) {
+                $sameReferenceAlreadyCredited = GroupTokenContribution::query()
+                    ->where('group_id', $group->id)
+                    ->where('payment_reference', (string) $row->payment_reference)
+                    ->where('id', '!=', $row->id)
+                    ->where('token_amount', '>', 0)
+                    ->exists();
+            }
+
+            $row->token_amount = $expectedTokens;
+            $row->save();
+
+            if (! $sameReferenceAlreadyCredited) {
+                $groupToken->addTokens($expectedTokens);
+            }
+
+            AuditLog::create([
+                'group_id' => $group->id,
+                'actor_id' => Auth::id(),
+                'action' => 'settings.reconcile_tokens',
+                'target_type' => GroupTokenContribution::class,
+                'target_id' => $row->id,
+                'metadata_json' => [
+                    'source' => (string) $row->source,
+                    'du_paid' => $duPaid,
+                    'token_amount' => $expectedTokens,
+                    'payment_reference' => (string) ($row->payment_reference ?? ''),
+                    'credited_balance' => ! $sameReferenceAlreadyCredited,
+                ],
+                'created_at' => now(),
+            ]);
+        }
     }
 }

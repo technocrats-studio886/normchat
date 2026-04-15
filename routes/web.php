@@ -44,12 +44,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups', [GroupController::class, 'index'])->name('groups.index');
     Route::get('/groups/create', [GroupController::class, 'create'])->name('groups.create');
     Route::post('/groups', [GroupController::class, 'store'])->name('groups.store');
+    Route::delete('/groups/{group}', [GroupController::class, 'destroy'])->name('groups.destroy');
     Route::get('/groups/payment-callback', [GroupController::class, 'paymentCallback'])->name('groups.payment.callback');
 
     // Chat
     Route::get('/chat/last', [ChatController::class, 'openLast'])->name('chat.last');
     Route::get('/groups/{group}/chat', [ChatController::class, 'show'])->middleware('group.permission')->name('chat.show');
     Route::post('/groups/{group}/messages', [ChatController::class, 'store'])->middleware('group.permission')->name('chat.store');
+    Route::get('/groups/{group}/polls/stats', [ChatController::class, 'pollStats'])->middleware('group.permission')->name('chat.polls.stats');
+    Route::post('/groups/{group}/polls/{message}/vote', [ChatController::class, 'votePoll'])->middleware('group.permission')->name('chat.polls.vote');
     Route::post('/groups/{group}/messages/read', [ChatController::class, 'markRead'])->middleware('group.permission')->name('chat.read');
     Route::patch('/groups/{group}/messages/{message}', [ChatController::class, 'update'])->middleware('group.permission')->name('chat.update');
     Route::delete('/groups/{group}/messages/{message}', [ChatController::class, 'destroy'])->middleware('group.permission')->name('chat.destroy');

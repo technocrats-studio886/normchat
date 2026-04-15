@@ -1,7 +1,10 @@
 import './bootstrap';
 
+const chatShell = document.querySelector('[data-chat-shell]');
 const chatFeed = document.querySelector('[data-chat-feed]');
 const groupId = chatFeed?.getAttribute('data-chat-group-id');
+const chatThemeStorageKey = `nc:chatTheme:${groupId || 'global'}`;
+const hiddenMessagesStorageKey = `nc:hiddenMessages:${groupId || 'global'}`;
 const authUserIdFromFeed = Number(chatFeed?.getAttribute('data-auth-user-id') || 0);
 const authUserIdFromMeta = Number(document.querySelector('meta[name="auth-user-id"]')?.getAttribute('content') || 0);
 const authUserId = authUserIdFromFeed || authUserIdFromMeta;
@@ -11,9 +14,259 @@ const latestMessageIdFromServer = Number(chatFeed?.getAttribute('data-latest-mes
 const unreadCountFromServer = Number(chatFeed?.getAttribute('data-unread-count') || 0);
 const hasReadBeforeFromServer = String(chatFeed?.getAttribute('data-has-read-before') || '0') === '1';
 const chatReadUrlFromServer = String(chatFeed?.getAttribute('data-chat-read-url') || '');
+const pollStatsUrlFromServer = String(chatFeed?.getAttribute('data-poll-stats-url') || '');
+const pollVoteUrlTemplateFromServer = String(chatFeed?.getAttribute('data-poll-vote-url-template') || '');
 const pendingMessagesByLocalId = new Map();
+const pollStatsById = new Map();
 let pendingLocalMessageCounter = 0;
 let chatSubmitInFlight = false;
+let pollStatsRequestInFlight = false;
+let openPollComposerFromAny = null;
+
+const chatThemePalettes = [
+	{ id: 'default', label: 'Default', color: '' },
+	{
+		id: 'midnight',
+		label: 'Midnight',
+		color: '#041126',
+		primary: '#38bdf8',
+		primaryHover: '#0ea5e9',
+		mine: '#2563eb',
+		headerBg: 'rgba(2, 6, 23, 0.8)',
+		headerBorder: 'rgba(148, 163, 184, 0.3)',
+		headerTitle: '#e2e8f0',
+		headerSubtitle: '#94a3b8',
+		otherBg: 'rgba(15, 23, 42, 0.86)',
+		otherText: '#e2e8f0',
+		otherBorder: 'rgba(148, 163, 184, 0.34)',
+		aiBg: 'rgba(6, 95, 70, 0.86)',
+		aiText: '#ecfdf5',
+		aiBorder: 'rgba(110, 231, 183, 0.45)',
+		composerBg: 'rgba(2, 6, 23, 0.88)',
+		composerInputBg: 'rgba(15, 23, 42, 0.86)',
+		composerText: '#e2e8f0',
+		composerSoft: '#94a3b8',
+		composerLine: 'rgba(148, 163, 184, 0.25)',
+	},
+	{
+		id: 'ocean',
+		label: 'Ocean',
+		color: '#0a4f76',
+		primary: '#22d3ee',
+		primaryHover: '#06b6d4',
+		mine: '#0284c7',
+		headerBg: 'rgba(7, 33, 50, 0.78)',
+		headerBorder: 'rgba(125, 211, 252, 0.28)',
+		headerTitle: '#e0f2fe',
+		headerSubtitle: '#bae6fd',
+		otherBg: 'rgba(8, 47, 73, 0.84)',
+		otherText: '#e0f2fe',
+		otherBorder: 'rgba(125, 211, 252, 0.32)',
+		aiBg: 'rgba(6, 78, 59, 0.82)',
+		aiText: '#ecfdf5',
+		aiBorder: 'rgba(110, 231, 183, 0.4)',
+		composerBg: 'rgba(7, 33, 50, 0.86)',
+		composerInputBg: 'rgba(8, 47, 73, 0.84)',
+		composerText: '#e0f2fe',
+		composerSoft: '#bae6fd',
+		composerLine: 'rgba(125, 211, 252, 0.25)',
+	},
+	{
+		id: 'forest',
+		label: 'Forest',
+		color: '#0f5132',
+		primary: '#34d399',
+		primaryHover: '#10b981',
+		mine: '#059669',
+		headerBg: 'rgba(6, 38, 24, 0.78)',
+		headerBorder: 'rgba(110, 231, 183, 0.28)',
+		headerTitle: '#d1fae5',
+		headerSubtitle: '#a7f3d0',
+		otherBg: 'rgba(6, 78, 59, 0.82)',
+		otherText: '#ecfdf5',
+		otherBorder: 'rgba(110, 231, 183, 0.35)',
+		aiBg: 'rgba(5, 150, 105, 0.84)',
+		aiText: '#ecfdf5',
+		aiBorder: 'rgba(167, 243, 208, 0.4)',
+		composerBg: 'rgba(6, 38, 24, 0.86)',
+		composerInputBg: 'rgba(6, 78, 59, 0.84)',
+		composerText: '#ecfdf5',
+		composerSoft: '#a7f3d0',
+		composerLine: 'rgba(110, 231, 183, 0.24)',
+	},
+	{
+		id: 'sunset',
+		label: 'Sunset',
+		color: '#7c2d12',
+		primary: '#fb923c',
+		primaryHover: '#f97316',
+		mine: '#ea580c',
+		headerBg: 'rgba(67, 20, 7, 0.78)',
+		headerBorder: 'rgba(251, 191, 36, 0.3)',
+		headerTitle: '#ffedd5',
+		headerSubtitle: '#fed7aa',
+		otherBg: 'rgba(124, 45, 18, 0.82)',
+		otherText: '#ffedd5',
+		otherBorder: 'rgba(251, 191, 36, 0.32)',
+		aiBg: 'rgba(120, 53, 15, 0.84)',
+		aiText: '#ffedd5',
+		aiBorder: 'rgba(253, 186, 116, 0.36)',
+		composerBg: 'rgba(67, 20, 7, 0.86)',
+		composerInputBg: 'rgba(124, 45, 18, 0.84)',
+		composerText: '#ffedd5',
+		composerSoft: '#fdba74',
+		composerLine: 'rgba(251, 191, 36, 0.25)',
+	},
+	{
+		id: 'slate',
+		label: 'Slate',
+		color: '#1e293b',
+		primary: '#a78bfa',
+		primaryHover: '#8b5cf6',
+		mine: '#7c3aed',
+		headerBg: 'rgba(15, 23, 42, 0.8)',
+		headerBorder: 'rgba(148, 163, 184, 0.32)',
+		headerTitle: '#e2e8f0',
+		headerSubtitle: '#cbd5e1',
+		otherBg: 'rgba(30, 41, 59, 0.85)',
+		otherText: '#e2e8f0',
+		otherBorder: 'rgba(148, 163, 184, 0.35)',
+		aiBg: 'rgba(30, 64, 55, 0.84)',
+		aiText: '#ecfdf5',
+		aiBorder: 'rgba(110, 231, 183, 0.35)',
+		composerBg: 'rgba(15, 23, 42, 0.88)',
+		composerInputBg: 'rgba(30, 41, 59, 0.86)',
+		composerText: '#e2e8f0',
+		composerSoft: '#94a3b8',
+		composerLine: 'rgba(148, 163, 184, 0.25)',
+	},
+	{
+		id: 'charcoal',
+		label: 'Charcoal',
+		color: '#111827',
+		primary: '#22d3ee',
+		primaryHover: '#06b6d4',
+		mine: '#0891b2',
+		headerBg: 'rgba(2, 6, 23, 0.82)',
+		headerBorder: 'rgba(71, 85, 105, 0.4)',
+		headerTitle: '#e2e8f0',
+		headerSubtitle: '#94a3b8',
+		otherBg: 'rgba(15, 23, 42, 0.88)',
+		otherText: '#e2e8f0',
+		otherBorder: 'rgba(71, 85, 105, 0.45)',
+		aiBg: 'rgba(6, 78, 59, 0.84)',
+		aiText: '#ecfdf5',
+		aiBorder: 'rgba(16, 185, 129, 0.45)',
+		composerBg: 'rgba(2, 6, 23, 0.9)',
+		composerInputBg: 'rgba(15, 23, 42, 0.88)',
+		composerText: '#e2e8f0',
+		composerSoft: '#94a3b8',
+		composerLine: 'rgba(71, 85, 105, 0.4)',
+	},
+];
+
+const resolveChatThemePalette = (themeId) => {
+	const selectedId = String(themeId || '').trim().toLowerCase();
+	return chatThemePalettes.find((item) => item.id === selectedId) || chatThemePalettes[0];
+};
+
+const applyChatTheme = (themeId) => {
+	if (!(chatShell instanceof HTMLElement)) {
+		return;
+	}
+
+	const theme = resolveChatThemePalette(themeId);
+	chatShell.dataset.chatTheme = theme.id;
+	const clearThemeVars = () => {
+		[
+			'--nc-primary',
+			'--nc-primary-hover',
+			'--nc-mine',
+			'--nc-chat-meta',
+			'--nc-chat-meta-strong',
+			'--nc-chat-header-bg',
+			'--nc-chat-header-border',
+			'--nc-chat-header-title',
+			'--nc-chat-header-subtitle',
+			'--nc-chat-reply-mine-bg',
+			'--nc-chat-reply-mine-border',
+			'--nc-chat-reply-mine-text',
+			'--nc-chat-reply-ai-bg',
+			'--nc-chat-reply-ai-border',
+			'--nc-chat-reply-ai-text',
+			'--nc-chat-reply-other-bg',
+			'--nc-chat-reply-other-border',
+			'--nc-chat-reply-other-text',
+			'--nc-chat-other-bg',
+			'--nc-chat-other-text',
+			'--nc-chat-other-border',
+			'--nc-chat-ai-bg',
+			'--nc-chat-ai-text',
+			'--nc-chat-ai-border',
+			'--nc-chat-composer-bg',
+			'--nc-chat-composer-input-bg',
+			'--nc-chat-composer-text',
+			'--nc-chat-composer-soft',
+			'--nc-chat-composer-line',
+		].forEach((name) => {
+			chatShell.style.removeProperty(name);
+		});
+	};
+
+	if (!theme.color) {
+		chatShell.style.background = '';
+		chatShell.style.backgroundImage = '';
+		chatShell.style.backgroundColor = '';
+		clearThemeVars();
+		return;
+	}
+
+	clearThemeVars();
+	chatShell.style.setProperty('--nc-primary', String(theme.primary || '#4f46e5'));
+	chatShell.style.setProperty('--nc-primary-hover', String(theme.primaryHover || theme.primary || '#4338ca'));
+	chatShell.style.setProperty('--nc-mine', String(theme.mine || theme.primary || '#4f46e5'));
+	chatShell.style.setProperty('--nc-chat-meta', String(theme.headerSubtitle || '#94a3b8'));
+	chatShell.style.setProperty('--nc-chat-meta-strong', String(theme.headerTitle || '#e2e8f0'));
+	chatShell.style.setProperty('--nc-chat-header-bg', String(theme.headerBg || 'rgba(255,255,255,0.95)'));
+	chatShell.style.setProperty('--nc-chat-header-border', String(theme.headerBorder || 'rgba(226, 232, 240, 0.95)'));
+	chatShell.style.setProperty('--nc-chat-header-title', String(theme.headerTitle || '#1f2937'));
+	chatShell.style.setProperty('--nc-chat-header-subtitle', String(theme.headerSubtitle || '#6b7280'));
+	chatShell.style.setProperty('--nc-chat-reply-mine-bg', String(theme.replyMineBg || 'rgba(15, 23, 42, 0.52)'));
+	chatShell.style.setProperty('--nc-chat-reply-mine-border', String(theme.primary || '#60a5fa'));
+	chatShell.style.setProperty('--nc-chat-reply-mine-text', String(theme.headerTitle || '#e2e8f0'));
+	chatShell.style.setProperty('--nc-chat-reply-ai-bg', String(theme.replyAiBg || 'rgba(6, 95, 70, 0.5)'));
+	chatShell.style.setProperty('--nc-chat-reply-ai-border', String(theme.aiBorder || '#34d399'));
+	chatShell.style.setProperty('--nc-chat-reply-ai-text', String(theme.aiText || '#ecfdf5'));
+	chatShell.style.setProperty('--nc-chat-reply-other-bg', String(theme.replyOtherBg || 'rgba(15, 23, 42, 0.5)'));
+	chatShell.style.setProperty('--nc-chat-reply-other-border', String(theme.otherBorder || '#64748b'));
+	chatShell.style.setProperty('--nc-chat-reply-other-text', String(theme.otherText || '#e2e8f0'));
+	chatShell.style.setProperty('--nc-chat-other-bg', String(theme.otherBg || '#ffffff'));
+	chatShell.style.setProperty('--nc-chat-other-text', String(theme.otherText || '#111827'));
+	chatShell.style.setProperty('--nc-chat-other-border', String(theme.otherBorder || '#e5e7eb'));
+	chatShell.style.setProperty('--nc-chat-ai-bg', String(theme.aiBg || '#ecfdf5'));
+	chatShell.style.setProperty('--nc-chat-ai-text', String(theme.aiText || '#064e3b'));
+	chatShell.style.setProperty('--nc-chat-ai-border', String(theme.aiBorder || '#a7f3d0'));
+	chatShell.style.setProperty('--nc-chat-composer-bg', String(theme.composerBg || '#ffffff'));
+	chatShell.style.setProperty('--nc-chat-composer-input-bg', String(theme.composerInputBg || '#ffffff'));
+	chatShell.style.setProperty('--nc-chat-composer-text', String(theme.composerText || '#111827'));
+	chatShell.style.setProperty('--nc-chat-composer-soft', String(theme.composerSoft || '#64748b'));
+	chatShell.style.setProperty('--nc-chat-composer-line', String(theme.composerLine || '#e5e7eb'));
+
+	chatShell.style.backgroundImage = 'none';
+	chatShell.style.background = theme.color;
+	chatShell.style.backgroundColor = theme.color;
+};
+
+const loadSavedChatTheme = () => {
+	try {
+		const storedTheme = String(window.localStorage.getItem(chatThemeStorageKey) || '').trim();
+		applyChatTheme(storedTheme || 'default');
+	} catch (_error) {
+		applyChatTheme('default');
+	}
+};
+
+loadSavedChatTheme();
 
 const scrollChatToBottom = (behavior = 'auto') => {
 	if (!chatFeed) {
@@ -245,6 +498,27 @@ const formatAudioTime = (seconds) => {
 	return `${min}:${sec}`;
 };
 
+const formatFileSize = (bytes) => {
+	const size = Number(bytes || 0);
+	if (!Number.isFinite(size) || size <= 0) {
+		return 'Dokumen';
+	}
+
+	if (size < 1024) {
+		return `${size} B`;
+	}
+
+	if (size < 1024 * 1024) {
+		return `${(size / 1024).toFixed(1)} KB`;
+	}
+
+	if (size < 1024 * 1024 * 1024) {
+		return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+};
+
 const playIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4.75a.75.75 0 0 1 1.165-.623l7 4.75a.75.75 0 0 1 0 1.246l-7 4.75A.75.75 0 0 1 6.5 14.25v-9.5Z" /></svg>';
 const pauseIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6 4.75A.75.75 0 0 1 6.75 4h1.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75V4.75Zm5 0A.75.75 0 0 1 11.75 4h1.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75V4.75Z" /></svg>';
 const voiceWaveHeights = ['h-2', 'h-3', 'h-2', 'h-4', 'h-2', 'h-3', 'h-4', 'h-2', 'h-3', 'h-2', 'h-4', 'h-2'];
@@ -252,18 +526,20 @@ const voiceWaveHeights = ['h-2', 'h-3', 'h-2', 'h-4', 'h-2', 'h-3', 'h-4', 'h-2'
 const buildVoicePlayerMarkup = (safeUrl, sourceType, palette) => {
 	const isMine = palette === 'blue';
 	const playerClass = isMine
-		? 'border-[#0b4a3d] bg-[#0f5f4e] text-emerald-50'
+		? 'border-white/15 text-white'
 		: (palette === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-100 text-slate-800');
-	const buttonClass = isMine ? 'bg-emerald-300 text-emerald-950' : 'bg-emerald-500 text-white';
-	const sliderClass = isMine ? 'accent-emerald-300' : 'accent-emerald-500';
-	const timerClass = isMine ? 'text-emerald-100' : 'text-slate-500';
-	const waveClass = isMine ? 'bg-emerald-200/85' : 'bg-emerald-500/70';
+	const playerStyle = isMine ? 'style="background: var(--nc-mine);"' : '';
+	const buttonClass = isMine ? 'bg-white/20 text-white' : 'bg-emerald-500 text-white';
+	const sliderClass = isMine ? '' : 'accent-emerald-500';
+	const sliderStyle = isMine ? 'style="accent-color: rgba(255,255,255,0.85);"' : '';
+	const timerClass = isMine ? 'text-white/80' : 'text-slate-500';
+	const waveClass = isMine ? 'bg-white/70' : 'bg-emerald-500/70';
 	const waveHtml = voiceWaveHeights
 		.map((heightClass) => `<span class="${heightClass} w-0.5 rounded-full ${waveClass} opacity-45" data-voice-bar></span>`)
 		.join('');
 
 	return `
-		<div class="mb-2 inline-block w-55 max-w-full rounded-2xl border px-3 py-2 transition ${playerClass}" data-voice-player="1">
+		<div class="mb-2 inline-block w-55 max-w-full rounded-2xl border px-3 py-2 transition ${playerClass}" ${playerStyle} data-voice-player="1">
 			<audio preload="metadata" class="hidden" data-voice-audio>
 				<source src="${safeUrl}" type="${sourceType}">
 			</audio>
@@ -273,7 +549,7 @@ const buildVoicePlayerMarkup = (safeUrl, sourceType, palette) => {
 				</button>
 				<div class="min-w-0 flex-1">
 					<div class="mb-1 flex h-4 items-end gap-0.5" data-voice-wave>${waveHtml}</div>
-					<input type="range" min="0" max="1000" value="0" class="h-1 w-full cursor-pointer ${sliderClass}" data-voice-progress>
+					<input type="range" min="0" max="1000" value="0" class="h-1 w-full cursor-pointer ${sliderClass}" ${sliderStyle} data-voice-progress>
 					<div class="mt-1 flex items-center justify-between text-[11px] ${timerClass}">
 						<span data-voice-current>0:00</span>
 						<span data-voice-duration>0:00</span>
@@ -285,22 +561,62 @@ const buildVoicePlayerMarkup = (safeUrl, sourceType, palette) => {
 	`;
 };
 
-const renderAttachment = (message, palette = 'slate') => {
+const renderAttachment = (message, palette = 'slate', options = {}) => {
 	const url = message?.attachment_url || '';
 	if (!url) {
 		return '';
 	}
 
+	const mergedCaption = options?.mergedCaption === true;
+
 	const mime = String(message?.attachment_mime || '').toLowerCase();
 	const type = String(message?.message_type || 'text').toLowerCase();
+	const attachmentName = escapeHtml(message?.attachment_original_name || 'Lampiran');
+	const attachmentSizeLabel = escapeHtml(formatFileSize(message?.attachment_size));
 	const safeUrl = escapeAttr(url);
+	const safeNameAttr = escapeAttr(message?.attachment_original_name || 'lampiran');
+	const isVideo = type === 'video' || mime.startsWith('video/');
 
 	if (type === 'image' || mime.startsWith('image/')) {
 		const border = palette === 'blue' ? 'border-blue-200 bg-blue-50' : (palette === 'emerald' ? 'border-emerald-100 bg-emerald-50' : 'border-slate-200 bg-white');
+		if (mergedCaption) {
+			return `
+				<a href="${safeUrl}" class="block overflow-hidden rounded-t-[20px]" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="${safeNameAttr}" data-attachment-frame="1">
+					<img src="${safeUrl}" alt="Gambar" class="h-auto max-h-72 w-full object-cover" />
+				</a>
+			`;
+		}
+
 		return `
-			<a href="${safeUrl}" target="_blank" rel="noopener" class="mb-2 block overflow-hidden rounded-2xl border ${border}" data-message-body="1">
-				<img src="${safeUrl}" alt="Gambar" class="h-auto max-h-64 w-full object-cover" />
+			<a href="${safeUrl}" class="mb-2 block overflow-hidden rounded-2xl border ${border}" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="${safeNameAttr}">
+				<img src="${safeUrl}" alt="Gambar" class="h-auto max-h-72 w-full object-cover" />
 			</a>
+		`;
+	}
+
+	if (isVideo) {
+		const frameClass = palette === 'blue'
+			? 'border-blue-200 bg-blue-50'
+			: (palette === 'emerald' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white');
+		if (mergedCaption) {
+			return `
+				<button type="button" class="block w-full overflow-hidden rounded-t-[20px] bg-black" data-message-body="1" data-attachment-open="1" data-attachment-kind="video" data-attachment-url="${safeUrl}" data-attachment-name="${safeNameAttr}" data-attachment-frame="1">
+					<div class="relative">
+						<video src="${safeUrl}" class="h-auto max-h-72 w-full bg-black object-cover" muted playsinline preload="metadata"></video>
+						<span class="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm font-bold text-white">▶</span>
+					</div>
+				</button>
+			`;
+		}
+
+		return `
+			<button type="button" class="mb-2 block w-full overflow-hidden rounded-2xl border ${frameClass}" data-message-body="1" data-attachment-open="1" data-attachment-kind="video" data-attachment-url="${safeUrl}" data-attachment-name="${safeNameAttr}">
+				<div class="relative">
+					<video src="${safeUrl}" class="h-auto max-h-72 w-full bg-black object-cover" muted playsinline preload="metadata"></video>
+					<span class="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm font-bold text-white">▶</span>
+				</div>
+				<p class="px-3 py-2 text-left text-xs font-medium text-slate-700">${attachmentName}</p>
+			</button>
 		`;
 	}
 
@@ -309,9 +625,22 @@ const renderAttachment = (message, palette = 'slate') => {
 		return buildVoicePlayerMarkup(safeUrl, sourceType, palette).replace('data-voice-player="1"', 'data-voice-player="1" data-message-body="1"');
 	}
 
-	const attachmentName = escapeHtml(message?.attachment_original_name || 'Lampiran');
+	const fileToneClass = palette === 'blue'
+		? 'border-blue-200 bg-blue-50 text-blue-800'
+		: (palette === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700');
+	const fileMarginClass = mergedCaption ? '' : 'mb-2';
+
 	return `
-		<a href="${safeUrl}" target="_blank" rel="noopener" class="mb-2 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-blue-600 underline" data-message-body="1">${attachmentName}</a>
+		<button type="button" class="${fileMarginClass} block w-full rounded-2xl border ${fileToneClass} p-3 text-left" data-message-body="1" data-attachment-download="1" data-attachment-url="${safeUrl}" data-attachment-name="${safeNameAttr}">
+			<div class="flex items-center gap-3">
+				<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/10 text-base">📄</span>
+				<div class="min-w-0 flex-1">
+					<p class="truncate text-sm font-semibold">${attachmentName}</p>
+					<p class="text-[11px] opacity-75">${attachmentSizeLabel}</p>
+				</div>
+				<span class="text-[11px] font-semibold opacity-80">Buka</span>
+			</div>
+		</button>
 	`;
 };
 
@@ -329,20 +658,408 @@ const renderReplyPreview = (message, palette = 'slate') => {
 	}
 
 	const safeSummary = escapeHtml(summary.slice(0, 120));
-	const boxClass = palette === 'blue'
-		? 'border-l-[3px] border-blue-500 bg-blue-50 text-slate-700 shadow-sm hover:bg-blue-100'
-		: (palette === 'emerald'
-			? 'border-l-[3px] border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-			: 'border-l-[3px] border-slate-400 bg-slate-50 text-slate-600 hover:bg-slate-100');
-	const senderClass = palette === 'blue' ? 'text-blue-700' : (palette === 'emerald' ? 'text-emerald-700' : 'text-slate-700');
-	const previewClass = palette === 'blue' ? 'text-slate-600' : '';
+	const toneClass = palette === 'blue'
+		? 'nc-reply-chip--mine'
+		: (palette === 'emerald' ? 'nc-reply-chip--ai' : 'nc-reply-chip--other');
 
 	return `
-		<a href="#message-${replyTo.id}" class="mb-1 block rounded-xl px-3 py-1.5 text-xs ${boxClass}">
-			<p class="font-semibold ${senderClass}">Membalas ${sender}</p>
-			<p class="truncate ${previewClass}">${safeSummary}</p>
+		<a href="#message-${replyTo.id}" class="nc-reply-chip ${toneClass} mb-1 block rounded-xl px-3 py-1.5 text-xs">
+			<p class="nc-reply-chip-sender font-semibold">Membalas ${sender}</p>
+			<p class="truncate">${safeSummary}</p>
 		</a>
 	`;
+};
+
+const parsePollContent = (rawContent) => {
+	const normalized = String(rawContent || '').replace(/\r\n/g, '\n').trim();
+	if (!normalized) {
+		return null;
+	}
+
+	if (!/^📊\s*poll:/i.test(normalized)) {
+		return null;
+	}
+
+	const lines = normalized
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => line !== '');
+
+	if (!lines.length) {
+		return null;
+	}
+
+	const question = lines[0].replace(/^📊\s*poll:\s*/i, '').trim();
+	if (!question) {
+		return null;
+	}
+
+	const options = [];
+	for (let i = 1; i < lines.length; i++) {
+		const match = lines[i].match(/^(\d+)[.)]\s+(.+)$/);
+		if (!match) {
+			continue;
+		}
+
+		const optionNumber = Number(match[1]);
+		const optionLabel = String(match[2] || '').trim();
+		if (!Number.isFinite(optionNumber) || optionNumber <= 0 || !optionLabel) {
+			continue;
+		}
+
+		options.push({
+			number: optionNumber,
+			label: optionLabel,
+		});
+	}
+
+	if (options.length < 2) {
+		return null;
+	}
+
+	return {
+		question,
+		options: options.slice(0, 8),
+	};
+};
+
+const renderPollCard = ({ poll, tone = 'other', messageId = 0, inlineTimeHtml = '' }) => {
+	if (!poll || !Array.isArray(poll.options) || poll.options.length < 2) {
+		return '';
+	}
+
+	const colorMap = {
+		mine: {
+			card: 'bg-indigo-500 text-white border-indigo-400',
+			question: 'text-indigo-50',
+			meta: 'text-indigo-100/90',
+			option: 'bg-indigo-400/45 border-indigo-300/70 text-white hover:bg-indigo-300/55',
+		},
+		ai: {
+			card: 'bg-emerald-50 text-emerald-900 border-emerald-200',
+			question: 'text-emerald-900',
+			meta: 'text-emerald-700',
+			option: 'bg-white border-emerald-200 text-emerald-900 hover:bg-emerald-100',
+		},
+		other: {
+			card: 'bg-white text-slate-800 border-slate-200',
+			question: 'text-slate-900',
+			meta: 'text-slate-500',
+			option: 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100',
+		},
+	};
+
+	const palette = colorMap[tone] || colorMap.other;
+	const safeQuestion = escapeHtml(poll.question);
+	const numericMessageId = Number(messageId || 0);
+	const canVote = Number.isFinite(numericMessageId) && numericMessageId > 0;
+	const optionsHtml = poll.options
+		.map((option) => {
+			const safeLabel = escapeHtml(option.label);
+			const safeNumber = Number(option.number || 0);
+			if (!canVote) {
+				return `<div class="rounded-xl border px-2.5 py-2 text-xs font-medium ${palette.option}" data-poll-option-row="1" data-poll-option-number="${safeNumber}"><div class="flex items-center gap-2"><span class="font-bold">${safeNumber}.</span><span class="min-w-0 flex-1 truncate">${safeLabel}</span><span class="text-[10px] font-semibold opacity-80" data-poll-option-count>0</span></div></div>`;
+			}
+
+			return `
+				<button
+					type="button"
+					class="w-full rounded-xl border px-2.5 py-2 text-left text-xs font-medium transition ${palette.option}"
+					data-poll-vote="1"
+					data-poll-id="${numericMessageId}"
+					data-poll-option="${safeNumber}"
+					data-poll-label="${escapeAttr(option.label)}"
+					data-poll-option-row="1"
+					data-poll-option-number="${safeNumber}"
+				>
+					<span class="flex items-center gap-2"><span class="font-bold">${safeNumber}.</span><span class="min-w-0 flex-1 truncate">${safeLabel}</span><span class="text-[10px] font-semibold opacity-80" data-poll-option-count>0</span></span>
+				</button>
+			`;
+		})
+		.join('');
+
+	return `
+		<div class="rounded-2xl border px-3 py-2.5 ${palette.card}" data-message-body="1" data-poll-card="1" data-poll-id="${numericMessageId}" data-poll-tone="${escapeAttr(tone)}">
+			<p class="text-[11px] font-semibold uppercase tracking-wide ${palette.meta}">Polling</p>
+			<p class="mt-1 text-sm font-semibold ${palette.question}">${safeQuestion}</p>
+			<div class="mt-2 space-y-1.5">${optionsHtml}</div>
+			<p class="mt-2 text-[11px] ${palette.meta}" data-poll-summary>Belum ada vote</p>
+			${inlineTimeHtml}
+		</div>
+	`;
+};
+
+const parseVoteContent = (rawContent) => {
+	const normalized = String(rawContent || '').replace(/\r\n/g, '\n').trim();
+	if (!normalized) {
+		return null;
+	}
+
+	const match = normalized.match(/^🗳️\s*vote\s+poll\s+#(\d+)\s*:\s*(\d+)/i);
+	if (!match) {
+		return null;
+	}
+
+	const pollId = Number(match[1] || 0);
+	const optionNumber = Number(match[2] || 0);
+	if (!Number.isFinite(pollId) || pollId <= 0 || !Number.isFinite(optionNumber) || optionNumber <= 0) {
+		return null;
+	}
+
+	return {
+		pollId,
+		optionNumber,
+	};
+};
+
+const buildPollVoteUrl = (pollId) => {
+	const numericPollId = Number(pollId || 0);
+	if (!Number.isFinite(numericPollId) || numericPollId <= 0) {
+		return '';
+	}
+
+	if (pollVoteUrlTemplateFromServer.includes('__MESSAGE__')) {
+		return pollVoteUrlTemplateFromServer.replace('__MESSAGE__', String(numericPollId));
+	}
+
+	if (groupId) {
+		return `/groups/${groupId}/polls/${numericPollId}/vote`;
+	}
+
+	return '';
+};
+
+const collectPollCardIds = () => {
+	if (!(chatFeed instanceof HTMLElement)) {
+		return [];
+	}
+
+	return Array.from(chatFeed.querySelectorAll('[data-poll-card]'))
+		.map((card) => Number(card.getAttribute('data-poll-id') || 0))
+		.filter((pollId) => Number.isFinite(pollId) && pollId > 0)
+		.filter((pollId, index, list) => list.indexOf(pollId) === index);
+};
+
+const mergePollStatsIntoCache = (pollStatsPayload) => {
+	const pollId = Number(pollStatsPayload?.poll_id || 0);
+	if (!Number.isFinite(pollId) || pollId <= 0) {
+		return;
+	}
+
+	const optionCountsRaw = pollStatsPayload?.option_counts;
+	const optionCounts = {};
+	if (optionCountsRaw && typeof optionCountsRaw === 'object') {
+		Object.entries(optionCountsRaw).forEach(([key, value]) => {
+			const optionNumber = Number(key || 0);
+			const count = Number(value || 0);
+			if (!Number.isFinite(optionNumber) || optionNumber <= 0) {
+				return;
+			}
+
+			optionCounts[optionNumber] = Number.isFinite(count) && count > 0 ? count : 0;
+		});
+	}
+
+	pollStatsById.set(pollId, {
+		totalVotes: Math.max(0, Number(pollStatsPayload?.total_votes || 0)),
+		myVoteOption: Math.max(0, Number(pollStatsPayload?.my_vote_option || 0)),
+		optionCounts,
+	});
+};
+
+const requestPollStatsForVisibleCards = async () => {
+	if (!pollStatsUrlFromServer || pollStatsRequestInFlight) {
+		return;
+	}
+
+	const pollIds = collectPollCardIds();
+	if (!pollIds.length) {
+		return;
+	}
+
+	const missingIds = pollIds.filter((pollId) => !pollStatsById.has(pollId));
+	if (!missingIds.length) {
+		return;
+	}
+
+	pollStatsRequestInFlight = true;
+	try {
+		let didUpdate = false;
+		const result = await chatApiRequest(`${pollStatsUrlFromServer}?ids=${missingIds.join(',')}`);
+		if (result?.polls && typeof result.polls === 'object') {
+			Object.values(result.polls).forEach((pollStatsPayload) => {
+				mergePollStatsIntoCache(pollStatsPayload);
+				didUpdate = true;
+			});
+		}
+
+		if (didUpdate) {
+			refreshPollCardsFromFeed();
+		}
+	} catch (_error) {
+		// Ignore polling stat fetch errors and keep feed-based fallback active.
+	} finally {
+		pollStatsRequestInFlight = false;
+	}
+};
+
+const collectPollVotesFromFeed = () => {
+	if (!(chatFeed instanceof HTMLElement)) {
+		return new Map();
+	}
+
+	const votesByPoll = new Map();
+	const nodes = Array.from(chatFeed.querySelectorAll('[data-message-id]'));
+	nodes.forEach((node) => {
+		if (!(node instanceof HTMLElement) || node.classList.contains('hidden')) {
+			return;
+		}
+
+		const vote = parseVoteContent(node.dataset.messageContent || '');
+		if (!vote) {
+			return;
+		}
+
+		const senderId = Number(node.dataset.messageSenderId || 0);
+		const messageId = Number(node.getAttribute('data-message-id') || 0);
+		if (!Number.isFinite(senderId) || senderId <= 0 || !Number.isFinite(messageId) || messageId <= 0) {
+			return;
+		}
+
+		if (!votesByPoll.has(vote.pollId)) {
+			votesByPoll.set(vote.pollId, new Map());
+		}
+
+		const senderVotes = votesByPoll.get(vote.pollId);
+		const existing = senderVotes.get(senderId);
+		if (!existing || messageId > existing.messageId) {
+			senderVotes.set(senderId, {
+				messageId,
+				optionNumber: vote.optionNumber,
+			});
+		}
+	});
+
+	return votesByPoll;
+};
+
+const refreshPollCardsFromFeed = () => {
+	if (!(chatFeed instanceof HTMLElement)) {
+		return;
+	}
+
+	const votesByPoll = collectPollVotesFromFeed();
+	requestPollStatsForVisibleCards();
+	chatFeed.querySelectorAll('[data-poll-card]').forEach((card) => {
+		if (!(card instanceof HTMLElement)) {
+			return;
+		}
+
+		const pollId = Number(card.getAttribute('data-poll-id') || 0);
+		const serverStats = pollStatsById.get(pollId);
+
+		const optionCounts = new Map();
+		let totalVotes = 0;
+		let myVoteOption = 0;
+
+		if (serverStats) {
+			Object.entries(serverStats.optionCounts || {}).forEach(([optionNumber, count]) => {
+				const parsedOption = Number(optionNumber || 0);
+				const parsedCount = Number(count || 0);
+				if (Number.isFinite(parsedOption) && parsedOption > 0) {
+					optionCounts.set(parsedOption, Math.max(0, parsedCount));
+				}
+			});
+
+			totalVotes = Math.max(0, Number(serverStats.totalVotes || 0));
+			myVoteOption = Math.max(0, Number(serverStats.myVoteOption || 0));
+		} else {
+			const senderVotes = votesByPoll.get(pollId) || new Map();
+			senderVotes.forEach((vote) => {
+				optionCounts.set(vote.optionNumber, (optionCounts.get(vote.optionNumber) || 0) + 1);
+			});
+			totalVotes = senderVotes.size;
+
+			const mine = senderVotes.get(authUserId);
+			if (mine && Number.isFinite(mine.optionNumber)) {
+				myVoteOption = mine.optionNumber;
+			}
+		}
+
+		card.querySelectorAll('[data-poll-option-row="1"]').forEach((row) => {
+			if (!(row instanceof HTMLElement)) {
+				return;
+			}
+
+			const optionNumber = Number(row.getAttribute('data-poll-option-number') || 0);
+			const count = optionCounts.get(optionNumber) || 0;
+			const countEl = row.querySelector('[data-poll-option-count]');
+			if (countEl instanceof HTMLElement) {
+				countEl.textContent = String(count);
+			}
+
+			const ratio = totalVotes > 0 ? Math.max(0, Math.min(100, Math.round((count / totalVotes) * 100))) : 0;
+			row.style.backgroundImage = ratio > 0
+				? `linear-gradient(90deg, rgba(14, 165, 233, 0.16) ${ratio}%, rgba(0,0,0,0) ${ratio}%)`
+				: '';
+
+			const isMine = optionNumber > 0 && optionNumber === myVoteOption;
+			row.classList.toggle('ring-2', isMine);
+			row.classList.toggle('ring-cyan-400', isMine);
+			row.classList.toggle('ring-offset-1', isMine);
+		});
+
+		const summary = card.querySelector('[data-poll-summary]');
+		if (summary instanceof HTMLElement) {
+			if (totalVotes <= 0) {
+				summary.textContent = 'Belum ada vote';
+			} else if (myVoteOption > 0) {
+				summary.textContent = `${totalVotes} vote • Kamu pilih opsi ${myVoteOption}`;
+			} else {
+				summary.textContent = `${totalVotes} vote`;
+			}
+		}
+	});
+};
+
+const hydrateExistingPollMessages = () => {
+	if (!(chatFeed instanceof HTMLElement)) {
+		return;
+	}
+
+	chatFeed.querySelectorAll('[data-message-id]').forEach((messageNode) => {
+		if (!(messageNode instanceof HTMLElement)) {
+			return;
+		}
+
+		if (messageNode.querySelector('[data-poll-card]')) {
+			return;
+		}
+
+		const pollData = parsePollContent(messageNode.dataset.messageContent || '');
+		if (!pollData) {
+			return;
+		}
+
+		const bubble = messageNode.querySelector('.bubble-mine, .bubble-ai, .bubble-other');
+		if (!(bubble instanceof HTMLElement)) {
+			return;
+		}
+
+		const inlineTimeEl = bubble.querySelector('.nc-inline-time');
+		const inlineTimeHtml = inlineTimeEl instanceof HTMLElement ? inlineTimeEl.outerHTML : '';
+		const messageId = Number(messageNode.getAttribute('data-message-id') || 0);
+		const tone = messageNode.classList.contains('justify-end')
+			? 'mine'
+			: (bubble.classList.contains('bubble-ai') ? 'ai' : 'other');
+
+		bubble.outerHTML = renderPollCard({
+			poll: pollData,
+			tone,
+			messageId,
+			inlineTimeHtml,
+		});
+	});
 };
 
 const buildMessageNode = (message) => {
@@ -368,10 +1085,13 @@ const buildMessageNode = (message) => {
 	const editedMarkForMine = buildEditedMarkHtml('mine');
 	const editedMarkForAi = buildEditedMarkHtml('ai');
 	const editedMarkForOther = buildEditedMarkHtml('other');
-	const content = escapeHtml(message?.content || '');
+	const rawContent = String(message?.content || '');
+	const content = escapeHtml(rawContent);
+	const pollData = parsePollContent(rawContent);
 
 	const wrapper = document.createElement('div');
 	wrapper.setAttribute('data-message-id', String(message?.id ?? ''));
+	wrapper.dataset.messageSenderId = String(Number(message?.sender_id || 0));
 	wrapper.style.touchAction = 'pan-y';
 	wrapper.style.userSelect = 'none';
 	wrapper.style.webkitUserSelect = 'none';
@@ -379,22 +1099,41 @@ const buildMessageNode = (message) => {
 
 	if (isMine) {
 		const replyBlock = renderReplyPreview(message, 'blue');
-		const attachmentBlock = renderAttachment(message, 'blue');
 		const inlineTimeHtml = timeText
 			? `<span class="nc-inline-time">${timeText}${editedMarkForMine}</span>`
 			: '';
+		const hasAttachment = Boolean(message?.attachment_url);
+		const shouldMergeAttachmentCaption = hasAttachment && Boolean(content) && !pollData;
+		const attachmentBlock = renderAttachment(message, 'blue', {
+			mergedCaption: shouldMergeAttachmentCaption,
+		});
+		const attachmentWithCaptionBlock = shouldMergeAttachmentCaption
+			? `
+				<div class="nc-media-caption-card nc-media-caption-card--mine" data-message-body="1">
+					${attachmentBlock}
+					<div class="px-3 pb-2 pt-2 text-sm text-white/95">
+						<span class="whitespace-pre-wrap">${content}</span>
+						${inlineTimeHtml}
+					</div>
+				</div>
+			`
+			: '';
 		const textBlock = content
-			? `<div class="bubble-mine" data-message-body="1"><span class="whitespace-pre-wrap">${content}</span>${inlineTimeHtml}</div>`
+			? (pollData
+				? renderPollCard({ poll: pollData, tone: 'mine', messageId: message?.id, inlineTimeHtml })
+				: (shouldMergeAttachmentCaption
+					? ''
+					: `<div class="bubble-mine" data-message-body="1"><span class="whitespace-pre-wrap">${content}</span>${inlineTimeHtml}</div>`))
 			: '';
 		const pendingTail = isPending
-			? `<p class="mt-1 text-right text-[11px] text-slate-400"><span class="inline-flex items-center gap-1"><span class="h-2 w-2 animate-pulse rounded-full bg-amber-400"></span>Mengirim...</span></p>`
-			: (content ? '' : `<p class="mt-1 text-right text-[11px] text-slate-400">${timeText}${editedMarkForMine}</p>`);
+			? `<p class="nc-chat-meta mt-1 text-right text-[11px]"><span class="inline-flex items-center gap-1"><span class="h-2 w-2 animate-pulse rounded-full bg-amber-400"></span>Mengirim...</span></p>`
+			: (content ? '' : `<p class="nc-chat-meta mt-1 text-right text-[11px]">${timeText}${editedMarkForMine}</p>`);
 
 		wrapper.className = 'flex justify-end';
 		wrapper.innerHTML = `
 			<div class="max-w-[75%]">
 				${replyBlock}
-				${attachmentBlock}
+				${attachmentWithCaptionBlock || attachmentBlock}
 				${textBlock}
 				${pendingTail}
 			</div>
@@ -402,6 +1141,8 @@ const buildMessageNode = (message) => {
 		wrapper.dataset.messageSenderName = String(message?.sender_name || 'You');
 		wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
 		wrapper.dataset.messageType = String(message?.message_type || 'text');
+		wrapper.dataset.messageAttachmentMime = String(message?.attachment_mime || '');
+		wrapper.dataset.messageAttachmentName = String(message?.attachment_original_name || '');
 		return wrapper;
 	}
 
@@ -409,26 +1150,33 @@ const buildMessageNode = (message) => {
 		const replyBlock = renderReplyPreview(message, 'emerald');
 		const aiName = escapeHtml(message?.sender_name || 'NormAI');
 		const attachmentBlock = renderAttachment(message, 'emerald');
-		const renderedContent = content ? renderMarkdown(content) : '';
+		const renderedContent = pollData ? '' : (content ? renderMarkdown(content) : '');
 		const hasRichContent = renderedContent && (renderedContent.includes('<table') || renderedContent.includes('mermaid'));
 		const inlineTimeHtml = timeText
 			? `<span class="nc-inline-time">${timeText}${editedMarkForAi}</span>`
 			: '';
-		const textBlock = renderedContent
-			? `<div class="bubble-ai ai-markdown overflow-hidden" data-message-body="1">${renderedContent}${inlineTimeHtml}</div>`
+		const aiTimeHtml = timeText
+			? `<p class="nc-chat-meta nc-chat-meta--ai mt-1 text-right text-[11px] font-medium">${timeText}${editedMarkForAi}</p>`
 			: '';
+		const textBlock = pollData
+			? renderPollCard({ poll: pollData, tone: 'ai', messageId: message?.id, inlineTimeHtml: '' })
+			: (renderedContent
+				? `<div class="bubble-ai ai-markdown overflow-hidden" data-message-body="1">${renderedContent}</div>`
+				: '');
 
 		wrapper.className = hasRichContent ? 'max-w-[95%]' : 'max-w-[80%]';
 		wrapper.innerHTML = `
-			<p class="mb-1 text-[11px] font-semibold text-emerald-700">${aiName}</p>
+			<p class="nc-chat-sender nc-chat-sender--ai mb-1 text-[11px] font-semibold">${aiName}</p>
 			${replyBlock}
 			${attachmentBlock}
 			${textBlock}
-			${renderedContent ? '' : `<p class="mt-1 text-[11px] font-medium text-emerald-700">${timeText}${editedMarkForAi}</p>`}
+			${aiTimeHtml}
 		`;
 		wrapper.dataset.messageSenderName = String(message?.sender_name || 'NormAI');
 		wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
 		wrapper.dataset.messageType = String(message?.message_type || 'text');
+		wrapper.dataset.messageAttachmentMime = String(message?.attachment_mime || '');
+		wrapper.dataset.messageAttachmentName = String(message?.attachment_original_name || '');
 		return wrapper;
 	}
 
@@ -439,20 +1187,24 @@ const buildMessageNode = (message) => {
 		? `<span class="nc-inline-time">${timeText}${editedMarkForOther}</span>`
 		: '';
 	const textBlock = content
-		? `<div class="bubble-other" data-message-body="1"><span class="whitespace-pre-wrap">${content}</span>${inlineTimeHtml}</div>`
+		? (pollData
+			? renderPollCard({ poll: pollData, tone: 'other', messageId: message?.id, inlineTimeHtml })
+			: `<div class="bubble-other" data-message-body="1"><span class="whitespace-pre-wrap">${content}</span>${inlineTimeHtml}</div>`)
 		: '';
 
 	wrapper.className = 'max-w-[75%]';
 	wrapper.innerHTML = `
-		<p class="mb-1 text-[11px] text-slate-500">${senderName}</p>
+		<p class="nc-chat-sender mb-1 text-[11px]">${senderName}</p>
 		${replyBlock}
 		${attachmentBlock}
 		${textBlock}
-		${content ? '' : `<p class="mt-1 text-[11px] text-slate-400">${timeText}${editedMarkForOther}</p>`}
+		${content ? '' : `<p class="nc-chat-meta mt-1 text-[11px]">${timeText}${editedMarkForOther}</p>`}
 	`;
 	wrapper.dataset.messageSenderName = String(message?.sender_name || 'User');
 	wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
 	wrapper.dataset.messageType = String(message?.message_type || 'text');
+	wrapper.dataset.messageAttachmentMime = String(message?.attachment_mime || '');
+	wrapper.dataset.messageAttachmentName = String(message?.attachment_original_name || '');
 
 	return wrapper;
 };
@@ -478,6 +1230,7 @@ const replaceRenderedMessageByPayload = (message) => {
 	currentNode.replaceWith(nextNode);
 	initVoicePlayers(nextNode);
 	renderMermaidInNode(nextNode);
+	refreshPollCardsFromFeed();
 
 	return nextNode;
 };
@@ -535,6 +1288,7 @@ const removeRenderedMessageById = (messageId) => {
 	}
 
 	target.remove();
+	refreshPollCardsFromFeed();
 	return true;
 };
 
@@ -732,6 +1486,8 @@ const initVoicePlayers = (root = document) => {
 
 localizeExistingMessageTimes();
 initVoicePlayers(document);
+hydrateExistingPollMessages();
+refreshPollCardsFromFeed();
 
 // Render markdown in server-rendered AI bubbles
 document.querySelectorAll('[data-ai-raw]').forEach((el) => {
@@ -849,18 +1605,18 @@ const syncScrollBottomCount = () => {
 };
 
 if (chatFeed) {
-	requestAnimationFrame(() => {
-		if (hasVisitedGroupBefore) {
-			scrollChatToBottom('auto');
-			window.setTimeout(() => {
-				markGroupRead();
-			}, 180);
-			return;
-		}
-
-		chatFeed.scrollTo({ top: 0, behavior: 'auto' });
+	const jumpToLatest = () => {
+		scrollChatToBottom('auto');
+	};
+	requestAnimationFrame(jumpToLatest);
+	// Re-run after images/fonts load so height is final.
+	window.setTimeout(jumpToLatest, 80);
+	window.setTimeout(jumpToLatest, 260);
+	window.addEventListener('load', jumpToLatest, { once: true });
+	window.setTimeout(() => {
+		markGroupRead();
 		syncScrollBottomCount();
-	});
+	}, 300);
 }
 
 const focusComposerInput = (delay = 0) => {
@@ -872,14 +1628,7 @@ const focusComposerInput = (delay = 0) => {
 	}, delay);
 };
 
-requestAnimationFrame(() => focusComposerInput(0));
-focusComposerInput(220);
-focusComposerInput(650);
-document.addEventListener('visibilitychange', () => {
-	if (!document.hidden) {
-		focusComposerInput(80);
-	}
-});
+// Don't auto-open keyboard on group open — user opens it when they tap input.
 
 let refreshScrollBottomButton = () => {};
 if (chatFeed && scrollBottomBtn) {
@@ -1142,8 +1891,9 @@ if (window.Echo && groupId) {
 
 				pendingMessagesByLocalId.delete(localId);
 				markGroupVisited();
-				scrollChatToBottom('smooth');
+				scrollChatToBottom('auto');
 				markGroupRead(Number(payload.message.id || 0));
+				refreshPollCardsFromFeed();
 				return;
 			}
 		}
@@ -1168,7 +1918,7 @@ if (window.Echo && groupId) {
 			if (isMine) {
 				markGroupVisited();
 			}
-			scrollChatToBottom('smooth');
+			scrollChatToBottom(isMine ? 'auto' : 'smooth');
 			markGroupRead(Number(payload.message.id || 0));
 		} else {
 			if (!isMine) {
@@ -1178,6 +1928,7 @@ if (window.Echo && groupId) {
 			}
 			refreshScrollBottomButton();
 		}
+		refreshPollCardsFromFeed();
 	});
 
 	groupChannel.listen('.message.updated', (payload) => {
@@ -1197,6 +1948,7 @@ if (window.Echo && groupId) {
 		}
 		latestKnownMessageId = Math.max(latestKnownMessageId, messageId);
 		refreshScrollBottomButton();
+		refreshPollCardsFromFeed();
 	});
 
 	groupChannel.listen('.message.deleted', (payload) => {
@@ -1212,6 +1964,30 @@ if (window.Echo && groupId) {
 		removeRenderedMessageById(messageId);
 		latestKnownMessageId = extractLatestMessageIdFromDom();
 		refreshScrollBottomButton();
+		refreshPollCardsFromFeed();
+	});
+
+	groupChannel.listen('.poll.voted', (payload) => {
+		if (!payload?.poll) {
+			return;
+		}
+
+		mergePollStatsIntoCache(payload.poll);
+		refreshPollCardsFromFeed();
+	});
+
+	groupChannel.listen('.group.membership.changed', (payload) => {
+		const targetUserId = Number(payload?.target_user_id || 0);
+		if (!Number.isFinite(targetUserId) || targetUserId <= 0 || targetUserId !== authUserId) {
+			return;
+		}
+
+		if (String(payload?.action || '') === 'removed') {
+			window.location.href = '/groups';
+			return;
+		}
+
+		window.location.reload();
 	});
 }
 
@@ -1226,7 +2002,6 @@ const buildMessageApiUrl = (messageId) => {
 };
 const attachmentInput = chatForm?.querySelector('[data-chat-attachment]');
 const cameraInput = chatForm?.querySelector('[data-chat-camera-input]');
-const attachmentLabel = chatForm?.querySelector('[data-attachment-label]');
 const cameraButton = chatForm?.querySelector('[data-open-camera]');
 const voiceButton = chatForm?.querySelector('[data-pick-voice]');
 const attachMenuButton = chatForm?.querySelector('[data-open-attach-menu]');
@@ -1252,6 +2027,7 @@ const isDesktopKeyboard = (() => {
 	const hasTouchPoints = (navigator.maxTouchPoints || 0) > 0;
 	return !hasCoarsePointer && !hasTouchPoints;
 })();
+let refreshSendVoiceToggle = () => {};
 
 const insertAtCursor = (input, text) => {
 	const start = input.selectionStart ?? input.value.length;
@@ -1279,8 +2055,8 @@ const detectAttachmentMessageType = (file) => {
 		return 'voice';
 	}
 
-	if (extension === 'webm' && mime.startsWith('video/')) {
-		return 'voice';
+	if (mime.startsWith('video/') || ['mp4', 'mov', 'm4v', 'webm', '3gp', 'mkv'].includes(extension)) {
+		return 'video';
 	}
 
 	if (['mp3', 'wav', 'ogg', 'aac', 'm4a'].includes(extension)) {
@@ -1303,73 +2079,885 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 	};
 
 	let attachmentPreviewUrl = null;
-	const ensureAttachmentPreviewEl = () => {
-		let el = chatForm.querySelector('[data-attachment-preview]');
-		if (el) return el;
+	const revokeAttachmentPreviewUrl = () => {
+		if (!attachmentPreviewUrl) {
+			return;
+		}
+		URL.revokeObjectURL(attachmentPreviewUrl);
+		attachmentPreviewUrl = null;
+	};
+
+	const clearSelectedAttachment = () => {
+		attachmentInput.value = '';
+		if (cameraInput instanceof HTMLInputElement) {
+			cameraInput.value = '';
+		}
+		revokeAttachmentPreviewUrl();
+		refreshAttachmentLabel();
+	};
+
+	const ensureFileAttachmentPreviewEl = () => {
+		let el = chatForm.querySelector('[data-attachment-preview-file]');
+		if (el instanceof HTMLElement) {
+			return el;
+		}
+
 		el = document.createElement('div');
-		el.setAttribute('data-attachment-preview', '1');
-		el.className = 'mb-2 hidden items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-2 py-2';
+		el.setAttribute('data-attachment-preview-file', '1');
+		el.className = 'mb-2 hidden items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5';
 		el.innerHTML = `
-			<img data-attachment-preview-img class="h-14 w-14 rounded-lg object-cover" alt="preview" />
+			<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-base">📄</span>
 			<div class="min-w-0 flex-1">
-				<p class="truncate text-xs font-semibold text-blue-700" data-attachment-preview-name></p>
-				<p class="text-[10px] text-blue-500">Siap dikirim</p>
+				<p class="truncate text-sm font-semibold text-slate-700" data-attachment-preview-file-name>Dokumen</p>
+				<p class="text-[11px] text-slate-500" data-attachment-preview-file-size>Siap dikirim</p>
 			</div>
-			<button type="button" class="rounded-md p-1 text-blue-500 hover:bg-blue-100" data-attachment-preview-clear aria-label="Hapus lampiran">
+			<button type="button" class="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600" data-attachment-preview-file-clear aria-label="Batal lampiran">
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
 			</button>
 		`;
+
 		const composer = chatForm.querySelector('[data-composer-main]');
 		if (composer && composer.parentNode) {
 			composer.parentNode.insertBefore(el, composer);
 		} else {
 			chatForm.appendChild(el);
 		}
-		el.querySelector('[data-attachment-preview-clear]')?.addEventListener('click', () => {
-			attachmentInput.value = '';
-			if (cameraInput instanceof HTMLInputElement) cameraInput.value = '';
-			refreshAttachmentLabel();
+
+		el.querySelector('[data-attachment-preview-file-clear]')?.addEventListener('click', clearSelectedAttachment);
+		return el;
+	};
+
+	const ensureMediaAttachmentPreviewEl = () => {
+		let el = document.querySelector('[data-attachment-preview-media]');
+		if (el instanceof HTMLElement) {
+			return el;
+		}
+
+		el = document.createElement('div');
+		el.setAttribute('data-attachment-preview-media', '1');
+		el.className = 'fixed inset-0 left-1/2 z-[55] hidden w-full max-w-md -translate-x-1/2 bg-slate-950/95';
+		el.innerHTML = `
+			<div class="flex h-full flex-col pt-4">
+				<div class="flex items-center justify-between px-3 text-white">
+					<button type="button" class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/14 text-white hover:bg-white/20" data-attachment-preview-media-clear aria-label="Batal lampiran">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
+					</button>
+					<p class="truncate px-2 text-center text-sm font-semibold text-white/90" data-attachment-preview-media-name></p>
+					<div class="flex items-center gap-1.5" data-attachment-preview-tools>
+						<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/14 text-lg font-semibold text-white hover:bg-white/20" data-preview-tool="sticker" data-preview-tool-button="1" aria-label="Tambah stiker">😀</button>
+						<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/14 text-sm font-semibold text-white hover:bg-white/20" data-preview-tool="text" data-preview-tool-button="1" aria-label="Tambah teks">Aa</button>
+						<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/14 text-sm font-semibold text-white hover:bg-white/20" data-preview-tool="doodle" data-preview-tool-button="1" aria-label="Coretan">✎</button>
+					</div>
+				</div>
+				<div class="mt-2 flex flex-col gap-2 px-3">
+					<div class="hidden items-center justify-end gap-1 rounded-full bg-white/14 px-2 py-1" data-preview-pen-sizes>
+						<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-pen-size="2">S</button>
+						<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-pen-size="4">M</button>
+						<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-pen-size="7">L</button>
+						<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-pen-size="11">XL</button>
+					</div>
+					<div class="hidden rounded-2xl bg-white/10 px-2 py-2" data-preview-sticker-controls>
+						<div class="flex gap-1 overflow-x-auto pb-1" data-preview-sticker-list>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="😀">😀</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="😂">😂</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="😍">😍</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="😎">😎</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="👍">👍</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🙏">🙏</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🎉">🎉</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🔥">🔥</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="❤️">❤️</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="😭">😭</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="😡">😡</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="✨">✨</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🤩">🤩</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🥳">🥳</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🤯">🤯</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="😴">😴</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🤖">🤖</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="💯">💯</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="✅">✅</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="❌">❌</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="💡">💡</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="💥">💥</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="⭐">⭐</button>
+							<button type="button" class="min-w-8 rounded-full bg-white/18 px-2 py-1 text-lg" data-preview-sticker="🌈">🌈</button>
+						</div>
+						<div class="mt-1 flex items-center justify-end gap-1" data-preview-sticker-sizes>
+							<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-sticker-size="30">S</button>
+							<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-sticker-size="42">M</button>
+							<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-sticker-size="56">L</button>
+							<button type="button" class="h-7 w-7 rounded-full bg-white/25 text-[10px] font-semibold text-white" data-preview-sticker-size="72">XL</button>
+						</div>
+					</div>
+				</div>
+				<div class="mt-3 flex min-h-0 flex-1 items-center justify-center px-3">
+					<div class="relative w-full overflow-hidden rounded-2xl bg-black/50" data-attachment-preview-stage>
+						<img data-attachment-preview-media-img class="hidden max-h-[60vh] w-full rounded-2xl object-contain" alt="Preview media" />
+						<video data-attachment-preview-media-video class="hidden max-h-[60vh] w-full rounded-2xl bg-black object-contain" controls playsinline preload="metadata"></video>
+						<div data-attachment-preview-annotations class="pointer-events-none absolute inset-0 z-[4]"></div>
+						<canvas data-attachment-preview-doodle class="pointer-events-none absolute inset-0 z-[5] hidden h-full w-full rounded-2xl touch-none"></canvas>
+					</div>
+				</div>
+				<p class="mt-2 hidden px-3 text-center text-xs text-white/80" data-attachment-preview-media-caption></p>
+				<div class="px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-2">
+					<div class="flex items-center gap-2 rounded-2xl bg-white/12 px-3 py-2.5 backdrop-blur">
+						<input type="text" class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60" data-attachment-preview-caption-input placeholder="Tambah keterangan..." />
+						<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-emerald-950 hover:bg-emerald-400" data-attachment-preview-caption-send aria-label="Kirim lampiran">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 3.105a.75.75 0 0 1 .818-.164l12 5.25a.75.75 0 0 1 0 1.374l-12 5.25A.75.75 0 0 1 2.9 14.18l1.2-4.18a.75.75 0 0 0 0-.4l-1.2-4.18a.75.75 0 0 1 .205-.815Z" /></svg>
+						</button>
+					</div>
+				</div>
+			</div>
+			<div class="absolute inset-0 z-[75] hidden bg-slate-950/90 px-4 pb-6 pt-14" data-preview-text-editor>
+				<div class="flex items-center justify-between text-white">
+					<p class="text-sm font-semibold">Tambah teks</p>
+					<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white hover:bg-white/20" data-preview-text-close aria-label="Tutup editor teks">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
+					</button>
+				</div>
+				<div class="mt-4 rounded-2xl bg-white/12 p-3">
+					<input type="text" class="w-full rounded-xl border border-white/25 bg-black/20 px-3 py-3 text-base text-white outline-none placeholder:text-white/60" data-preview-text-input placeholder="Ketik teks" autocomplete="off" />
+				</div>
+				<div class="mt-3 flex items-center justify-between gap-3">
+					<div class="flex items-center gap-1" data-preview-text-size-controls>
+						<button type="button" class="h-8 w-8 rounded-full bg-white/20 text-[11px] font-semibold text-white" data-preview-text-size="24">S</button>
+						<button type="button" class="h-8 w-8 rounded-full bg-white/20 text-[11px] font-semibold text-white" data-preview-text-size="32">M</button>
+						<button type="button" class="h-8 w-8 rounded-full bg-white/20 text-[11px] font-semibold text-white" data-preview-text-size="42">L</button>
+					</div>
+					<div class="flex items-center gap-1" data-preview-text-color-controls>
+						<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-white" data-preview-text-color="#ffffff" aria-label="Warna putih"></button>
+						<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-yellow-300" data-preview-text-color="#fde047" aria-label="Warna kuning"></button>
+						<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-cyan-300" data-preview-text-color="#67e8f9" aria-label="Warna cyan"></button>
+						<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-rose-400" data-preview-text-color="#fb7185" aria-label="Warna rose"></button>
+					</div>
+				</div>
+				<div class="mt-4 flex items-center justify-end gap-2">
+					<button type="button" class="rounded-xl px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10" data-preview-text-cancel>Batal</button>
+					<button type="button" class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 hover:bg-emerald-400" data-preview-text-apply>Terapkan</button>
+				</div>
+			</div>
+		`;
+
+		el.querySelector('[data-attachment-preview-media-clear]')?.addEventListener('click', clearSelectedAttachment);
+
+		const previewCaptionInput = el.querySelector('[data-attachment-preview-caption-input]');
+		const previewCaptionSend = el.querySelector('[data-attachment-preview-caption-send]');
+		const previewMediaCaption = el.querySelector('[data-attachment-preview-media-caption]');
+		const previewDoodleCanvas = el.querySelector('[data-attachment-preview-doodle]');
+		const previewStage = el.querySelector('[data-attachment-preview-stage]');
+		const previewAnnotationLayer = el.querySelector('[data-attachment-preview-annotations]');
+		const penSizeGroup = el.querySelector('[data-preview-pen-sizes]');
+		const penSizeButtons = Array.from(el.querySelectorAll('[data-preview-pen-size]'));
+		const stickerControls = el.querySelector('[data-preview-sticker-controls]');
+		const stickerButtons = Array.from(el.querySelectorAll('[data-preview-sticker]'));
+		const stickerSizeButtons = Array.from(el.querySelectorAll('[data-preview-sticker-size]'));
+		const toolButtons = Array.from(el.querySelectorAll('[data-preview-tool-button="1"]'));
+		const previewMediaImg = el.querySelector('[data-attachment-preview-media-img]');
+		const previewMediaVideo = el.querySelector('[data-attachment-preview-media-video]');
+		const textEditor = el.querySelector('[data-preview-text-editor]');
+		const textInput = el.querySelector('[data-preview-text-input]');
+		const textApplyButton = el.querySelector('[data-preview-text-apply]');
+		const textCancelButton = el.querySelector('[data-preview-text-cancel]');
+		const textCloseButton = el.querySelector('[data-preview-text-close]');
+		const textSizeButtons = Array.from(el.querySelectorAll('[data-preview-text-size]'));
+		const textColorButtons = Array.from(el.querySelectorAll('[data-preview-text-color]'));
+
+		const syncComposerCaption = (text) => {
+			if (!(mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement)) {
+				return;
+			}
+			if (mentionInput.value === text) {
+				return;
+			}
+			mentionInput.value = text;
+			mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+		};
+
+		if (previewCaptionInput instanceof HTMLInputElement) {
+			previewCaptionInput.addEventListener('input', () => {
+				syncComposerCaption(previewCaptionInput.value);
+			});
+		}
+
+		if (previewCaptionSend instanceof HTMLButtonElement) {
+			previewCaptionSend.addEventListener('click', () => {
+				if (previewCaptionInput instanceof HTMLInputElement) {
+					syncComposerCaption(previewCaptionInput.value.trim());
+				}
+				chatForm.requestSubmit();
+			});
+		}
+
+		let doodleEnabled = false;
+		let drawing = false;
+		let placementMode = '';
+		let penSize = 4;
+		let selectedSticker = '😀';
+		let stickerSize = 42;
+		let textSize = 32;
+		let textColor = '#ffffff';
+		let selectedAnnotation = null;
+		let pendingTextPlacement = null;
+		let lastX = 0;
+		let lastY = 0;
+
+		const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+		const selectAnnotation = (node) => {
+			if (selectedAnnotation && selectedAnnotation !== node) {
+				selectedAnnotation.classList.remove('ring-2', 'ring-emerald-300', 'ring-offset-1', 'ring-offset-black/40');
+			}
+
+			selectedAnnotation = node instanceof HTMLElement ? node : null;
+			if (selectedAnnotation) {
+				selectedAnnotation.classList.add('ring-2', 'ring-emerald-300', 'ring-offset-1', 'ring-offset-black/40');
+			}
+		};
+
+		const applyAnnotationSize = (node, nextSize) => {
+			if (!(node instanceof HTMLElement) || !Number.isFinite(nextSize) || nextSize <= 0) {
+				return;
+			}
+
+			node.style.fontSize = `${nextSize}px`;
+			node.dataset.annotationSize = String(nextSize);
+		};
+
+		const makeAnnotationDraggable = (node) => {
+			if (!(node instanceof HTMLElement) || !(previewStage instanceof HTMLElement)) {
+				return;
+			}
+
+			node.classList.add('pointer-events-auto', 'cursor-move', 'touch-none', 'select-none');
+			let dragOffsetX = 0;
+			let dragOffsetY = 0;
+			let draggingAnnotation = false;
+
+			node.addEventListener('pointerdown', (event) => {
+				if (doodleEnabled) {
+					return;
+				}
+
+				event.preventDefault();
+				event.stopPropagation();
+				selectAnnotation(node);
+				draggingAnnotation = true;
+				const rect = node.getBoundingClientRect();
+				dragOffsetX = event.clientX - (rect.left + (rect.width / 2));
+				dragOffsetY = event.clientY - (rect.top + (rect.height / 2));
+				node.setPointerCapture(event.pointerId);
+			});
+
+			node.addEventListener('pointermove', (event) => {
+				if (!draggingAnnotation) {
+					return;
+				}
+
+				event.preventDefault();
+				const stageRect = previewStage.getBoundingClientRect();
+				const x = clamp(event.clientX - stageRect.left - dragOffsetX, 0, stageRect.width);
+				const y = clamp(event.clientY - stageRect.top - dragOffsetY, 0, stageRect.height);
+				node.style.left = `${x}px`;
+				node.style.top = `${y}px`;
+			});
+
+			const stopDragging = () => {
+				draggingAnnotation = false;
+			};
+
+			node.addEventListener('pointerup', stopDragging);
+			node.addEventListener('pointercancel', stopDragging);
+		};
+
+		const createStickerAnnotation = (x, y) => {
+			if (!(previewAnnotationLayer instanceof HTMLElement)) {
+				return;
+			}
+
+			const stickerNode = document.createElement('span');
+			stickerNode.className = 'absolute -translate-x-1/2 -translate-y-1/2 drop-shadow';
+			stickerNode.style.left = `${x}px`;
+			stickerNode.style.top = `${y}px`;
+			stickerNode.style.lineHeight = '1';
+			stickerNode.textContent = selectedSticker;
+			stickerNode.dataset.annotationType = 'sticker';
+			applyAnnotationSize(stickerNode, stickerSize);
+			previewAnnotationLayer.appendChild(stickerNode);
+			makeAnnotationDraggable(stickerNode);
+			selectAnnotation(stickerNode);
+		};
+
+		const createTextAnnotation = (x, y, textValue) => {
+			if (!(previewAnnotationLayer instanceof HTMLElement)) {
+				return;
+			}
+
+			const textNode = document.createElement('span');
+			textNode.className = 'absolute max-w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-md bg-black/45 px-2 py-1 text-center font-semibold shadow';
+			textNode.style.left = `${x}px`;
+			textNode.style.top = `${y}px`;
+			textNode.style.wordBreak = 'break-word';
+			textNode.style.color = textColor;
+			textNode.textContent = textValue;
+			textNode.dataset.annotationType = 'text';
+			applyAnnotationSize(textNode, textSize);
+			previewAnnotationLayer.appendChild(textNode);
+			makeAnnotationDraggable(textNode);
+			selectAnnotation(textNode);
+		};
+
+		const openTextEditor = (x, y) => {
+			if (!(textEditor instanceof HTMLElement) || !(textInput instanceof HTMLInputElement)) {
+				return;
+			}
+
+			pendingTextPlacement = { x, y };
+			textEditor.classList.remove('hidden');
+			textEditor.classList.add('flex', 'flex-col');
+			textInput.value = '';
+			window.setTimeout(() => textInput.focus(), 30);
+		};
+
+		const closeTextEditor = () => {
+			if (!(textEditor instanceof HTMLElement)) {
+				return;
+			}
+
+			textEditor.classList.add('hidden');
+			textEditor.classList.remove('flex', 'flex-col');
+			pendingTextPlacement = null;
+		};
+
+		const updateToolButtonState = () => {
+			toolButtons.forEach((button) => {
+				const tool = String(button.getAttribute('data-preview-tool') || '');
+				const isActive = (tool === 'doodle' && doodleEnabled) || (tool !== 'doodle' && placementMode === tool);
+				button.classList.toggle('bg-emerald-500/80', isActive);
+				button.classList.toggle('text-emerald-950', isActive);
+				button.classList.toggle('bg-white/14', !isActive);
+				button.classList.toggle('text-white', !isActive);
+			});
+
+			if (penSizeGroup instanceof HTMLElement) {
+				const showPenControls = doodleEnabled === true;
+				penSizeGroup.classList.toggle('hidden', !showPenControls);
+				penSizeGroup.classList.toggle('flex', showPenControls);
+			}
+
+			if (stickerControls instanceof HTMLElement) {
+				const showStickerControls = !doodleEnabled && placementMode === 'sticker';
+				stickerControls.classList.toggle('hidden', !showStickerControls);
+			}
+		};
+
+		const updatePenSizeUi = () => {
+			penSizeButtons.forEach((button) => {
+				const size = Number(button.getAttribute('data-preview-pen-size') || 0);
+				const active = Math.abs(size - penSize) < 0.1;
+				button.classList.toggle('bg-emerald-500/80', active);
+				button.classList.toggle('text-emerald-950', active);
+				button.classList.toggle('bg-white/25', !active);
+				button.classList.toggle('text-white', !active);
+			});
+		};
+
+		const updateStickerUi = () => {
+			stickerButtons.forEach((button) => {
+				const isActive = button.getAttribute('data-preview-sticker') === selectedSticker;
+				button.classList.toggle('bg-emerald-500/85', isActive);
+				button.classList.toggle('bg-white/18', !isActive);
+			});
+
+			stickerSizeButtons.forEach((button) => {
+				const size = Number(button.getAttribute('data-preview-sticker-size') || 0);
+				const active = Math.abs(size - stickerSize) < 0.1;
+				button.classList.toggle('bg-emerald-500/85', active);
+				button.classList.toggle('text-emerald-950', active);
+				button.classList.toggle('bg-white/25', !active);
+				button.classList.toggle('text-white', !active);
+			});
+		};
+
+		const updateTextEditorUi = () => {
+			textSizeButtons.forEach((button) => {
+				const size = Number(button.getAttribute('data-preview-text-size') || 0);
+				const active = Math.abs(size - textSize) < 0.1;
+				button.classList.toggle('bg-emerald-500/85', active);
+				button.classList.toggle('text-emerald-950', active);
+				button.classList.toggle('bg-white/20', !active);
+				button.classList.toggle('text-white', !active);
+			});
+
+			textColorButtons.forEach((button) => {
+				const color = String(button.getAttribute('data-preview-text-color') || '#ffffff').toLowerCase();
+				const active = color === String(textColor).toLowerCase();
+				button.classList.toggle('ring-2', active);
+				button.classList.toggle('ring-emerald-300', active);
+				button.classList.toggle('ring-offset-1', active);
+				button.classList.toggle('ring-offset-black/70', active);
+			});
+		};
+
+		const clearPreviewAnnotations = () => {
+			if (previewAnnotationLayer instanceof HTMLElement) {
+				previewAnnotationLayer.innerHTML = '';
+			}
+			if (previewDoodleCanvas instanceof HTMLCanvasElement) {
+				const ctx = previewDoodleCanvas.getContext('2d');
+				if (ctx) {
+					ctx.clearRect(0, 0, previewDoodleCanvas.width, previewDoodleCanvas.height);
+				}
+			}
+			doodleEnabled = false;
+			placementMode = '';
+			selectedAnnotation = null;
+			closeTextEditor();
+			if (previewMediaCaption instanceof HTMLElement) {
+				previewMediaCaption.textContent = '';
+				previewMediaCaption.classList.add('hidden');
+			}
+			if (previewDoodleCanvas instanceof HTMLCanvasElement) {
+				previewDoodleCanvas.classList.add('hidden', 'pointer-events-none');
+				previewDoodleCanvas.classList.remove('pointer-events-auto');
+				previewDoodleCanvas.style.touchAction = '';
+			}
+			if (previewStage instanceof HTMLElement) {
+				previewStage.style.touchAction = '';
+			}
+			updateToolButtonState();
+		};
+
+		const resizeDoodleCanvas = () => {
+			if (!(previewDoodleCanvas instanceof HTMLCanvasElement) || !(previewStage instanceof HTMLElement)) {
+				return;
+			}
+			const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+			const width = Math.max(1, Math.floor(previewStage.clientWidth));
+			const height = Math.max(1, Math.floor(previewStage.clientHeight));
+			previewDoodleCanvas.width = Math.floor(width * pixelRatio);
+			previewDoodleCanvas.height = Math.floor(height * pixelRatio);
+			previewDoodleCanvas.style.width = `${width}px`;
+			previewDoodleCanvas.style.height = `${height}px`;
+			const ctx = previewDoodleCanvas.getContext('2d');
+			if (!ctx) {
+				return;
+			}
+			ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+			ctx.imageSmoothingEnabled = true;
+			ctx.lineCap = 'round';
+			ctx.lineJoin = 'round';
+			ctx.lineWidth = penSize;
+			ctx.strokeStyle = '#f8fafc';
+			ctx.globalCompositeOperation = 'source-over';
+		};
+
+		const getCanvasPoint = (event) => {
+			if (!(previewDoodleCanvas instanceof HTMLCanvasElement)) {
+				return null;
+			}
+			const rect = previewDoodleCanvas.getBoundingClientRect();
+			return {
+				x: event.clientX - rect.left,
+				y: event.clientY - rect.top,
+			};
+		};
+
+		const drawLine = (x1, y1, x2, y2) => {
+			if (!(previewDoodleCanvas instanceof HTMLCanvasElement)) {
+				return;
+			}
+			const ctx = previewDoodleCanvas.getContext('2d');
+			if (!ctx) {
+				return;
+			}
+			const distance = Math.hypot(x2 - x1, y2 - y1);
+			const steps = Math.max(1, Math.ceil(distance / 0.45));
+			ctx.beginPath();
+			ctx.moveTo(x1, y1);
+			for (let i = 1; i <= steps; i++) {
+				const t = i / steps;
+				ctx.lineTo(x1 + ((x2 - x1) * t), y1 + ((y2 - y1) * t));
+			}
+			ctx.stroke();
+		};
+
+		if (previewDoodleCanvas instanceof HTMLCanvasElement) {
+			previewDoodleCanvas.addEventListener('pointerdown', (event) => {
+				if (!doodleEnabled) {
+					return;
+				}
+				event.preventDefault();
+				const point = getCanvasPoint(event);
+				if (!point) {
+					return;
+				}
+				drawing = true;
+				lastX = point.x;
+				lastY = point.y;
+				const ctx = previewDoodleCanvas.getContext('2d');
+				if (ctx) {
+					ctx.beginPath();
+					ctx.fillStyle = '#f8fafc';
+					ctx.arc(point.x, point.y, penSize / 2, 0, Math.PI * 2);
+					ctx.fill();
+				}
+				previewDoodleCanvas.setPointerCapture(event.pointerId);
+			});
+
+			const handleDoodlePointerMove = (event) => {
+				if (!doodleEnabled || !drawing) {
+					return;
+				}
+				event.preventDefault();
+				const coalesced = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
+				coalesced.forEach((pointerEvent) => {
+					const point = getCanvasPoint(pointerEvent);
+					if (!point) {
+						return;
+					}
+					drawLine(lastX, lastY, point.x, point.y);
+					lastX = point.x;
+					lastY = point.y;
+				});
+			};
+
+			previewDoodleCanvas.addEventListener('pointermove', handleDoodlePointerMove);
+			previewDoodleCanvas.addEventListener('pointerrawupdate', handleDoodlePointerMove);
+
+			const stopDrawing = () => {
+				drawing = false;
+			};
+			previewDoodleCanvas.addEventListener('pointerup', stopDrawing);
+			previewDoodleCanvas.addEventListener('pointercancel', stopDrawing);
+		}
+
+		if (previewStage instanceof HTMLElement) {
+			previewStage.addEventListener('click', (event) => {
+				if (!placementMode || doodleEnabled || !(previewAnnotationLayer instanceof HTMLElement)) {
+					return;
+				}
+
+				const rect = previewStage.getBoundingClientRect();
+				const x = event.clientX - rect.left;
+				const y = event.clientY - rect.top;
+
+				if (!Number.isFinite(x) || !Number.isFinite(y)) {
+					return;
+				}
+
+				if (placementMode === 'text') {
+					openTextEditor(x, y);
+					return;
+				}
+
+				if (placementMode === 'sticker') {
+					createStickerAnnotation(x, y);
+				}
+			});
+		}
+
+		if (previewAnnotationLayer instanceof HTMLElement) {
+			previewAnnotationLayer.addEventListener('click', (event) => {
+				const target = event.target.closest('[data-annotation-type]');
+				if (target instanceof HTMLElement) {
+					event.stopPropagation();
+					selectAnnotation(target);
+					return;
+				}
+
+				selectAnnotation(null);
+			}, true);
+		}
+
+		el.querySelector('[data-attachment-preview-tools]')?.addEventListener('click', (event) => {
+			const toolButton = event.target.closest('[data-preview-tool]');
+			if (!(toolButton instanceof HTMLButtonElement)) {
+				return;
+			}
+
+			const tool = String(toolButton.getAttribute('data-preview-tool') || '');
+			if (tool === 'sticker') {
+				doodleEnabled = false;
+				placementMode = placementMode === 'sticker' ? '' : 'sticker';
+				if (previewDoodleCanvas instanceof HTMLCanvasElement) {
+					previewDoodleCanvas.classList.add('hidden', 'pointer-events-none');
+					previewDoodleCanvas.classList.remove('pointer-events-auto');
+					previewDoodleCanvas.style.touchAction = '';
+				}
+				if (previewStage instanceof HTMLElement) {
+					previewStage.style.touchAction = '';
+				}
+				updateToolButtonState();
+				if (placementMode === 'sticker') {
+					showActionToast('Tap media untuk menaruh emoji, lalu drag untuk geser');
+				}
+				return;
+			}
+
+			if (tool === 'text') {
+				doodleEnabled = false;
+				placementMode = placementMode === 'text' ? '' : 'text';
+				if (previewDoodleCanvas instanceof HTMLCanvasElement) {
+					previewDoodleCanvas.classList.add('hidden', 'pointer-events-none');
+					previewDoodleCanvas.classList.remove('pointer-events-auto');
+					previewDoodleCanvas.style.touchAction = '';
+				}
+				if (previewStage instanceof HTMLElement) {
+					previewStage.style.touchAction = '';
+				}
+				updateToolButtonState();
+				if (placementMode === 'text') {
+					showActionToast('Tap media untuk menaruh teks');
+				}
+				return;
+			}
+
+			if (tool === 'doodle') {
+				if (!(previewDoodleCanvas instanceof HTMLCanvasElement)) {
+					return;
+				}
+				doodleEnabled = !doodleEnabled;
+				placementMode = '';
+				previewDoodleCanvas.classList.toggle('hidden', !doodleEnabled);
+				previewDoodleCanvas.classList.toggle('pointer-events-none', !doodleEnabled);
+				previewDoodleCanvas.classList.toggle('pointer-events-auto', doodleEnabled);
+				previewDoodleCanvas.style.touchAction = doodleEnabled ? 'none' : '';
+				if (previewStage instanceof HTMLElement) {
+					previewStage.style.touchAction = doodleEnabled ? 'none' : '';
+				}
+				updateToolButtonState();
+				if (doodleEnabled) {
+					resizeDoodleCanvas();
+					showActionToast('Mode coretan aktif');
+				} else {
+					showActionToast('Mode coretan dimatikan');
+				}
+			}
 		});
+
+		if (penSizeButtons.length > 0) {
+			penSizeButtons.forEach((button) => {
+				button.addEventListener('click', () => {
+					const nextSize = Number(button.getAttribute('data-preview-pen-size') || penSize);
+					if (!Number.isFinite(nextSize) || nextSize <= 0) {
+						return;
+					}
+					penSize = nextSize;
+					updatePenSizeUi();
+					if (previewDoodleCanvas instanceof HTMLCanvasElement) {
+						const ctx = previewDoodleCanvas.getContext('2d');
+						if (ctx) {
+							ctx.lineWidth = penSize;
+						}
+					}
+					showActionToast(`Ketebalan pena: ${penSize}px`);
+				});
+			});
+			updatePenSizeUi();
+		}
+
+		if (stickerButtons.length > 0) {
+			stickerButtons.forEach((button) => {
+				button.addEventListener('click', (event) => {
+					event.stopPropagation();
+					doodleEnabled = false;
+					selectedSticker = String(button.getAttribute('data-preview-sticker') || '😀');
+					updateStickerUi();
+					updateToolButtonState();
+					if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'sticker') {
+						selectedAnnotation.textContent = selectedSticker;
+					}
+				});
+			});
+		}
+
+		if (stickerSizeButtons.length > 0) {
+			stickerSizeButtons.forEach((button) => {
+				button.addEventListener('click', (event) => {
+					event.stopPropagation();
+					doodleEnabled = false;
+					const nextSize = Number(button.getAttribute('data-preview-sticker-size') || stickerSize);
+					if (!Number.isFinite(nextSize) || nextSize <= 0) {
+						return;
+					}
+
+					stickerSize = nextSize;
+					updateStickerUi();
+					updateToolButtonState();
+					if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'sticker') {
+						applyAnnotationSize(selectedAnnotation, stickerSize);
+					}
+				});
+			});
+		}
+
+		if (textSizeButtons.length > 0) {
+			textSizeButtons.forEach((button) => {
+				button.addEventListener('click', () => {
+					const nextSize = Number(button.getAttribute('data-preview-text-size') || textSize);
+					if (!Number.isFinite(nextSize) || nextSize <= 0) {
+						return;
+					}
+
+					textSize = nextSize;
+					updateTextEditorUi();
+					if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'text') {
+						applyAnnotationSize(selectedAnnotation, textSize);
+					}
+				});
+			});
+		}
+
+		if (textColorButtons.length > 0) {
+			textColorButtons.forEach((button) => {
+				button.addEventListener('click', () => {
+					textColor = String(button.getAttribute('data-preview-text-color') || '#ffffff');
+					updateTextEditorUi();
+					if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'text') {
+						selectedAnnotation.style.color = textColor;
+					}
+				});
+			});
+		}
+
+		const applyTextPlacement = () => {
+			if (!(textInput instanceof HTMLInputElement) || !pendingTextPlacement) {
+				closeTextEditor();
+				return;
+			}
+
+			const value = String(textInput.value || '').trim();
+			if (!value) {
+				showActionToast('Teks belum diisi');
+				textInput.focus();
+				return;
+			}
+
+			createTextAnnotation(pendingTextPlacement.x, pendingTextPlacement.y, value);
+			closeTextEditor();
+			showActionToast('Teks ditambahkan, drag untuk atur posisi');
+		};
+
+		textApplyButton?.addEventListener('click', applyTextPlacement);
+		textCancelButton?.addEventListener('click', closeTextEditor);
+		textCloseButton?.addEventListener('click', closeTextEditor);
+		textInput?.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				applyTextPlacement();
+			}
+		});
+
+		updateStickerUi();
+		updateTextEditorUi();
+
+		const syncCaptionFromComposer = () => {
+			if (!(previewCaptionInput instanceof HTMLInputElement)) {
+				return;
+			}
+			const composerValue = mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement
+				? mentionInput.value
+				: '';
+			previewCaptionInput.value = composerValue;
+		};
+
+		window.addEventListener('resize', resizeDoodleCanvas);
+		previewMediaImg?.addEventListener('load', resizeDoodleCanvas);
+		previewMediaVideo?.addEventListener('loadedmetadata', resizeDoodleCanvas);
+		el.addEventListener('preview:sync-caption', syncCaptionFromComposer);
+		el.addEventListener('preview:resize-doodle', resizeDoodleCanvas);
+		el.addEventListener('preview:reset-annotations', clearPreviewAnnotations);
+		updateToolButtonState();
+
+		document.body.appendChild(el);
 		return el;
 	};
 
 	const refreshAttachmentLabel = () => {
 		const file = attachmentInput.files?.[0];
-		const previewEl = ensureAttachmentPreviewEl();
-		const previewImg = previewEl.querySelector('[data-attachment-preview-img]');
-		const previewName = previewEl.querySelector('[data-attachment-preview-name]');
+		const filePreviewEl = ensureFileAttachmentPreviewEl();
+		const mediaPreviewEl = ensureMediaAttachmentPreviewEl();
+		const previewImg = mediaPreviewEl.querySelector('[data-attachment-preview-media-img]');
+		const previewVideo = mediaPreviewEl.querySelector('[data-attachment-preview-media-video]');
+		const previewMediaName = mediaPreviewEl.querySelector('[data-attachment-preview-media-name]');
+		const previewMediaCaption = mediaPreviewEl.querySelector('[data-attachment-preview-media-caption]');
+		const previewMediaCaptionInput = mediaPreviewEl.querySelector('[data-attachment-preview-caption-input]');
+		const previewFileName = filePreviewEl.querySelector('[data-attachment-preview-file-name]');
+		const previewFileSize = filePreviewEl.querySelector('[data-attachment-preview-file-size]');
 
-		if (attachmentPreviewUrl) {
-			URL.revokeObjectURL(attachmentPreviewUrl);
-			attachmentPreviewUrl = null;
+		revokeAttachmentPreviewUrl();
+
+		if (previewImg instanceof HTMLImageElement) {
+			previewImg.src = '';
+			previewImg.classList.add('hidden');
 		}
+		if (previewVideo instanceof HTMLVideoElement) {
+			previewVideo.pause();
+			previewVideo.removeAttribute('src');
+			previewVideo.load();
+			previewVideo.classList.add('hidden');
+		}
+		mediaPreviewEl.dispatchEvent(new Event('preview:reset-annotations'));
+		if (previewMediaCaptionInput instanceof HTMLInputElement) {
+			previewMediaCaptionInput.value = mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement
+				? mentionInput.value
+				: '';
+		}
+		mediaPreviewEl.dispatchEvent(new Event('preview:resize-doodle'));
 
 		if (!file) {
-			attachmentLabel?.classList.add('hidden');
-			previewEl.classList.add('hidden');
-			previewEl.classList.remove('flex');
+			mediaPreviewEl.classList.add('hidden');
+			filePreviewEl.classList.add('hidden');
+			filePreviewEl.classList.remove('flex');
+			refreshSendVoiceToggle();
 			return;
 		}
 
-		const isImage = String(file.type || '').toLowerCase().startsWith('image/');
-		if (isImage && previewImg instanceof HTMLImageElement) {
+		const lowerMime = String(file.type || '').toLowerCase();
+		const isImage = lowerMime.startsWith('image/');
+		const isVideo = lowerMime.startsWith('video/');
+
+		if (isImage || isVideo) {
 			attachmentPreviewUrl = URL.createObjectURL(file);
-			previewImg.src = attachmentPreviewUrl;
-			previewImg.classList.remove('hidden');
-			if (previewName) previewName.textContent = file.name;
-			previewEl.classList.remove('hidden');
-			previewEl.classList.add('flex');
-			attachmentLabel?.classList.add('hidden');
+			if (previewMediaName instanceof HTMLElement) {
+				previewMediaName.textContent = file.name;
+			}
+			if (previewMediaCaption instanceof HTMLElement) {
+				previewMediaCaption.textContent = '';
+				previewMediaCaption.classList.add('hidden');
+			}
+
+			if (isImage && previewImg instanceof HTMLImageElement) {
+				previewImg.src = attachmentPreviewUrl;
+				previewImg.classList.remove('hidden');
+			}
+
+			if (isVideo && previewVideo instanceof HTMLVideoElement) {
+				previewVideo.src = attachmentPreviewUrl;
+				previewVideo.classList.remove('hidden');
+			}
+
+			filePreviewEl.classList.add('hidden');
+			filePreviewEl.classList.remove('flex');
+			mediaPreviewEl.classList.remove('hidden');
+			mediaPreviewEl.dispatchEvent(new Event('preview:sync-caption'));
+			mediaPreviewEl.dispatchEvent(new Event('preview:resize-doodle'));
+			refreshSendVoiceToggle();
 			return;
 		}
 
-		// non-image: fallback ke label teks lama
-		previewEl.classList.add('hidden');
-		previewEl.classList.remove('flex');
-		if (attachmentLabel) {
-			attachmentLabel.textContent = file.name;
-			attachmentLabel.classList.remove('hidden');
+		if (previewFileName instanceof HTMLElement) {
+			previewFileName.textContent = file.name;
 		}
+		if (previewFileSize instanceof HTMLElement) {
+			previewFileSize.textContent = formatFileSize(file.size);
+		}
+
+		mediaPreviewEl.classList.add('hidden');
+		filePreviewEl.classList.remove('hidden');
+		filePreviewEl.classList.add('flex');
+		refreshSendVoiceToggle();
 	};
 
 	let editingMessageId = 0;
@@ -1474,6 +3062,268 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		}, 1800);
 	};
 
+	const inferAttachmentKind = (trigger, messageNode) => {
+		const explicitKind = String(trigger?.getAttribute('data-attachment-kind') || '').toLowerCase();
+		if (explicitKind) {
+			return explicitKind;
+		}
+
+		if (trigger instanceof HTMLElement && trigger.querySelector('img')) {
+			return 'image';
+		}
+
+		const messageType = String(messageNode?.dataset?.messageType || '').toLowerCase();
+		if (messageType === 'image' || messageType === 'voice' || messageType === 'video') {
+			return messageType;
+		}
+
+		const mime = String(messageNode?.dataset?.messageAttachmentMime || '').toLowerCase();
+		if (mime.startsWith('image/')) {
+			return 'image';
+		}
+		if (mime.startsWith('video/')) {
+			return 'video';
+		}
+		if (mime.startsWith('audio/')) {
+			return 'voice';
+		}
+
+		const href = String(trigger?.getAttribute('href') || trigger?.getAttribute('data-attachment-url') || '').toLowerCase();
+		if (/\.(jpg|jpeg|png|webp|gif|bmp|heic|heif)(\?|$)/.test(href)) {
+			return 'image';
+		}
+		if (/\.(mp4|mov|m4v|webm|3gp|mkv)(\?|$)/.test(href)) {
+			return 'video';
+		}
+		if (/\.(mp3|wav|ogg|aac|m4a)(\?|$)/.test(href)) {
+			return 'voice';
+		}
+
+		return 'file';
+	};
+
+	const openAttachmentPreview = ({ url, kind = 'image', name = 'Lampiran' }) => {
+		if (!url) {
+			return;
+		}
+
+		const safeUrl = escapeAttr(url);
+		const safeName = escapeHtml(name || 'Lampiran');
+		const overlay = document.createElement('div');
+		overlay.className = 'fixed inset-0 z-[95] bg-slate-950';
+
+		const isVideo = kind === 'video';
+		overlay.innerHTML = isVideo
+			? `
+				<div class="mx-auto flex h-full w-full max-w-md touch-none items-center justify-center overflow-hidden p-3" data-media-swipe-stage="1">
+					<video src="${safeUrl}" controls playsinline preload="metadata" class="max-h-full w-full select-none rounded-2xl bg-black object-contain" autoplay data-media-preview-el="1"></video>
+				</div>
+				<p class="pointer-events-none absolute inset-x-0 bottom-6 px-4 text-center text-xs font-medium text-white/70">Geser video ke arah mana saja untuk menutup</p>
+			`
+			: `
+				<div class="mx-auto flex h-full w-full max-w-md touch-none items-center justify-center overflow-hidden p-3" data-media-swipe-stage="1">
+					<img src="${safeUrl}" alt="${safeName}" class="max-h-full w-full select-none rounded-2xl object-contain" draggable="false" data-media-preview-el="1" />
+				</div>
+				<p class="pointer-events-none absolute inset-x-0 bottom-6 px-4 text-center text-xs font-medium text-white/70">Geser gambar ke arah mana saja untuk menutup</p>
+			`;
+
+		const close = () => {
+			overlay.remove();
+			document.body.style.overflow = '';
+			document.removeEventListener('keydown', onEscape);
+		};
+
+		const onEscape = (event) => {
+			if (event.key === 'Escape') {
+				close();
+			}
+		};
+
+		document.body.style.overflow = 'hidden';
+		document.addEventListener('keydown', onEscape);
+
+		overlay.addEventListener('click', (event) => {
+			if (event.target === overlay) {
+				close();
+			}
+		});
+
+		const stage = overlay.querySelector('[data-media-swipe-stage="1"]');
+		const media = overlay.querySelector('[data-media-preview-el="1"]');
+		if (stage instanceof HTMLElement && media instanceof HTMLElement) {
+			let dragging = false;
+			let startX = 0;
+			let startY = 0;
+			let deltaX = 0;
+			let deltaY = 0;
+
+			const applyTransform = (x, y) => {
+				media.style.transform = `translate(${x}px, ${y}px)`;
+				const distance = Math.min(1, Math.sqrt((x * x) + (y * y)) / 220);
+				overlay.style.opacity = String(1 - (distance * 0.5));
+			};
+
+			const resetTransform = () => {
+				media.style.transition = 'transform 180ms ease';
+				overlay.style.transition = 'opacity 180ms ease';
+				applyTransform(0, 0);
+				window.setTimeout(() => {
+					media.style.transition = '';
+					overlay.style.transition = '';
+				}, 190);
+			};
+
+			stage.addEventListener('pointerdown', (event) => {
+				dragging = true;
+				startX = event.clientX;
+				startY = event.clientY;
+				deltaX = 0;
+				deltaY = 0;
+				stage.setPointerCapture(event.pointerId);
+			});
+
+			stage.addEventListener('pointermove', (event) => {
+				if (!dragging) {
+					return;
+				}
+				deltaX = event.clientX - startX;
+				deltaY = event.clientY - startY;
+				applyTransform(deltaX, deltaY);
+			});
+
+			const finishSwipe = () => {
+				if (!dragging) {
+					return;
+				}
+				dragging = false;
+				const distance = Math.sqrt((deltaX * deltaX) + (deltaY * deltaY));
+				if (distance > 72) {
+					close();
+					return;
+				}
+				resetTransform();
+			};
+
+			stage.addEventListener('pointerup', finishSwipe);
+			stage.addEventListener('pointercancel', finishSwipe);
+		}
+
+		document.body.appendChild(overlay);
+	};
+
+	const downloadAttachmentInApp = async (url, filename = 'lampiran') => {
+		if (!url) {
+			return;
+		}
+
+		try {
+			const response = await fetch(url, {
+				method: 'GET',
+				credentials: 'same-origin',
+				headers: {
+					'X-Requested-With': 'XMLHttpRequest',
+				},
+			});
+
+			if (!response.ok) {
+				throw new Error('download_failed');
+			}
+
+			const blob = await response.blob();
+			const objectUrl = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = objectUrl;
+			link.download = filename || 'lampiran';
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			URL.revokeObjectURL(objectUrl);
+			showActionToast('Lampiran diunduh');
+		} catch (_error) {
+			showActionToast('Gagal mengunduh lampiran');
+		}
+	};
+
+	if (chatFeed instanceof HTMLElement) {
+		chatFeed.addEventListener('click', async (event) => {
+			const attachmentTrigger = event.target.closest('[data-attachment-open="1"],[data-attachment-download="1"],a[href*="/messages/"][href*="/attachment"]');
+			if (attachmentTrigger instanceof HTMLElement) {
+				event.preventDefault();
+				const messageNode = attachmentTrigger.closest('[data-message-id]');
+				const attachmentUrl = String(attachmentTrigger.getAttribute('href') || attachmentTrigger.getAttribute('data-attachment-url') || '').trim();
+				const attachmentName = String(
+					attachmentTrigger.getAttribute('data-attachment-name')
+					|| messageNode?.dataset?.messageAttachmentName
+					|| 'lampiran'
+				).trim();
+				const kind = inferAttachmentKind(attachmentTrigger, messageNode);
+
+				if (kind === 'image' || kind === 'video') {
+					openAttachmentPreview({
+						url: attachmentUrl,
+						kind,
+						name: attachmentName || 'Lampiran',
+					});
+					return;
+				}
+
+				if (kind === 'voice') {
+					return;
+				}
+
+				await downloadAttachmentInApp(attachmentUrl, attachmentName || 'lampiran');
+				return;
+			}
+
+			const voteButton = event.target.closest('[data-poll-vote]');
+			if (!(voteButton instanceof HTMLButtonElement)) {
+				return;
+			}
+
+			event.preventDefault();
+
+			if (voteButton.dataset.pollSubmitting === '1') {
+				return;
+			}
+
+			const pollId = Number(voteButton.getAttribute('data-poll-id') || 0);
+			const optionNumber = Number(voteButton.getAttribute('data-poll-option') || 0);
+			if (!Number.isFinite(pollId) || pollId <= 0 || !Number.isFinite(optionNumber) || optionNumber <= 0) {
+				return;
+			}
+
+			const voteUrl = buildPollVoteUrl(pollId);
+			if (!voteUrl) {
+				showActionToast('Vote poll belum tersedia');
+				return;
+			}
+
+			voteButton.dataset.pollSubmitting = '1';
+			voteButton.disabled = true;
+
+			try {
+				const result = await chatApiRequest(voteUrl, {
+					method: 'POST',
+					body: {
+						option_number: optionNumber,
+					},
+				});
+
+				if (result?.poll) {
+					mergePollStatsIntoCache(result.poll);
+				}
+
+				refreshPollCardsFromFeed();
+				showActionToast('Vote tersimpan');
+			} catch (_error) {
+				showActionToast('Gagal mengirim vote');
+			} finally {
+				delete voteButton.dataset.pollSubmitting;
+				voteButton.disabled = false;
+			}
+		});
+	}
+
 	const toggleMessageSelection = (messageNode) => {
 		if (!(messageNode instanceof HTMLElement)) {
 			return;
@@ -1569,6 +3419,64 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		});
 	};
 
+	const viewerIsModerator = String(chatFeed?.getAttribute('data-viewer-is-moderator') || '0') === '1';
+
+	const showConfirmDialog = ({ title, message, confirmLabel = 'Hapus', cancelLabel = 'Batal', danger = true, checkboxLabel = '', checkboxDefault = false, checkboxDisabled = false } = {}) => new Promise((resolve) => {
+		const overlay = document.createElement('div');
+		overlay.className = 'fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-5';
+		overlay.innerHTML = `
+			<div class="w-full max-w-xs rounded-2xl bg-white p-5 shadow-2xl">
+				<p class="text-sm font-semibold text-slate-900">${escapeHtml(title || 'Konfirmasi')}</p>
+				${message ? `<p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">${escapeHtml(message)}</p>` : ''}
+				${checkboxLabel ? `
+					<label class="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-[13px] text-slate-700 ${checkboxDisabled ? 'opacity-50' : 'cursor-pointer'}">
+						<input type="checkbox" data-confirm-checkbox class="h-4 w-4 rounded border-slate-300" ${checkboxDefault ? 'checked' : ''} ${checkboxDisabled ? 'disabled' : ''}>
+						<span>${escapeHtml(checkboxLabel)}</span>
+					</label>
+				` : ''}
+				<div class="mt-4 flex items-center justify-end gap-2">
+					<button type="button" data-confirm-cancel class="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">${escapeHtml(cancelLabel)}</button>
+					<button type="button" data-confirm-ok class="rounded-xl px-3 py-2 text-xs font-bold text-white ${danger ? 'bg-rose-500 hover:bg-rose-600' : 'bg-indigo-600 hover:bg-indigo-700'}">${escapeHtml(confirmLabel)}</button>
+				</div>
+			</div>
+		`;
+		const checkbox = overlay.querySelector('[data-confirm-checkbox]');
+		const cleanup = (confirmed) => {
+			const checked = checkbox instanceof HTMLInputElement ? checkbox.checked : false;
+			overlay.remove();
+			resolve(confirmed ? { confirmed: true, checked } : { confirmed: false, checked: false });
+		};
+		overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+		overlay.querySelector('[data-confirm-cancel]').addEventListener('click', () => cleanup(false));
+		overlay.querySelector('[data-confirm-ok]').addEventListener('click', () => cleanup(true));
+		document.body.appendChild(overlay);
+	});
+
+	const loadHiddenMessageIds = () => {
+		try {
+			const raw = window.localStorage.getItem(hiddenMessagesStorageKey);
+			const arr = raw ? JSON.parse(raw) : [];
+			return new Set(Array.isArray(arr) ? arr.map(String) : []);
+		} catch (_e) { return new Set(); }
+	};
+	const persistHiddenMessageIds = (set) => {
+		try { window.localStorage.setItem(hiddenMessagesStorageKey, JSON.stringify(Array.from(set))); } catch (_e) {}
+	};
+	const hiddenMessageIds = loadHiddenMessageIds();
+	const hideMessageLocally = (messageId) => {
+		const id = String(messageId);
+		hiddenMessageIds.add(id);
+		persistHiddenMessageIds(hiddenMessageIds);
+		const node = document.querySelector(`[data-message-id="${id}"]`);
+		if (node instanceof HTMLElement) node.classList.add('hidden');
+	};
+	if (chatFeed instanceof HTMLElement && hiddenMessageIds.size > 0) {
+		hiddenMessageIds.forEach((id) => {
+			const node = chatFeed.querySelector(`[data-message-id="${id}"]`);
+			if (node instanceof HTMLElement) node.classList.add('hidden');
+		});
+	}
+
 	const showMessagePopup = (messageNode) => {
 		dismissPopup();
 		const rawContent = String(messageNode.dataset.messageContent || '').trim();
@@ -1578,6 +3486,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		const sender = String(messageNode.dataset.messageSenderName || 'User');
 		const isMine = messageNode.closest('.flex.justify-end') !== null;
 		const canEdit = isMine && type === 'text' && rawContent !== '';
+		const canDelete = viewerIsModerator;
 
 		const overlay = document.createElement('div');
 		overlay.className = 'nc-popup-overlay';
@@ -1613,7 +3522,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.93Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125 16.875 4.5"/></svg>
 						Edit cepat
 					</button>` : ''}
-					${isMine ? `<button type="button" class="nc-popup-menu-item nc-popup-menu-danger" data-popup-delete>
+					${canDelete ? `<button type="button" class="nc-popup-menu-item nc-popup-menu-danger" data-popup-delete>
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21A48.1 48.1 0 0 0 12 5.5a48.1 48.1 0 0 0-7.228.29m14.456 0-.263 13.883A2.25 2.25 0 0 1 15.916 21.75H8.084a2.25 2.25 0 0 1-2.244-2.077L5.572 5.79m14.456 0c-.338-.052-.676-.107-1.022-.166m-12 .562c.34-.059.68-.114 1.022-.165"/></svg>
 						Hapus
 					</button>` : ''}
@@ -1705,8 +3614,14 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			if (!Number.isFinite(messageId) || messageId <= 0) {
 				return;
 			}
-
-			if (!window.confirm('Hapus pesan ini?')) {
+			const result = await showConfirmDialog({
+				title: 'Hapus pesan?',
+				message: 'Pesan ini akan dihapus untuk semua anggota grup.',
+				confirmLabel: 'Hapus',
+				cancelLabel: 'Batal',
+				danger: true,
+			});
+			if (!result.confirmed) {
 				return;
 			}
 
@@ -1731,7 +3646,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 				latestKnownMessageId = extractLatestMessageIdFromDom();
 				refreshScrollBottomButton();
-				showActionToast('Pesan dihapus');
+				showActionToast('Pesan dihapus untuk semua');
 			} catch (_error) {
 				showActionToast('Gagal menghapus pesan');
 			}
@@ -1896,7 +3811,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 	}
 
 	voiceButton?.addEventListener('click', () => {
-		attachmentInput.accept = 'image/*,audio/*';
+		attachmentInput.accept = 'image/*,video/*,audio/*';
 		attachmentInput.removeAttribute('capture');
 		attachmentInput.click();
 	});
@@ -1910,7 +3825,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 	attachMenu?.querySelector('[data-attach-photo]')?.addEventListener('click', () => {
 		attachMenu.classList.add('hidden');
-		attachmentInput.accept = 'image/*';
+		attachmentInput.accept = 'image/*,video/*';
 		attachmentInput.removeAttribute('capture');
 		attachmentInput.click();
 	});
@@ -1931,6 +3846,16 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		attachmentInput.accept = '*/*';
 		attachmentInput.removeAttribute('capture');
 		attachmentInput.click();
+	});
+
+	attachMenu?.querySelector('[data-attach-poll]')?.addEventListener('click', () => {
+		attachMenu.classList.add('hidden');
+		if (typeof openPollComposerFromAny === 'function') {
+			openPollComposerFromAny();
+			return;
+		}
+
+		showActionToast('Menu polling belum tersedia');
 	});
 
 	// Close attach menu on outside click
@@ -2098,6 +4023,11 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			mentionInput.style.height = `${Math.min(mentionInput.scrollHeight, 96)}px`;
 		};
 
+		mentionInput.addEventListener('focus', () => {
+			window.setTimeout(() => scrollChatToBottom('auto'), 70);
+			window.setTimeout(() => scrollChatToBottom('auto'), 220);
+		});
+
 		mentionInput.addEventListener('keydown', (event) => {
 			if (event.key !== 'Escape' || editingMessageId <= 0) {
 				return;
@@ -2109,6 +4039,20 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		});
 
 		mentionInput.addEventListener('input', resizeComposerInput);
+		const composerVoiceBtn = chatForm.querySelector('[data-composer-voice-btn]');
+		refreshSendVoiceToggle = () => {
+			const hasText = mentionInput.value.trim().length > 0;
+			const hasAttachment = attachmentInput instanceof HTMLInputElement && (attachmentInput.files?.length || 0) > 0;
+			const canSend = hasText || hasAttachment;
+			if (sendButton instanceof HTMLElement) {
+				sendButton.classList.toggle('hidden', !canSend);
+			}
+			if (composerVoiceBtn instanceof HTMLElement) {
+				composerVoiceBtn.classList.toggle('hidden', canSend);
+			}
+		};
+		mentionInput.addEventListener('input', refreshSendVoiceToggle);
+		refreshSendVoiceToggle();
 		mentionInput.addEventListener('input', () => {
 			const hasText = mentionInput.value.trim().length > 0;
 			if (!hasText) {
@@ -2139,9 +4083,6 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			typingStopTimer = null;
 		}
 		whisperTyping(false);
-		if (attachmentLabel) {
-			attachmentLabel.classList.add('hidden');
-		}
 	});
 
 	const setSendingUi = (isSending) => {
@@ -2172,6 +4113,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			attachment_url: blobUrl,
 			attachment_mime: file instanceof File ? file.type : null,
 			attachment_original_name: file instanceof File ? file.name : null,
+			attachment_size: file instanceof File ? file.size : null,
 			created_at: new Date().toISOString(),
 			is_pending: true,
 		};
@@ -2234,8 +4176,9 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 		pendingMessagesByLocalId.delete(localId);
 		latestKnownMessageId = Math.max(latestKnownMessageId, Number(serverMessage?.id || 0));
-		scrollChatToBottom('smooth');
+		scrollChatToBottom('auto');
 		markGroupRead(Number(serverMessage?.id || 0));
+		refreshPollCardsFromFeed();
 	};
 
 	chatForm.addEventListener('submit', async (event) => {
@@ -2319,7 +4262,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		if (cameraInput instanceof HTMLInputElement) {
 			cameraInput.value = '';
 		}
-		attachmentLabel?.classList.add('hidden');
+		refreshAttachmentLabel();
 		emojiPanel?.classList.add('hidden');
 		clearReplyTarget();
 		whisperTyping(false);
@@ -2489,43 +4432,337 @@ if ((mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTML
 	});
 }
 
-const settingsDrawer = document.querySelector('[data-settings-drawer]');
+const settingsMenu = document.querySelector('[data-settings-menu]');
 const settingsOverlay = document.querySelector('[data-settings-overlay]');
 const openSettingsButtons = Array.from(document.querySelectorAll('[data-open-settings]'));
-const closeSettingsButton = document.querySelector('[data-close-settings]');
+const quickDeleteOverlay = document.querySelector('[data-delete-group-menu-overlay]');
+const quickDeleteClose = document.querySelector('[data-close-delete-group-menu]');
+const quickDeleteInput = document.querySelector('[data-delete-group-menu-confirm-input]');
+const quickDeleteSubmit = document.querySelector('[data-delete-group-menu-submit]');
 
-if (settingsDrawer && settingsOverlay && openSettingsButtons.length > 0 && closeSettingsButton) {
-	let drawerOpen = false;
+if (settingsMenu && settingsOverlay && openSettingsButtons.length > 0) {
+	let menuOpen = false;
+	const applySettingsMenuTheme = () => {
+		if (!(settingsMenu instanceof HTMLElement)) {
+			return;
+		}
 
-	const openDrawer = () => {
-		drawerOpen = true;
-		settingsDrawer.classList.remove('translate-x-full');
-		settingsOverlay.classList.remove('pointer-events-none', 'opacity-0', 'bg-slate-900/0');
-		settingsOverlay.classList.add('bg-slate-900/35', 'opacity-100');
-		document.body.classList.add('overflow-hidden');
+		const styleSource = chatShell instanceof HTMLElement ? chatShell : document.documentElement;
+		const primary = getComputedStyle(styleSource).getPropertyValue('--nc-primary').trim() || '#4f46e5';
+		settingsMenu.style.background = primary;
+		settingsMenu.style.boxShadow = '0 16px 40px rgba(2, 6, 23, 0.35)';
 	};
 
-	const closeDrawer = () => {
-		drawerOpen = false;
-		settingsDrawer.classList.add('translate-x-full');
-		settingsOverlay.classList.add('pointer-events-none', 'opacity-0', 'bg-slate-900/0');
-		settingsOverlay.classList.remove('bg-slate-900/35', 'opacity-100');
-		document.body.classList.remove('overflow-hidden');
+	const formatPollMessage = (question, options) => {
+		const lines = [`📊 POLL: ${question}`, ''];
+		options.forEach((option, index) => {
+			lines.push(`${index + 1}. ${option}`);
+		});
+		lines.push('', 'Balas dengan angka pilihan kamu.');
+		return lines.join('\n');
 	};
+
+	const openPollComposer = () => {
+		if (!chatMessagesBaseUrl) {
+			showMenuToast('Form polling hanya tersedia di halaman chat');
+			return;
+		}
+
+		const overlay = document.createElement('div');
+		overlay.className = 'fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-5';
+		overlay.innerHTML = `
+			<div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+				<p class="text-sm font-semibold text-slate-900">Create Poll</p>
+				<p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Buat polling cepat dan kirim ke grup.</p>
+				<div class="mt-3 space-y-2">
+					<input type="text" class="input-field" data-poll-question placeholder="Pertanyaan polling" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="0" placeholder="Opsi 1" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="1" placeholder="Opsi 2" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="2" placeholder="Opsi 3 (opsional)" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="3" placeholder="Opsi 4 (opsional)" autocomplete="off" />
+				</div>
+				<div class="mt-4 flex items-center justify-end gap-2">
+					<button type="button" data-poll-cancel class="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Batal</button>
+					<button type="button" data-poll-send class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Kirim Poll</button>
+				</div>
+			</div>
+		`;
+
+		const questionInput = overlay.querySelector('[data-poll-question]');
+		const optionInputs = Array.from(overlay.querySelectorAll('[data-poll-option]'));
+		const cancelBtn = overlay.querySelector('[data-poll-cancel]');
+		const sendBtn = overlay.querySelector('[data-poll-send]');
+
+		const close = () => {
+			overlay.remove();
+		};
+
+		overlay.addEventListener('click', (event) => {
+			if (event.target === overlay) {
+				close();
+			}
+		});
+		cancelBtn?.addEventListener('click', close);
+
+		sendBtn?.addEventListener('click', async () => {
+			const question = String(questionInput instanceof HTMLInputElement ? questionInput.value : '').trim();
+			const options = optionInputs
+				.map((input) => String(input instanceof HTMLInputElement ? input.value : '').trim())
+				.filter((item) => item !== '');
+
+			if (!question) {
+				showMenuToast('Pertanyaan polling belum diisi');
+				questionInput?.focus();
+				return;
+			}
+
+			if (options.length < 2) {
+				showMenuToast('Minimal 2 opsi polling');
+				optionInputs[0]?.focus();
+				return;
+			}
+
+			sendBtn.disabled = true;
+			sendBtn.classList.add('opacity-70', 'cursor-wait');
+			try {
+				const result = await chatApiRequest(chatMessagesBaseUrl, {
+					method: 'POST',
+					body: {
+						content: formatPollMessage(question, options),
+					},
+				});
+
+				if (result?.message && chatFeed) {
+					const duplicate = chatFeed.querySelector(`[data-message-id="${result.message.id}"]`);
+					if (!duplicate) {
+						const node = buildMessageNode(result.message);
+						node.setAttribute('data-message-id', String(result.message.id));
+						node.id = `message-${result.message.id}`;
+						if (typingIndicator && typingIndicator.parentNode === chatFeed) {
+							chatFeed.insertBefore(node, typingIndicator);
+						} else {
+							chatFeed.appendChild(node);
+						}
+						initVoicePlayers(node);
+						renderMermaidInNode(node);
+						latestKnownMessageId = Math.max(latestKnownMessageId, Number(result.message.id || 0));
+						scrollChatToBottom('auto');
+						markGroupRead(Number(result.message.id || 0));
+						refreshPollCardsFromFeed();
+					}
+				}
+
+				showMenuToast('Poll berhasil dikirim');
+				close();
+			} catch (_error) {
+				showMenuToast('Gagal mengirim poll');
+				sendBtn.disabled = false;
+				sendBtn.classList.remove('opacity-70', 'cursor-wait');
+			}
+		});
+
+		document.body.appendChild(overlay);
+		if (questionInput instanceof HTMLInputElement) {
+			questionInput.focus();
+		}
+	};
+
+	openPollComposerFromAny = openPollComposer;
+
+	const showMenuToast = (message) => {
+		if (!message) {
+			return;
+		}
+
+		const toast = document.createElement('div');
+		toast.className = 'fixed left-1/2 bottom-24 z-[75] -translate-x-1/2 rounded-full bg-slate-900/95 px-3 py-1.5 text-xs font-medium text-white shadow-lg';
+		toast.textContent = message;
+		document.body.appendChild(toast);
+		window.setTimeout(() => {
+			if (toast.isConnected) {
+				toast.remove();
+			}
+		}, 1800);
+	};
+
+	const openMenu = () => {
+		menuOpen = true;
+		applySettingsMenuTheme();
+		document.body.style.overflow = '';
+		settingsMenu.classList.remove('hidden');
+	};
+
+	const closeMenu = () => {
+		menuOpen = false;
+		document.body.style.overflow = '';
+		settingsMenu.classList.add('hidden');
+	};
+
+	document.addEventListener('click', (event) => {
+		if (!menuOpen) return;
+		if (settingsMenu.contains(event.target)) return;
+		if (event.target.closest('[data-open-settings]')) return;
+		closeMenu();
+	}, true);
 
 	openSettingsButtons.forEach((openSettingsButton) => {
 		openSettingsButton.addEventListener('click', (event) => {
 			event.preventDefault();
-			if (drawerOpen) {
-				closeDrawer();
+			if (menuOpen) {
+				closeMenu();
 				return;
 			}
-			openDrawer();
+			openMenu();
 		});
 	});
-	closeSettingsButton.addEventListener('click', closeDrawer);
-	settingsOverlay.addEventListener('click', closeDrawer);
+
+	settingsOverlay.addEventListener('click', closeMenu);
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && menuOpen) {
+			closeMenu();
+		}
+	});
+
+	settingsMenu.addEventListener('click', (event) => {
+		const target = event.target.closest('button,a');
+		if (!target) {
+			return;
+		}
+
+		if (target.matches('[data-menu-clear-history]')) {
+			event.preventDefault();
+			const confirmClear = window.confirm('Clear history lokal di perangkat ini?');
+			if (confirmClear && chatFeed) {
+				const hiddenIds = [];
+				chatFeed.querySelectorAll('[data-message-id]').forEach((node) => {
+					const messageId = String(node.getAttribute('data-message-id') || '').trim();
+					if (messageId) {
+						hiddenIds.push(messageId);
+					}
+					node.classList.add('hidden');
+				});
+				try {
+					window.localStorage.setItem(hiddenMessagesStorageKey, JSON.stringify(Array.from(new Set(hiddenIds))));
+				} catch (_error) {
+					// Ignore storage write failures silently.
+				}
+				showMenuToast('History lokal dibersihkan');
+			}
+			closeMenu();
+			return;
+		}
+
+		if (target.matches('[data-open-search]')) {
+			closeMenu();
+			return;
+		}
+
+		if (target.matches('[data-open-delete-group-menu]')) {
+			event.preventDefault();
+			closeMenu();
+			if (quickDeleteOverlay instanceof HTMLElement) {
+				quickDeleteOverlay.classList.remove('hidden');
+				quickDeleteOverlay.classList.add('flex');
+				if (quickDeleteInput instanceof HTMLInputElement) {
+					quickDeleteInput.value = '';
+					quickDeleteInput.focus();
+				}
+				if (quickDeleteSubmit instanceof HTMLButtonElement) {
+					quickDeleteSubmit.disabled = true;
+				}
+			}
+			return;
+		}
+
+		closeMenu();
+	});
+
+	if (
+		quickDeleteOverlay instanceof HTMLElement
+		&& quickDeleteClose instanceof HTMLElement
+		&& quickDeleteInput instanceof HTMLInputElement
+		&& quickDeleteSubmit instanceof HTMLButtonElement
+	) {
+		const expected = String(document.querySelector('[data-chat-shell]')?.getAttribute('data-group-name') || '').trim();
+		const hideDeleteOverlay = () => {
+			quickDeleteOverlay.classList.add('hidden');
+			quickDeleteOverlay.classList.remove('flex');
+		};
+		quickDeleteClose.addEventListener('click', hideDeleteOverlay);
+		quickDeleteOverlay.addEventListener('click', (event) => {
+			if (event.target === quickDeleteOverlay) {
+				hideDeleteOverlay();
+			}
+		});
+		quickDeleteInput.addEventListener('input', () => {
+			quickDeleteSubmit.disabled = quickDeleteInput.value.trim() !== expected;
+		});
+	}
 }
+
+// Message search inside a group
+(() => {
+	const bar = document.querySelector('[data-message-search-bar]');
+	const input = document.querySelector('[data-message-search-input]');
+	const countEl = document.querySelector('[data-message-search-count]');
+	const openBtn = document.querySelector('[data-open-search]');
+	const closeBtn = document.querySelector('[data-close-search]');
+	const feed = document.querySelector('[data-chat-feed]');
+	if (!bar || !input || !openBtn || !closeBtn || !feed) return;
+
+	const show = () => {
+		bar.classList.remove('hidden');
+		bar.classList.add('flex');
+		input.focus();
+	};
+	const hide = () => {
+		bar.classList.add('hidden');
+		bar.classList.remove('flex');
+		input.value = '';
+		applyFilter('');
+	};
+	const applyFilter = (raw) => {
+		const q = raw.trim().toLowerCase();
+		const nodes = feed.querySelectorAll('[data-message-id]');
+		let matches = 0;
+		nodes.forEach((node) => {
+			if (!q) {
+				node.classList.remove('hidden');
+				return;
+			}
+			const content = String(node.dataset.messageContent || '').toLowerCase();
+			const sender = String(node.dataset.messageSenderName || '').toLowerCase();
+			const match = content.includes(q) || sender.includes(q);
+			node.classList.toggle('hidden', !match);
+			if (match) matches++;
+		});
+		if (countEl) countEl.textContent = q ? `${matches} hasil` : '';
+	};
+
+	openBtn.addEventListener('click', show);
+	closeBtn.addEventListener('click', hide);
+	input.addEventListener('input', () => applyFilter(input.value));
+	input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+})();
+
+// Group list search on home
+(() => {
+	const searchInput = document.querySelector('[data-group-search-input]');
+	const emptyEl = document.querySelector('[data-group-search-empty]');
+	if (!searchInput) return;
+	const cards = Array.from(document.querySelectorAll('[data-group-card]'));
+	searchInput.addEventListener('input', () => {
+		const q = searchInput.value.trim().toLowerCase();
+		let matches = 0;
+		cards.forEach((card) => {
+			const hay = String(card.getAttribute('data-group-search') || '').toLowerCase();
+			const show = !q || hay.includes(q);
+			card.classList.toggle('hidden', !show);
+			if (show) matches++;
+		});
+		if (emptyEl) emptyEl.classList.toggle('hidden', matches > 0 || !q);
+	});
+})();
 
 document.querySelectorAll('[data-copy-share-id]').forEach((button) => {
 	button.addEventListener('click', async () => {

@@ -32,7 +32,7 @@
                         @switch($pending->payment_type)
                             @case('subscription') Subscription @break
                             @case('topup') Top-up Token @break
-                            @case('add_seat') Tambah Seat @break
+                            @case('add_seat') Penyesuaian Akses @break
                         @endswitch
                     </p>
                 </div>

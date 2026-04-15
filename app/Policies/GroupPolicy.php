@@ -27,31 +27,42 @@ class GroupPolicy
     }
 
     /**
-     * Edit profil grup, password, approval, billing, backup, export — owner only.
+     * Edit profil grup, password, approval.
      */
     public function editGroupProfile(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group);
+        return $this->isOwner($user, $group)
+            || $this->hasRoleKey($user, $group, 'admin')
+            || $this->hasPermission($user, $group, 'manage_billing')
+            || $this->hasPermission($user, $group, 'change_password');
     }
 
     public function manageBilling(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group);
+        return $this->isOwner($user, $group)
+            || $this->hasRoleKey($user, $group, 'admin')
+            || $this->hasPermission($user, $group, 'manage_billing');
     }
 
     public function exportChat(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group);
+        return $this->isOwner($user, $group)
+            || $this->hasRoleKey($user, $group, 'admin')
+            || $this->hasPermission($user, $group, 'export_chat');
     }
 
     public function createBackup(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group);
+        return $this->isOwner($user, $group)
+            || $this->hasRoleKey($user, $group, 'admin')
+            || $this->hasPermission($user, $group, 'recover_history');
     }
 
     public function restoreBackup(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group);
+        return $this->isOwner($user, $group)
+            || $this->hasRoleKey($user, $group, 'admin')
+            || $this->hasPermission($user, $group, 'recover_history');
     }
 
     /**
@@ -59,7 +70,9 @@ class GroupPolicy
      */
     public function manageAiPersona(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group) || $this->hasRoleKey($user, $group, 'admin');
+        return $this->isOwner($user, $group)
+            || $this->hasRoleKey($user, $group, 'admin')
+            || $this->hasPermission($user, $group, 'add_ai');
     }
 
     /**
@@ -67,7 +80,7 @@ class GroupPolicy
      */
     public function manageMembers(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group) || $this->hasRoleKey($user, $group, 'admin');
+        return $this->isOwner($user, $group);
     }
 
     /**
@@ -109,5 +122,15 @@ class GroupPolicy
             ->where('status', 'active')
             ->get()
             ->contains(fn ($m) => $m->role && $m->role->key === $roleKey);
+    }
+
+    private function hasPermission(User $user, Group $group, string $permissionKey): bool
+    {
+        return GroupMember::query()
+            ->where('group_id', $group->id)
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->whereHas('role.permissions', fn ($query) => $query->where('key', $permissionKey))
+            ->exists();
     }
 }

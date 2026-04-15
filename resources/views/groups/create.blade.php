@@ -56,9 +56,38 @@
 
             {{-- Credit Info --}}
             <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p class="text-xs font-semibold text-emerald-700">Biaya pembuatan grup: {{ $duPrice }} Dots Units (DU)</p>
-                <p class="mt-1 text-xs text-emerald-600">{{ $includedCredits }} normkredit langsung dialokasikan ke grup ini.</p>
+                <p class="text-xs font-semibold text-emerald-700">Setiap grup baru mendapat {{ $includedCredits }} Normkredit.</p>
+                <p class="mt-1 text-xs text-emerald-600">Pilih metode DU atau Midtrans tanpa mengubah fungsionalitas grup.</p>
                 <p class="mt-1 text-xs text-emerald-600">NormAI aktif otomatis, member bisa langsung pakai AI.</p>
+            </div>
+
+            {{-- Metode Pembayaran --}}
+            <div class="panel-card px-4 py-3">
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Metode Pembayaran</label>
+                <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="payment_method" value="du" class="mt-0.5 accent-blue-600" {{ old('payment_method', 'du') === 'du' ? 'checked' : '' }}>
+                        <span>
+                            <span class="block text-sm font-bold text-slate-800">Dots Units (DU)</span>
+                            <span class="block text-xs text-slate-500">{{ $duPrice }} DU</span>
+                        </span>
+                    </label>
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="payment_method" value="midtrans" class="mt-0.5 accent-blue-600" {{ old('payment_method') === 'midtrans' ? 'checked' : '' }}>
+                        <span>
+                            <span class="block text-sm font-bold text-slate-800">Midtrans (IDR)</span>
+                            <span class="block text-xs text-slate-500">Rp{{ number_format($idrPrice, 0, ',', '.') }}</span>
+                        </span>
+                    </label>
+                </div>
+                <p class="mt-2 text-[11px] text-slate-500" id="createGroupMethodHint">Pembayaran menggunakan saldo Dots Units akun Interdotz Anda.</p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-slate-600">Total bayar</span>
+                    <span class="text-base font-extrabold text-blue-600" id="createGroupTotalText">{{ $duPrice }} DU</span>
+                </div>
             </div>
 
             <button type="submit" class="btn-cta" id="submitBtn">Bayar {{ $duPrice }} DU & Buat Group</button>
@@ -66,6 +95,37 @@
     </section>
 
     <script>
+        const createGroupPricing = {
+            du: {
+                total: '{{ $duPrice }} DU',
+                button: 'Bayar {{ $duPrice }} DU & Buat Group',
+                hint: 'Pembayaran menggunakan saldo Dots Units akun Interdotz Anda.',
+            },
+            midtrans: {
+                total: 'Rp{{ number_format($idrPrice, 0, ',', '.') }}',
+                button: 'Bayar Rp{{ number_format($idrPrice, 0, ',', '.') }} & Buat Group',
+                hint: 'Pembayaran diproses melalui Midtrans (IDR).',
+            },
+        };
+
+        function syncCreateGroupPaymentUi() {
+            const selected = document.querySelector('input[name="payment_method"]:checked')?.value || 'du';
+            const cfg = createGroupPricing[selected] || createGroupPricing.du;
+            const submitBtn = document.getElementById('submitBtn');
+            const totalText = document.getElementById('createGroupTotalText');
+            const hint = document.getElementById('createGroupMethodHint');
+
+            if (submitBtn) {
+                submitBtn.textContent = cfg.button;
+            }
+            if (totalText) {
+                totalText.textContent = cfg.total;
+            }
+            if (hint) {
+                hint.textContent = cfg.hint;
+            }
+        }
+
         function togglePasswordInput(inputId, trigger) {
             const input = document.getElementById(inputId);
             if (!input) {
@@ -82,5 +142,10 @@
                 hideEl.classList.toggle('hidden', !isPassword);
             }
         }
+
+        document.querySelectorAll('input[name="payment_method"]').forEach((input) => {
+            input.addEventListener('change', syncCreateGroupPaymentUi);
+        });
+        syncCreateGroupPaymentUi();
     </script>
 @endsection

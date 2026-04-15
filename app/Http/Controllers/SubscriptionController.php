@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Group;
 use App\Models\GroupToken;
 use App\Models\GroupTokenContribution;
+use App\Models\PendingPayment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPayment;
 use App\Services\InterdotzService;
@@ -71,10 +72,10 @@ class SubscriptionController extends Controller
 
     // ── Token Purchase (via DU) ─────────────────────────────
 
-    public function buyTokensForm(): View
+    public function buyTokensForm(Request $request): View|RedirectResponse
     {
         $user = Auth::user();
-        $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
+        $packageOptions = $this->topupPackages();
 
         $groups = Group::query()
             ->where('status', 'active')
@@ -85,9 +86,22 @@ class SubscriptionController extends Controller
             ->with('groupToken')
             ->get();
 
+        $contextGroup = null;
+        if ($request->filled('group')) {
+            $contextGroup = $groups->firstWhere('id', (int) $request->input('group'));
+        }
+
+        if (! $contextGroup) {
+            return redirect()->route('groups.index')
+                ->with('info', 'Top-up Normkredit hanya bisa dilakukan dari dalam grup.');
+        }
+
+        session(['normchat_topup_group_id' => (int) $contextGroup->id]);
+
         return view('subscription.buy-tokens', [
             'groups' => $groups,
-            'duPer12Nk' => $duPer12Nk,
+            'packageOptions' => $packageOptions,
+            'contextGroup' => $contextGroup,
         ]);
     }
 
@@ -96,26 +110,32 @@ class SubscriptionController extends Controller
         $validated = $request->validate([
             'group_id' => ['required', 'exists:groups,id'],
             'package' => ['required', 'in:nk_12,nk_24,nk_48,nk_100'],
+            'payment_method' => ['nullable', 'in:du,midtrans'],
         ]);
+
+        $lockedGroupId = (int) session('normchat_topup_group_id', 0);
+        if ($lockedGroupId <= 0) {
+            return redirect()->route('groups.index')
+                ->withErrors(['payment' => 'Top-up Normkredit harus dimulai dari halaman grup.']);
+        }
+
+        if ($lockedGroupId > 0 && $lockedGroupId !== (int) $validated['group_id']) {
+            return redirect()->route('groups.index')
+                ->withErrors(['payment' => 'Top-up harus dilakukan dari grup aktif yang sama.']);
+        }
 
         $user = Auth::user();
         $group = Group::findOrFail($validated['group_id']);
+        $paymentMethod = (string) ($validated['payment_method'] ?? 'du');
 
         $isMember = $group->owner_id === $user->id
             || $group->members()->where('user_id', $user->id)->where('status', 'active')->exists();
         abort_unless($isMember, 403);
 
-        $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
-
-        $packages = [
-            'nk_12' => ['normkredits' => 12, 'du' => $duPer12Nk],
-            'nk_24' => ['normkredits' => 24, 'du' => $duPer12Nk * 2],
-            'nk_48' => ['normkredits' => 48, 'du' => $duPer12Nk * 4],
-            'nk_100' => ['normkredits' => 100, 'du' => (int) ceil(($duPer12Nk / 12) * 100)],
-        ];
-
+        $packages = $this->topupPackages();
         $pkg = $packages[$validated['package']];
-        $duAmount = $pkg['du'];
+        $duAmount = (int) $pkg['du'];
+        $idrAmount = (int) $pkg['idr'];
         $normkredits = $pkg['normkredits'];
         $tokenAmount = $normkredits * self::TOKENS_PER_CREDIT;
 
@@ -127,9 +147,23 @@ class SubscriptionController extends Controller
                 ->with('token_purchase', [
                     'normkredits' => $normkredits,
                     'tokens' => $tokenAmount,
-                    'du_paid' => 0,
+                    'paid_amount' => 0,
+                    'payment_method' => 'bypass',
+                    'payment_unit' => 'DU',
                     'group_name' => $group->name,
                 ]);
+        }
+
+        if ($paymentMethod === 'midtrans') {
+            return $this->initiateTopupMidtransPayment(
+                $request,
+                $group,
+                $user,
+                $validated['package'],
+                $idrAmount,
+                $normkredits,
+                $tokenAmount
+            );
         }
 
         $interdotz = app(InterdotzService::class);
@@ -159,7 +193,9 @@ class SubscriptionController extends Controller
                 ->with('token_purchase', [
                     'normkredits' => $normkredits,
                     'tokens' => $tokenAmount,
-                    'du_paid' => $duAmount,
+                    'paid_amount' => $duAmount,
+                    'payment_method' => 'du',
+                    'payment_unit' => 'DU',
                     'group_name' => $group->name,
                 ]);
         }
@@ -223,5 +259,121 @@ class SubscriptionController extends Controller
             'price_paid' => $duPaid,
             'payment_reference' => $reference,
         ]);
+    }
+
+    private function topupPackages(): array
+    {
+        $duPer12Nk = (int) config('normchat.du_topup_12nk', 150);
+
+        return [
+            'nk_12' => [
+                'normkredits' => 12,
+                'du' => $duPer12Nk,
+                'idr' => (int) config('normchat.idr_topup_12nk', 35000),
+            ],
+            'nk_24' => [
+                'normkredits' => 24,
+                'du' => $duPer12Nk * 2,
+                'idr' => (int) config('normchat.idr_topup_24nk', 70000),
+            ],
+            'nk_48' => [
+                'normkredits' => 48,
+                'du' => $duPer12Nk * 4,
+                'idr' => (int) config('normchat.idr_topup_48nk', 140000),
+            ],
+            'nk_100' => [
+                'normkredits' => 100,
+                'du' => (int) ceil(($duPer12Nk / 12) * 100),
+                'idr' => (int) config('normchat.idr_topup_100nk', 280000),
+            ],
+        ];
+    }
+
+    private function createUniqueOrderId(string $prefix): string
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $orderId = strtoupper($prefix) . '-' . now()->format('His') . '-' . strtoupper(Str::random(6));
+            if (! PendingPayment::where('order_id', $orderId)->exists()) {
+                return $orderId;
+            }
+        }
+
+        return strtoupper($prefix) . '-' . now()->format('His') . '-' . strtoupper(Str::random(8));
+    }
+
+    private function initiateTopupMidtransPayment(
+        Request $request,
+        Group $group,
+        $user,
+        string $packageId,
+        int $idrAmount,
+        int $normkredits,
+        int $tokenAmount
+    ): RedirectResponse {
+        $interdotz = app(InterdotzService::class);
+
+        if (! $interdotz->isConfigured()) {
+            return back()->withErrors(['payment' => 'Sistem pembayaran belum dikonfigurasi.']);
+        }
+
+        $ssoToken = $user->getAccessToken();
+        if (! $ssoToken) {
+            return back()->withErrors(['payment' => 'Sesi login berakhir. Silakan logout dan login kembali.']);
+        }
+
+        $interdotzUserId = (string) ($user->interdotz_id ?: $user->provider_user_id ?: '');
+        $orderId = $this->createUniqueOrderId('NCTOPUP');
+        $callbackUrl = route('groups.payment.callback', ['order' => $orderId]);
+
+        $payment = $interdotz->createPayment(
+            $ssoToken,
+            $orderId,
+            $idrAmount,
+            'IDR',
+            $callbackUrl,
+            [
+                'name' => (string) $user->name,
+                'email' => (string) $user->email,
+                'phone' => '',
+            ],
+            [[
+                'id' => 'topup-' . $packageId,
+                'name' => 'Top-up ' . $normkredits . ' Normkredit',
+                'price' => $idrAmount,
+                'quantity' => 1,
+            ]],
+            $interdotzUserId
+        );
+
+        $payload = is_array($payment['payload'] ?? null) ? $payment['payload'] : (is_array($payment) ? $payment : []);
+        $redirectUrl = (string) ($payload['redirect_url'] ?? $payload['redirectUrl'] ?? $payload['checkout_url'] ?? $payload['checkoutUrl'] ?? '');
+        $paymentId = (string) ($payload['id'] ?? $payload['payment_id'] ?? '');
+
+        if ($redirectUrl === '') {
+            $errorMessage = $interdotz->getLastError() ?? 'Gagal membuat pembayaran Midtrans.';
+
+            return back()->withErrors(['payment' => $errorMessage]);
+        }
+
+        PendingPayment::create([
+            'user_id' => (int) $user->id,
+            'group_id' => (int) $group->id,
+            'order_id' => $orderId,
+            'payment_type' => 'topup_midtrans',
+            'expected_amount' => $idrAmount,
+            'status' => 'pending',
+            'metadata_json' => [
+                'action' => 'topup_midtrans',
+                'group_name' => $group->name,
+                'package_id' => $packageId,
+                'normkredits' => $normkredits,
+                'token_amount' => $tokenAmount,
+                'payment_method' => 'midtrans',
+                'payment_id' => $paymentId,
+            ],
+            'expires_at' => now()->addHour(),
+        ]);
+
+        return redirect()->away($redirectUrl);
     }
 }
