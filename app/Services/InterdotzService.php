@@ -6,6 +6,9 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Interdotz\Sdk\InterdotzClient;
+use Interdotz\Sdk\Exceptions\AuthException;
+use Interdotz\Sdk\Exceptions\PaymentException;
 use Throwable;
 
 class InterdotzService
@@ -321,7 +324,15 @@ class InterdotzService
         return null;
     }
 
-    // ── Payments (Midtrans) ─────────────────────────────────────
+    // ── Payments (Midtrans) — uses official SDK PaymentClient ───
+
+    /**
+     * Get the SDK InterdotzClient (lazy-loaded singleton).
+     */
+    private function getSdkClient(): InterdotzClient
+    {
+        return app(InterdotzClient::class);
+    }
 
     public function createPayment(
         string $ssoAccessToken,
@@ -331,7 +342,8 @@ class InterdotzService
         string $callbackUrl,
         array $customer,
         array $items,
-        ?string $interdotzUserId = null
+        ?string $interdotzUserId = null,
+        ?string $redirectUrl = null
     ): ?array {
         $this->setLastError(null);
 
@@ -341,34 +353,49 @@ class InterdotzService
                 return null;
             }
 
+            // Use proven getClientToken() for auth (SDK auth has camelCase bug)
             $clientToken = $this->getClientToken($userId);
             if (! $clientToken) {
                 return null;
             }
 
-            $response = $this->client($clientToken)
-                ->post("{$this->apiBase}/api/client/payments", [
-                    'referenceId' => $referenceId,
-                    'reference_id' => $referenceId,
-                    'amount' => $amount,
-                    'currency' => $currency,
-                    'callback_url' => $callbackUrl,
-                    'callbackUrl' => $callbackUrl,
-                    'userId' => $userId,
-                    'user_id' => $userId,
-                    'customer' => $customer,
-                    'items' => $items,
-                ]);
+            // Use SDK PaymentClient for the actual payment creation
+            $payment = $this->getSdkClient()->payment()->createMidtransPayment(
+                accessToken: $clientToken,
+                referenceId: $referenceId,
+                amount:      $amount,
+                items:       $items,
+                redirectUrl: $redirectUrl ?? $callbackUrl,
+                customer:    $customer,
+                currency:    $currency,
+            );
 
-            if ($response->successful()) {
-                return $response->json();
-            }
+            Log::info('Interdotz Midtrans payment created via SDK.', [
+                'reference_id' => $referenceId,
+                'payment_id'   => $payment->id,
+                'redirect_url' => $payment->redirectUrl,
+            ]);
 
-            $this->setLastError($this->extractResponseError($response) ?? 'Pembuatan pembayaran gagal.');
-
-            Log::warning('Interdotz payment creation failed.', [
-                'status' => $response->status(),
-                'body' => $response->body(),
+            // Return array for backward compatibility with controllers
+            return [
+                'payload' => [
+                    'id'           => $payment->id,
+                    'reference_id' => $payment->referenceId,
+                    'amount'       => $payment->amount,
+                    'currency'     => $payment->currency,
+                    'status'       => $payment->status,
+                    'snap_token'   => $payment->snapToken,
+                    'redirect_url' => $payment->redirectUrl,
+                    'expires_at'   => $payment->expiresAt,
+                    'created_at'   => $payment->createdAt,
+                ],
+            ];
+        } catch (PaymentException $e) {
+            $this->setLastError('Pembayaran Midtrans gagal: ' . $e->getMessage());
+            Log::warning('Interdotz Midtrans payment failed.', [
+                'error'   => $e->getMessage(),
+                'code'    => $e->getCode(),
+                'context' => $e->getContext(),
             ]);
         } catch (Throwable $e) {
             $this->setLastError('Gagal menghubungi server Interdotz.');
@@ -392,19 +419,36 @@ class InterdotzService
                 return null;
             }
 
+            // Use proven getClientToken() for auth (SDK auth has camelCase bug)
             $clientToken = $this->getClientToken($userId);
             if (! $clientToken) {
                 return null;
             }
 
-            $response = $this->client($clientToken, 10)
-                ->get("{$this->apiBase}/api/client/payments/{$paymentId}");
+            // Use SDK PaymentClient for the actual status check
+            $status = $this->getSdkClient()->payment()->getMidtransPaymentStatus(
+                accessToken: $clientToken,
+                paymentId:   $paymentId,
+            );
 
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            $this->setLastError($this->extractResponseError($response) ?? 'Gagal mengambil status pembayaran.');
+            // Return array for backward compatibility with controllers
+            return [
+                'payload' => [
+                    'id'                     => $status->id,
+                    'reference_id'           => $status->referenceId,
+                    'amount'                 => $status->amount,
+                    'currency'               => $status->currency,
+                    'status'                 => $status->status,
+                    'payment_method'         => $status->paymentMethod,
+                    'gateway_transaction_id' => $status->gatewayTransactionId,
+                    'paid_at'                => $status->paidAt,
+                    'created_at'             => $status->createdAt,
+                    'updated_at'             => $status->updatedAt,
+                ],
+            ];
+        } catch (PaymentException $e) {
+            $this->setLastError('Gagal mengambil status pembayaran: ' . $e->getMessage());
+            Log::warning('Interdotz Midtrans status failed.', ['error' => $e->getMessage()]);
         } catch (Throwable $e) {
             $this->setLastError('Gagal menghubungi server Interdotz.');
             Log::warning('Interdotz payment status exception.', ['error' => $e->getMessage()]);

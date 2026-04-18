@@ -229,6 +229,98 @@ class GroupController extends Controller
                     ->with('info', 'Pembayaran gagal atau kedaluwarsa. Silakan coba kembali.');
             }
 
+            // ── Payment still pending: sync status from Midtrans via Interdotz ──
+            $meta = (array) ($pendingPayment->metadata_json ?? []);
+            $paymentId = (string) ($meta['payment_id'] ?? '');
+
+            if ($paymentId !== '') {
+                $interdotz = app(InterdotzService::class);
+                $user = Auth::user();
+                $ssoToken = $user?->getAccessToken();
+
+                if ($ssoToken) {
+                    $interdotzUserId = (string) ($user->interdotz_id ?: $user->provider_user_id ?: '');
+                    $statusResponse = $interdotz->getPaymentStatus($ssoToken, $paymentId, $interdotzUserId);
+
+                    if ($statusResponse) {
+                        $statusPayload = $statusResponse['payload'] ?? $statusResponse;
+                        $gatewayStatus = strtolower((string) ($statusPayload['status'] ?? ''));
+
+                        Log::info('Payment callback: synced Midtrans status.', [
+                            'order_id' => $orderId,
+                            'gateway_status' => $gatewayStatus,
+                        ]);
+
+                        $isPaid = in_array($gatewayStatus, [
+                            'settlement', 'capture', 'paid', 'success', 'confirmed',
+                        ], true);
+
+                        $isFailed = in_array($gatewayStatus, [
+                            'expire', 'expired', 'cancel', 'cancelled', 'deny', 'denied', 'failure', 'failed',
+                        ], true);
+
+                        if ($isPaid) {
+                            $paidAmount = (int) ($statusPayload['amount'] ?? $pendingPayment->expected_amount);
+                            $paymentRef = (string) ($statusPayload['gateway_transaction_id'] ?? $paymentId);
+                            $paymentMethod = (string) ($statusPayload['payment_method'] ?? 'midtrans');
+                            $paidAt = $statusPayload['paid_at'] ?? now();
+
+                            // Fulfill the pending payment directly
+                            app(\App\Http\Controllers\Api\WebhookController::class)
+                                ->fulfillPendingPaymentFromCallback(
+                                    $pendingPayment, $paidAmount, $paymentRef, $paymentMethod, $paidAt
+                                );
+
+                            // Re-read to confirm it was fulfilled
+                            $pendingPayment->refresh();
+
+                            if ($pendingPayment->status === 'paid') {
+                                $action = (string) ($meta['action'] ?? '');
+                                $group = $pendingPayment->group;
+
+                                if (($action === 'group_create_midtrans' || $action === 'group_join_midtrans') && $group) {
+                                    return redirect()->route('chat.show', $group)
+                                        ->with('success', 'Pembayaran berhasil! Selamat menggunakan grup.');
+                                }
+
+                                if ($action === 'topup_midtrans') {
+                                    session(['token_purchase' => [
+                                        'group_name' => (string) ($meta['group_name'] ?? ($group?->name ?? 'Grup')),
+                                        'normkredits' => (int) ($meta['normkredits'] ?? 0),
+                                        'tokens' => (int) ($meta['token_amount'] ?? 0),
+                                        'paid_amount' => $paidAmount,
+                                        'payment_method' => 'midtrans',
+                                        'payment_unit' => 'IDR',
+                                    ]]);
+
+                                    return redirect()->route('subscription.tokens.buy.success')
+                                        ->with('success', 'Top-up berhasil dikonfirmasi.');
+                                }
+
+                                return redirect()->route('groups.index')
+                                    ->with('success', 'Pembayaran berhasil dikonfirmasi.');
+                            }
+                        }
+
+                        if ($isFailed) {
+                            $pendingPayment->update(['status' => 'failed']);
+
+                            // Delete pending group if it was a creation
+                            $action = (string) ($meta['action'] ?? '');
+                            if ($action === 'group_create_midtrans') {
+                                $group = $pendingPayment->group;
+                                if ($group && ($group->status ?? '') === 'pending_payment') {
+                                    $group->forceDelete();
+                                }
+                            }
+
+                            return redirect()->route('groups.index')
+                                ->with('info', 'Pembayaran gagal atau kedaluwarsa. Silakan coba kembali.');
+                        }
+                    }
+                }
+            }
+
             return redirect()->route('groups.index')
                 ->with('info', 'Pembayaran sedang diproses. Mohon tunggu beberapa saat.');
         }

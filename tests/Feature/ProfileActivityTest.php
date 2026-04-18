@@ -52,14 +52,23 @@ class ProfileActivityTest extends TestCase
             'payment_reference' => 'topup_ref_abc',
         ]);
 
-        $response = $this->actingAs($user)->get('/profile/activity');
+        $response = $this->actingAs($user)->get('/profile');
 
         $response->assertOk()
-            ->assertSee('Aktivitas Akun')
+            ->assertSee('Setting')
             ->assertSee('Login History')
-            ->assertSee('10.10.10.10')
-            ->assertSee('Riwayat Pembayaran User')
-            ->assertSee('Top-up normkredit (DU)')
-            ->assertSee('topup_ref_abc');
+            ->assertSee('IP 10.10.10.10')
+            ->assertSee('Riwayat transaksi')
+            ->assertSee('Top-up Normkredit')
+            ->assertSee('150 DU');
+    }
+
+    public function test_profile_activity_route_redirects_to_profile_page(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/profile/activity')
+            ->assertRedirect(route('profile.show') . '#riwayat-login');
     }
 }

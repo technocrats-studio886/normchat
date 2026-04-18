@@ -7,7 +7,7 @@
         @endphp
 
         <div class="mb-4 flex items-center gap-3">
-            <a href="{{ route('settings.show', $group) }}" class="text-slate-400">
+            <a href="{{ route('chat.show', $group) }}" class="text-slate-400">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
@@ -35,9 +35,6 @@
             <div class="panel-card p-4">
                 <div class="mb-3 flex items-center justify-between">
                     <p class="text-sm font-bold text-[#0F172A]">NormAI Persona</p>
-                    <span class="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                        Active
-                    </span>
                 </div>
 
                     <label for="ai_persona_style" class="mb-1 block text-xs font-semibold text-[#64748B]">Persona Style</label>

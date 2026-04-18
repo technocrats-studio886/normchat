@@ -18,6 +18,7 @@ Route::get('/login', [AuthController::class, 'landing'])->name('login');
 Route::get('/auth/interdotz/login', [AuthController::class, 'redirectToInterdotz'])->name('auth.interdotz.login');
 Route::get('/auth/interdotz/register', [AuthController::class, 'registerAtInterdotz'])->name('auth.interdotz.register');
 Route::get('/sso/interdotz/callback', [AuthController::class, 'handleInterdotzCallback'])->name('auth.interdotz.callback');
+Route::get('/groups/payment-callback', [GroupController::class, 'paymentCallback'])->name('groups.payment.callback');
 
 // Join group via share ID
 Route::get('/join/{shareId}', [GroupController::class, 'showJoin'])->middleware(['auth'])->name('groups.join');
@@ -45,7 +46,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups/create', [GroupController::class, 'create'])->name('groups.create');
     Route::post('/groups', [GroupController::class, 'store'])->name('groups.store');
     Route::delete('/groups/{group}', [GroupController::class, 'destroy'])->name('groups.destroy');
-    Route::get('/groups/payment-callback', [GroupController::class, 'paymentCallback'])->name('groups.payment.callback');
 
     // Chat
     Route::get('/chat/last', [ChatController::class, 'openLast'])->name('chat.last');
@@ -77,8 +77,13 @@ Route::middleware('auth')->group(function () {
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::get('/profile/account', [ProfileController::class, 'account'])->name('profile.account');
+    Route::post('/profile/account', [ProfileController::class, 'updateAccount'])->name('profile.account.update');
     Route::get('/profile/activity', [ProfileController::class, 'activity'])->name('profile.activity');
+    Route::get('/profile/storage', [ProfileController::class, 'storage'])->name('profile.storage');
     Route::get('/profile/security', [ProfileController::class, 'security'])->name('profile.security');
+    Route::get('/profile/login-history', [ProfileController::class, 'loginHistory'])->name('profile.login-history');
+    Route::get('/profile/transactions', [ProfileController::class, 'transactionHistoryPage'])->name('profile.transactions');
 
     Route::redirect('/app', '/groups');
 });
@@ -90,11 +95,11 @@ Route::get('/manifest.webmanifest', function () {
         'short_name' => 'Normchat',
         'start_url' => '/groups',
         'display' => 'standalone',
-        'background_color' => '#f4fbf9',
-        'theme_color' => '#0f766e',
+        'background_color' => '#ffffff',
+        'theme_color' => '#ffffff',
         'icons' => [
-            ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
-            ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
+            ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
+            ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
             ['src' => '/apple-touch-icon.png', 'sizes' => '180x180', 'type' => 'image/png', 'purpose' => 'any'],
         ],
     ], 200, ['Content-Type' => 'application/manifest+json']);

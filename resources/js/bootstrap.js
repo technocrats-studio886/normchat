@@ -14,7 +14,16 @@ if (csrfToken) {
 
 const reverbKey = import.meta.env.VITE_REVERB_APP_KEY;
 
-if (reverbKey) {
+const path = window.location.pathname || '';
+const isPaymentFlowPath =
+	path === '/groups/create'
+	|| /^\/groups\/[^/]+\/join$/.test(path)
+	|| path === '/groups/payment-callback'
+	|| path.startsWith('/subscription');
+
+const shouldBootRealtime = Boolean(reverbKey) && !isPaymentFlowPath;
+
+if (shouldBootRealtime) {
     const configuredHost = import.meta.env.VITE_REVERB_HOST || window.location.hostname;
     const wsHost = configuredHost === 'reverb' ? window.location.hostname : configuredHost;
 

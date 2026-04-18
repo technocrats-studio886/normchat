@@ -225,7 +225,8 @@ class AuthController extends Controller
             $interdotzId = substr(hash('sha256', $accessToken), 0, 32);
         }
 
-        $username = (string) ($claims['username'] ?? $claims['preferred_username'] ?? $interdotzId);
+        $usernameRaw = (string) ($claims['username'] ?? $claims['preferred_username'] ?? $interdotzId);
+        $username = strtolower(substr((string) preg_replace('/[^A-Za-z0-9._-]/', '', $usernameRaw), 0, 40));
         $email = (string) ($claims['email'] ?? '');
         $name = (string) (
             $profile['name']
@@ -258,6 +259,7 @@ class AuthController extends Controller
         if (! $user) {
             $user = User::create([
                 'name' => $name,
+                'username' => $username !== '' ? $username : null,
                 'email' => $email,
                 'avatar_url' => $avatar !== '' ? $avatar : null,
                 'auth_provider' => 'interdotz',
@@ -265,13 +267,19 @@ class AuthController extends Controller
                 'email_verified_at' => now(),
             ]);
         } else {
-            $user->update([
+            $updatePayload = [
                 'name' => $name !== '' ? $name : $user->name,
                 'email' => $email !== '' ? $email : $user->email,
                 'avatar_url' => $avatar !== '' ? $avatar : $user->avatar_url,
                 'auth_provider' => 'interdotz',
                 'provider_user_id' => $interdotzId,
-            ]);
+            ];
+
+            if (! $user->username && $username !== '') {
+                $updatePayload['username'] = $username;
+            }
+
+            $user->update($updatePayload);
         }
 
         $expiresAt = isset($claims['exp']) ? Carbon::createFromTimestamp((int) $claims['exp']) : null;

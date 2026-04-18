@@ -8,7 +8,7 @@
         <meta name="auth-user-id" content="{{ auth()->id() }}">
         <meta name="auth-user-name" content="{{ auth()->user()->name }}">
     @endauth
-    <meta name="theme-color" content="#0f766e">
+    <meta name="theme-color" content="#ffffff">
     <meta property="og:image" content="{{ asset('normchat-logo.png') }}">
     <meta name="twitter:image" content="{{ asset('normchat-logo.png') }}">
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
@@ -116,9 +116,9 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
                             BUAT
                         </a>
-                        <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Profile">
+                        <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Setting">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
-                            PROFIL
+                            SETTING
                         </a>
                     </div>
                 </nav>

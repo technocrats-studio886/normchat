@@ -8,6 +8,8 @@
     "require": {
         "php": "^8.3",
         "barryvdh/laravel-dompdf": "^3.1",
+        "interdotz/sdk-laravel": "dev-main",
+        "interdotz/sdk-php": "dev-main as 1.0.0",
         "laravel/framework": "^13.0",
         "laravel/reverb": "^1.8",
         "laravel/socialite": "^5.25",
@@ -86,5 +88,14 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [{
+        "name": "interdotz-sdk-laravel",
+        "type": "vcs",
+        "url": "https://github.com/technocrats-studio886/interdotz-sdk-laravel.git"
+    },{
+        "name": "interdotz-sdk-php",
+        "type": "vcs",
+        "url": "https://github.com/technocrats-studio886/interdotz-sdk-php.git"
+    }]
 }

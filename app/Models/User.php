@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Crypt;
 
 #[Fillable([
     'name',
+    'username',
     'email',
     'avatar_url',
     'auth_provider',

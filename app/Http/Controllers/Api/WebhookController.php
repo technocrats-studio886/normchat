@@ -431,6 +431,19 @@ class WebhookController extends Controller
         return in_array($status, ['expire', 'expired', 'cancel', 'cancelled', 'deny', 'denied', 'failure', 'failed'], true);
     }
 
+    /**
+     * Public wrapper so GroupController can call fulfillment from the redirect callback.
+     */
+    public function fulfillPendingPaymentFromCallback(
+        PendingPayment $pending,
+        int $paidAmount,
+        string $paymentReference,
+        string $paymentMethod,
+        mixed $paidAt
+    ): void {
+        $this->fulfillPendingPayment($pending, $paidAmount, $paymentReference, $paymentMethod, $paidAt);
+    }
+
     private function fulfillPendingPayment(
         PendingPayment $pending,
         int $paidAmount,
