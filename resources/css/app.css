@@ -13,22 +13,24 @@
 
 @layer base {
     :root {
-        --nc-bg: #f4f6fb;
+        --nc-bg: #f4fbf9;
         --nc-surface: #ffffff;
-        --nc-surface-2: #f0f2f8;
+        --nc-surface-2: #ecf7f4;
         --nc-text: #111827;
         --nc-text-soft: #4b5563;
         --nc-muted: #9ca3af;
-        --nc-line: #e5e7eb;
+        --nc-line: #cfe8e1;
 
-        /* Single primary color — indigo */
-        --nc-primary: #4f46e5;
-        --nc-primary-light: #eef2ff;
-        --nc-primary-hover: #4338ca;
+        /* Collaboration palette derived from Normchat logo */
+        --nc-primary: #0f766e;
+        --nc-primary-light: #e6f7f4;
+        --nc-primary-hover: #0d5f59;
+        --nc-accent: #22c55e;
+        --nc-accent-soft: #ecfdf5;
 
         /* Accents */
-        --nc-mine: #4f46e5;
-        --nc-ai: #059669;
+        --nc-mine: #0f766e;
+        --nc-ai: #22c55e;
         --nc-ai-soft: #ecfdf5;
         --nc-warn: #d97706;
         --nc-danger: #dc2626;
@@ -60,7 +62,7 @@
 
     .brand-mark {
         @apply inline-flex h-9 w-9 items-center justify-center rounded-2xl text-white;
-        background: var(--nc-primary);
+        background: linear-gradient(135deg, var(--nc-primary) 0%, var(--nc-accent) 100%);
     }
 
     .brand-title {
@@ -82,15 +84,17 @@
     }
     .input-field:focus {
         border-color: var(--nc-primary);
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--nc-primary) 18%, transparent);
     }
 
     /* ── Buttons ─────────────────────────────────── */
     .btn-primary {
         @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white transition active:scale-[0.98];
-        background: var(--nc-primary);
+        background: linear-gradient(135deg, var(--nc-primary) 0%, var(--nc-accent) 100%);
     }
-    .btn-primary:hover { background: var(--nc-primary-hover); }
+    .btn-primary:hover {
+        background: linear-gradient(135deg, var(--nc-primary-hover) 0%, #ea580c 100%);
+    }
 
     .btn-secondary {
         @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-700 transition active:scale-[0.98];
@@ -106,9 +110,11 @@
 
     .btn-cta {
         @apply block w-full rounded-2xl py-3.5 text-center text-sm font-extrabold tracking-wide text-white transition active:scale-[0.98];
-        background: var(--nc-primary);
+        background: linear-gradient(135deg, var(--nc-primary) 0%, var(--nc-accent) 100%);
     }
-    .btn-cta:hover { background: var(--nc-primary-hover); }
+    .btn-cta:hover {
+        background: linear-gradient(135deg, var(--nc-primary-hover) 0%, #ea580c 100%);
+    }
 
     .btn-cta-warm {
         @apply block w-full rounded-2xl py-3.5 text-center text-sm font-extrabold tracking-wide text-white transition active:scale-[0.98];
@@ -118,9 +124,11 @@
 
     .google-btn {
         @apply inline-flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-3 font-bold text-white transition active:scale-[0.98];
-        background: var(--nc-primary);
+        background: linear-gradient(135deg, var(--nc-primary) 0%, var(--nc-accent) 100%);
     }
-    .google-btn:hover { background: var(--nc-primary-hover); }
+    .google-btn:hover {
+        background: linear-gradient(135deg, var(--nc-primary-hover) 0%, #ea580c 100%);
+    }
 
     .google-mark {
         display: inline-flex;
@@ -384,8 +392,8 @@
             animation-duration: 720ms;
         }
         .nc-message-edited-flash--mine {
-            --nc-edited-flash-fill: rgba(59, 130, 246, 0.13);
-            --nc-edited-flash-ring: rgba(59, 130, 246, 0.22);
+            --nc-edited-flash-fill: color-mix(in srgb, var(--nc-primary) 13%, transparent);
+            --nc-edited-flash-ring: color-mix(in srgb, var(--nc-primary) 22%, transparent);
         }
         .nc-message-edited-flash--ai {
             --nc-edited-flash-fill: rgba(16, 185, 129, 0.12);
@@ -412,7 +420,10 @@
     .chip-slate {
         @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold;
     }
-    .chip-indigo { background: #eef2ff; color: #4338ca; }
+    .chip-indigo {
+        background: color-mix(in srgb, var(--nc-primary) 10%, #ffffff);
+        color: var(--nc-primary-hover);
+    }
     .chip-emerald { background: #ecfdf5; color: #047857; }
     .chip-amber { background: #fffbeb; color: #b45309; }
     .chip-rose { background: #fef2f2; color: #be123c; }
@@ -448,6 +459,27 @@
     .composer-send {
         @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition active:scale-[0.96];
         background: var(--nc-primary);
+    }
+
+    .nc-scroll-bottom-btn {
+        color: color-mix(in srgb, var(--nc-primary) 68%, #64748b);
+    }
+    .nc-scroll-bottom-icon {
+        border-color: color-mix(in srgb, var(--nc-primary) 22%, #cbd5e1);
+        background: color-mix(in srgb, var(--nc-primary) 8%, #ffffff);
+        color: color-mix(in srgb, var(--nc-primary) 72%, #334155);
+    }
+    .nc-scroll-bottom-btn:hover .nc-scroll-bottom-icon {
+        background: color-mix(in srgb, var(--nc-primary) 13%, #ffffff);
+    }
+    .nc-scroll-bottom-count {
+        background: color-mix(in srgb, var(--nc-primary) 88%, #0f766e);
+        color: #ffffff;
+    }
+    .nc-scroll-bottom-btn[data-mode="reply"] .nc-scroll-bottom-icon {
+        border-color: color-mix(in srgb, var(--nc-primary) 38%, transparent);
+        background: color-mix(in srgb, var(--nc-primary) 16%, #ffffff);
+        box-shadow: 0 8px 18px -14px color-mix(in srgb, var(--nc-primary) 65%, transparent);
     }
 
     /* ── Floating action button ──────────────────── */
@@ -554,6 +586,47 @@
         max-height: 45vh; overflow-y: auto;
         word-break: break-word;
     }
+    .nc-popup-body--quote {
+        -webkit-touch-callout: default;
+        user-select: text;
+    }
+    .nc-quote-picker {
+        display: block;
+        max-height: 30vh;
+        overflow-y: auto;
+        border: 1px solid var(--nc-line);
+        border-radius: 12px;
+        padding: 12px;
+        background: #ffffff;
+        line-height: 1.8;
+        white-space: pre-wrap;
+        cursor: text;
+    }
+    .nc-quote-word {
+        border: none;
+        border-radius: 6px;
+        padding: 0 2px;
+        margin-right: 3px;
+        background: transparent;
+        color: var(--nc-text);
+        font-size: 13px;
+        line-height: 1.7;
+        cursor: pointer;
+    }
+    .nc-quote-word--selected {
+        background: color-mix(in srgb, var(--nc-primary) 22%, transparent);
+        color: inherit;
+    }
+    .nc-quote-result {
+        margin: 10px 0 0;
+        border-radius: 10px;
+        background: #f8fafc;
+        color: var(--nc-text-soft);
+        font-size: 12px;
+        line-height: 1.45;
+        padding: 8px 10px;
+        min-height: 32px;
+    }
     .nc-popup-actions {
         display: flex; gap: 8px;
         padding: 10px 16px 14px;
@@ -572,6 +645,185 @@
     .nc-popup-btn-select:hover:not(:disabled) { background: #e2e5ee; }
     .nc-popup-btn:disabled {
         opacity: 0.4; cursor: not-allowed;
+    }
+    .nc-inline-highlight-quote,
+    .nc-inline-highlight-search {
+        border-radius: 4px;
+        padding: 0 0.03em;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+    }
+    .nc-inline-highlight-quote {
+        background: rgba(15, 118, 110, 0.24);
+        background: color-mix(in srgb, var(--nc-primary) 24%, transparent);
+        color: inherit;
+        box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.25);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--nc-primary) 28%, transparent);
+        animation: ncQuoteGlow 1400ms ease;
+    }
+    .nc-inline-highlight-search {
+        background: rgba(15, 118, 110, 0.26);
+        color: inherit;
+    }
+    .nc-jump-focus {
+        animation: ncJumpFocusPulse 1400ms cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: box-shadow, transform;
+        border-radius: 16px;
+    }
+    @keyframes ncJumpFocusPulse {
+        0% {
+            box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--nc-primary) 58%, transparent), 0 0 0 0 color-mix(in srgb, var(--nc-primary) 28%, transparent);
+            transform: translateY(0);
+        }
+        16% {
+            box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--nc-primary) 58%, transparent), 0 14px 30px -16px color-mix(in srgb, var(--nc-primary) 62%, transparent);
+            transform: translateY(-1px);
+        }
+        36% {
+            box-shadow: inset 0 0 0 0 transparent, 0 0 0 0 transparent;
+            transform: translateY(0);
+        }
+        54% {
+            box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--nc-primary) 45%, transparent), 0 10px 22px -16px color-mix(in srgb, var(--nc-primary) 45%, transparent);
+            transform: translateY(-0.5px);
+        }
+        100% {
+            box-shadow: inset 0 0 0 0 transparent, 0 0 0 0 transparent;
+            transform: translateY(0);
+        }
+    }
+    @keyframes ncQuoteGlow {
+        0% {
+            background: rgba(15, 118, 110, 0.42);
+            background: color-mix(in srgb, var(--nc-primary) 42%, transparent);
+        }
+        100% {
+            background: rgba(15, 118, 110, 0.24);
+            background: color-mix(in srgb, var(--nc-primary) 24%, transparent);
+        }
+    }
+
+    /* Keep existing blue/indigo utility usage aligned with the logo palette. */
+    .text-indigo-500,
+    .text-indigo-600,
+    .text-blue-600,
+    .text-blue-700 {
+        color: var(--nc-primary) !important;
+    }
+    .text-blue-800,
+    .text-blue-900,
+    .text-indigo-700 {
+        color: var(--nc-primary-hover) !important;
+    }
+    .bg-indigo-50,
+    .bg-blue-50,
+    .bg-blue-100 {
+        background-color: color-mix(in srgb, var(--nc-primary) 10%, #ffffff) !important;
+    }
+    .bg-indigo-500,
+    .bg-indigo-600,
+    .bg-blue-600 {
+        background-color: var(--nc-primary) !important;
+    }
+    .bg-indigo-400\/45 {
+        background-color: color-mix(in srgb, var(--nc-primary) 45%, transparent) !important;
+    }
+    .bg-indigo-300\/55 {
+        background-color: color-mix(in srgb, var(--nc-primary) 55%, transparent) !important;
+    }
+    .bg-blue-200 {
+        background-color: color-mix(in srgb, var(--nc-primary) 22%, #ffffff) !important;
+    }
+    .border-indigo-100,
+    .border-indigo-200,
+    .border-blue-200,
+    .border-blue-300 {
+        border-color: color-mix(in srgb, var(--nc-primary) 32%, #ffffff) !important;
+    }
+    .border-blue-400,
+    .border-indigo-400 {
+        border-color: color-mix(in srgb, var(--nc-primary) 48%, #ffffff) !important;
+    }
+    .border-indigo-300\/70 {
+        border-color: color-mix(in srgb, var(--nc-primary) 70%, #ffffff) !important;
+    }
+    .border-blue-500,
+    .border-indigo-500 {
+        border-color: var(--nc-primary) !important;
+    }
+    .focus\:border-blue-400:focus,
+    .focus\:border-indigo-500:focus {
+        border-color: color-mix(in srgb, var(--nc-primary) 56%, #ffffff) !important;
+    }
+    .focus\:ring-blue-100:focus,
+    .focus\:ring-indigo-500:focus {
+        --tw-ring-color: color-mix(in srgb, var(--nc-primary) 24%, #ffffff) !important;
+    }
+    .accent-blue-600 {
+        accent-color: var(--nc-primary) !important;
+    }
+    .hover\:text-indigo-700:hover,
+    .hover\:text-blue-700:hover {
+        color: var(--nc-primary-hover) !important;
+    }
+    .text-indigo-50 {
+        color: color-mix(in srgb, var(--nc-primary) 8%, #ffffff) !important;
+    }
+    .text-indigo-100\/90 {
+        color: color-mix(in srgb, var(--nc-primary) 18%, #ffffff) !important;
+    }
+    .hover\:bg-indigo-100:hover,
+    .hover\:bg-blue-50:hover {
+        background-color: color-mix(in srgb, var(--nc-primary) 14%, #ffffff) !important;
+    }
+    .hover\:bg-indigo-300\/55:hover {
+        background-color: color-mix(in srgb, var(--nc-primary-hover) 55%, transparent) !important;
+    }
+    .hover\:bg-indigo-700:hover {
+        background-color: var(--nc-primary-hover) !important;
+    }
+
+    /* Remap rose utility classes to the collaboration palette. */
+    .text-rose-400,
+    .text-rose-500,
+    .text-rose-600 {
+        color: var(--nc-primary) !important;
+    }
+    .text-rose-700 {
+        color: var(--nc-primary-hover) !important;
+    }
+    .bg-rose-50,
+    .bg-rose-100 {
+        background-color: color-mix(in srgb, var(--nc-primary) 10%, #ffffff) !important;
+    }
+    .bg-rose-500 {
+        background-color: var(--nc-primary) !important;
+    }
+    .bg-rose-600 {
+        background-color: var(--nc-primary-hover) !important;
+    }
+    .border-rose-100,
+    .border-rose-200,
+    .border-rose-300 {
+        border-color: color-mix(in srgb, var(--nc-primary) 28%, #ffffff) !important;
+    }
+    .hover\:bg-rose-50:hover,
+    .hover\:bg-rose-100:hover {
+        background-color: color-mix(in srgb, var(--nc-primary) 14%, #ffffff) !important;
+    }
+    .hover\:bg-rose-500:hover {
+        background-color: color-mix(in srgb, var(--nc-primary) 88%, #0f766e) !important;
+    }
+    .hover\:bg-rose-600:hover {
+        background-color: var(--nc-primary-hover) !important;
+    }
+    .hover\:text-rose-700:hover {
+        color: var(--nc-primary-hover) !important;
+    }
+    .shadow-rose-900\/15,
+    .shadow-rose-900\/20,
+    .shadow-rose-900\/35 {
+        --tw-shadow-color: color-mix(in srgb, var(--nc-primary) 34%, transparent) !important;
     }
     @keyframes ncFadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes ncSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

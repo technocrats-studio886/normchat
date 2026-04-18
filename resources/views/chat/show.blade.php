@@ -101,13 +101,16 @@
                         ? (string) $message->content
                         : ($isImage ? '[Gambar]' : ($isVideo ? '[Video]' : ($isVoice ? '[Voice note]' : ($isFileAttachment ? '[File]' : '[Lampiran]'))));
                     $replyTarget = $message->replyToMessage;
+                    $replyQuote = trim((string) ($message->reply_quote_text ?? ''));
                     $replySender = $replyTarget
                         ? ($replyTarget->sender_type === 'ai' ? 'NormAI' : ($replyTarget->sender->name ?? 'User'))
                         : null;
                     $replyPreview = $replyTarget
-                        ? ($replyTarget->content
+                        ? ($replyQuote !== ''
+                            ? \Illuminate\Support\Str::limit($replyQuote, 100)
+                            : ($replyTarget->content
                             ? \Illuminate\Support\Str::limit((string) $replyTarget->content, 100)
-                            : (($replyTarget->message_type === 'image') ? '[Gambar]' : (($replyTarget->message_type === 'voice') ? '[Voice note]' : '[Lampiran]')))
+                            : (($replyTarget->message_type === 'image') ? '[Gambar]' : (($replyTarget->message_type === 'voice') ? '[Voice note]' : '[Lampiran]'))))
                         : null;
                     $audioSourceMime = $attachmentMime === 'video/webm' ? 'audio/webm' : ($message->attachment_mime ?? 'audio/webm');
                     $isEdited = ((int) ($message->versions_count ?? 0)) > 0;
@@ -122,10 +125,10 @@
                     <div id="message-{{ $message->id }}" class="flex justify-end" data-message-id="{{ $message->id }}" data-message-sender-id="{{ (int) ($message->sender_id ?? 0) }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}" data-message-attachment-mime="{{ $message->attachment_mime }}" data-message-attachment-name="{{ $message->attachment_original_name }}">
                         <div class="max-w-[75%]">
                             @if($replyTarget)
-                                <a href="#message-{{ $replyTarget->id }}" class="nc-reply-chip nc-reply-chip--mine mb-1 block rounded-xl px-3 py-1.5 text-xs">
+                                <button type="button" data-reply-jump="{{ $replyTarget->id }}" data-reply-quote="{{ $replyQuote }}" class="nc-reply-chip nc-reply-chip--mine mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">
                                     <p class="nc-reply-chip-sender font-semibold">Membalas {{ $replySender }}</p>
                                     <p class="truncate">{{ $replyPreview }}</p>
-                                </a>
+                                </button>
                             @endif
                             @if($message->content && $isImage)
                                 <div class="nc-media-caption-card nc-media-caption-card--mine mb-2" data-message-body="1">
@@ -211,10 +214,10 @@
                     @php $hasRich = str_contains($message->content ?? '', '|') || str_contains($message->content ?? '', '```mermaid'); @endphp
                     <div id="message-{{ $message->id }}" class="{{ $hasRich ? 'max-w-[95%]' : 'max-w-[80%]' }}" data-message-id="{{ $message->id }}" data-message-sender-id="{{ (int) ($message->sender_id ?? 0) }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}" data-message-attachment-mime="{{ $message->attachment_mime }}" data-message-attachment-name="{{ $message->attachment_original_name }}">
                         @if($replyTarget)
-                            <div class="nc-reply-chip nc-reply-chip--ai mb-1 rounded-xl px-3 py-1.5 text-xs">
+                            <button type="button" data-reply-jump="{{ $replyTarget->id }}" data-reply-quote="{{ $replyQuote }}" class="nc-reply-chip nc-reply-chip--ai mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">
                                 <p class="nc-reply-chip-sender font-semibold">Membalas {{ $replySender }}</p>
                                 <p class="truncate">{{ $replyPreview }}</p>
-                            </div>
+                            </button>
                         @endif
                         @if($isImage)
                             <a href="{{ $attachmentUrl }}" class="mb-2 block overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="{{ $attachmentName }}">
@@ -277,10 +280,10 @@
                     <div id="message-{{ $message->id }}" class="max-w-[75%]" data-message-id="{{ $message->id }}" data-message-sender-id="{{ (int) ($message->sender_id ?? 0) }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}" data-message-attachment-mime="{{ $message->attachment_mime }}" data-message-attachment-name="{{ $message->attachment_original_name }}">
                         <p class="nc-chat-sender mb-1 text-[11px]">{{ $senderName }}</p>
                         @if($replyTarget)
-                            <div class="nc-reply-chip nc-reply-chip--other mb-1 rounded-xl px-3 py-1.5 text-xs">
+                            <button type="button" data-reply-jump="{{ $replyTarget->id }}" data-reply-quote="{{ $replyQuote }}" class="nc-reply-chip nc-reply-chip--other mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">
                                 <p class="nc-reply-chip-sender font-semibold">Membalas {{ $replySender }}</p>
                                 <p class="truncate">{{ $replyPreview }}</p>
-                            </div>
+                            </button>
                         @endif
                         @if($isImage)
                             <a href="{{ $attachmentUrl }}" class="mb-2 block overflow-hidden rounded-2xl border border-slate-200 bg-white" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="{{ $attachmentName }}">
@@ -354,6 +357,7 @@
                 <input type="file" name="attachment" accept="image/*,audio/*,video/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z" class="hidden" data-chat-attachment="1" />
                 <input type="file" accept="image/*" capture="environment" class="hidden" data-chat-camera-input="1" />
                 <input type="hidden" name="reply_to_message_id" value="" data-reply-to-input="1" />
+                <input type="hidden" name="reply_quote_text" value="" data-reply-quote-input="1" />
 
                 <div class="hidden items-center justify-between border-b border-indigo-100 bg-indigo-50/70 px-4 py-2" data-reply-preview="1">
                     <div class="flex min-w-0 items-center gap-2">
@@ -447,9 +451,9 @@
         </div>
 
         {{-- Scroll to bottom button --}}
-        <button type="button" class="fixed z-20 right-4 hidden flex-col items-center gap-1.5 rounded-full bg-transparent text-slate-500 transition" style="bottom: calc(env(safe-area-inset-bottom) + 78px);" data-scroll-bottom="1" aria-label="Lewati ke pesan terbaru">
-            <span class="hidden min-w-10 rounded-full bg-[#2b6cb0] px-2 py-0.5 text-center text-[11px] font-semibold text-white shadow" data-scroll-bottom-count="1"></span>
-            <span class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md hover:bg-slate-50">
+        <button type="button" class="nc-scroll-bottom-btn fixed z-20 right-4 hidden flex-col items-center gap-1.5 rounded-full bg-transparent transition" style="bottom: calc(env(safe-area-inset-bottom) + 78px);" data-scroll-bottom="1" data-mode="latest" aria-label="Lewati ke pesan terbaru">
+            <span class="nc-scroll-bottom-count hidden min-w-10 rounded-full px-2 py-0.5 text-center text-[11px] font-semibold shadow" data-scroll-bottom-count="1"></span>
+            <span class="nc-scroll-bottom-icon inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-md">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
             </span>
         </button>

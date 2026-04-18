@@ -44,8 +44,13 @@
                 <h2 class="text-sm font-bold text-slate-900">Informasi Keamanan</h2>
                 <p class="mt-1 text-xs text-slate-500">Akun Anda dilindungi oleh Interdotz SSO. Semua autentikasi dikelola melalui Interdotz.</p>
                 <div class="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                    Untuk mengubah password atau mengaktifkan 2FA, kelola langsung di akun Interdotz Anda.
+                    Untuk mengubah password, kelola langsung di akun Interdotz Anda.
                 </div>
+
+                <a href="{{ route('profile.activity') }}" class="mt-3 inline-flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                    <span>Lihat login history & transaksi user</span>
+                    <span aria-hidden="true">&rarr;</span>
+                </a>
             </div>
         </div>
     </section>

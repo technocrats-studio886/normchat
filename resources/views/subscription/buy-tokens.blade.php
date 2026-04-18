@@ -7,7 +7,7 @@
         </a>
 
         <h1 class="mt-3 font-display text-2xl font-extrabold text-slate-900">Top-up Normkredit</h1>
-        <p class="mt-1 text-sm text-slate-500">Pilih paket lalu bayar via DU atau Midtrans tanpa mengganggu chat yang sedang berjalan.</p>
+        <p class="mt-1 text-sm text-slate-500">Pilih paket lalu bayar via DU atau IDR tanpa mengganggu chat yang sedang berjalan.</p>
 
         @if($errors->has('payment'))
             <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -42,7 +42,7 @@
                         </label>
                         <label class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:checked]:text-blue-700">
                             <input type="radio" name="payment_method" value="midtrans" class="accent-blue-600" {{ old('payment_method') === 'midtrans' ? 'checked' : '' }}>
-                            Midtrans
+                            IDR
                         </label>
                     </div>
                 </div>
@@ -94,11 +94,11 @@
             const submit = document.getElementById('topupSubmitBtn');
             const hint = document.getElementById('topupHintText');
             if (submit) {
-                submit.textContent = method === 'midtrans' ? 'Bayar dengan Midtrans' : 'Top-up Normkredit';
+                submit.textContent = method === 'midtrans' ? 'Bayar dengan IDR' : 'Top-up Normkredit';
             }
             if (hint) {
                 hint.textContent = method === 'midtrans'
-                    ? 'Pembayaran diproses melalui Midtrans dalam Rupiah (IDR).'
+                    ? 'Pembayaran diproses dalam Rupiah (IDR).'
                     : 'Pembayaran menggunakan Dots Units dari akun Interdotz Anda.';
             }
         }

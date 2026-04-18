@@ -66,7 +66,7 @@
                             <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
                                 <input type="radio" name="payment_method" value="midtrans" class="mt-0.5 accent-blue-600" {{ old('payment_method') === 'midtrans' ? 'checked' : '' }}>
                                 <span>
-                                    <span class="block text-sm font-bold text-slate-800">Midtrans (IDR)</span>
+                                    <span class="block text-sm font-bold text-slate-800">IDR</span>
                                     <span class="block text-xs text-slate-500">Rp{{ number_format($idrPatungan, 0, ',', '.') }}</span>
                                 </span>
                             </label>
@@ -109,7 +109,7 @@
             midtrans: {
                 value: 'Rp{{ number_format($idrPatungan, 0, ',', '.') }}',
                 button: 'Bayar Rp{{ number_format($idrPatungan, 0, ',', '.') }} & Bergabung',
-                hint: 'Pembayaran diproses via Midtrans (IDR).',
+                hint: 'Pembayaran diproses dalam Rupiah (IDR).',
             },
         };
 

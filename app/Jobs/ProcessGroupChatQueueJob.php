@@ -149,6 +149,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
                 'attachment_mime',
                 'attachment_original_name',
                 'reply_to_message_id',
+                'reply_quote_text',
             ])
             ->reverse()
             ->values();
@@ -224,6 +225,10 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'group_id' => $message->group_id,
             'sender_type' => 'ai',
             'sender_id' => null,
+            'reply_to_message_id' => $message->id,
+            'reply_quote_text' => trim((string) ($message->reply_quote_text ?? '')) !== ''
+                ? trim((string) $message->reply_quote_text)
+                : null,
             'content' => $responseText,
         ];
 
@@ -236,6 +241,8 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         }
 
         $aiMessage = Message::create($aiMessageData);
+        $aiMessage->loadMissing('replyToMessage.sender:id,name');
+        $aiReplyTarget = $aiMessage->replyToMessage;
 
         $attachmentUrl = $aiMessage->attachment_path
             ? route('chat.attachment', ['group' => $group->id, 'message' => $aiMessage->id])
@@ -254,7 +261,16 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'attachment_mime' => $aiMessage->attachment_mime,
             'attachment_original_name' => $aiMessage->attachment_original_name,
             'created_at' => optional($aiMessage->created_at)->toIso8601String(),
-            'reply_to' => null,
+            'reply_to' => $aiReplyTarget ? [
+                'id' => (int) $aiReplyTarget->id,
+                'sender_name' => $aiReplyTarget->sender_type === 'ai'
+                    ? 'NormAI'
+                    : ($aiReplyTarget->sender?->name ?? 'User'),
+                'message_type' => (string) $aiReplyTarget->message_type,
+                'content' => (string) ($aiReplyTarget->content ?? ''),
+                'quote_text' => (string) ($aiMessage->reply_quote_text ?? ''),
+                'attachment_original_name' => (string) ($aiReplyTarget->attachment_original_name ?? ''),
+            ] : null,
             'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
             'group_credits_remaining' => round(((int) ($groupToken?->remaining_tokens ?? 0)) / 2500, 1),
         ]));
@@ -376,7 +392,8 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             . "\n- Markdown table untuk data tabular (gunakan | header | format |)"
             . "\n- Mermaid diagram dengan syntax ```mermaid untuk flowchart, sequence diagram, pie chart, dll"
             . "\n- Numbered list dan bullet list"
-            . "\nGunakan format yang paling sesuai untuk menjawab pertanyaan user.";
+            . "\nGunakan format yang paling sesuai untuk menjawab pertanyaan user."
+            . "\nJika user membalas pesan (reply), prioritaskan konteks pada bagian kutipan reply bila tersedia.";
 
         if ($group) {
             if ($group->ai_persona_style) {
@@ -458,6 +475,11 @@ class ProcessGroupChatQueueJob implements ShouldQueue
                 ? 'NormAI'
                 : ($replyTarget->sender?->name ?? 'User');
 
+            $replyQuoteText = trim((string) ($requestMessage->reply_quote_text ?? ''));
+            if ($replyQuoteText !== '') {
+                $parts[] = "Bagian spesifik yang dibalas user dari pesan {$replySender}: \"{$replyQuoteText}\". Fokus utama jawabanmu pada bagian ini.";
+            }
+
             $replySummary = trim((string) $replyTarget->content);
             if ($replySummary === '') {
                 $replySummary = $this->isImageMessage($replyTarget)
@@ -490,14 +512,22 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
     private function messageToContextLine($row, string $token): string
     {
+        $replyQuoteText = trim((string) ($row['reply_quote_text'] ?? ''));
+        $replyMeta = '';
+        if ((int) ($row['reply_to_message_id'] ?? 0) > 0) {
+            $replyMeta = $replyQuoteText !== ''
+                ? " [reply mengutip: \"{$replyQuoteText}\"]"
+                : ' [reply]';
+        }
+
         $content = trim((string) ($row['content'] ?? ''));
         if ($content !== '') {
-            return $content;
+            return $content . $replyMeta;
         }
 
         $messageType = strtolower((string) ($row['message_type'] ?? 'text'));
         if ($messageType === 'image') {
-            return '[Pesan sebelumnya berisi gambar]';
+            return '[Pesan sebelumnya berisi gambar]' . $replyMeta;
         }
 
         if ($messageType === 'voice') {
@@ -512,13 +542,13 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
             $transcript = $this->transcribeAudioAttachment($audioMessage, $token);
             if ($transcript !== null && $transcript !== '') {
-                return '[Transkrip audio] ' . $transcript;
+                return '[Transkrip audio] ' . $transcript . $replyMeta;
             }
 
-            return '[Pesan sebelumnya berisi audio]';
+            return '[Pesan sebelumnya berisi audio]' . $replyMeta;
         }
 
-        return '[Pesan sebelumnya berisi lampiran]';
+        return '[Pesan sebelumnya berisi lampiran]' . $replyMeta;
     }
 
     private function isImageMessage(?Message $message): bool

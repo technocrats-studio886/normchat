@@ -4,7 +4,7 @@
     <section class="page-shell">
         {{-- Header --}}
         <div class="flex items-start justify-between">
-            <div class="flex items-center gap-3">
+            <a href="{{ route('profile.show') }}" class="flex items-center gap-3 rounded-full transition active:opacity-70" aria-label="Buka profil">
                 @if(Auth::user()->avatar_url)
                     <img src="{{ Auth::user()->avatar_url }}" alt="" class="h-11 w-11 rounded-full object-cover ring-1 ring-slate-200" referrerpolicy="no-referrer" />
                 @else
@@ -16,7 +16,7 @@
                     <p class="text-xs text-slate-500">Selamat datang</p>
                     <h1 class="font-display text-lg font-extrabold text-slate-900">{{ Str::words(Auth::user()->name, 1, '') }}</h1>
                 </div>
-            </div>
+            </a>
             <a href="{{ route('profile.security') }}" class="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50" aria-label="Settings profil">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </a>
@@ -26,7 +26,7 @@
         <div class="mt-5">
             <div class="card-soft">
                 <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 8h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h2m8-4H8l-1 4h10l-1-4Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 12v4m-2-2h4"/></svg>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -52,7 +52,7 @@
         {{-- Section title --}}
         <div class="mt-6 flex items-center justify-between">
             <h2 class="section-title">Grup Kamu</h2>
-            <a href="{{ route('groups.create') }}" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700">+ Buat baru</a>
+            <a href="{{ route('groups.create') }}" class="text-[11px] font-bold text-rose-600 hover:text-rose-700">+ Buat baru</a>
         </div>
 
         {{-- Group search --}}
@@ -90,7 +90,7 @@
                     <div class="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
                         <span class="truncate">ID: <span class="font-mono font-semibold text-slate-600">{{ $group->share_id }}</span></span>
                         <div class="flex items-center gap-3">
-                            <button type="button" class="font-semibold text-indigo-600 hover:text-indigo-700" data-copy-share-id="{{ $group->share_id }}">Copy</button>
+                            <button type="button" class="font-semibold text-rose-600 hover:text-rose-700" data-copy-share-id="{{ $group->share_id }}">Copy</button>
                             <button
                                 type="button"
                                 class="font-semibold text-emerald-600 hover:text-emerald-700"
@@ -104,7 +104,7 @@
                 </div>
             @empty
                 <div class="card-soft p-6 text-center">
-                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
+                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-500">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h7m-7 4h5M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6l-4 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>
                     </div>
                     <p class="text-sm font-semibold text-slate-700">Belum ada grup</p>

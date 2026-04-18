@@ -222,9 +222,9 @@ const applyChatTheme = (themeId) => {
 	}
 
 	clearThemeVars();
-	chatShell.style.setProperty('--nc-primary', String(theme.primary || '#4f46e5'));
-	chatShell.style.setProperty('--nc-primary-hover', String(theme.primaryHover || theme.primary || '#4338ca'));
-	chatShell.style.setProperty('--nc-mine', String(theme.mine || theme.primary || '#4f46e5'));
+	chatShell.style.setProperty('--nc-primary', String(theme.primary || '#0f766e'));
+	chatShell.style.setProperty('--nc-primary-hover', String(theme.primaryHover || theme.primary || '#0d5f59'));
+	chatShell.style.setProperty('--nc-mine', String(theme.mine || theme.primary || '#0f766e'));
 	chatShell.style.setProperty('--nc-chat-meta', String(theme.headerSubtitle || '#94a3b8'));
 	chatShell.style.setProperty('--nc-chat-meta-strong', String(theme.headerTitle || '#e2e8f0'));
 	chatShell.style.setProperty('--nc-chat-header-bg', String(theme.headerBg || 'rgba(255,255,255,0.95)'));
@@ -232,7 +232,7 @@ const applyChatTheme = (themeId) => {
 	chatShell.style.setProperty('--nc-chat-header-title', String(theme.headerTitle || '#1f2937'));
 	chatShell.style.setProperty('--nc-chat-header-subtitle', String(theme.headerSubtitle || '#6b7280'));
 	chatShell.style.setProperty('--nc-chat-reply-mine-bg', String(theme.replyMineBg || 'rgba(15, 23, 42, 0.52)'));
-	chatShell.style.setProperty('--nc-chat-reply-mine-border', String(theme.primary || '#60a5fa'));
+	chatShell.style.setProperty('--nc-chat-reply-mine-border', String(theme.primary || '#f472b6'));
 	chatShell.style.setProperty('--nc-chat-reply-mine-text', String(theme.headerTitle || '#e2e8f0'));
 	chatShell.style.setProperty('--nc-chat-reply-ai-bg', String(theme.replyAiBg || 'rgba(6, 95, 70, 0.5)'));
 	chatShell.style.setProperty('--nc-chat-reply-ai-border', String(theme.aiBorder || '#34d399'));
@@ -651,7 +651,12 @@ const renderReplyPreview = (message, palette = 'slate') => {
 	}
 
 	const sender = escapeHtml(replyTo.sender_name || 'User');
-	let summary = String(replyTo.content || '').trim();
+	const quoteText = String(replyTo.quote_text || '').trim();
+	const safeQuoteAttr = escapeAttr(quoteText);
+	let summary = String(replyTo.quote_text || '').trim();
+	if (!summary) {
+		summary = String(replyTo.content || '').trim();
+	}
 	if (!summary) {
 		const replyType = String(replyTo.message_type || '').toLowerCase();
 		summary = replyType === 'image' ? '[Gambar]' : (replyType === 'voice' ? '[Voice note]' : '[Lampiran]');
@@ -663,10 +668,10 @@ const renderReplyPreview = (message, palette = 'slate') => {
 		: (palette === 'emerald' ? 'nc-reply-chip--ai' : 'nc-reply-chip--other');
 
 	return `
-		<a href="#message-${replyTo.id}" class="nc-reply-chip ${toneClass} mb-1 block rounded-xl px-3 py-1.5 text-xs">
+		<button type="button" data-reply-jump="${replyTo.id}" data-reply-quote="${safeQuoteAttr}" class="nc-reply-chip ${toneClass} mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">
 			<p class="nc-reply-chip-sender font-semibold">Membalas ${sender}</p>
 			<p class="truncate">${safeSummary}</p>
-		</a>
+		</button>
 	`;
 };
 
@@ -1516,6 +1521,42 @@ let firstOpenPendingCount = unreadCountFromServer > 0 ? unreadCountFromServer : 
 let shouldShowFirstOpenSkip = !hasVisitedGroupBefore && initialMessageCount > 0;
 let markReadInFlight = false;
 let markReadQueued = false;
+let pendingSkipReplySourceMessageId = 0;
+let clearPendingSkipReplyTimer = null;
+
+const syncScrollBottomMode = () => {
+	if (!(scrollBottomBtn instanceof HTMLElement)) {
+		return;
+	}
+
+	const inReplyMode = pendingSkipReplySourceMessageId > 0;
+	scrollBottomBtn.dataset.mode = inReplyMode ? 'reply' : 'latest';
+	scrollBottomBtn.setAttribute('aria-label', inReplyMode ? 'Kembali ke pesan yang membalas' : 'Lewati ke pesan terbaru');
+};
+
+const setPendingSkipReplySourceMessageId = (messageId) => {
+	const numericId = Number(messageId || 0);
+	if (!Number.isFinite(numericId) || numericId <= 0) {
+		pendingSkipReplySourceMessageId = 0;
+		if (clearPendingSkipReplyTimer) {
+			window.clearTimeout(clearPendingSkipReplyTimer);
+			clearPendingSkipReplyTimer = null;
+		}
+		syncScrollBottomMode();
+		return;
+	}
+
+	pendingSkipReplySourceMessageId = numericId;
+	syncScrollBottomMode();
+	if (clearPendingSkipReplyTimer) {
+		window.clearTimeout(clearPendingSkipReplyTimer);
+	}
+	clearPendingSkipReplyTimer = window.setTimeout(() => {
+		pendingSkipReplySourceMessageId = 0;
+		clearPendingSkipReplyTimer = null;
+		syncScrollBottomMode();
+	}, 15000);
+};
 
 const extractLatestMessageIdFromDom = () => {
 	if (!chatFeed) {
@@ -1594,6 +1635,12 @@ const syncScrollBottomCount = () => {
 		return;
 	}
 
+	if (pendingSkipReplySourceMessageId > 0) {
+		scrollBottomCount.classList.add('hidden');
+		scrollBottomCount.textContent = '';
+		return;
+	}
+
 	if (shouldShowFirstOpenSkip && firstOpenPendingCount > 0) {
 		scrollBottomCount.textContent = String(firstOpenPendingCount);
 		scrollBottomCount.classList.remove('hidden');
@@ -1633,6 +1680,7 @@ const focusComposerInput = (delay = 0) => {
 let refreshScrollBottomButton = () => {};
 if (chatFeed && scrollBottomBtn) {
 	const checkScrollPos = () => {
+		syncScrollBottomMode();
 		const distFromBottom = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
 		if (distFromBottom < 64) {
 			markGroupVisited();
@@ -1641,7 +1689,7 @@ if (chatFeed && scrollBottomBtn) {
 
 		syncScrollBottomCount();
 
-		if (distFromBottom > 200 || shouldShowFirstOpenSkip) {
+		if (distFromBottom > 200 || shouldShowFirstOpenSkip || pendingSkipReplySourceMessageId > 0) {
 			scrollBottomBtn.classList.remove('hidden');
 			scrollBottomBtn.classList.add('inline-flex');
 		} else {
@@ -1653,6 +1701,15 @@ if (chatFeed && scrollBottomBtn) {
 	refreshScrollBottomButton = checkScrollPos;
 	chatFeed.addEventListener('scroll', checkScrollPos, { passive: true });
 	scrollBottomBtn.addEventListener('click', () => {
+		if (pendingSkipReplySourceMessageId > 0) {
+			const sourceId = pendingSkipReplySourceMessageId;
+			setPendingSkipReplySourceMessageId(0);
+			if (highlightMessageInFeed(sourceId)) {
+				checkScrollPos();
+				return;
+			}
+		}
+
 		scrollChatToBottom('smooth');
 		markGroupVisited();
 		syncScrollBottomCount();
@@ -1674,7 +1731,202 @@ const ensureMentionToastStack = () => {
 	return stack;
 };
 
-const highlightMessageInFeed = (messageId) => {
+const clearHighlightMarks = (root, markerClass) => {
+	if (!(root instanceof HTMLElement || root instanceof Document)) {
+		return;
+	}
+
+	root.querySelectorAll(`mark.${markerClass}`).forEach((markNode) => {
+		const parent = markNode.parentNode;
+		if (!parent) {
+			return;
+		}
+		parent.replaceChild(document.createTextNode(markNode.textContent || ''), markNode);
+		parent.normalize();
+	});
+};
+
+const getMessageHighlightTargets = (messageNode, includeSender = false) => {
+	if (!(messageNode instanceof HTMLElement)) {
+		return [];
+	}
+
+	const targets = Array.from(messageNode.querySelectorAll('.whitespace-pre-wrap'));
+	if (targets.length === 0) {
+		targets.push(...Array.from(messageNode.querySelectorAll('.ai-markdown p, .ai-markdown li, .ai-markdown td, .ai-markdown h1, .ai-markdown h2, .ai-markdown h3, .ai-markdown h4')));
+	}
+	if (includeSender) {
+		const senderTarget = messageNode.querySelector('.nc-chat-sender');
+		if (senderTarget instanceof HTMLElement) {
+			targets.push(senderTarget);
+		}
+	}
+
+	return targets;
+};
+
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const applyInlineHighlight = (targetEl, phrase, { mode = 'quote', highlightAll = false } = {}) => {
+	if (!(targetEl instanceof HTMLElement)) {
+		return false;
+	}
+
+	const cleanedPhrase = String(phrase || '').trim();
+	if (cleanedPhrase === '') {
+		return false;
+	}
+
+	const sourceText = targetEl.textContent || '';
+	if (sourceText === '') {
+		return false;
+	}
+
+	const className = mode === 'search' ? 'nc-inline-highlight-search' : 'nc-inline-highlight-quote';
+	const escapedPhrase = escapeRegex(cleanedPhrase).replace(/\s+/g, '\\s+');
+	const regex = new RegExp(escapedPhrase, highlightAll ? 'gi' : 'i');
+	let resultHtml = '';
+	let lastIndex = 0;
+	let found = false;
+	let match = regex.exec(sourceText);
+
+	while (match) {
+		found = true;
+		const matchText = match[0] || '';
+		const start = Number(match.index || 0);
+		const end = start + matchText.length;
+		resultHtml += `${escapeHtml(sourceText.slice(lastIndex, start))}<mark class="${className}">${escapeHtml(matchText)}</mark>`;
+		lastIndex = end;
+
+		if (!highlightAll) {
+			break;
+		}
+
+		match = regex.exec(sourceText);
+	}
+
+	if (!found) {
+		return false;
+	}
+
+	resultHtml += escapeHtml(sourceText.slice(lastIndex));
+	targetEl.innerHTML = resultHtml;
+	return true;
+};
+
+const clearQuoteHighlightsInFeed = () => {
+	clearHighlightMarks(document, 'nc-inline-highlight-quote');
+};
+
+const REPLY_JUMP_VISUAL_MS = 1400;
+const REPLY_JUMP_SCROLL_SETTLE_MS = 220;
+
+let clearQuoteHighlightTimer = null;
+let pendingReplyVisualTimer = null;
+
+const cancelPendingReplyVisual = () => {
+	if (pendingReplyVisualTimer) {
+		window.clearTimeout(pendingReplyVisualTimer);
+		pendingReplyVisualTimer = null;
+	}
+};
+
+const cancelScheduledQuoteHighlightClear = () => {
+	if (clearQuoteHighlightTimer) {
+		window.clearTimeout(clearQuoteHighlightTimer);
+		clearQuoteHighlightTimer = null;
+	}
+};
+
+const scheduleQuoteHighlightClear = (delayMs = REPLY_JUMP_VISUAL_MS) => {
+	cancelScheduledQuoteHighlightClear();
+	clearQuoteHighlightTimer = window.setTimeout(() => {
+		clearQuoteHighlightsInFeed();
+		clearQuoteHighlightTimer = null;
+	}, delayMs);
+};
+
+const clearSearchHighlightsInFeed = (feed) => {
+	if (!(feed instanceof HTMLElement)) {
+		return;
+	}
+
+	clearHighlightMarks(feed, 'nc-inline-highlight-search');
+};
+
+let activeJumpFocusNode = null;
+let clearJumpFocusTimer = null;
+
+const animateJumpFocus = (target) => {
+	if (!(target instanceof HTMLElement)) {
+		return;
+	}
+
+	const visualTarget = target.matches('[data-message-body="1"]')
+		? target
+		: (target.querySelector('[data-message-body="1"], .bubble-mine, .bubble-ai, .bubble-other, .nc-media-caption-card, [data-poll-card]')
+		|| target);
+
+	if (activeJumpFocusNode instanceof HTMLElement && activeJumpFocusNode !== visualTarget) {
+		activeJumpFocusNode.classList.remove('nc-jump-focus');
+	}
+
+	if (clearJumpFocusTimer) {
+		window.clearTimeout(clearJumpFocusTimer);
+		clearJumpFocusTimer = null;
+	}
+
+	visualTarget.style.animation = 'none';
+	visualTarget.classList.remove('nc-jump-focus');
+	void visualTarget.offsetWidth;
+	visualTarget.style.animation = '';
+	visualTarget.classList.add('nc-jump-focus');
+	activeJumpFocusNode = visualTarget;
+
+	clearJumpFocusTimer = window.setTimeout(() => {
+		visualTarget.classList.remove('nc-jump-focus');
+		if (activeJumpFocusNode === visualTarget) {
+			activeJumpFocusNode = null;
+		}
+		clearJumpFocusTimer = null;
+	}, REPLY_JUMP_VISUAL_MS);
+};
+
+const highlightQuoteInMessage = (messageNode, quoteText) => {
+	const cleanedQuote = String(quoteText || '').trim();
+	if (cleanedQuote === '' || !(messageNode instanceof HTMLElement)) {
+		return null;
+	}
+
+	const targets = getMessageHighlightTargets(messageNode, false);
+	for (const target of targets) {
+		if (applyInlineHighlight(target, cleanedQuote, { mode: 'quote', highlightAll: false })) {
+			const markNode = target.querySelector('mark.nc-inline-highlight-quote');
+			return markNode instanceof HTMLElement ? markNode : target;
+		}
+	}
+
+	return null;
+};
+
+const highlightSearchInMessage = (messageNode, queryText) => {
+	const cleanedQuery = String(queryText || '').trim();
+	if (cleanedQuery === '' || !(messageNode instanceof HTMLElement)) {
+		return false;
+	}
+
+	let hasHighlight = false;
+	const targets = getMessageHighlightTargets(messageNode, true);
+	targets.forEach((target) => {
+		if (applyInlineHighlight(target, cleanedQuery, { mode: 'search', highlightAll: true })) {
+			hasHighlight = true;
+		}
+	});
+
+	return hasHighlight;
+};
+
+const highlightMessageInFeed = (messageId, replyQuote = '') => {
 	if (!messageId) {
 		return false;
 	}
@@ -1685,11 +1937,21 @@ const highlightMessageInFeed = (messageId) => {
 		return false;
 	}
 
-	target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-	target.classList.add('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-[#F7F7F7]', 'rounded-2xl');
-	window.setTimeout(() => {
-		target.classList.remove('ring-2', 'ring-amber-300', 'ring-offset-2', 'ring-offset-[#F7F7F7]', 'rounded-2xl');
-	}, 2600);
+	cancelPendingReplyVisual();
+	cancelScheduledQuoteHighlightClear();
+	target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+	pendingReplyVisualTimer = window.setTimeout(() => {
+		clearQuoteHighlightsInFeed();
+		const highlightedTextTarget = highlightQuoteInMessage(target, replyQuote);
+
+		if (highlightedTextTarget instanceof HTMLElement) {
+			scheduleQuoteHighlightClear(REPLY_JUMP_VISUAL_MS);
+		} else {
+			animateJumpFocus(target);
+		}
+
+		pendingReplyVisualTimer = null;
+	}, REPLY_JUMP_SCROLL_SETTLE_MS);
 
 	return true;
 };
@@ -1977,6 +2239,12 @@ if (window.Echo && groupId) {
 	});
 
 	groupChannel.listen('.group.membership.changed', (payload) => {
+		const payloadGroupId = Number(payload?.group_id || 0);
+		const currentGroupId = Number(groupId || 0);
+		if (Number.isFinite(currentGroupId) && currentGroupId > 0 && payloadGroupId !== currentGroupId) {
+			return;
+		}
+
 		const targetUserId = Number(payload?.target_user_id || 0);
 		if (!Number.isFinite(targetUserId) || targetUserId <= 0 || targetUserId !== authUserId) {
 			return;
@@ -1984,10 +2252,7 @@ if (window.Echo && groupId) {
 
 		if (String(payload?.action || '') === 'removed') {
 			window.location.href = '/groups';
-			return;
 		}
-
-		window.location.reload();
 	});
 }
 
@@ -2018,6 +2283,7 @@ const recordingIndicator = chatForm?.querySelector('[data-recording-indicator]')
 const mentionInput = chatForm?.querySelector('[data-mention-input]');
 const sendButton = chatForm?.querySelector('[data-chat-send]');
 const replyToInput = chatForm?.querySelector('[data-reply-to-input]');
+const replyQuoteInput = chatForm?.querySelector('[data-reply-quote-input]');
 const replyPreview = chatForm?.querySelector('[data-reply-preview]');
 const replyPreviewSender = chatForm?.querySelector('[data-reply-preview-sender]');
 const replyPreviewContent = chatForm?.querySelector('[data-reply-preview-content]');
@@ -2974,6 +3240,10 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			replyToInput.value = '';
 		}
 
+		if (replyQuoteInput instanceof HTMLInputElement) {
+			replyQuoteInput.value = '';
+		}
+
 		if (replyPreview instanceof HTMLElement) {
 			replyPreview.classList.add('hidden');
 			replyPreview.classList.remove('flex');
@@ -2982,6 +3252,35 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		if (editingMessageId > 0) {
 			clearEditingState();
 		}
+	};
+
+	const normalizeReplyQuote = (value) => String(value || '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, 500);
+
+	const getSelectedReplyQuoteFromMessage = (messageNode) => {
+		if (!(messageNode instanceof HTMLElement)) {
+			return '';
+		}
+
+		const selection = window.getSelection();
+		if (!selection || selection.rangeCount === 0) {
+			return '';
+		}
+
+		const selectedText = normalizeReplyQuote(selection.toString() || '');
+		if (selectedText === '') {
+			return '';
+		}
+
+		const selectionRange = selection.getRangeAt(0);
+		const commonNode = selectionRange.commonAncestorContainer;
+		if (!messageNode.contains(commonNode)) {
+			return '';
+		}
+
+		return selectedText;
 	};
 
 	const setReplyTarget = (messageNode) => {
@@ -2999,18 +3298,27 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		const type = String(messageNode.dataset.messageType || 'text').toLowerCase();
 		const fallback = type === 'image' ? '[Gambar]' : (type === 'voice' ? '[Voice note]' : '[Lampiran]');
 		const content = rawContent !== '' ? rawContent : fallback;
+		const selectedQuote = getSelectedReplyQuoteFromMessage(messageNode);
 
 		replyToInput.value = messageId;
+		if (replyQuoteInput instanceof HTMLInputElement) {
+			replyQuoteInput.value = selectedQuote;
+		}
 		clearEditingState();
 		if (replyPreviewSender instanceof HTMLElement) {
 			replyPreviewSender.textContent = `Membalas ${sender}`;
 		}
 		if (replyPreviewContent instanceof HTMLElement) {
-			replyPreviewContent.textContent = content;
+			replyPreviewContent.textContent = selectedQuote || content;
 		}
 		if (replyPreview instanceof HTMLElement) {
 			replyPreview.classList.remove('hidden');
 			replyPreview.classList.add('flex');
+		}
+
+		const selection = window.getSelection();
+		if (selection && selectedQuote !== '') {
+			selection.removeAllRanges();
 		}
 
 		mentionInput?.focus();
@@ -3028,9 +3336,13 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		const rawContent = String(messageNode.dataset.messageContent || '').trim();
 		const type = String(messageNode.dataset.messageType || 'text').toLowerCase();
 		const fallback = type === 'image' ? '[Gambar]' : (type === 'voice' ? '[Voice note]' : '[Lampiran]');
-		const content = selectedText || (rawContent !== '' ? rawContent : fallback);
+		const normalizedSelectedText = normalizeReplyQuote(selectedText);
+		const content = normalizedSelectedText || (rawContent !== '' ? rawContent : fallback);
 
 		replyToInput.value = messageId;
+		if (replyQuoteInput instanceof HTMLInputElement) {
+			replyQuoteInput.value = normalizedSelectedText;
+		}
 		clearEditingState();
 		if (replyPreviewSender instanceof HTMLElement) {
 			replyPreviewSender.textContent = `Membalas ${sender}`;
@@ -3246,6 +3558,30 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 	if (chatFeed instanceof HTMLElement) {
 		chatFeed.addEventListener('click', async (event) => {
+			const replyJumpTrigger = event.target.closest('[data-reply-jump], a[href^="#message-"]');
+			if (replyJumpTrigger instanceof HTMLElement) {
+				event.preventDefault();
+				event.stopPropagation();
+				if (typeof event.stopImmediatePropagation === 'function') {
+					event.stopImmediatePropagation();
+				}
+				const sourceMessageNode = replyJumpTrigger.closest('[data-message-id]');
+				const sourceMessageId = Number(sourceMessageNode?.getAttribute('data-message-id') || 0);
+				setPendingSkipReplySourceMessageId(sourceMessageId);
+
+				const fallbackTarget = String(replyJumpTrigger.getAttribute('href') || '').replace('#message-', '');
+				const targetId = Number(replyJumpTrigger.getAttribute('data-reply-jump') || fallbackTarget || 0);
+				const replyQuote = String(replyJumpTrigger.getAttribute('data-reply-quote') || '').trim();
+				if (!Number.isFinite(targetId) || targetId <= 0) {
+					return;
+				}
+
+				if (!highlightMessageInFeed(targetId, replyQuote)) {
+					showActionToast('Pesan yang direply tidak ditemukan');
+				}
+				return;
+			}
+
 			const attachmentTrigger = event.target.closest('[data-attachment-open="1"],[data-attachment-download="1"],a[href*="/messages/"][href*="/attachment"]');
 			if (attachmentTrigger instanceof HTMLElement) {
 				event.preventDefault();
@@ -3348,7 +3684,12 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 	/* ── Message popup (long-press) ── */
 	let activePopup = null;
+	let activePopupCleanup = null;
 	const dismissPopup = () => {
+		if (typeof activePopupCleanup === 'function') {
+			activePopupCleanup();
+		}
+		activePopupCleanup = null;
 		if (activePopup) {
 			activePopup.remove();
 			activePopup = null;
@@ -3357,6 +3698,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 	const showSelectTextPopup = (messageNode, sender, messageText) => {
 		dismissPopup();
+		const safeMessageText = String(messageText || '').trim();
 		const selectOverlay = document.createElement('div');
 		selectOverlay.className = 'nc-popup-overlay';
 		selectOverlay.innerHTML = `
@@ -3365,31 +3707,63 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 					<span class="nc-popup-sender">${escapeHtml(sender)}</span>
 					<button type="button" class="nc-popup-close" data-popup-close>&times;</button>
 				</div>
-				<div class="nc-popup-body" style="user-select:text;-webkit-user-select:text;">${escapeHtml(messageText)}</div>
+				<div class="nc-popup-body nc-popup-body--quote" data-quote-picker-body>
+					<p class="nc-quote-picker" data-quote-picker-words>${escapeHtml(safeMessageText)}</p>
+					<p class="nc-quote-result" data-quote-picker-result>Pilih teks langsung seperti biasa, lalu tekan tombol di bawah.</p>
+				</div>
 				<div class="nc-popup-actions">
-					<button type="button" class="nc-popup-btn nc-popup-btn-select" data-popup-copy-sel>Salin teks terpilih</button>
-					<button type="button" class="nc-popup-btn" data-popup-reply-sel>Balas teks terpilih</button>
+					<button type="button" class="nc-popup-btn" data-popup-reply-sel disabled>Balas teks terpilih</button>
 				</div>
 			</div>
 		`;
 		document.body.appendChild(selectOverlay);
 		activePopup = selectOverlay;
 
-		const btnCopySel = selectOverlay.querySelector('[data-popup-copy-sel]');
+		const wordsContainer = selectOverlay.querySelector('[data-quote-picker-words]');
+		const resultEl = selectOverlay.querySelector('[data-quote-picker-result]');
 		const btnReplySel = selectOverlay.querySelector('[data-popup-reply-sel]');
+		const getSelectedQuote = () => {
+			const selection = window.getSelection();
+			if (!selection || selection.rangeCount === 0) {
+				return '';
+			}
 
-		const onSelChange = () => {
-			const sel = window.getSelection();
-			const text = sel ? sel.toString().trim() : '';
-			if (btnCopySel) btnCopySel.disabled = !text;
-			if (btnReplySel) btnReplySel.disabled = !text;
+			const selectedText = String(selection.toString() || '').trim();
+			if (selectedText === '' || !(wordsContainer instanceof HTMLElement)) {
+				return '';
+			}
+
+			const selectionRange = selection.getRangeAt(0);
+			const commonNode = selectionRange.commonAncestorContainer;
+			if (!wordsContainer.contains(commonNode)) {
+				return '';
+			}
+
+			return selectedText;
 		};
 
-		document.addEventListener('selectionchange', onSelChange);
-		onSelChange();
+		const renderSelectionState = () => {
+			const quote = getSelectedQuote();
+			if (resultEl instanceof HTMLElement) {
+				resultEl.textContent = quote !== ''
+					? `"${quote}"`
+					: 'Pilih teks langsung seperti biasa, lalu tekan tombol di bawah.';
+			}
+
+			if (btnReplySel instanceof HTMLButtonElement) {
+				btnReplySel.disabled = quote === '';
+			}
+		};
+
+		renderSelectionState();
+		document.addEventListener('selectionchange', renderSelectionState);
+		activePopupCleanup = () => {
+			document.removeEventListener('selectionchange', renderSelectionState);
+		};
 
 		const cleanup = () => {
-			document.removeEventListener('selectionchange', onSelChange);
+			activePopupCleanup = null;
+			document.removeEventListener('selectionchange', renderSelectionState);
 			dismissPopup();
 		};
 
@@ -3399,19 +3773,8 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			}
 		});
 		selectOverlay.querySelector('[data-popup-close]')?.addEventListener('click', cleanup);
-		btnCopySel?.addEventListener('click', () => {
-			const sel = window.getSelection();
-			const text = sel ? sel.toString().trim() : '';
-			if (text && navigator.clipboard) {
-				navigator.clipboard.writeText(text).then(() => {
-					showActionToast('Teks terpilih disalin');
-				}).catch(() => {});
-			}
-			cleanup();
-		});
 		btnReplySel?.addEventListener('click', () => {
-			const sel = window.getSelection();
-			const text = sel ? sel.toString().trim() : '';
+			const text = getSelectedQuote();
 			cleanup();
 			if (text) {
 				setReplyTargetWithText(messageNode, text);
@@ -3496,7 +3859,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				<div class="nc-popup-menu">
 					<button type="button" class="nc-popup-menu-item" data-popup-reply>
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 0 1 0 10H9m-6-10 4-4m-4 4 4 4"/></svg>
-						Quote & Balas
+						Balas
 					</button>
 					<button type="button" class="nc-popup-menu-item" data-popup-copy>
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -3660,6 +4023,8 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		let startY = 0;
 		let activeNode = null;
 		let longPressTimer = null;
+		let swipeReplyReady = false;
+		let swipeReplyHapticSent = false;
 
 		const clearLongPress = () => {
 			if (longPressTimer) {
@@ -3679,7 +4044,23 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		const clearActive = () => {
 			if (activeNode) resetTransform(activeNode);
 			activeNode = null;
+			swipeReplyReady = false;
+			swipeReplyHapticSent = false;
 			clearLongPress();
+		};
+
+		const commitGestureOnRelease = () => {
+			if (!(activeNode instanceof HTMLElement)) {
+				return;
+			}
+
+			const targetNode = activeNode;
+			const shouldReply = swipeReplyReady;
+			clearActive();
+
+			if (shouldReply) {
+				setReplyTarget(targetNode);
+			}
 		};
 
 		chatFeed.addEventListener('pointerdown', (event) => {
@@ -3702,6 +4083,8 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			}
 
 			activeNode = node;
+			swipeReplyReady = false;
+			swipeReplyHapticSent = false;
 			startX = event.clientX;
 			startY = event.clientY;
 			node.style.transition = '';
@@ -3735,23 +4118,23 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			if (deltaX > 6) {
 				const dragX = Math.min(90, deltaX);
 				activeNode.style.transform = `translateX(${dragX}px)`;
+				const passesThreshold = deltaX > SWIPE_THRESHOLD && deltaX > Math.abs(deltaY) + 8;
+				swipeReplyReady = passesThreshold;
+				if (passesThreshold && !swipeReplyHapticSent) {
+					try { navigator.vibrate?.(10); } catch (_) {}
+					swipeReplyHapticSent = true;
+				}
 				if (event.cancelable) event.preventDefault();
 			} else if (deltaX < -6) {
 				// block left swipe — just cancel
 				clearActive();
 				return;
-			}
-
-			if (deltaX > SWIPE_THRESHOLD && deltaX > Math.abs(deltaY) + 8) {
-				try { navigator.vibrate?.(10); } catch (_) {}
-				setReplyTarget(activeNode);
-				resetTransform(activeNode);
-				activeNode = null;
-				clearLongPress();
+			} else {
+				swipeReplyReady = false;
 			}
 		}, { passive: false });
 
-		chatFeed.addEventListener('pointerup', clearActive);
+		chatFeed.addEventListener('pointerup', commitGestureOnRelease);
 		chatFeed.addEventListener('pointercancel', clearActive);
 		chatFeed.addEventListener('pointerleave', clearActive);
 
@@ -4095,7 +4478,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		sendButton.classList.toggle('cursor-wait', isSending);
 	};
 
-	const appendPendingMessageNode = (content, file) => {
+	const appendPendingMessageNode = (content, file, replyContext = null) => {
 		if (!chatFeed) {
 			return null;
 		}
@@ -4110,6 +4493,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			sender_id: authUserId,
 			sender_name: 'You',
 			content: content || '',
+			reply_to: replyContext && replyContext.id ? replyContext : null,
 			attachment_url: blobUrl,
 			attachment_mime: file instanceof File ? file.type : null,
 			attachment_original_name: file instanceof File ? file.name : null,
@@ -4251,8 +4635,33 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 
 		markGroupVisited();
 
+		const replyToId = replyToInput instanceof HTMLInputElement
+			? Number(replyToInput.value || 0)
+			: 0;
+		const replyQuoteText = replyQuoteInput instanceof HTMLInputElement
+			? normalizeReplyQuote(replyQuoteInput.value)
+			: '';
+		let pendingReplyContext = null;
+		if (replyToId > 0 && chatFeed instanceof HTMLElement) {
+			const replySource = chatFeed.querySelector(`[data-message-id="${replyToId}"]`);
+			if (replySource instanceof HTMLElement) {
+				const sourceType = String(replySource.dataset.messageType || 'text').toLowerCase();
+				const sourceRawContent = String(replySource.dataset.messageContent || '').trim();
+				const sourceFallback = sourceType === 'image'
+					? '[Gambar]'
+					: (sourceType === 'voice' ? '[Voice note]' : '[Lampiran]');
+				pendingReplyContext = {
+					id: replyToId,
+					sender_name: String(replySource.dataset.messageSenderName || 'User'),
+					message_type: sourceType,
+					content: sourceRawContent !== '' ? sourceRawContent : sourceFallback,
+					quote_text: replyQuoteText,
+				};
+			}
+		}
+
 		const formData = new FormData(chatForm);
-		const localId = appendPendingMessageNode(contentText, selectedFile);
+		const localId = appendPendingMessageNode(contentText, selectedFile, pendingReplyContext);
 
 		if (mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement) {
 			mentionInput.value = '';
@@ -4448,7 +4857,7 @@ if (settingsMenu && settingsOverlay && openSettingsButtons.length > 0) {
 		}
 
 		const styleSource = chatShell instanceof HTMLElement ? chatShell : document.documentElement;
-		const primary = getComputedStyle(styleSource).getPropertyValue('--nc-primary').trim() || '#4f46e5';
+		const primary = getComputedStyle(styleSource).getPropertyValue('--nc-primary').trim() || '#0f766e';
 		settingsMenu.style.background = primary;
 		settingsMenu.style.boxShadow = '0 16px 40px rgba(2, 6, 23, 0.35)';
 	};
@@ -4725,6 +5134,7 @@ if (settingsMenu && settingsOverlay && openSettingsButtons.length > 0) {
 		const q = raw.trim().toLowerCase();
 		const nodes = feed.querySelectorAll('[data-message-id]');
 		let matches = 0;
+		clearSearchHighlightsInFeed(feed);
 		nodes.forEach((node) => {
 			if (!q) {
 				node.classList.remove('hidden');
@@ -4734,7 +5144,10 @@ if (settingsMenu && settingsOverlay && openSettingsButtons.length > 0) {
 			const sender = String(node.dataset.messageSenderName || '').toLowerCase();
 			const match = content.includes(q) || sender.includes(q);
 			node.classList.toggle('hidden', !match);
-			if (match) matches++;
+			if (match) {
+				highlightSearchInMessage(node, raw.trim());
+				matches++;
+			}
 		});
 		if (countEl) countEl.textContent = q ? `${matches} hasil` : '';
 	};

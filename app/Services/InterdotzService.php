@@ -349,8 +349,10 @@ class InterdotzService
             $response = $this->client($clientToken)
                 ->post("{$this->apiBase}/api/client/payments", [
                     'referenceId' => $referenceId,
+                    'reference_id' => $referenceId,
                     'amount' => $amount,
                     'currency' => $currency,
+                    'callback_url' => $callbackUrl,
                     'callbackUrl' => $callbackUrl,
                     'userId' => $userId,
                     'user_id' => $userId,

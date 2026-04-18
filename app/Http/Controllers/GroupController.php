@@ -56,10 +56,12 @@ class GroupController extends Controller
     {
         $duPrice = (int) config('normchat.du_group_creation', 175);
         $idrPrice = (int) config('normchat.idr_group_creation', 35000);
+        $idrTestPrice = (int) config('normchat.idr_group_creation_test', 1);
 
         return view('groups.create', [
             'duPrice' => $duPrice,
             'idrPrice' => $idrPrice,
+            'idrTestPrice' => $idrTestPrice,
             'includedCredits' => $this->groupCreationCredits(),
         ]);
     }
@@ -71,7 +73,7 @@ class GroupController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'password' => ['required', 'string', 'min:4', 'max:100'],
             'approval_enabled' => ['nullable'],
-            'payment_method' => ['nullable', 'in:du,midtrans'],
+            'payment_method' => ['nullable', 'in:du,midtrans,midtrans_test'],
         ]);
 
         $user = Auth::user();
@@ -110,6 +112,10 @@ class GroupController extends Controller
 
         if ($paymentMethod === 'midtrans') {
             return $this->initiateGroupMidtransPayment($request, $group, $user);
+        }
+
+        if ($paymentMethod === 'midtrans_test') {
+            return $this->initiateGroupMidtransPayment($request, $group, $user, true);
         }
 
         // Charge via Interdotz DU
@@ -646,10 +652,12 @@ class GroupController extends Controller
         return strtoupper($prefix) . '-' . now()->format('His') . '-' . strtoupper(Str::random(8));
     }
 
-    private function initiateGroupMidtransPayment(Request $request, Group $group, $user): RedirectResponse
+    private function initiateGroupMidtransPayment(Request $request, Group $group, $user, bool $isTest = false): RedirectResponse
     {
         $interdotz = app(InterdotzService::class);
-        $idrPrice = (int) config('normchat.idr_group_creation', 35000);
+        $idrPrice = $isTest
+            ? (int) config('normchat.idr_group_creation_test', 1)
+            : (int) config('normchat.idr_group_creation', 35000);
 
         if (! $interdotz->isConfigured()) {
             $group->forceDelete();
@@ -680,8 +688,8 @@ class GroupController extends Controller
                 'phone' => '',
             ],
             [[
-                'id' => 'group-' . $group->id,
-                'name' => 'Pembuatan grup ' . $group->name,
+                'id' => ($isTest ? 'group-test-' : 'group-') . $group->id,
+                'name' => ($isTest ? 'Test pembayaran grup ' : 'Pembuatan grup ') . $group->name,
                 'price' => $idrPrice,
                 'quantity' => 1,
             ]],
@@ -710,7 +718,8 @@ class GroupController extends Controller
             'metadata_json' => [
                 'action' => 'group_create_midtrans',
                 'group_name' => $group->name,
-                'payment_method' => 'midtrans',
+                'payment_method' => $isTest ? 'midtrans_test' : 'midtrans',
+                'is_test' => $isTest,
                 'payment_id' => $paymentId,
             ],
             'expires_at' => now()->addHour(),

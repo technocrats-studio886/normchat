@@ -32,6 +32,7 @@ return [
         'interdotz' => [
         'client_id' => env('INTERDOTZ_CLIENT_ID'),
         'client_secret' => env('INTERDOTZ_CLIENT_SECRET'),
+        'admin_bearer_token' => env('INTERDOTZ_ADMIN_BEARER_TOKEN'),
         'api_base' => env('INTERDOTZ_API_BASE', 'https://api-interdotz.technocrats.studio'),
         'sso_base' => env('INTERDOTZ_SSO_BASE', 'https://interdotz.technocrats.studio'),
         'redirect_uri' => env('INTERDOTZ_REDIRECT_URI', env('APP_URL') . '/sso/interdotz/callback'),

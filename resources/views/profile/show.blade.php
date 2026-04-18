@@ -34,28 +34,37 @@
                 </span>
             </div>
 
-            {{-- Normkredit per Grup --}}
-            @php
-                $totalCredits = 0;
-                foreach ($subscriptions as $sub) {
-                    if ($sub->status === 'active' && $sub->group) {
-                        $totalCredits += ($sub->group->groupToken?->credits ?? 0);
-                    }
-                }
-            @endphp
+            {{-- Storage Usage --}}
             <div class="rounded-2xl border border-[#dbe6ff] bg-white px-4 py-3.5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-slate-700">Total Normkredit Grup</span>
-                    <span class="text-sm font-bold text-blue-600">{{ number_format($totalCredits, 1) }} normkredit</span>
+                    <span class="text-sm text-slate-700">Penyimpanan</span>
+                    <span class="text-sm font-bold text-blue-600">{{ $storage['total_human'] }}</span>
                 </div>
-                <p class="mt-0.5 text-[11px] text-slate-400">1 normkredit = Rp2.500</p>
-                <p class="mt-2 text-[11px] text-slate-400">Top-up Normkredit dilakukan dari dalam grup.</p>
+                <p class="mt-0.5 text-[11px] text-slate-400">Total dari file, gambar, dan video yang kamu kirim.</p>
+
+                @if($storage['total_bytes'] > 0)
+                    <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+                        @foreach($storage['breakdown'] as $row)
+                            <div class="rounded-xl bg-slate-50 px-2 py-2">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ $row['label'] }}</p>
+                                <p class="mt-0.5 text-xs font-bold text-slate-800">{{ $row['human'] }}</p>
+                                <p class="text-[10px] text-slate-500">{{ $row['count'] }} item</p>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
 
             {{-- Keamanan Akun --}}
             <a href="{{ route('profile.security') }}" class="flex items-center justify-between rounded-2xl border border-[#dbe6ff] bg-white px-4 py-3.5 shadow-sm">
                 <span class="text-sm text-slate-700">Keamanan Akun</span>
                 <span class="text-sm font-bold text-blue-600">Kelola</span>
+            </a>
+
+            {{-- Aktivitas Akun --}}
+            <a href="{{ route('profile.activity') }}" class="flex items-center justify-between rounded-2xl border border-[#dbe6ff] bg-white px-4 py-3.5 shadow-sm">
+                <span class="text-sm text-slate-700">Aktivitas & Riwayat Pembayaran</span>
+                <span class="text-sm font-bold text-blue-600">Lihat</span>
             </a>
 
             {{-- Logout --}}

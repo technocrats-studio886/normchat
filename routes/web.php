@@ -77,6 +77,7 @@ Route::middleware('auth')->group(function () {
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::get('/profile/activity', [ProfileController::class, 'activity'])->name('profile.activity');
     Route::get('/profile/security', [ProfileController::class, 'security'])->name('profile.security');
 
     Route::redirect('/app', '/groups');
@@ -89,10 +90,12 @@ Route::get('/manifest.webmanifest', function () {
         'short_name' => 'Normchat',
         'start_url' => '/groups',
         'display' => 'standalone',
-        'background_color' => '#f5f8ff',
-        'theme_color' => '#1d4ed8',
+        'background_color' => '#f4fbf9',
+        'theme_color' => '#0f766e',
         'icons' => [
-            ['src' => '/normchat-logo.svg', 'sizes' => 'any', 'type' => 'image/svg+xml', 'purpose' => 'any'],
+            ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
+            ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
+            ['src' => '/apple-touch-icon.png', 'sizes' => '180x180', 'type' => 'image/png', 'purpose' => 'any'],
         ],
     ], 200, ['Content-Type' => 'application/manifest+json']);
 })->name('pwa.manifest');

@@ -5,9 +5,9 @@
 @section('content')
     <section class="page-shell flex min-h-screen flex-col bg-transparent px-0 pb-0 pt-0">
         {{-- Header --}}
-        <header class="border-b border-[#dbe6ff] bg-white px-5 py-5">
+        <header class="border-b border-rose-100 bg-white px-5 py-5">
             <div class="inline-flex items-center gap-2">
-                <img src="{{ asset('normchat-logo.svg') }}" alt="Normchat Logo" class="h-9 w-9 rounded-xl" />
+                <img src="{{ asset('normchat-logo.png') }}" alt="Normchat Logo" class="h-9 w-9 rounded-xl" />
                 <h1 class="font-display text-xl font-extrabold tracking-tight text-slate-900">Normchat</h1>
             </div>
         </header>
@@ -50,7 +50,7 @@
                 </div>
 
                 <button type="submit"
-                    class="w-full rounded-2xl bg-linear-to-r from-slate-800 to-slate-900 px-4 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110">
+                    class="w-full rounded-2xl bg-linear-to-r from-[#e11d74] to-[#f97316] px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-900/20 transition hover:brightness-110">
                     Connect {{ $providerLabel }}
                 </button>
             </form>

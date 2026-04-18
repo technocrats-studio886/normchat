@@ -83,7 +83,12 @@ class AuthController extends Controller
             'action' => 'auth.connect',
             'target_type' => User::class,
             'target_id' => $user->id,
-            'metadata_json' => ['provider' => 'interdotz', 'method' => 'sso'],
+            'metadata_json' => [
+                'provider' => 'interdotz',
+                'method' => 'sso',
+                'ip' => $request->ip(),
+                'user_agent' => (string) $request->userAgent(),
+            ],
             'created_at' => now(),
         ]);
 
@@ -117,6 +122,10 @@ class AuthController extends Controller
             'action' => 'auth.logout',
             'target_type' => User::class,
             'target_id' => $userId,
+            'metadata_json' => [
+                'ip' => $request->ip(),
+                'user_agent' => (string) $request->userAgent(),
+            ],
             'created_at' => now(),
         ]);
 

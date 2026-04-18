@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Route;
 
 // ── Webhooks (no auth — validated by secret/signature) ──────
 
-Route::prefix('webhooks/interdotz')->group(function () {
+Route::prefix('webhooks/interdotz')->middleware('interdotz.webhook')->group(function () {
     Route::post('/charge', [WebhookController::class, 'chargeCallback']);
     Route::post('/topup', [WebhookController::class, 'topupCallback']);
     Route::post('/payment', [WebhookController::class, 'paymentCallback']);
@@ -22,5 +22,7 @@ Route::prefix('product')->group(function () {
 
 // ── Transactions ────────────────────────────────────────────
 
-Route::get('/transactions', [TransactionController::class, 'index']);
-Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+Route::middleware('interdotz.client')->group(function () {
+    Route::get('/transactions', [TransactionController::class, 'index']);
+    Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+});

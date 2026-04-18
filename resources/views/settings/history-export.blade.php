@@ -36,7 +36,7 @@
                         <p class="mt-1 text-xs text-[#64748B]">{{ $export->created_at?->format('d M Y, H:i') }} • {{ strtoupper($export->file_type) }} • {{ ucfirst($export->status) }}</p>
                     </div>
                     @if($export->status === 'done' && $export->storage_path)
-                        <a href="{{ url('/groups/'.$group->id.'/settings/export/'.$export->id.'/download') }}" class="shrink-0 rounded-lg bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1D4ED8]">Unduh</a>
+                        <a href="{{ url('/groups/'.$group->id.'/settings/export/'.$export->id.'/download') }}" class="shrink-0 rounded-lg bg-[#e11d74] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#be185d]">Unduh</a>
                     @endif
                 </div>
             @empty
@@ -79,7 +79,7 @@
                 <form method="POST" action="{{ route('settings.export', $group) }}">
                     @csrf
                     <input type="hidden" name="file_type" value="pdf" />
-                    <button type="submit" class="w-full rounded-xl py-3 text-sm font-bold normal-case tracking-normal transition {{ $canExportChat ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'cursor-not-allowed bg-slate-100 text-slate-400' }}" @if(! $canExportChat) disabled @endif>
+                    <button type="submit" class="w-full rounded-xl py-3 text-sm font-bold normal-case tracking-normal transition {{ $canExportChat ? 'bg-[#e11d74] text-white hover:bg-[#be185d]' : 'cursor-not-allowed bg-slate-100 text-slate-400' }}" @if(! $canExportChat) disabled @endif>
                         Export PDF
                     </button>
                 </form>

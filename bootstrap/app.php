@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'llm.connected' => \App\Http\Middleware\EnsureLlmConnected::class,
             'group.permission' => \App\Http\Middleware\EnsureGroupPermission::class,
             'user.llm.connected' => \App\Http\Middleware\EnsureUserHasLlmConnection::class,
+            'interdotz.client' => \App\Http\Middleware\VerifyInterdotzClientRequest::class,
+            'interdotz.webhook' => \App\Http\Middleware\VerifyInterdotzWebhookRequest::class,
         ]);
 
         // Trust Nginx reverse proxy

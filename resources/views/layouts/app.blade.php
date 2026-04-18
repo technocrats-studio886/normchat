@@ -8,7 +8,13 @@
         <meta name="auth-user-id" content="{{ auth()->id() }}">
         <meta name="auth-user-name" content="{{ auth()->user()->name }}">
     @endauth
-    <meta name="theme-color" content="#1d4ed8">
+    <meta name="theme-color" content="#0f766e">
+    <meta property="og:image" content="{{ asset('normchat-logo.png') }}">
+    <meta name="twitter:image" content="{{ asset('normchat-logo.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('icons/icon-512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ route('pwa.manifest') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,7 +41,7 @@
                 gap: 12px;
                 width: 100%;
                 border-radius: 9999px;
-                background: #2563eb;
+                background: linear-gradient(135deg, #0f766e 0%, #22c55e 100%);
                 color: #fff;
                 font-weight: 700;
                 text-decoration: none;
@@ -54,7 +60,7 @@
 </head>
 <body class="normchat-bg min-h-screen antialiased">
     <div class="mx-auto min-h-screen w-full max-w-md">
-        <main class="pb-32">
+        <main class="{{ auth()->check() ? 'pb-32' : 'pb-0' }}">
             @if (session('success'))
                 <div class="mx-4 pt-4">
                     <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm">
@@ -65,7 +71,7 @@
 
             @if (session('info'))
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700 shadow-sm">
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700 shadow-sm">
                         {{ session('info') }}
                     </div>
                 </div>

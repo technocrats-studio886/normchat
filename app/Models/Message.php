@@ -17,6 +17,7 @@ class Message extends Model
         'sender_type',
         'sender_id',
         'reply_to_message_id',
+        'reply_quote_text',
         'content',
         'attachment_disk',
         'attachment_path',

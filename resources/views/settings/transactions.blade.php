@@ -17,13 +17,13 @@
             @forelse ($contributions as $c)
                 @php
                     $sourceLabel = match($c->source) {
-                        'patungan' => 'Patungan gabung',
-                        'patungan_midtrans' => 'Patungan gabung (Midtrans)',
-                        'topup' => 'Top-up normkredit',
-                        'topup_midtrans' => 'Top-up normkredit (Midtrans)',
-                        'interdotz_topup', 'interdotz_charge_topup' => 'Top-up normkredit',
-                        'group_creation' => 'Pembuatan grup',
-                        'group_creation_midtrans' => 'Pembuatan grup (Midtrans)',
+                        'patungan' => 'Patungan gabung (DU)',
+                        'patungan_midtrans' => 'Patungan gabung (IDR)',
+                        'topup' => 'Top-up normkredit (DU)',
+                        'topup_midtrans' => 'Top-up normkredit (IDR)',
+                        'interdotz_topup', 'interdotz_charge_topup' => 'Top-up normkredit (DU)',
+                        'group_creation' => 'Pembuatan grup (DU)',
+                        'group_creation_midtrans' => 'Pembuatan grup (IDR)',
                         default => ucfirst(str_replace('_', ' ', (string) $c->source)),
                     };
                     $sourceColor = match($c->source) {
@@ -32,7 +32,7 @@
                         'group_creation', 'group_creation_midtrans' => 'bg-amber-100 text-amber-700',
                         default => 'bg-slate-100 text-slate-700',
                     };
-                    $isMidtrans = in_array($c->source, ['patungan_midtrans', 'topup_midtrans', 'group_creation_midtrans'], true);
+                    $isIdr = in_array($c->source, ['patungan_midtrans', 'topup_midtrans', 'group_creation_midtrans'], true);
                 @endphp
                 <div class="rounded-xl border border-[#CBD5E1] bg-white px-4 py-3">
                     <div class="flex items-start justify-between gap-3">
@@ -49,7 +49,7 @@
                         <div>
                             <p class="text-[10px] uppercase tracking-wide text-slate-400">Dibayar</p>
                             <p class="text-sm font-bold text-[#0F172A]">
-                                @if($isMidtrans)
+                                @if($isIdr)
                                     Rp{{ number_format((int) $c->price_paid, 0, ',', '.') }}
                                 @else
                                     {{ number_format((int) $c->price_paid) }} DU

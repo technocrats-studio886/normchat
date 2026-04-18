@@ -175,18 +175,21 @@ class ChatController extends Controller
             'content' => ['nullable', 'string', 'max:3000'],
             'attachment' => ['nullable', 'file', 'max:15360', 'mimes:jpg,jpeg,png,webp,gif,heic,heif,mp3,wav,ogg,webm,mp4,aac,m4a,pdf,txt,csv,doc,docx,xls,xlsx,ppt,pptx,zip,rar,7z'],
             'reply_to_message_id' => ['nullable', 'integer'],
+            'reply_quote_text' => ['nullable', 'string', 'max:500'],
         ]);
 
         $content = trim((string) ($validated['content'] ?? ''));
         $attachment = $request->file('attachment');
         $replyToMessageId = (int) ($validated['reply_to_message_id'] ?? 0);
+        $replyQuoteText = trim((string) ($validated['reply_quote_text'] ?? ''));
+        $replyQuoteText = (string) Str::of($replyQuoteText)->squish()->substr(0, 500);
 
         if ($content === '' && ! $attachment instanceof UploadedFile) {
             return back()->withErrors(['content' => 'Kirim teks, gambar, atau voice note.'])->withInput();
         }
 
         try {
-            $message = Cache::lock('group-chat-submit:'.$group->id, 10)->block(3, function () use ($group, $content, $attachment, $replyToMessageId) {
+            $message = Cache::lock('group-chat-submit:'.$group->id, 10)->block(3, function () use ($group, $content, $attachment, $replyToMessageId, $replyQuoteText) {
                 $messageType = $this->resolveMessageType($attachment);
 
                 $attachmentPath = null;
@@ -202,6 +205,10 @@ class ChatController extends Controller
                         ->where('group_id', $group->id)
                         ->first();
                 }
+
+                $resolvedReplyQuoteText = $replyTarget && $replyQuoteText !== ''
+                    ? $replyQuoteText
+                    : null;
 
                 if ($attachment instanceof UploadedFile) {
                     $attachmentDisk = 'normchat_attachments';
@@ -234,6 +241,7 @@ class ChatController extends Controller
                     'sender_type' => 'user',
                     'sender_id' => Auth::id(),
                     'reply_to_message_id' => $replyTarget?->id,
+                    'reply_quote_text' => $resolvedReplyQuoteText,
                     'content' => $content !== '' ? $content : null,
                     'attachment_disk' => $attachmentDisk,
                     'attachment_path' => $attachmentPath,
@@ -882,6 +890,7 @@ class ChatController extends Controller
                     : ($replyTarget->sender?->name ?? 'User'),
                 'message_type' => (string) $replyTarget->message_type,
                 'content' => (string) ($replyTarget->content ?? ''),
+                'quote_text' => (string) ($message->reply_quote_text ?? ''),
                 'attachment_original_name' => (string) ($replyTarget->attachment_original_name ?? ''),
             ] : null,
             'group_tokens_remaining' => (int) ($groupToken?->remaining_tokens ?? 0),
