@@ -94,8 +94,8 @@
                                     </p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-[10px] uppercase tracking-wide text-slate-400">Token</p>
-                                    <p class="text-sm font-bold text-emerald-700">+{{ number_format((int) $item->token_amount) }}</p>
+                                    <p class="text-[10px] uppercase tracking-wide text-slate-400">Normkredit</p>
+                                    <p class="text-sm font-bold text-emerald-700">+{{ number_format(round(((int) $item->token_amount) / 2500, 1), 1, ',', '.') }}</p>
                                 </div>
                             </div>
                         </div>

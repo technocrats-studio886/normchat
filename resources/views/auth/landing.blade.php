@@ -27,7 +27,7 @@
                 <a href="{{ route('auth.interdotz.login') }}"
                          class="mt-4 text-xs font-semibold underline-offset-2 hover:underline"
                          style="color: var(--nc-primary);">
-                    Lihat harga
+                    Lihat fitur
                 </a>
             </div>
         </div>

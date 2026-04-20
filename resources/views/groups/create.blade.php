@@ -7,7 +7,7 @@
         </a>
 
         <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Buat Group Chat</h1>
-        <p class="mt-1 text-sm text-slate-500">Buat grup, atur password, lalu langsung mulai chatting.</p>
+        <p class="mt-1 text-sm text-slate-500">Buat grup, aktifkan AI bersama, lalu undang member untuk patungan Normkredit.</p>
 
         <form method="POST" action="{{ route('groups.store') }}" class="mt-6 space-y-3" id="createGroupForm">
             @csrf
@@ -57,7 +57,7 @@
             {{-- Metode Pembayaran --}}
             <div class="panel-card px-4 py-3">
                 <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Metode Pembayaran</label>
-                <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
                         <input type="radio" name="payment_method" value="du" class="mt-0.5 accent-blue-600" {{ old('payment_method', 'du') === 'du' ? 'checked' : '' }}>
                         <span>
@@ -70,13 +70,6 @@
                         <span>
                             <span class="block text-sm font-bold text-slate-800">IDR</span>
                             <span class="block text-xs text-slate-500">Rp{{ number_format($idrPrice, 0, ',', '.') }}</span>
-                        </span>
-                    </label>
-                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                        <input type="radio" name="payment_method" value="midtrans_test" class="mt-0.5 accent-blue-600" {{ old('payment_method') === 'midtrans_test' ? 'checked' : '' }}>
-                        <span>
-                            <span class="block text-sm font-bold text-slate-800">IDR (Test)</span>
-                            <span class="block text-xs text-slate-500">Rp{{ number_format($idrTestPrice, 0, ',', '.') }}</span>
                         </span>
                     </label>
                 </div>
@@ -92,9 +85,9 @@
 
             {{-- Credit Info --}}
             <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p class="text-xs font-semibold text-emerald-700">Setiap grup baru mendapat {{ $includedCredits }} Normkredit.</p>
-                <p class="mt-1 text-xs text-emerald-600">Pilih metode DU atau IDR tanpa mengubah fungsionalitas grup.</p>
-                <p class="mt-1 text-xs text-emerald-600">NormAI aktif otomatis, member bisa langsung pakai AI.</p>
+                <p class="text-xs font-semibold text-emerald-700">Setiap grup baru mendapat <span id="createGroupCreditsText">{{ $includedCredits }}</span> Normkredit.</p>
+                <p class="mt-1 text-xs text-emerald-600">DU memberikan Normkredit lebih banyak: {{ (int) ($includedCreditsByMethod['du'] ?? $includedCredits) }} (DU) vs {{ (int) ($includedCreditsByMethod['midtrans'] ?? 10) }} (IDR).</p>
+                <p class="mt-1 text-xs text-emerald-600">NormAI aktif otomatis, lalu member bisa patungan agar AI grup tetap jalan lebih lama.</p>
             </div>
 
             <button type="submit" class="btn-cta" id="submitBtn">Bayar {{ $duPrice }} DU & Buat Group</button>
@@ -107,16 +100,13 @@
                 total: '{{ $duPrice }} DU',
                 button: 'Bayar {{ $duPrice }} DU & Buat Group',
                 hint: 'Pembayaran menggunakan saldo Dots Units akun Interdotz Anda.',
+                credits: {{ (int) ($includedCreditsByMethod['du'] ?? $includedCredits) }},
             },
             midtrans: {
                 total: 'Rp{{ number_format($idrPrice, 0, ',', '.') }}',
                 button: 'Bayar Rp{{ number_format($idrPrice, 0, ',', '.') }} & Buat Group',
                 hint: 'Pembayaran diproses dalam Rupiah (IDR).',
-            },
-            midtrans_test: {
-                total: 'Rp{{ number_format($idrTestPrice, 0, ',', '.') }}',
-                button: 'Bayar Rp{{ number_format($idrTestPrice, 0, ',', '.') }} (Test) & Buat Group',
-                hint: 'Mode uji IDR untuk verifikasi alur pembayaran.',
+                credits: {{ (int) ($includedCreditsByMethod['midtrans'] ?? 10) }},
             },
         };
 
@@ -126,6 +116,7 @@
             const submitBtn = document.getElementById('submitBtn');
             const totalText = document.getElementById('createGroupTotalText');
             const hint = document.getElementById('createGroupMethodHint');
+            const creditsText = document.getElementById('createGroupCreditsText');
 
             if (submitBtn) {
                 submitBtn.textContent = cfg.button;
@@ -135,6 +126,9 @@
             }
             if (hint) {
                 hint.textContent = cfg.hint;
+            }
+            if (creditsText) {
+                creditsText.textContent = String(cfg.credits ?? 0);
             }
         }
 

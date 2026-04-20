@@ -56,13 +56,16 @@ class GroupController extends Controller
     {
         $duPrice = (int) config('normchat.du_group_creation', 175);
         $idrPrice = (int) config('normchat.idr_group_creation', 35000);
-        $idrTestPrice = (int) config('normchat.idr_group_creation_test', 1);
+        $includedCreditsByMethod = [
+            'du' => $this->groupCreationCredits('du'),
+            'midtrans' => $this->groupCreationCredits('midtrans'),
+        ];
 
         return view('groups.create', [
             'duPrice' => $duPrice,
             'idrPrice' => $idrPrice,
-            'idrTestPrice' => $idrTestPrice,
-            'includedCredits' => $this->groupCreationCredits(),
+            'includedCredits' => $includedCreditsByMethod['du'],
+            'includedCreditsByMethod' => $includedCreditsByMethod,
         ]);
     }
 
@@ -73,7 +76,7 @@ class GroupController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'password' => ['required', 'string', 'min:4', 'max:100'],
             'approval_enabled' => ['nullable'],
-            'payment_method' => ['nullable', 'in:du,midtrans,midtrans_test'],
+            'payment_method' => ['nullable', 'in:du,midtrans'],
         ]);
 
         $user = Auth::user();
@@ -112,10 +115,6 @@ class GroupController extends Controller
 
         if ($paymentMethod === 'midtrans') {
             return $this->initiateGroupMidtransPayment($request, $group, $user);
-        }
-
-        if ($paymentMethod === 'midtrans_test') {
-            return $this->initiateGroupMidtransPayment($request, $group, $user, true);
         }
 
         // Charge via Interdotz DU
@@ -372,6 +371,24 @@ class GroupController extends Controller
             'alreadyMember' => false,
             'duPatungan' => $duPatungan,
             'idrPatungan' => $idrPatungan,
+            'joinCreditsByMethod' => [
+                'du' => $this->joinCreditsForPayment('du', $duPatungan),
+                'midtrans' => $this->joinCreditsForPayment('midtrans', $idrPatungan),
+            ],
+            'joinPricingByMethod' => [
+                'du' => [
+                    'minimum' => $duPatungan,
+                    'baseAmount' => $duPatungan,
+                    'baseCredits' => 10,
+                    'unit' => 'DU',
+                ],
+                'midtrans' => [
+                    'minimum' => $idrPatungan,
+                    'baseAmount' => $idrPatungan,
+                    'baseCredits' => 8,
+                    'unit' => 'IDR',
+                ],
+            ],
         ]);
     }
 
@@ -398,19 +415,41 @@ class GroupController extends Controller
         $request->validate([
             'password' => 'required|string',
             'payment_method' => 'nullable|in:du,midtrans',
+            'patungan_amount' => 'nullable|integer|min:1',
         ]);
 
         $paymentMethod = (string) $request->input('payment_method', 'du');
+        $minimumAmount = $this->minJoinAmountForMethod($paymentMethod);
+        $requestedAmount = $request->filled('patungan_amount')
+            ? (int) $request->input('patungan_amount')
+            : $minimumAmount;
+
+        if ($requestedAmount < $minimumAmount) {
+            $minimumLabel = $paymentMethod === 'du'
+                ? $minimumAmount . ' DU'
+                : 'Rp' . number_format($minimumAmount, 0, ',', '.');
+
+            return back()
+                ->withErrors(['patungan_amount' => 'Nominal patungan minimal ' . $minimumLabel . '.'])
+                ->withInput();
+        }
+
+        $paidAmount = $requestedAmount;
 
         if (! Hash::check($request->input('password'), $group->password_hash)) {
             return back()->withErrors(['password' => 'Password grup salah.'])->withInput();
         }
 
         $user = Auth::user();
-        $duPatungan = (int) config('normchat.du_patungan', 25);
 
         if ($paymentMethod === 'midtrans') {
-            return $this->initiateJoinMidtransPayment($request, $group, $user, $shareId);
+            return $this->initiateJoinMidtransPayment(
+                $request,
+                $group,
+                $user,
+                $shareId,
+                $paidAmount
+            );
         }
 
         // Superadmin bypass
@@ -438,22 +477,22 @@ class GroupController extends Controller
         $callbackUrl = url('/api/webhooks/interdotz/charge');
 
         // Try direct charge first (immediate deduction)
-        $chargeResult = $interdotz->charge($ssoToken, $duPatungan, 'normchat_patungan', $referenceId, $interdotzUserId);
+        $chargeResult = $interdotz->charge($ssoToken, $paidAmount, 'normchat_patungan', $referenceId, $interdotzUserId);
 
         if ($chargeResult && isset($chargeResult['payload'])) {
-            $this->activateJoin($group, $user, $duPatungan, $chargeResult['payload']['transaction_id'] ?? $referenceId);
+            $this->activateJoin($group, $user, $paidAmount, $chargeResult['payload']['transaction_id'] ?? $referenceId);
 
             return redirect()->route('chat.show', $group)
-                ->with('success', 'Berhasil bergabung ke group "' . $group->name . '"! ' . $duPatungan . ' DU telah dipotong.');
+                ->with('success', 'Berhasil bergabung ke group "' . $group->name . '"! ' . $paidAmount . ' DU telah dipotong.');
         }
 
         // Fallback to chargeRequest (redirect flow)
         $result = $interdotz->chargeRequest(
             $ssoToken,
-            $duPatungan,
+            $paidAmount,
             'normchat_patungan',
             $referenceId,
-            "Patungan bergabung ke grup: {$group->name} ({$duPatungan} DU)",
+            "Patungan bergabung ke grup: {$group->name} ({$paidAmount} DU)",
             $callbackUrl,
             $interdotzUserId
         );
@@ -474,7 +513,7 @@ class GroupController extends Controller
         if ($serviceError) {
             $errorMessage .= ' ' . $serviceError;
         } else {
-            $errorMessage .= ' Pastikan saldo Dots Units mencukupi (' . $duPatungan . ' DU).';
+            $errorMessage .= ' Pastikan saldo Dots Units mencukupi (' . $paidAmount . ' DU).';
         }
 
         return back()->withErrors(['payment' => $errorMessage]);
@@ -618,7 +657,7 @@ class GroupController extends Controller
             'included_seats' => 2,
         ]);
 
-        $includedCredits = $this->groupCreationCredits();
+        $includedCredits = $this->groupCreationCredits($paymentMethod);
         $includedTokens = $includedCredits * self::TOKENS_PER_CREDIT;
         GroupToken::create([
             'group_id' => $group->id,
@@ -627,7 +666,8 @@ class GroupController extends Controller
             'remaining_tokens' => $includedTokens,
         ]);
 
-        $source = $paymentMethod === 'midtrans' ? 'group_creation_midtrans' : 'group_creation';
+        $isMidtransPayment = $paymentMethod === 'midtrans';
+        $source = $isMidtransPayment ? 'group_creation_midtrans' : 'group_creation';
 
         GroupTokenContribution::create([
             'group_id' => $group->id,
@@ -675,8 +715,8 @@ class GroupController extends Controller
             $subscription->save();
         }
 
-        $joinCredits = $this->joinCredits();
-        $tokensFromJoin = $joinCredits * self::TOKENS_PER_CREDIT;
+        $tokensFromJoin = $this->joinTokensForPayment($paymentMethod, $paidAmount);
+        $joinCredits = round($tokensFromJoin / self::TOKENS_PER_CREDIT, 1);
 
         if ($tokensFromJoin > 0) {
             $groupToken = GroupToken::firstOrCreate(
@@ -686,7 +726,8 @@ class GroupController extends Controller
             $groupToken->addTokens($tokensFromJoin);
         }
 
-        $source = $paymentMethod === 'midtrans' ? 'patungan_midtrans' : 'patungan';
+        $isMidtransPayment = $paymentMethod === 'midtrans';
+        $source = $isMidtransPayment ? 'patungan_midtrans' : 'patungan';
 
         GroupTokenContribution::create([
             'group_id' => $group->id,
@@ -722,14 +763,48 @@ class GroupController extends Controller
         )->id;
     }
 
-    private function groupCreationCredits(): int
+    private function groupCreationCredits(string $paymentMethod = 'du'): int
     {
-        return max(0, (int) config('normchat.group_creation_credits', 10));
+        if ($paymentMethod === 'midtrans') {
+            return max(0, (int) config('normchat.group_creation_credits_idr', config('normchat.group_creation_credits', 10)));
+        }
+
+        return max(0, (int) config('normchat.group_creation_credits_du', 12));
     }
 
-    private function joinCredits(): int
+    private function joinCreditsForPayment(string $paymentMethod, int $paidAmount): float
     {
-        return max(0, (int) config('normchat.join_credits', 15));
+        $tokens = $this->joinTokensForPayment($paymentMethod, $paidAmount);
+
+        return round($tokens / self::TOKENS_PER_CREDIT, 1);
+    }
+
+    private function minJoinAmountForMethod(string $paymentMethod): int
+    {
+        if ($paymentMethod === 'midtrans') {
+            return max(1, (int) config('normchat.idr_patungan_min', 5000));
+        }
+
+        return max(1, (int) config('normchat.du_patungan', 25));
+    }
+
+    private function joinTokensForPayment(string $paymentMethod, int $paidAmount): int
+    {
+        if ($paidAmount <= 0) {
+            return max(0, (int) config('normchat.join_credits', 15)) * self::TOKENS_PER_CREDIT;
+        }
+
+        if ($paymentMethod === 'midtrans') {
+            $baseAmount = max(1, (int) config('normchat.idr_patungan_min', 5000));
+            $baseTokens = 8 * self::TOKENS_PER_CREDIT;
+
+            return (int) floor(($paidAmount * $baseTokens) / $baseAmount);
+        }
+
+        $baseAmount = max(1, (int) config('normchat.du_patungan', 25));
+        $baseTokens = 10 * self::TOKENS_PER_CREDIT;
+
+        return (int) floor(($paidAmount * $baseTokens) / $baseAmount);
     }
 
     private function createUniqueOrderId(string $prefix): string
@@ -744,12 +819,10 @@ class GroupController extends Controller
         return strtoupper($prefix) . '-' . now()->format('His') . '-' . strtoupper(Str::random(8));
     }
 
-    private function initiateGroupMidtransPayment(Request $request, Group $group, $user, bool $isTest = false): RedirectResponse
+    private function initiateGroupMidtransPayment(Request $request, Group $group, $user): RedirectResponse
     {
         $interdotz = app(InterdotzService::class);
-        $idrPrice = $isTest
-            ? (int) config('normchat.idr_group_creation_test', 1)
-            : (int) config('normchat.idr_group_creation', 35000);
+        $idrPrice = (int) config('normchat.idr_group_creation', 35000);
 
         if (! $interdotz->isConfigured()) {
             $group->forceDelete();
@@ -780,8 +853,8 @@ class GroupController extends Controller
                 'phone' => '',
             ],
             [[
-                'id' => ($isTest ? 'group-test-' : 'group-') . $group->id,
-                'name' => ($isTest ? 'Test pembayaran grup ' : 'Pembuatan grup ') . $group->name,
+                'id' => 'group-' . $group->id,
+                'name' => 'Pembuatan grup ' . $group->name,
                 'price' => $idrPrice,
                 'quantity' => 1,
             ]],
@@ -810,8 +883,7 @@ class GroupController extends Controller
             'metadata_json' => [
                 'action' => 'group_create_midtrans',
                 'group_name' => $group->name,
-                'payment_method' => $isTest ? 'midtrans_test' : 'midtrans',
-                'is_test' => $isTest,
+                'payment_method' => 'midtrans',
                 'payment_id' => $paymentId,
             ],
             'expires_at' => now()->addHour(),
@@ -820,10 +892,17 @@ class GroupController extends Controller
         return redirect()->away($redirectUrl);
     }
 
-    private function initiateJoinMidtransPayment(Request $request, Group $group, $user, string $shareId): RedirectResponse
+    private function initiateJoinMidtransPayment(
+        Request $request,
+        Group $group,
+        $user,
+        string $shareId,
+        ?int $customAmount = null
+    ): RedirectResponse
     {
         $interdotz = app(InterdotzService::class);
-        $idrPatungan = (int) config('normchat.idr_patungan_min', 5000);
+        $minimumAmount = (int) config('normchat.idr_patungan_min', 5000);
+        $idrPatungan = max($minimumAmount, (int) ($customAmount ?? $minimumAmount));
 
         if (! $interdotz->isConfigured()) {
             return back()->withErrors(['payment' => 'Sistem pembayaran belum dikonfigurasi.']);

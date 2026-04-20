@@ -22,7 +22,7 @@
             </div>
             <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Normkredit</p>
-                <p class="mt-1 text-sm font-bold text-emerald-700">+{{ number_format($totalTokensEarned) }}</p>
+                <p class="mt-1 text-sm font-bold text-emerald-700">+{{ number_format(round(((int) $totalTokensEarned) / 2500, 1), 1, ',', '.') }}</p>
             </div>
         </div>
 
@@ -101,7 +101,7 @@
                                             {{ number_format((int) $item->price_paid) }} DU
                                         @endif
                                     </p>
-                                    <p class="text-[10px] font-semibold text-emerald-600">+{{ number_format((int) $item->token_amount) }} normkredit</p>
+                                    <p class="text-[10px] font-semibold text-emerald-600">+{{ number_format(round(((int) $item->token_amount) / 2500, 1), 1, ',', '.') }} normkredit</p>
                                 </div>
                             </div>
                             <div class="mt-1.5 flex items-center justify-between gap-2">

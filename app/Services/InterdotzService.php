@@ -93,21 +93,37 @@ class InterdotzService
     private function getClientToken(string $userId): ?string
     {
         try {
-            $response = Http::withHeaders([
+            $payload = [
+                // Keep both key styles for compatibility across Interdotz deployments.
+                'client_id' => $this->clientId,
+                'client_secret' => $this->clientSecret,
+                'clientId' => $this->clientId,
+                'clientSecret' => $this->clientSecret,
+                'user_id' => $userId,
+                'userId' => $userId,
+            ];
+
+            $headers = [
                 'Accept' => 'application/json',
                 'X-Client-Id' => $this->clientId,
                 'X-Client-Secret' => $this->clientSecret,
-            ])
-                ->timeout(10)
-                ->post("{$this->apiBase}/api/client/auth", [
-                    // Keep both key styles for compatibility across Interdotz deployments.
-                    'client_id' => $this->clientId,
-                    'client_secret' => $this->clientSecret,
-                    'clientId' => $this->clientId,
-                    'clientSecret' => $this->clientSecret,
-                    'user_id' => $userId,
-                    'userId' => $userId,
-                ]);
+            ];
+
+            $sendAuthRequest = static function (array $headers, array $payload, string $url, bool $asForm = false): Response {
+                $request = Http::withHeaders($headers)->timeout(10);
+                if ($asForm) {
+                    $request = $request->asForm();
+                }
+
+                return $request->post($url, $payload);
+            };
+
+            $response = $sendAuthRequest($headers, $payload, "{$this->apiBase}/api/client/auth");
+
+            // Some API deployments only accept form-encoded payloads for this endpoint.
+            if (! $response->successful() && str_contains(strtolower((string) $response->body()), 'client_id is required')) {
+                $response = $sendAuthRequest($headers, $payload, "{$this->apiBase}/api/client/auth", true);
+            }
 
             if ($response->successful()) {
                 $token = (string) (

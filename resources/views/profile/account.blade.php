@@ -15,7 +15,7 @@
             {{-- Avatar + info card (clickable avatar to change photo) --}}
             <div class="rounded-2xl border border-[#dbe6ff] bg-white px-4 py-4 shadow-sm">
                 <div class="flex items-center gap-4">
-                    <label for="avatar" class="relative cursor-pointer group shrink-0" title="Klik untuk ganti foto profil">
+                    <label for="avatar" class="relative inline-flex h-16 w-16 items-center justify-center overflow-visible cursor-pointer group shrink-0" title="Klik untuk ganti foto profil">
                         @if($user->avatar_url)
                             <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-16 w-16 rounded-full object-cover ring-2 ring-blue-100 transition group-hover:opacity-75" referrerpolicy="no-referrer" id="avatarPreview" />
                         @else

@@ -120,17 +120,18 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             return;
         }
 
-        // Check token balance before calling AI
+        // Check balance before calling AI
         $groupToken = $group->groupToken;
         if (! $groupToken || $groupToken->remaining_tokens <= 0) {
-            $this->sendSystemMessage($group, 'Saldo token grup habis. Minta owner atau member untuk top-up normkredit agar bisa menggunakan AI.');
+            $this->sendSystemMessage($group, 'Saldo Normkredit grup habis. Minta owner atau member untuk top-up Normkredit agar bisa menggunakan AI.');
             return;
         }
 
-        // Estimate minimum needed (at least 1000 tokens * multiplier)
+        // Estimate minimum needed (internal token estimate with model multiplier)
         $minEstimate = (int) ceil(1000 * $multiplier);
         if ($groupToken->remaining_tokens < $minEstimate) {
-            $this->sendSystemMessage($group, 'Saldo token grup tidak cukup untuk request ini. Sisa: ' . $groupToken->formattedRemaining() . ' token. Top-up normkredit untuk melanjutkan.');
+            $remainingCredits = number_format(round(((int) $groupToken->remaining_tokens) / 2500, 1), 1, ',', '.');
+            $this->sendSystemMessage($group, 'Saldo Normkredit grup tidak cukup untuk request ini. Sisa: ' . $remainingCredits . ' Normkredit. Top-up Normkredit untuk melanjutkan.');
             return;
         }
 
@@ -208,10 +209,10 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             $effectiveTokens = $groupToken->consumeTokens($usageTokens, $multiplier);
 
             if ($effectiveTokens === false) {
-                // Not enough tokens - still send the response but warn
-                $remaining = $groupToken->formattedRemaining();
-                $needed = number_format((int) ceil($usageTokens * $multiplier));
-                $responseText = ($responseText ?? '') . "\n\n---\nSaldo token grup tidak mencukupi. Sisa: {$remaining} token, dibutuhkan: {$needed} token. Top-up normkredit untuk melanjutkan penggunaan AI.";
+                // Not enough balance - still send the response but warn
+                $remainingCredits = number_format(round(((int) $groupToken->remaining_tokens) / 2500, 1), 1, ',', '.');
+                $neededCredits = number_format(round(((int) ceil($usageTokens * $multiplier)) / 2500, 1), 1, ',', '.');
+                $responseText = ($responseText ?? '') . "\n\n---\nSaldo Normkredit grup tidak mencukupi. Sisa: {$remainingCredits} Normkredit, dibutuhkan: {$neededCredits} Normkredit. Top-up Normkredit untuk melanjutkan penggunaan AI.";
 
                 // Force consume whatever is left
                 if ($groupToken->remaining_tokens > 0) {

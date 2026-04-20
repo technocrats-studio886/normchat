@@ -31,7 +31,7 @@
                     <p class="text-sm font-bold text-slate-700">
                         @switch($pending->payment_type)
                             @case('subscription') Subscription @break
-                            @case('topup') Top-up Token @break
+                            @case('topup') Top-up Normkredit @break
                             @case('add_seat') Penyesuaian Akses @break
                         @endswitch
                     </p>

@@ -22,7 +22,6 @@ return [
     */
 
     'idr_group_creation' => (int) env('NORMCHAT_IDR_GROUP_CREATION', 35000),
-    'idr_group_creation_test' => (int) env('NORMCHAT_IDR_GROUP_CREATION_TEST', 1),
     'idr_patungan_min' => (int) env('NORMCHAT_IDR_PATUNGAN_MIN', 5000),
     'idr_topup_12nk' => (int) env('NORMCHAT_IDR_TOPUP_12NK', 35000),
     'idr_topup_24nk' => (int) env('NORMCHAT_IDR_TOPUP_24NK', 70000),
@@ -35,6 +34,8 @@ return [
     |--------------------------------------------------------------------------
     */
 
+    'group_creation_credits_du' => (int) env('NORMCHAT_GROUP_CREATION_CREDITS_DU', 12),
+    'group_creation_credits_idr' => (int) env('NORMCHAT_GROUP_CREATION_CREDITS_IDR', 10),
     'group_creation_credits' => (int) env('NORMCHAT_GROUP_CREATION_CREDITS', 10),
     'join_credits' => (int) env('NORMCHAT_JOIN_CREDITS', 15),
 
