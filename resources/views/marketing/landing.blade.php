@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#c0267a">
-    <meta name="description" content="Normchat — platform group chat murah untuk komunitas, tim, dan organisasi. Chatting ramean jadi lebih mudah dan lebih murah.">
+    <meta name="description" content="Normchat — chatting ramean dengan AI, lebih mudah lebih murah. Satu grup, satu saldo, satu asisten AI yang dipakai bareng seluruh tim dan komunitas.">
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
     <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('icons/icon-512.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
-    <title>Normchat — Chatting Ramean Lebih Mudah, Lebih Murah</title>
+    <title>Normchat — Chatting Ramean dengan AI, Lebih Mudah Lebih Murah</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@700;800&display=swap" rel="stylesheet">
@@ -39,6 +39,12 @@
             -webkit-font-smoothing: antialiased;
             line-height: 1.6;
             overflow-x: hidden;
+            min-width: 320px;
+        }
+
+        img, svg {
+            max-width: 100%;
+            height: auto;
         }
 
         .font-display { font-family: 'Poppins', sans-serif; }
@@ -61,6 +67,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 12px;
         }
         .logo-link {
             display: inline-flex;
@@ -111,8 +118,8 @@
             top: -60px;
             left: 50%;
             transform: translateX(-50%);
-            width: 500px;
-            height: 500px;
+            width: min(500px, 92vw);
+            height: min(500px, 92vw);
             border-radius: 50%;
             background: radial-gradient(circle, rgba(192,38,122,0.15) 0%, transparent 70%);
             pointer-events: none;
@@ -154,6 +161,7 @@
             max-width: 700px;
             margin: 0 auto;
             letter-spacing: -0.02em;
+            overflow-wrap: anywhere;
         }
         .hero h1 .grad {
             background: var(--nc-grad);
@@ -238,6 +246,11 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 16px;
         }
+        @media (max-width: 980px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
         @media (max-width: 640px) {
             .features-grid {
                 grid-template-columns: 1fr;
@@ -271,6 +284,7 @@
             font-size: 15px;
             color: #fff;
             margin-bottom: 8px;
+            line-height: 1.45;
         }
         .feature-card p {
             font-size: 13px;
@@ -306,8 +320,20 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 24px;
         }
+        @media (max-width: 980px) {
+            .steps { grid-template-columns: repeat(2, 1fr); }
+            .step:last-child {
+                grid-column: span 2;
+                max-width: 380px;
+                margin: 0 auto;
+            }
+        }
         @media (max-width: 640px) {
             .steps { grid-template-columns: 1fr; }
+            .step:last-child {
+                grid-column: auto;
+                max-width: none;
+            }
         }
         .step {
             text-align: center;
@@ -331,6 +357,7 @@
             font-size: 15px;
             color: #fff;
             margin-bottom: 6px;
+            line-height: 1.4;
         }
         .step p {
             font-size: 13px;
@@ -365,6 +392,7 @@
             font-size: 24px;
             color: #fff;
             margin-bottom: 16px;
+            line-height: 1.4;
         }
         .pricing-price {
             font-family: 'Poppins', sans-serif;
@@ -393,7 +421,7 @@
             font-size: 13px;
             color: var(--nc-text-soft);
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
         }
         .pricing-features li::before {
@@ -456,6 +484,152 @@
         @keyframes fadeUp {
             to { opacity: 1; transform: translateY(0); }
         }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 18px;
+            }
+
+            .site-header {
+                padding: 16px 0;
+            }
+
+            .logo-text {
+                font-size: 18px;
+            }
+
+            .header-cta {
+                padding: 8px 14px;
+                font-size: 12px;
+            }
+
+            .hero {
+                padding: 40px 0 56px;
+            }
+
+            .hero-badge {
+                font-size: 10px;
+                letter-spacing: 0.1em;
+                margin-bottom: 20px;
+            }
+
+            .hero-sub {
+                margin-top: 16px;
+                font-size: 15px;
+                line-height: 1.65;
+            }
+
+            .hero-actions {
+                margin-top: 28px;
+                width: 100%;
+            }
+
+            .btn-main,
+            .btn-outline {
+                width: 100%;
+                justify-content: center;
+                padding: 13px 18px;
+            }
+
+            .features,
+            .how-section,
+            .pricing {
+                padding: 44px 0;
+            }
+
+            .section-title {
+                margin-bottom: 28px;
+                line-height: 1.3;
+            }
+
+            .pricing-card {
+                max-width: 100%;
+                padding: 26px 20px;
+                border-radius: 16px;
+            }
+
+            .pricing-name {
+                font-size: 20px;
+            }
+
+            .pricing-desc {
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 14px;
+            }
+
+            .logo-link {
+                gap: 8px;
+            }
+
+            .logo-img {
+                width: 32px;
+                height: 32px;
+            }
+
+            .logo-text {
+                font-size: 17px;
+            }
+
+            .header-inner {
+                flex-wrap: wrap;
+            }
+
+            .header-cta {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .hero h1 {
+                font-size: 29px;
+                line-height: 1.22;
+            }
+
+            .hero h1 br {
+                display: none;
+            }
+
+            .hero-price-note {
+                font-size: 12px;
+            }
+
+            .feature-card {
+                padding: 20px 16px;
+            }
+
+            .pricing-btn {
+                font-size: 13px;
+            }
+
+            .step {
+                padding: 2px;
+            }
+
+            .site-footer {
+                padding: 30px 0;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .fade-up,
+            .fade-up-d1,
+            .fade-up-d2,
+            .fade-up-d3,
+            .fade-up-d4 {
+                opacity: 1;
+                transform: none;
+                animation: none;
+            }
+
+            .btn-main,
+            .pricing-btn {
+                transition: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -485,17 +659,18 @@
             <div class="container">
                 <div class="hero-badge fade-up">
                     <span class="hero-badge-dot"></span>
-                    AI group chat platform
+                    Grup chat + AI, satu aplikasi
                 </div>
 
                 <h1 class="fade-up fade-up-d1">
-                    AI bareng satu grup<br>
+                    Chatting ramean dengan AI<br>
                     <span class="grad">lebih mudah, lebih murah.</span>
                 </h1>
 
                 <p class="hero-sub fade-up fade-up-d2">
-                    Normchat adalah platform chat grup dengan AI di dalamnya untuk komunitas, tim, dan organisasi.
-                    Member bisa patungan Normkredit, lalu AI dipakai bareng di percakapan yang sama.
+                    Normchat menyatukan grup chat dan asisten AI dalam satu ruang.
+                    Kumpulkan tim atau komunitasmu, patungan Normkredit, lalu pakai AI bareng —
+                    tanpa ribet langganan sendiri-sendiri.
                 </p>
 
                 <div class="hero-actions fade-up fade-up-d3">
@@ -506,7 +681,7 @@
                     <a href="#cara-kerja" class="btn-outline">Lihat Cara Kerja</a>
                 </div>
 
-                <p class="hero-price-note fade-up fade-up-d4">Detail paket ditampilkan setelah login, saat kamu siap membuat grup.</p>
+                <p class="hero-price-note fade-up fade-up-d4">Detail paket muncul setelah login, pas kamu siap bikin grup pertama.</p>
             </div>
         </section>
 
@@ -518,24 +693,24 @@
                         <div class="feature-icon">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         </div>
-                        <h3>AI Patungan untuk Semua Member</h3>
-                        <p>Setiap member bisa patungan. Normkredit terkumpul di grup dan dipakai bersama untuk kebutuhan AI harian.</p>
+                        <h3>Patungan sekali, pakai bareng</h3>
+                        <p>Member grup menyetor Normkredit ke saldo bersama. Satu dompet, satu AI, dipakai siapa pun yang butuh — jauh lebih hemat daripada langganan per orang.</p>
                     </div>
 
                     <div class="feature-card fade-up fade-up-d1">
                         <div class="feature-icon">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                         </div>
-                        <h3>Chat Real-time + AI Context</h3>
-                        <p>Diskusi jalan cepat tanpa pindah aplikasi. AI membaca konteks obrolan grup agar respons tetap nyambung.</p>
+                        <h3>Chat cepat, AI yang paham konteks</h3>
+                        <p>Obrolan grup berjalan real-time. AI ikut membaca alur percakapan, jadi setiap jawabannya nyambung tanpa perlu kamu jelaskan ulang.</p>
                     </div>
 
                     <div class="feature-card fade-up fade-up-d2">
                         <div class="feature-icon">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                         </div>
-                        <h3>Satu Ruang untuk Tim + AI</h3>
-                        <p>Dari ide, keputusan, sampai tindak lanjut, semua tetap di satu ruang obrolan bersama AI sebagai copilot tim.</p>
+                        <h3>Satu ruang untuk ide, keputusan, dan AI</h3>
+                        <p>Brainstorming, diskusi, sampai tindak lanjut tetap di satu tempat. AI duduk di meja yang sama — bukan di tab sebelah yang harus dibuka-tutup.</p>
                     </div>
                 </div>
             </div>
@@ -545,23 +720,23 @@
         <section class="how-section" id="cara-kerja">
             <div class="container">
                 <p class="section-label">Cara Kerja</p>
-                <h2 class="section-title">Tiga langkah, langsung pakai AI bareng.</h2>
+                <h2 class="section-title">Tiga langkah, AI langsung aktif di grupmu.</h2>
 
                 <div class="steps">
                     <div class="step fade-up">
                         <div class="step-num">1</div>
-                        <h4>Buat Grup AI</h4>
-                        <p>Daftar akun, lalu buat grup baru. AI langsung aktif di dalam grup dengan kontrol owner tetap penuh.</p>
+                        <h4>Bikin grup</h4>
+                        <p>Daftar akun dan buka grup baru. AI hadir di dalamnya sejak menit pertama, kendali penuh tetap di tangan owner.</p>
                     </div>
                     <div class="step fade-up fade-up-d1">
                         <div class="step-num">2</div>
-                        <h4>Undang dan Patungan</h4>
-                        <p>Bagikan Share ID ke tim atau komunitas. Member join lalu patungan untuk menambah Normkredit AI grup.</p>
+                        <h4>Undang dan patungan</h4>
+                        <p>Bagikan Share ID ke tim atau komunitas. Member gabung, lalu patungan Normkredit untuk saldo AI bersama.</p>
                     </div>
                     <div class="step fade-up fade-up-d2">
                         <div class="step-num">3</div>
-                        <h4>Eksekusi Bareng AI</h4>
-                        <p>Tanya, rangkum, dan susun respons langsung dari chat grup. Semua histori tetap rapi dan mudah ditelusuri.</p>
+                        <h4>Ngobrol bareng AI</h4>
+                        <p>Tanya, rangkum, dan susun jawaban langsung di chat. Seluruh histori tersimpan rapi dan gampang ditelusuri kapan pun.</p>
                     </div>
                 </div>
             </div>
@@ -570,24 +745,24 @@
         <!-- Value Spotlight -->
         <section class="pricing" id="kenapa-normchat">
             <div class="container">
-                <p class="section-label">Kenapa Pilih Normchat</p>
-                <h2 class="section-title">Bukan cuma grup chat, ini AI bersama satu tim.</h2>
+                <p class="section-label">Kenapa Normchat</p>
+                <h2 class="section-title">Bukan sekadar grup chat — ini AI yang dipakai bareng.</h2>
 
                 <div class="pricing-card fade-up">
                     <p class="pricing-label">AI-first Group Experience</p>
-                    <p class="pricing-name">Satu ruang chat + satu asisten AI untuk seluruh member.</p>
-                    <p class="pricing-desc">Fokus tim tetap di percakapan. AI membantu meringkas, menyusun jawaban, dan menjaga ritme kerja bersama.</p>
+                    <p class="pricing-name">Satu ruang chat, satu saldo AI, untuk seluruh anggota.</p>
+                    <p class="pricing-desc">Fokus tim tetap di percakapan. Normchat yang mengurus AI, saldo, dan konteksnya — biar kamu cukup berpikir dan mengerjakan.</p>
 
                     <ul class="pricing-features">
-                        <li>Onboarding cepat lewat Share ID + password</li>
-                        <li>Patungan Normkredit untuk kebutuhan AI grup</li>
-                        <li>AI assist langsung di thread percakapan</li>
-                        <li>Chat real-time dan histori terarsip rapi</li>
-                        <li>Kontrol owner untuk role, akses, dan keamanan</li>
-                        <li>Siap dipakai komunitas, tim kecil, hingga organisasi</li>
+                        <li>Onboarding singkat via Share ID + password</li>
+                        <li>Patungan Normkredit, hemat bersama satu grup</li>
+                        <li>Bantuan AI langsung di thread obrolan</li>
+                        <li>Chat real-time dengan arsip tertata rapi</li>
+                        <li>Kendali owner untuk peran, akses, dan keamanan</li>
+                        <li>Cocok untuk komunitas, tim kecil, sampai organisasi</li>
                     </ul>
 
-                    <a href="{{ $loginToSubscriptionUrl }}" class="pricing-btn">Buat Akun dan Mulai AI Bareng</a>
+                    <a href="{{ $loginToSubscriptionUrl }}" class="pricing-btn">Mulai Chatting Ramean dengan AI</a>
                 </div>
             </div>
         </section>
@@ -596,7 +771,7 @@
     <!-- Footer -->
     <footer class="site-footer">
         <div class="container">
-            <p class="footer-text">&copy; {{ date('Y') }} Normchat. All rights reserved.</p>
+            <p class="footer-text">&copy; {{ date('Y') }} Normchat — chatting ramean dengan AI, lebih mudah lebih murah.</p>
         </div>
     </footer>
 </body>
