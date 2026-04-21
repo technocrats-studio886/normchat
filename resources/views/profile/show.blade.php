@@ -15,7 +15,14 @@
             @endif
             <div class="min-w-0 flex-1">
                 <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Akun Kamu</p>
-                <h2 class="truncate text-base font-bold text-slate-900">{{ $user->name }}</h2>
+                <div class="flex items-center gap-2">
+                    <h2 class="truncate text-base font-bold text-slate-900">{{ $user->name }}</h2>
+                    <a href="{{ route('mailbox.inbox') }}" onclick="event.stopPropagation();" class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-600 transition hover:bg-blue-200" title="Mailbox">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                        </svg>
+                    </a>
+                </div>
                 <p class="truncate text-xs text-slate-500">{{ '@' . $username }}</p>
             </div>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-slate-300">

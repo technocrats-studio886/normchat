@@ -499,6 +499,89 @@ class InterdotzService
         return null;
     }
 
+    // ── Mailbox ─────────────────────────────────────────────────
+
+    public function getMailboxInbox(string $ssoAccessToken, ?string $interdotzUserId = null): ?array
+    {
+        return $this->mailboxRequest('GET', '/interdotz/mailbox/inbox', $ssoAccessToken, $interdotzUserId);
+    }
+
+    public function getMailboxSent(string $ssoAccessToken, ?string $interdotzUserId = null): ?array
+    {
+        return $this->mailboxRequest('GET', '/interdotz/mailbox/sent', $ssoAccessToken, $interdotzUserId);
+    }
+
+    public function getMailDetail(string $mailId, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
+    {
+        return $this->mailboxRequest('GET', "/interdotz/mailbox/{$mailId}", $ssoAccessToken, $interdotzUserId);
+    }
+
+    public function sendMail(array $payload, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
+    {
+        return $this->mailboxRequest('POST', '/interdotz/mailbox/send', $ssoAccessToken, $interdotzUserId, $payload);
+    }
+
+    public function markMailAsRead(string $mailId, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
+    {
+        return $this->mailboxRequest('PUT', "/interdotz/mailbox/{$mailId}/read", $ssoAccessToken, $interdotzUserId);
+    }
+
+    public function markAllMailAsRead(string $ssoAccessToken, ?string $interdotzUserId = null): ?array
+    {
+        return $this->mailboxRequest('PUT', '/interdotz/mailbox/read-all', $ssoAccessToken, $interdotzUserId);
+    }
+
+    public function deleteMail(string $mailId, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
+    {
+        return $this->mailboxRequest('DELETE', "/interdotz/mailbox/{$mailId}", $ssoAccessToken, $interdotzUserId);
+    }
+
+    private function mailboxRequest(string $method, string $path, string $ssoAccessToken, ?string $interdotzUserId = null, ?array $body = null): ?array
+    {
+        $this->setLastError(null);
+
+        try {
+            $userId = $this->resolveChargeUserId($ssoAccessToken, $interdotzUserId);
+            if (! $userId) {
+                return null;
+            }
+
+            $clientToken = $this->getClientToken($userId);
+            if (! $clientToken) {
+                return null;
+            }
+
+            $url = "{$this->apiBase}{$path}";
+            $request = $this->client($clientToken);
+
+            $response = match (strtoupper($method)) {
+                'GET' => $request->get($url),
+                'POST' => $request->post($url, $body ?? []),
+                'PUT' => $request->put($url, $body ?? []),
+                'DELETE' => $request->delete($url),
+                default => $request->get($url),
+            };
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            $this->setLastError($this->extractResponseError($response) ?? 'Permintaan mailbox gagal.');
+
+            Log::warning('Interdotz mailbox request failed.', [
+                'method' => $method,
+                'path' => $path,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+        } catch (Throwable $e) {
+            $this->setLastError('Gagal menghubungi server Interdotz.');
+            Log::warning('Interdotz mailbox exception.', ['error' => $e->getMessage()]);
+        }
+
+        return null;
+    }
+
     // ── Helpers ──────────────────────────────────────────────────
 
     public function isConfigured(): bool

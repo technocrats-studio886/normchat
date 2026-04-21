@@ -103,7 +103,8 @@
                     || request()->routeIs('subscription.payment.*')
                     || request()->routeIs('subscription.checkout')
                     || request()->routeIs('subscription.success')
-                    || request()->routeIs('settings.*');
+                    || request()->routeIs('settings.*')
+                    || request()->routeIs('mailbox.*');
             @endphp
             @unless($hideBottomNav)
                 <nav class="nc-bottom-nav">

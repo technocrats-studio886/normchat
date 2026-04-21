@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\GroupController;
+use App\Http\Controllers\MailboxController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
@@ -84,6 +85,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile/security', [ProfileController::class, 'security'])->name('profile.security');
     Route::get('/profile/login-history', [ProfileController::class, 'loginHistory'])->name('profile.login-history');
     Route::get('/profile/transactions', [ProfileController::class, 'transactionHistoryPage'])->name('profile.transactions');
+
+    // Mailbox
+    Route::get('/mailbox', [MailboxController::class, 'inbox'])->name('mailbox.inbox');
+    Route::get('/mailbox/sent', [MailboxController::class, 'sent'])->name('mailbox.sent');
+    Route::get('/mailbox/compose', [MailboxController::class, 'compose'])->name('mailbox.compose');
+    Route::post('/mailbox/send', [MailboxController::class, 'send'])->name('mailbox.send');
+    Route::put('/mailbox/read-all', [MailboxController::class, 'markAllRead'])->name('mailbox.read-all');
+    Route::get('/mailbox/{mailId}', [MailboxController::class, 'show'])->name('mailbox.show');
+    Route::delete('/mailbox/{mailId}', [MailboxController::class, 'destroy'])->name('mailbox.destroy');
 
     Route::redirect('/app', '/groups');
 });
