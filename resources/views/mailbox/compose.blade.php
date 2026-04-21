@@ -58,7 +58,7 @@
 
             <div class="rounded-2xl border border-[#dbe6ff] bg-white shadow-sm overflow-hidden">
                 <label class="block px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Isi Pesan</label>
-                <div id="quill-editor" class="min-h-[250px]">{!! old('body', '') !!}</div>
+                <div id="quill-editor">{!! old('body', '') !!}</div>
                 <input type="hidden" name="body" id="bodyInput" />
                 @error('body')
                     <p class="px-4 pb-2 text-xs text-rose-500">{{ $message }}</p>
@@ -79,20 +79,25 @@
     <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
     <style>
         #quill-editor .ql-editor {
-            min-height: 220px;
+            min-height: 200px;
             font-size: 14px;
             line-height: 1.6;
             color: #1e293b;
             font-family: Inter, sans-serif;
+            padding: 12px 16px;
         }
         #quill-editor .ql-editor.ql-blank::before {
             color: #94a3b8;
             font-style: normal;
+            padding-left: 0;
         }
         .ql-toolbar.ql-snow {
             border: none !important;
             border-bottom: 1px solid #e2e8f0 !important;
-            padding: 6px 8px !important;
+            padding: 4px 6px !important;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0;
         }
         .ql-container.ql-snow {
             border: none !important;
@@ -106,6 +111,40 @@
         .ql-snow .ql-picker-label {
             color: #64748b;
         }
+        /* Mobile-friendly toolbar */
+        .ql-toolbar .ql-formats {
+            margin-right: 4px !important;
+            margin-bottom: 2px !important;
+        }
+        .ql-snow .ql-picker {
+            font-size: 12px !important;
+        }
+        .ql-snow .ql-picker-label {
+            padding: 2px 4px !important;
+        }
+        .ql-snow.ql-toolbar button {
+            width: 26px !important;
+            height: 26px !important;
+            padding: 3px !important;
+        }
+        .ql-snow.ql-toolbar button svg {
+            width: 16px !important;
+            height: 16px !important;
+        }
+        /* Picker dropdown on mobile */
+        .ql-snow .ql-picker-options {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .ql-snow .ql-tooltip {
+            left: 4px !important;
+            right: 4px !important;
+            max-width: calc(100vw - 64px);
+        }
+        .ql-snow .ql-tooltip input[type=text] {
+            width: 100% !important;
+            max-width: 200px;
+        }
     </style>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -114,17 +153,11 @@
                 placeholder: 'Tulis pesan kamu di sini...',
                 modules: {
                     toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        [{ 'font': [] }],
-                        [{ 'size': ['small', false, 'large', 'huge'] }],
+                        [{ 'header': [1, 2, 3, false] }, { 'size': ['small', false, 'large', 'huge'] }],
                         ['bold', 'italic', 'underline', 'strike'],
                         [{ 'color': [] }, { 'background': [] }],
-                        [{ 'script': 'sub' }, { 'script': 'super' }],
-                        ['blockquote', 'code-block'],
-                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                        [{ 'indent': '-1' }, { 'indent': '+1' }],
-                        [{ 'direction': 'rtl' }],
-                        [{ 'align': [] }],
+                        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+                        [{ 'align': [] }, 'blockquote', 'code-block'],
                         ['link', 'image', 'video'],
                         ['clean']
                     ]

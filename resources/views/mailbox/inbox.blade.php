@@ -44,7 +44,13 @@
 
         @if($error)
             <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                {{ $error }}
+                <p>{{ $error }}</p>
+                @if(str_contains($error, 'login'))
+                    <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('mailbox-logout-form').submit();" class="mt-2 inline-block text-xs font-bold text-blue-600 hover:text-blue-800">
+                        Login Ulang
+                    </a>
+                    <form id="mailbox-logout-form" action="{{ route('logout') }}" method="POST" class="hidden">@csrf</form>
+                @endif
             </div>
         @endif
 
@@ -53,14 +59,16 @@
             @forelse($mails as $mail)
                 @php
                     $isRead = !empty($mail['read_at']) || !empty($mail['is_read']);
-                    $mailId = $mail['id'] ?? $mail['mail_id'] ?? '';
-                    $from = $mail['from'] ?? $mail['sender'] ?? $mail['from_name'] ?? '-';
-                    $to = $mail['to'] ?? $mail['recipient'] ?? $mail['to_name'] ?? '-';
+                    $mailId = $mail['id'] ?? $mail['mail_id'] ?? $mail['_id'] ?? $mail['mailId'] ?? $mail['message_id'] ?? $mail['messageId'] ?? '';
+                    $senderUser = $mail['sender_username'] ?? null;
+                    $recipientUser = $mail['recipient_username'] ?? null;
+                    $from = $mail['from'] ?? $mail['sender_email'] ?? ($senderUser ? $senderUser.'@interdotz.com' : null) ?? $mail['sender'] ?? $mail['from_name'] ?? '-';
+                    $to = $mail['to'] ?? $mail['recipient_email'] ?? ($recipientUser ? $recipientUser.'@interdotz.com' : null) ?? $mail['recipient'] ?? $mail['to_name'] ?? '-';
                     $subject = $mail['subject'] ?? '(Tanpa subjek)';
                     $preview = $mail['preview'] ?? $mail['excerpt'] ?? \Illuminate\Support\Str::limit(strip_tags($mail['body'] ?? ''), 80);
                     $date = $mail['created_at'] ?? $mail['sent_at'] ?? $mail['date'] ?? '';
                 @endphp
-                <a href="{{ route('mailbox.show', $mailId) }}" class="block rounded-2xl border {{ $isRead ? 'border-slate-200 bg-white' : 'border-blue-200 bg-blue-50' }} px-4 py-3 shadow-sm transition hover:bg-slate-50">
+                <a href="{{ $mailId !== '' ? route('mailbox.show', $mailId) : '#' }}" class="block rounded-2xl border {{ $isRead ? 'border-slate-200 bg-white' : 'border-blue-200 bg-blue-50' }} px-4 py-3 shadow-sm transition hover:bg-slate-50">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm {{ $isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900' }}">
@@ -71,7 +79,7 @@
                         </div>
                         <span class="shrink-0 text-[10px] text-slate-400">
                             @if($date)
-                                {{ \Carbon\Carbon::parse($date)->diffForHumans() }}
+                                <time datetime="{{ \Carbon\Carbon::parse($date, 'Asia/Jakarta')->toIso8601String() }}" data-mail-time="rel">{{ \Carbon\Carbon::parse($date, 'Asia/Jakarta')->diffForHumans() }}</time>
                             @endif
                         </span>
                     </div>
@@ -92,4 +100,26 @@
             @endforelse
         </div>
     </section>
+
+    <script>
+        (function () {
+            const rtf = new Intl.RelativeTimeFormat(navigator.language || 'id', { numeric: 'auto' });
+            const units = [
+                ['year', 31536000], ['month', 2592000], ['week', 604800],
+                ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1],
+            ];
+            document.querySelectorAll('time[data-mail-time="rel"]').forEach((el) => {
+                const t = new Date(el.getAttribute('datetime'));
+                if (isNaN(t)) return;
+                const diff = (t.getTime() - Date.now()) / 1000;
+                for (const [unit, secs] of units) {
+                    if (Math.abs(diff) >= secs || unit === 'second') {
+                        el.textContent = rtf.format(Math.round(diff / secs), unit);
+                        break;
+                    }
+                }
+                el.title = t.toLocaleString();
+            });
+        })();
+    </script>
 @endsection

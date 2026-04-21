@@ -503,37 +503,37 @@ class InterdotzService
 
     public function getMailboxInbox(string $ssoAccessToken, ?string $interdotzUserId = null): ?array
     {
-        return $this->mailboxRequest('GET', '/interdotz/mailbox/inbox', $ssoAccessToken, $interdotzUserId);
+        return $this->mailboxRequest('GET', '/api/client/mailbox/inbox', $ssoAccessToken, $interdotzUserId);
     }
 
     public function getMailboxSent(string $ssoAccessToken, ?string $interdotzUserId = null): ?array
     {
-        return $this->mailboxRequest('GET', '/interdotz/mailbox/sent', $ssoAccessToken, $interdotzUserId);
+        return $this->mailboxRequest('GET', '/api/client/mailbox/sent', $ssoAccessToken, $interdotzUserId);
     }
 
     public function getMailDetail(string $mailId, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
     {
-        return $this->mailboxRequest('GET', "/interdotz/mailbox/{$mailId}", $ssoAccessToken, $interdotzUserId);
+        return $this->mailboxRequest('GET', "/api/client/mailbox/{$mailId}", $ssoAccessToken, $interdotzUserId);
     }
 
     public function sendMail(array $payload, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
     {
-        return $this->mailboxRequest('POST', '/interdotz/mailbox/send', $ssoAccessToken, $interdotzUserId, $payload);
+        return $this->mailboxRequest('POST', '/api/client/mailbox/send', $ssoAccessToken, $interdotzUserId, $payload);
     }
 
     public function markMailAsRead(string $mailId, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
     {
-        return $this->mailboxRequest('PUT', "/interdotz/mailbox/{$mailId}/read", $ssoAccessToken, $interdotzUserId);
+        return $this->mailboxRequest('PUT', "/api/client/mailbox/{$mailId}/read", $ssoAccessToken, $interdotzUserId);
     }
 
     public function markAllMailAsRead(string $ssoAccessToken, ?string $interdotzUserId = null): ?array
     {
-        return $this->mailboxRequest('PUT', '/interdotz/mailbox/read-all', $ssoAccessToken, $interdotzUserId);
+        return $this->mailboxRequest('PUT', '/api/client/mailbox/read-all', $ssoAccessToken, $interdotzUserId);
     }
 
     public function deleteMail(string $mailId, string $ssoAccessToken, ?string $interdotzUserId = null): ?array
     {
-        return $this->mailboxRequest('DELETE', "/interdotz/mailbox/{$mailId}", $ssoAccessToken, $interdotzUserId);
+        return $this->mailboxRequest('DELETE', "/api/client/mailbox/{$mailId}", $ssoAccessToken, $interdotzUserId);
     }
 
     private function mailboxRequest(string $method, string $path, string $ssoAccessToken, ?string $interdotzUserId = null, ?array $body = null): ?array
@@ -577,6 +577,62 @@ class InterdotzService
         } catch (Throwable $e) {
             $this->setLastError('Gagal menghubungi server Interdotz.');
             Log::warning('Interdotz mailbox exception.', ['error' => $e->getMessage()]);
+        }
+
+        return null;
+    }
+
+    // ── Token Refresh ───────────────────────────────────────────
+
+    private function refreshSsoToken($user): ?string
+    {
+        $refreshToken = $user->getRefreshToken();
+        if (! $refreshToken) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(10)->post("{$this->apiBase}/api/auth/refresh", [
+                'refresh_token' => $refreshToken,
+                'refreshToken' => $refreshToken,
+            ]);
+
+            if ($response->successful()) {
+                $newAccess = (string) (
+                    $response->json('payload.access_token')
+                    ?? $response->json('payload.accessToken')
+                    ?? $response->json('access_token')
+                    ?? $response->json('accessToken')
+                    ?? ''
+                );
+                $newRefresh = (string) (
+                    $response->json('payload.refresh_token')
+                    ?? $response->json('payload.refreshToken')
+                    ?? $response->json('refresh_token')
+                    ?? $response->json('refreshToken')
+                    ?? ''
+                );
+                $expiresIn = $response->json('payload.expires_in')
+                    ?? $response->json('expires_in');
+
+                if ($newAccess !== '') {
+                    $expiresAt = $expiresIn ? now()->addSeconds((int) $expiresIn) : null;
+                    $user->storeOAuthTokens(
+                        $newAccess,
+                        $newRefresh !== '' ? $newRefresh : $refreshToken,
+                        $expiresAt
+                    );
+
+                    return $newAccess;
+                }
+            }
+
+            Log::warning('Interdotz SSO token refresh failed.', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+        } catch (Throwable $e) {
+            Log::warning('Interdotz SSO token refresh exception.', ['error' => $e->getMessage()]);
         }
 
         return null;

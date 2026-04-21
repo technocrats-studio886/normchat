@@ -3,24 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Services\InterdotzService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\View\View;
 
 class MailboxController extends Controller
 {
+    private const TOKEN_EXPIRED_MSG = 'Sesi Interdotz kamu sudah kedaluwarsa. Silakan logout dan login kembali untuk memperbarui sesi.';
+
     public function __construct(private InterdotzService $interdotz)
     {
     }
 
     private function getAccessToken(): ?string
     {
-        $user = Auth::user();
-
-        return $user->getAccessToken();
+        return Auth::user()->getAccessToken();
     }
 
     private function getInterdotzUserId(): ?string
@@ -30,22 +28,34 @@ class MailboxController extends Controller
         return $user->interdotz_id ?? $user->provider_user_id ?? null;
     }
 
+    private function resolveError(): string
+    {
+        $raw = $this->interdotz->getLastError() ?? '';
+        $lower = strtolower($raw);
+
+        if (str_contains($lower, 'expired') || str_contains($lower, 'authentication required') || str_contains($lower, 'token')) {
+            return self::TOKEN_EXPIRED_MSG;
+        }
+
+        return $raw !== '' ? $raw : 'Gagal memuat data mailbox.';
+    }
+
     public function inbox(Request $request): View
     {
         $token = $this->getAccessToken();
-        $userId = $this->getInterdotzUserId();
         $mails = [];
         $error = null;
 
         if ($token) {
-            $result = $this->interdotz->getMailboxInbox($token, $userId);
+            $result = $this->interdotz->getMailboxInbox($token, $this->getInterdotzUserId());
             if ($result) {
-                $mails = $result['payload'] ?? $result['data'] ?? $result;
+                $payload = $result['payload'] ?? $result['data'] ?? $result;
+                $mails = $payload['items'] ?? $payload['mails'] ?? (is_array($payload) && array_is_list($payload) ? $payload : []);
             } else {
-                $error = $this->interdotz->getLastError();
+                $error = $this->resolveError();
             }
         } else {
-            $error = 'Sesi tidak valid. Silakan login ulang.';
+            $error = self::TOKEN_EXPIRED_MSG;
         }
 
         return view('mailbox.inbox', [
@@ -58,19 +68,19 @@ class MailboxController extends Controller
     public function sent(Request $request): View
     {
         $token = $this->getAccessToken();
-        $userId = $this->getInterdotzUserId();
         $mails = [];
         $error = null;
 
         if ($token) {
-            $result = $this->interdotz->getMailboxSent($token, $userId);
+            $result = $this->interdotz->getMailboxSent($token, $this->getInterdotzUserId());
             if ($result) {
-                $mails = $result['payload'] ?? $result['data'] ?? $result;
+                $payload = $result['payload'] ?? $result['data'] ?? $result;
+                $mails = $payload['items'] ?? $payload['mails'] ?? (is_array($payload) && array_is_list($payload) ? $payload : []);
             } else {
-                $error = $this->interdotz->getLastError();
+                $error = $this->resolveError();
             }
         } else {
-            $error = 'Sesi tidak valid. Silakan login ulang.';
+            $error = self::TOKEN_EXPIRED_MSG;
         }
 
         return view('mailbox.inbox', [
@@ -83,35 +93,45 @@ class MailboxController extends Controller
     public function show(string $mailId): View
     {
         $token = $this->getAccessToken();
-        $userId = $this->getInterdotzUserId();
         $mail = null;
         $error = null;
 
         if ($token) {
-            $result = $this->interdotz->getMailDetail($mailId, $token, $userId);
+            $result = $this->interdotz->getMailDetail($mailId, $token, $this->getInterdotzUserId());
             if ($result) {
                 $mail = $result['payload'] ?? $result['data'] ?? $result;
-                // Mark as read
-                $this->interdotz->markMailAsRead($mailId, $token, $userId);
+                $this->interdotz->markMailAsRead($mailId, $token, $this->getInterdotzUserId());
             } else {
-                $error = $this->interdotz->getLastError();
+                $sent = $this->interdotz->getMailboxSent($token, $this->getInterdotzUserId());
+                if ($sent) {
+                    $payload = $sent['payload'] ?? $sent['data'] ?? $sent;
+                    $items = $payload['items'] ?? $payload['mails'] ?? (is_array($payload) && array_is_list($payload) ? $payload : []);
+                    foreach ($items as $item) {
+                        if (($item['id'] ?? null) === $mailId) {
+                            $mail = $item;
+                            break;
+                        }
+                    }
+                }
+                if (! $mail) {
+                    $error = $this->resolveError();
+                }
             }
         } else {
-            $error = 'Sesi tidak valid. Silakan login ulang.';
+            $error = self::TOKEN_EXPIRED_MSG;
         }
 
         return view('mailbox.show', [
             'mail' => $mail,
             'error' => $error,
+            'currentUser' => Auth::user(),
         ]);
     }
 
     public function compose(): View
     {
-        $user = Auth::user();
-
         return view('mailbox.compose', [
-            'user' => $user,
+            'user' => Auth::user(),
         ]);
     }
 
@@ -124,18 +144,17 @@ class MailboxController extends Controller
         ]);
 
         $token = $this->getAccessToken();
-        $userId = $this->getInterdotzUserId();
 
         if (! $token) {
             return redirect()->route('mailbox.compose')
-                ->with('error', 'Sesi tidak valid. Silakan login ulang.');
+                ->with('error', self::TOKEN_EXPIRED_MSG);
         }
 
         $result = $this->interdotz->sendMail([
-            'to' => trim($validated['to']),
+            'recipient_email' => trim($validated['to']),
             'subject' => trim($validated['subject']),
             'body' => $validated['body'],
-        ], $token, $userId);
+        ], $token, $this->getInterdotzUserId());
 
         if ($result) {
             return redirect()->route('mailbox.sent')
@@ -144,16 +163,15 @@ class MailboxController extends Controller
 
         return redirect()->route('mailbox.compose')
             ->withInput()
-            ->with('error', $this->interdotz->getLastError() ?? 'Gagal mengirim pesan.');
+            ->with('error', $this->resolveError());
     }
 
     public function markAllRead(): RedirectResponse
     {
         $token = $this->getAccessToken();
-        $userId = $this->getInterdotzUserId();
 
         if ($token) {
-            $this->interdotz->markAllMailAsRead($token, $userId);
+            $this->interdotz->markAllMailAsRead($token, $this->getInterdotzUserId());
         }
 
         return redirect()->route('mailbox.inbox')
@@ -163,10 +181,9 @@ class MailboxController extends Controller
     public function destroy(string $mailId): RedirectResponse
     {
         $token = $this->getAccessToken();
-        $userId = $this->getInterdotzUserId();
 
         if ($token) {
-            $result = $this->interdotz->deleteMail($mailId, $token, $userId);
+            $result = $this->interdotz->deleteMail($mailId, $token, $this->getInterdotzUserId());
             if ($result) {
                 return redirect()->route('mailbox.inbox')
                     ->with('success', 'Pesan berhasil dihapus.');
@@ -174,6 +191,6 @@ class MailboxController extends Controller
         }
 
         return redirect()->route('mailbox.inbox')
-            ->with('error', $this->interdotz->getLastError() ?? 'Gagal menghapus pesan.');
+            ->with('error', $this->resolveError());
     }
 }

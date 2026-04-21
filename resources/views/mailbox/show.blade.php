@@ -12,15 +12,30 @@
             </div>
         @elseif($mail)
             @php
-                $from = $mail['from'] ?? $mail['sender'] ?? $mail['from_name'] ?? '-';
-                $to = $mail['to'] ?? $mail['recipient'] ?? $mail['to_name'] ?? '-';
+                $senderUser = $mail['sender_username'] ?? null;
+                $recipientUser = $mail['recipient_username'] ?? null;
+                $currentUserId = $currentUser->interdotz_id ?? null;
+                $currentUsername = $currentUser->username ?? $currentUser->provider_user_id ?? null;
+                $fallbackMe = $currentUsername ? $currentUsername.'@interdotz.com' : ($currentUser->email ?? null);
+                $isSender = isset($mail['sender_id']) && $currentUserId && $mail['sender_id'] === $currentUserId;
+                // Inbox items don't expose recipient user ID — assume current user is the recipient unless they're the sender.
+                $isRecipient = ! $isSender;
+                $from = $mail['from'] ?? $mail['sender_email'] ?? ($senderUser ? $senderUser.'@interdotz.com' : null) ?? ($isSender ? $fallbackMe : null) ?? $mail['sender'] ?? $mail['from_name'] ?? '-';
+                $to = $mail['to'] ?? $mail['recipient_email'] ?? ($recipientUser ? $recipientUser.'@interdotz.com' : null) ?? ($isRecipient ? $fallbackMe : null) ?? $mail['recipient'] ?? $mail['to_name'] ?? '-';
                 $subject = $mail['subject'] ?? '(Tanpa subjek)';
+                $isReply = (bool) preg_match('/^\s*re\s*:/i', $subject);
                 $body = $mail['body'] ?? $mail['content'] ?? '';
                 $date = $mail['created_at'] ?? $mail['sent_at'] ?? $mail['date'] ?? '';
-                $mailId = $mail['id'] ?? $mail['mail_id'] ?? '';
+                $mailId = $mail['id'] ?? $mail['mail_id'] ?? $mail['_id'] ?? '';
             @endphp
 
             <div class="mt-4 rounded-2xl border border-[#dbe6ff] bg-white px-4 py-4 shadow-sm">
+                @if($isReply)
+                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 10 4 15l5 5M4 15h11a5 5 0 0 0 5-5V4"/></svg>
+                        Balasan
+                    </span>
+                @endif
                 <h1 class="text-lg font-bold text-slate-900">{{ $subject }}</h1>
 
                 <div class="mt-3 space-y-1.5 border-b border-slate-100 pb-3">
@@ -36,7 +51,7 @@
                         <span class="font-semibold text-slate-500 w-12">Tanggal</span>
                         <span class="text-slate-600">
                             @if($date)
-                                {{ \Carbon\Carbon::parse($date)->timezone(config('app.display_timezone', config('app.timezone')))->translatedFormat('d M Y, H:i') }}
+                                <time datetime="{{ \Carbon\Carbon::parse($date, 'Asia/Jakarta')->toIso8601String() }}" data-mail-time="abs">{{ \Carbon\Carbon::parse($date, 'Asia/Jakarta')->translatedFormat('h:i A, d M Y') }}</time>
                             @else
                                 -
                             @endif
@@ -69,4 +84,17 @@
             </div>
         @endif
     </section>
+
+    <script>
+        (function () {
+            document.querySelectorAll('time[data-mail-time="abs"]').forEach((el) => {
+                const t = new Date(el.getAttribute('datetime'));
+                if (isNaN(t)) return;
+                const lang = navigator.language || 'id';
+                const time = t.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit', hour12: true });
+                const date = t.toLocaleDateString(lang, { day: '2-digit', month: 'short', year: 'numeric' });
+                el.textContent = `${time}, ${date}`;
+            });
+        })();
+    </script>
 @endsection
