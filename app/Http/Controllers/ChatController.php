@@ -334,6 +334,33 @@ class ChatController extends Controller
             $message->content = $nextContent;
             $message->save();
 
+            if ($nextContent !== '') {
+                $previousMentionHandles = $this->extractMentionHandles($previousContent);
+                $nextMentionHandles = $this->extractMentionHandles($nextContent);
+                $newMentionHandles = array_values(array_diff($nextMentionHandles, $previousMentionHandles));
+
+                $this->dispatchMentionNotifications($group, $message, $nextContent, $newMentionHandles);
+            }
+
+            if ($this->shouldQueueAi($nextContent, $message->replyToMessage)) {
+                $queueAlreadyActive = ChatMessageQueue::query()
+                    ->where('group_id', $group->id)
+                    ->where('message_id', $message->id)
+                    ->whereIn('status', ['queued', 'processing'])
+                    ->exists();
+
+                if (! $queueAlreadyActive) {
+                    ChatMessageQueue::create([
+                        'group_id' => $group->id,
+                        'message_id' => $message->id,
+                        'status' => 'queued',
+                        'queued_at' => now(),
+                    ]);
+                }
+
+                ProcessGroupChatQueueJob::dispatch($group->id);
+            }
+
             AuditLog::create([
                 'group_id' => $group->id,
                 'actor_id' => $userId,
@@ -629,9 +656,16 @@ class ChatController extends Controller
         ];
     }
 
-    private function dispatchMentionNotifications(Group $group, Message $message, string $content): void
+    private function dispatchMentionNotifications(Group $group, Message $message, string $content, array $onlyHandles = []): void
     {
         $mentionedHandles = $this->extractMentionHandles($content);
+        if ($onlyHandles !== []) {
+            $mentionedHandles = collect($mentionedHandles)
+                ->filter(fn ($handle) => in_array($handle, $onlyHandles, true))
+                ->values()
+                ->all();
+        }
+
         if ($mentionedHandles === []) {
             return;
         }
@@ -748,8 +782,11 @@ class ChatController extends Controller
             || in_array((string) $mime, ['application/pdf'], true);
         $disposition = $isInline ? 'inline' : 'attachment';
 
-        return response()->stream(function () use ($disk, $message) {
-            $stream = $disk->readStream($message->attachment_path);
+        abort_unless($disk->exists($message->attachment_path), 404);
+        $stream = $disk->readStream($message->attachment_path);
+        abort_unless(is_resource($stream), 404);
+
+        return response()->stream(function () use ($stream) {
             fpassthru($stream);
             if (is_resource($stream)) {
                 fclose($stream);
@@ -830,12 +867,16 @@ class ChatController extends Controller
 
     private function buildMentionSuggestions(Group $group): array
     {
+        $viewerId = (int) Auth::id();
+
         $users = collect([$group->owner])
             ->merge($group->members->pluck('user'))
             ->filter()
+            ->filter(fn ($user) => (int) ($user->id ?? 0) !== $viewerId)
             ->unique('id')
             ->map(fn ($user) => [
                 'type' => 'user',
+                'user_id' => (int) $user->id,
                 'label' => (string) $user->name,
                 'insert' => '@'.strtolower(str_replace(' ', '_', (string) $user->name)),
             ])

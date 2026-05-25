@@ -10,6 +10,8 @@ use App\Models\Group;
 use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\AiDocumentGenerator;
+use App\Services\AttachmentTextExtractor;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -166,9 +168,13 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         $usageTokens = 0;
         $generatedImagePath = null;
         $generatedImageMime = null;
+        $generatedDocument = null;
 
-        // Detect if user is requesting image generation
+        // Detect generation intents
         $isImageGenRequest = $this->isImageGenerationRequest($content);
+        $documentFormat = $isImageGenRequest
+            ? null
+            : app(AiDocumentGenerator::class)->detectRequestedFormat((string) $message->content);
 
         event(new TypingStatus($group->id, 'ai', null, 'NormAI', true));
         try {
@@ -177,6 +183,16 @@ class ProcessGroupChatQueueJob implements ShouldQueue
                 [$generatedImagePath, $generatedImageMime, $responseText, $usageTokens] = $this->generateImage(
                     $credentials,
                     $message,
+                    $group
+                );
+            } elseif ($documentFormat !== null) {
+                [$generatedDocument, $responseText, $usageTokens] = $this->generateDocument(
+                    $documentFormat,
+                    $provider,
+                    $model,
+                    $credentials,
+                    $message,
+                    $recentMessages->all(),
                     $group
                 );
             } else {
@@ -193,7 +209,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             event(new TypingStatus($group->id, 'ai', null, 'NormAI', false));
         }
 
-        if (! $responseText && ! $generatedImagePath) {
+        if (! $responseText && ! $generatedImagePath && ! $generatedDocument) {
             $responseText = 'AI sedang sibuk dan belum bisa merespons saat ini. Coba lagi beberapa saat.';
             // Don't charge tokens if response failed
             $usageTokens = 0;
@@ -239,6 +255,18 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             $aiMessageData['attachment_path'] = $generatedImagePath;
             $aiMessageData['attachment_mime'] = $generatedImageMime ?? 'image/png';
             $aiMessageData['attachment_original_name'] = 'normai-generated.png';
+        } elseif ($generatedDocument) {
+            $aiMessageData['message_type'] = $generatedDocument['message_type'] ?? 'file';
+            $aiMessageData['attachment_disk'] = 'normchat_attachments';
+            $aiMessageData['attachment_path'] = $generatedDocument['path'];
+            $aiMessageData['attachment_mime'] = $generatedDocument['mime'];
+            $aiMessageData['attachment_original_name'] = $generatedDocument['original_name'];
+
+            try {
+                $aiMessageData['attachment_size'] = (int) Storage::disk('normchat_attachments')->size($generatedDocument['path']);
+            } catch (Throwable $e) {
+                $aiMessageData['attachment_size'] = null;
+            }
         }
 
         $aiMessage = Message::create($aiMessageData);
@@ -261,6 +289,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             'attachment_url' => $attachmentUrl,
             'attachment_mime' => $aiMessage->attachment_mime,
             'attachment_original_name' => $aiMessage->attachment_original_name,
+            'attachment_size' => $aiMessage->attachment_size,
             'created_at' => optional($aiMessage->created_at)->toIso8601String(),
             'reply_to' => $aiReplyTarget ? [
                 'id' => (int) $aiReplyTarget->id,
@@ -468,6 +497,14 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             }
         } elseif ($this->isImageMessage($requestMessage)) {
             $parts[] = 'Pesan ini menyertakan gambar. Gunakan gambar tersebut untuk menjawab.';
+        } else {
+            $documentText = $this->extractDocumentText($requestMessage);
+            if ($documentText !== null) {
+                $label = $requestMessage->attachment_original_name ?: 'lampiran';
+                $parts[] = "Isi dokumen \"{$label}\":\n\n" . $documentText;
+            } elseif ($requestMessage->attachment_path) {
+                $parts[] = 'Pesan ini berisi lampiran namun isinya tidak bisa dibaca AI (format tidak didukung atau gagal parse).';
+            }
         }
 
         $replyTarget = $requestMessage->replyToMessage;
@@ -501,6 +538,12 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
             if ($this->isImageMessage($replyTarget)) {
                 $parts[] = 'Ada gambar pada pesan yang direply. Perhatikan gambar tersebut dalam jawabanmu.';
+            } elseif (! $this->isAudioMessage($replyTarget)) {
+                $replyDocText = $this->extractDocumentText($replyTarget);
+                if ($replyDocText !== null) {
+                    $label = $replyTarget->attachment_original_name ?: 'lampiran';
+                    $parts[] = "Isi dokumen yang direply (\"{$label}\"):\n\n" . $replyDocText;
+                }
             }
         }
 
@@ -529,6 +572,26 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         $messageType = strtolower((string) ($row['message_type'] ?? 'text'));
         if ($messageType === 'image') {
             return '[Pesan sebelumnya berisi gambar]' . $replyMeta;
+        }
+
+        if ($messageType === 'file' && ($row['attachment_path'] ?? null)) {
+            $docMessage = new Message([
+                'message_type' => $messageType,
+                'attachment_disk' => $row['attachment_disk'] ?? null,
+                'attachment_path' => $row['attachment_path'] ?? null,
+                'attachment_mime' => $row['attachment_mime'] ?? null,
+                'attachment_original_name' => $row['attachment_original_name'] ?? null,
+            ]);
+            $docMessage->id = (int) ($row['id'] ?? 0);
+
+            $docText = $this->extractDocumentText($docMessage);
+            $label = $row['attachment_original_name'] ?? 'lampiran';
+            if ($docText !== null) {
+                $snippet = mb_substr($docText, 0, 1500);
+                return "[Dokumen \"{$label}\"]\n" . $snippet . $replyMeta;
+            }
+
+            return "[Pesan sebelumnya berisi lampiran file: {$label}]" . $replyMeta;
         }
 
         if ($messageType === 'voice') {
@@ -707,6 +770,127 @@ class ProcessGroupChatQueueJob implements ShouldQueue
             ]);
 
             return [null, null, 'Gagal membuat gambar, coba lagi nanti.', 0];
+        }
+    }
+
+    private function extractDocumentText(?Message $message): ?string
+    {
+        if (! $message || ! $message->attachment_path || ! $message->attachment_disk) {
+            return null;
+        }
+
+        if ($this->isImageMessage($message) || $this->isAudioMessage($message)) {
+            return null;
+        }
+
+        $cacheKey = 'msg-doc-text:' . $message->id;
+        return Cache::remember($cacheKey, now()->addHours(12), function () use ($message) {
+            return app(AttachmentTextExtractor::class)->extract($message);
+        });
+    }
+
+    /**
+     * Ask the LLM for markdown body, then render to the requested format and persist.
+     * Returns [documentDescriptor|null, captionText|null, tokensUsed].
+     */
+    private function generateDocument(string $format, string $provider, string $model, string $token, Message $requestMessage, array $recentMessages, ?Group $group): array
+    {
+        $userPrompt = trim((string) $requestMessage->content);
+        if ($userPrompt === '') {
+            $userPrompt = 'Buatkan dokumen ringkas berdasarkan konteks percakapan grup.';
+        }
+
+        $systemPrompt = "Kamu adalah AI yang menulis isi dokumen siap-render dalam Markdown bersih.\n"
+            . "Aturan keluaran:\n"
+            . "- Hanya keluarkan konten dokumen dalam Markdown (tanpa pembuka 'Tentu saja', tanpa penutup, tanpa code fence).\n"
+            . "- Awali dengan satu baris judul (#) yang ringkas dan deskriptif.\n"
+            . "- Gunakan heading (##), paragraf, dan bullet (-) bila perlu.\n"
+            . "- Bahasa Indonesia, jelas, padat, langsung dipakai.\n"
+            . "- Hindari tabel kompleks dan emoji berlebihan.";
+
+        $userInstruction = "Format yang diminta user: {$format}.\n"
+            . "Permintaan user: {$userPrompt}\n\n"
+            . "Tulis seluruh isi dokumen sekarang.";
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+        ];
+
+        foreach ($recentMessages as $row) {
+            if ((int) ($row['id'] ?? 0) === (int) $requestMessage->id) {
+                continue;
+            }
+            $line = $this->messageToContextLine($row, $token);
+            if (trim($line) === '') {
+                continue;
+            }
+            $messages[] = [
+                'role' => (($row['sender_type'] ?? 'user') === 'ai') ? 'assistant' : 'user',
+                'content' => $line,
+            ];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $userInstruction];
+
+        $payload = [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => 0.4,
+        ];
+
+        try {
+            $response = Http::withToken($token)
+                ->timeout(60)
+                ->post('https://api.openai.com/v1/chat/completions', $payload);
+
+            if ($response->failed() && $model !== 'gpt-4.1') {
+                $payload['model'] = 'gpt-4.1';
+                $response = Http::withToken($token)
+                    ->timeout(60)
+                    ->post('https://api.openai.com/v1/chat/completions', $payload);
+            }
+
+            if ($response->failed()) {
+                Log::warning('Document generation chat call failed.', [
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 500),
+                ]);
+                return [null, 'Gagal membuat dokumen, coba lagi nanti.', 0];
+            }
+
+            $markdown = trim((string) ($response->json('choices.0.message.content') ?? ''));
+            $usage = $response->json('usage', []);
+            $totalTokens = (int) ($usage['total_tokens'] ?? 0);
+
+            if ($markdown === '') {
+                return [null, 'Gagal membuat dokumen: respons AI kosong.', 0];
+            }
+
+            // Strip stray markdown code fences if the model wrapped output
+            $markdown = preg_replace('/^```[a-zA-Z]*\s*\n|\n```\s*$/u', '', $markdown) ?? $markdown;
+
+            $titleHint = null;
+            if (preg_match('/^#\s+(.+)$/mu', $markdown, $titleMatch)) {
+                $titleHint = trim($titleMatch[1]);
+            }
+
+            $descriptor = app(AiDocumentGenerator::class)->storeDocument(
+                (int) $requestMessage->group_id,
+                $format,
+                $markdown,
+                $titleHint
+            );
+
+            if (! $descriptor) {
+                return [null, 'Gagal merender dokumen ke format ' . strtoupper($format) . '.', 0];
+            }
+
+            $caption = '📄 Dokumen siap: ' . $descriptor['original_name'];
+
+            return [$descriptor, $caption, $totalTokens];
+        } catch (Throwable $e) {
+            Log::error('Document generation exception.', ['error' => $e->getMessage()]);
+            return [null, 'Gagal membuat dokumen: ' . $e->getMessage(), 0];
         }
     }
 

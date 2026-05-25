@@ -2160,6 +2160,35 @@ if (window.Echo && groupId) {
 			}
 		}
 
+		if (
+			payload.message.sender_type === 'user'
+			&& Number(payload.message.sender_id || 0) === authUserId
+			&& pendingMessagesByLocalId.size > 0
+		) {
+			const [fallbackLocalId, fallbackPending] = pendingMessagesByLocalId.entries().next().value || [];
+			if (fallbackLocalId && fallbackPending?.node?.isConnected) {
+				try {
+					const finalNode = buildMessageNode(payload.message);
+					finalNode.setAttribute('data-message-id', String(payload.message.id));
+					finalNode.id = `message-${payload.message.id}`;
+					fallbackPending.node.replaceWith(finalNode);
+					initVoicePlayers(finalNode);
+					renderMermaidInNode(finalNode);
+				} catch (_) {}
+
+				if (typeof fallbackPending.blobUrl === 'string') {
+					URL.revokeObjectURL(fallbackPending.blobUrl);
+				}
+
+				pendingMessagesByLocalId.delete(fallbackLocalId);
+				markGroupVisited();
+				scrollChatToBottom('auto');
+				markGroupRead(Number(payload.message.id || 0));
+				refreshPollCardsFromFeed();
+				return;
+			}
+		}
+
 		const duplicate = chatFeed.querySelector(`[data-message-id="${payload.message.id}"]`);
 		if (duplicate) {
 			return;
@@ -2473,6 +2502,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 3.105a.75.75 0 0 1 .818-.164l12 5.25a.75.75 0 0 1 0 1.374l-12 5.25A.75.75 0 0 1 2.9 14.18l1.2-4.18a.75.75 0 0 0 0-.4l-1.2-4.18a.75.75 0 0 1 .205-.815Z" /></svg>
 						</button>
 					</div>
+					<div class="mt-2 hidden rounded-xl border border-white/20 bg-slate-900/90 shadow-lg" data-preview-caption-mention-menu></div>
 				</div>
 			</div>
 			<div class="absolute inset-0 z-[75] hidden bg-slate-950/90 px-4 pb-6 pt-14" data-preview-text-editor>
@@ -2484,6 +2514,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				</div>
 				<div class="mt-4 rounded-2xl bg-white/12 p-3">
 					<input type="text" class="w-full rounded-xl border border-white/25 bg-black/20 px-3 py-3 text-base text-white outline-none placeholder:text-white/60" data-preview-text-input placeholder="Ketik teks" autocomplete="off" />
+					<div class="mt-2 hidden rounded-xl border border-white/20 bg-slate-900/90 shadow-lg" data-preview-text-mention-menu></div>
 				</div>
 				<div class="mt-3 flex items-center justify-between gap-3">
 					<div class="flex items-center gap-1" data-preview-text-size-controls>
@@ -2528,6 +2559,122 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 		const textCloseButton = el.querySelector('[data-preview-text-close]');
 		const textSizeButtons = Array.from(el.querySelectorAll('[data-preview-text-size]'));
 		const textColorButtons = Array.from(el.querySelectorAll('[data-preview-text-color]'));
+		const previewCaptionMentionMenu = el.querySelector('[data-preview-caption-mention-menu]');
+		const previewTextMentionMenu = el.querySelector('[data-preview-text-mention-menu]');
+
+		let previewMentionSuggestions = [];
+		try {
+			const sourceMentionMenu = chatForm?.querySelector('[data-mention-menu]');
+			const parsed = JSON.parse(sourceMentionMenu?.dataset.mentionItems || '[]');
+			previewMentionSuggestions = Array.isArray(parsed) ? parsed : [];
+		} catch (_error) {
+			previewMentionSuggestions = [];
+		}
+		previewMentionSuggestions = previewMentionSuggestions.filter((item) => {
+			if (String(item?.type || '') === 'ai') {
+				return true;
+			}
+			const userId = Number(item?.user_id || 0);
+			return userId <= 0 || userId !== authUserId;
+		});
+
+		const bindPreviewMentionMenu = (targetInput, targetMenu, onApplied) => {
+			if (!(targetInput instanceof HTMLInputElement) || !(targetMenu instanceof HTMLDivElement)) {
+				return;
+			}
+
+			let activeSuggestions = [];
+			const hideMenu = () => {
+				targetMenu.classList.add('hidden');
+				targetMenu.innerHTML = '';
+				activeSuggestions = [];
+			};
+
+			const getMentionQuery = () => {
+				const value = targetInput.value;
+				const caret = targetInput.selectionStart ?? value.length;
+				const beforeCaret = value.slice(0, caret);
+				const atIndex = beforeCaret.lastIndexOf('@');
+				if (atIndex < 0) {
+					return null;
+				}
+
+				const token = beforeCaret.slice(atIndex + 1);
+				if (/\s/.test(token)) {
+					return null;
+				}
+
+				return {
+					query: token.toLowerCase(),
+					start: atIndex,
+					end: caret,
+				};
+			};
+
+			const applyMention = (item) => {
+				const mention = getMentionQuery();
+				if (!mention) {
+					return;
+				}
+
+				const value = targetInput.value;
+				targetInput.value = `${value.slice(0, mention.start)}${item.insert} ${value.slice(mention.end)}`;
+				targetInput.focus();
+				hideMenu();
+				if (typeof onApplied === 'function') {
+					onApplied(targetInput.value);
+				}
+			};
+
+			targetInput.addEventListener('input', () => {
+				const mention = getMentionQuery();
+				if (!mention) {
+					hideMenu();
+					return;
+				}
+
+				const filtered = previewMentionSuggestions
+					.filter((item) => {
+						if (!mention.query) {
+							return true;
+						}
+						return String(item?.label || '').toLowerCase().includes(mention.query)
+							|| String(item?.insert || '').toLowerCase().includes(mention.query);
+					})
+					.slice(0, 8);
+
+				activeSuggestions = filtered;
+				if (!filtered.length) {
+					hideMenu();
+					return;
+				}
+
+				targetMenu.innerHTML = filtered
+					.map((item, index) => {
+						const tagTypeClass = item.type === 'ai' ? 'text-emerald-300' : 'text-blue-300';
+						return `<button type="button" data-preview-mention-index="${index}" class="flex w-full items-center justify-between border-b border-white/10 px-3 py-2 text-left text-sm text-white last:border-0 hover:bg-white/10"><span class="font-medium">${escapeHtml(item.label)}</span><span class="text-xs ${tagTypeClass}">${escapeHtml(item.insert)}</span></button>`;
+					})
+					.join('');
+				targetMenu.classList.remove('hidden');
+			});
+
+			targetMenu.addEventListener('click', (event) => {
+				const button = event.target.closest('[data-preview-mention-index]');
+				if (!button) {
+					return;
+				}
+
+				const index = Number(button.getAttribute('data-preview-mention-index'));
+				const selected = activeSuggestions[index];
+				if (selected) {
+					applyMention(selected);
+				}
+			});
+
+			targetInput.addEventListener('blur', () => {
+				window.setTimeout(hideMenu, 120);
+			});
+		};
 
 		const syncComposerCaption = (text) => {
 			if (!(mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement)) {
@@ -2544,6 +2691,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			previewCaptionInput.addEventListener('input', () => {
 				syncComposerCaption(previewCaptionInput.value);
 			});
+			bindPreviewMentionMenu(previewCaptionInput, previewCaptionMentionMenu, syncComposerCaption);
 		}
 
 		if (previewCaptionSend instanceof HTMLButtonElement) {
@@ -2554,6 +2702,8 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				chatForm.requestSubmit();
 			});
 		}
+
+		bindPreviewMentionMenu(textInput, previewTextMentionMenu);
 
 		let doodleEnabled = false;
 		let drawing = false;
@@ -3958,6 +4108,8 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				return;
 			}
 
+			clearSelectedAttachment();
+			clearReplyTarget();
 			editingMessageId = messageId;
 			mentionInput.value = rawContent;
 			mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -4077,7 +4229,7 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 				return;
 			}
 
-			if (event.target.closest('a, button, input, textarea, [data-voice-toggle], [data-voice-progress]')) {
+			if (event.target.closest('input, textarea, [data-voice-toggle], [data-voice-progress]')) {
 				activeNode = null;
 				return;
 			}
@@ -4469,13 +4621,18 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 	});
 
 	const setSendingUi = (isSending) => {
-		if (!(sendButton instanceof HTMLButtonElement)) {
-			return;
+		if (sendButton instanceof HTMLButtonElement) {
+			sendButton.disabled = isSending;
+			sendButton.classList.toggle('opacity-70', isSending);
+			sendButton.classList.toggle('cursor-wait', isSending);
 		}
 
-		sendButton.disabled = isSending;
-		sendButton.classList.toggle('opacity-70', isSending);
-		sendButton.classList.toggle('cursor-wait', isSending);
+		const mediaPreviewSendButton = document.querySelector('[data-attachment-preview-caption-send]');
+		if (mediaPreviewSendButton instanceof HTMLButtonElement) {
+			mediaPreviewSendButton.disabled = isSending;
+			mediaPreviewSendButton.classList.toggle('opacity-70', isSending);
+			mediaPreviewSendButton.classList.toggle('cursor-wait', isSending);
+		}
 	};
 
 	const appendPendingMessageNode = (content, file, replyContext = null) => {
@@ -4547,9 +4704,32 @@ if (chatForm && attachmentInput instanceof HTMLInputElement) {
 			return;
 		}
 
+		const serverMessageId = Number(serverMessage?.id || 0);
+		const duplicateNode = (
+			chatFeed instanceof HTMLElement
+			&& serverMessageId > 0
+		)
+			? chatFeed.querySelector(`[data-message-id="${serverMessageId}"]`)
+			: null;
+
+		if (duplicateNode instanceof HTMLElement && duplicateNode !== pending.node) {
+			pending.node.remove();
+
+			if (typeof pending.blobUrl === 'string') {
+				URL.revokeObjectURL(pending.blobUrl);
+			}
+
+			pendingMessagesByLocalId.delete(localId);
+			latestKnownMessageId = Math.max(latestKnownMessageId, serverMessageId);
+			scrollChatToBottom('auto');
+			markGroupRead(serverMessageId);
+			refreshPollCardsFromFeed();
+			return;
+		}
+
 		const finalNode = buildMessageNode(serverMessage);
-		finalNode.setAttribute('data-message-id', String(serverMessage.id));
-		finalNode.id = `message-${serverMessage.id}`;
+		finalNode.setAttribute('data-message-id', String(serverMessageId || serverMessage.id));
+		finalNode.id = `message-${serverMessageId || serverMessage.id}`;
 		pending.node.replaceWith(finalNode);
 		initVoicePlayers(finalNode);
 		renderMermaidInNode(finalNode);
@@ -4724,6 +4904,13 @@ if ((mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTML
 	} catch (_error) {
 		allSuggestions = [];
 	}
+	allSuggestions = allSuggestions.filter((item) => {
+		if (String(item?.type || '') === 'ai') {
+			return true;
+		}
+		const userId = Number(item?.user_id || 0);
+		return userId <= 0 || userId !== authUserId;
+	});
 
 	const hideMentionMenu = () => {
 		mentionMenu.innerHTML = '';

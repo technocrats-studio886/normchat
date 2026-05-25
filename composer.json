@@ -15,7 +15,8 @@
         "laravel/socialite": "^5.25",
         "laravel/tinker": "^3.0",
         "phpoffice/phpword": "^1.1",
-        "predis/predis": "*"
+        "predis/predis": "*",
+        "smalot/pdfparser": "^2.12"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
