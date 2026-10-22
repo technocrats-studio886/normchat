@@ -18,7 +18,7 @@ class ProfileActivityTest extends TestCase
         $this->get('/profile/activity')->assertRedirectContains('/login');
     }
 
-    public function test_profile_activity_shows_login_history_and_user_payment_history(): void
+    public function test_profile_pages_show_login_history_and_user_payment_history(): void
     {
         $user = User::factory()->create([
             'name' => 'Noel',
@@ -47,28 +47,32 @@ class ProfileActivityTest extends TestCase
             'group_id' => $group->id,
             'user_id' => $user->id,
             'source' => 'topup',
-            'token_amount' => 30000,
-            'price_paid' => 150,
+            'credit_amount' => 300,
+            'price_paid' => 30000,
             'payment_reference' => 'topup_ref_abc',
         ]);
 
-        $response = $this->actingAs($user)->get('/profile');
-
-        $response->assertOk()
-            ->assertSee('Setting')
+        $this->actingAs($user)->get('/profile')
+            ->assertOk()
             ->assertSee('Login History')
-            ->assertSee('IP 10.10.10.10')
-            ->assertSee('Riwayat transaksi')
-            ->assertSee('Top-up Normkredit')
-            ->assertSee('150 DU');
+            ->assertSee('Riwayat Transaksi');
+
+        $this->actingAs($user)->get('/profile/login-history')
+            ->assertOk()
+            ->assertSee('10.10.10.10');
+
+        $this->actingAs($user)->get('/profile/transactions')
+            ->assertOk()
+            ->assertSee('Top-up normkredit')
+            ->assertSee('Rp30.000');
     }
 
-    public function test_profile_activity_route_redirects_to_profile_page(): void
+    public function test_profile_activity_route_redirects_to_login_history(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->get('/profile/activity')
-            ->assertRedirect(route('profile.show') . '#riwayat-login');
+            ->assertRedirect(route('profile.login-history'));
     }
 }

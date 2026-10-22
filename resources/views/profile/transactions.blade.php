@@ -11,18 +11,14 @@
         <p class="mt-1 text-sm text-slate-500">Semua pembayaran yang pernah kamu lakukan di Normchat.</p>
 
         {{-- Summary stats --}}
-        <div class="mt-4 grid grid-cols-3 gap-2">
+        <div class="mt-4 grid grid-cols-2 gap-2">
             <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
-                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Total DU</p>
-                <p class="mt-1 text-sm font-bold text-slate-900">{{ number_format($totalSpentDu) }} <span class="text-[10px] font-semibold text-slate-500">DU</span></p>
-            </div>
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
-                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Total IDR</p>
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Total Dibayar</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">Rp{{ number_format($totalSpentIdr, 0, ',', '.') }}</p>
             </div>
             <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Normkredit</p>
-                <p class="mt-1 text-sm font-bold text-emerald-700">+{{ number_format(round(((int) $totalTokensEarned) / 2500, 1), 1, ',', '.') }}</p>
+                <p class="mt-1 text-sm font-bold text-emerald-700">+{{ number_format($totalCreditsEarned, 2, ',', '.') }}</p>
             </div>
         </div>
 
@@ -71,7 +67,6 @@
                         'group_creation', 'group_creation_midtrans' => 'bg-amber-50 text-amber-600',
                         default => 'bg-slate-50 text-slate-600',
                     };
-                    $isIdr = in_array($item->source, ['patungan_midtrans', 'topup_midtrans', 'group_creation_midtrans'], true);
                     $groupName = $item->group?->name ?? 'Tanpa grup';
                 @endphp
 
@@ -95,13 +90,9 @@
                                 </div>
                                 <div class="shrink-0 text-right">
                                     <p class="text-xs font-bold text-slate-900">
-                                        @if($isIdr)
-                                            Rp{{ number_format((int) $item->price_paid, 0, ',', '.') }}
-                                        @else
-                                            {{ number_format((int) $item->price_paid) }} DU
-                                        @endif
+                                                                                    Rp{{ number_format((int) $item->price_paid, 0, ',', '.') }}
                                     </p>
-                                    <p class="text-[10px] font-semibold text-emerald-600">+{{ number_format(round(((int) $item->token_amount) / 2500, 1), 1, ',', '.') }} normkredit</p>
+                                    <p class="text-[10px] font-semibold text-emerald-600">+{{ number_format((float) $item->credit_amount, 2, ',', '.') }} normkredit</p>
                                 </div>
                             </div>
                             <div class="mt-1.5 flex items-center justify-between gap-2">

@@ -639,7 +639,7 @@
         $landingUrl = $marketingBase.$marketingPath;
 
         $appBase = rtrim((string) config('app.normchat_app_url', config('app.url')), '/');
-        $loginToSubscriptionUrl = $appBase.'/login?next=subscription.payment.detail';
+        $loginToSubscriptionUrl = $appBase.'/login?next=groups.index';
     @endphp
 
     <!-- Header -->

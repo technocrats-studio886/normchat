@@ -17,12 +17,12 @@
                 <div class="flex items-center gap-4">
                     <label for="avatar" class="relative inline-flex h-16 w-16 items-center justify-center overflow-visible cursor-pointer group shrink-0" title="Klik untuk ganti foto profil">
                         @if($user->avatar_url)
-                            <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-16 w-16 rounded-full object-cover ring-2 ring-blue-100 transition group-hover:opacity-75" referrerpolicy="no-referrer" id="avatarPreview" />
+                            <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-16 w-16 rounded-full object-cover ring-2 ring-blue-100 transition group-hover:opacity-75" referrerpolicy="no-referrer" data-avatar-preview />
                         @else
-                            <div class="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-xl font-bold text-blue-600 transition group-hover:opacity-75" id="avatarInitial">
+                            <div class="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-xl font-bold text-blue-600 transition group-hover:opacity-75" data-avatar-initial>
                                 {{ strtoupper(substr($user->name, 0, 1)) }}
                             </div>
-                            <img src="" alt="" class="hidden h-16 w-16 rounded-full object-cover ring-2 ring-blue-100" id="avatarPreview" />
+                            <img src="" alt="" class="hidden h-16 w-16 rounded-full object-cover ring-2 ring-blue-100" data-avatar-preview />
                         @endif
                         {{-- Camera badge --}}
                         <span class="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow ring-2 ring-white">
@@ -38,13 +38,13 @@
                             accept="image/png,image/jpeg,image/webp"
                             class="sr-only"
                             style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0"
-                            onchange="previewAvatar(this)"
+                            data-avatar-input
                         />
                     </label>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-bold text-slate-900">{{ $user->name }}</p>
                         <p class="truncate text-xs text-slate-500">{{ $user->email }}</p>
-                        <p class="mt-1 text-[11px] font-semibold text-blue-600">Interdotz SSO</p>
+                        <p class="mt-1 text-[11px] font-semibold text-blue-600">{{ $user->authProviderLabel() }}</p>
                     </div>
                 </div>
             </div>
@@ -75,7 +75,7 @@
                         class="ml-2 w-full cursor-not-allowed bg-transparent text-sm text-slate-500 outline-none"
                     />
                 </div>
-                <p class="mt-1 text-[11px] text-slate-500">Username hanya bisa diubah langsung dari akun Interdotz.</p>
+                <p class="mt-1 text-[11px] text-slate-500">Username dibuat otomatis dari akun {{ $user->authProviderLabel() }} dan belum bisa diubah.</p>
             </div>
 
             <div class="panel-card px-4 py-3">
@@ -97,24 +97,4 @@
             <button type="submit" class="btn-cta">Simpan Perubahan</button>
         </form>
     </section>
-
-    <script>
-        function previewAvatar(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    const preview = document.getElementById('avatarPreview');
-                    const initial = document.getElementById('avatarInitial');
-                    if (preview) {
-                        preview.src = e.target.result;
-                        preview.classList.remove('hidden');
-                    }
-                    if (initial) {
-                        initial.classList.add('hidden');
-                    }
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-    </script>
 @endsection

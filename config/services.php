@@ -29,13 +29,30 @@ return [
         ],
     ],
 
-        'interdotz' => [
+    /*
+    | Interdotz (SSO, pembayaran via Interdotz, mailbox, API produk). Dinonaktifkan
+    | sementara: kodenya tetap ada, route-nya membalas 404 selama `enabled` false.
+    */
+    'interdotz' => [
+        'enabled' => filter_var(env('NORMCHAT_INTERDOTZ_ENABLED', false), FILTER_VALIDATE_BOOL),
         'client_id' => env('INTERDOTZ_CLIENT_ID'),
         'client_secret' => env('INTERDOTZ_CLIENT_SECRET'),
         'admin_bearer_token' => env('INTERDOTZ_ADMIN_BEARER_TOKEN'),
         'api_base' => env('INTERDOTZ_API_BASE', 'https://api-interdotz.technocrats.studio'),
         'sso_base' => env('INTERDOTZ_SSO_BASE', 'https://interdotz.technocrats.studio'),
         'redirect_uri' => env('INTERDOTZ_REDIRECT_URI', env('APP_URL') . '/sso/interdotz/callback'),
+    ],
+
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/auth/google/callback'),
+    ],
+
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'is_production' => filter_var(env('MIDTRANS_IS_PRODUCTION', false), FILTER_VALIDATE_BOOL),
     ],
 
     /*
@@ -46,14 +63,6 @@ return [
 
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
-    ],
-
-    'anthropic' => [
-        'api_key' => env('ANTHROPIC_API_KEY'),
-    ],
-
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY'),
     ],
 
 ];

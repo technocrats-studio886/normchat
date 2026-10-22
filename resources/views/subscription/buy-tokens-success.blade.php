@@ -21,17 +21,13 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-emerald-700">Normkredit</span>
-                        <span class="font-bold text-emerald-900">{{ $purchase['normkredits'] }}</span>
+                        <span class="font-bold text-emerald-900">{{ number_format((float) $purchase['normkredits'], 0, ',', '.') }} NK</span>
                     </div>
                     @if(($purchase['paid_amount'] ?? 0) > 0)
                     <div class="flex justify-between">
                         <span class="text-emerald-700">Dibayar</span>
                         <span class="font-bold text-emerald-900">
-                            @if(($purchase['payment_unit'] ?? 'DU') === 'IDR')
-                                Rp{{ number_format((int) $purchase['paid_amount'], 0, ',', '.') }}
-                            @else
-                                {{ (int) $purchase['paid_amount'] }} DU
-                            @endif
+                            Rp{{ number_format((int) $purchase['paid_amount'], 0, ',', '.') }}
                         </span>
                     </div>
                     @endif

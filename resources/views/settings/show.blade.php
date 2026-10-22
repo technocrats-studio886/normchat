@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => 'Group Setting - '.$group->name, 'group' => $group])
 
 @section('content')
-    <section class="page-shell">
+    <section class="page-shell" data-membership-watch="{{ (int) $group->id }}" data-groups-url="{{ route('groups.index') }}">
         @php
             $canEditProfile = $canEditProfile ?? ($canManageSettings ?? false);
             $canManageBilling = $canManageBilling ?? false;
@@ -41,7 +41,7 @@
                 <div class="mt-4 flex items-center justify-between">
                     <div>
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-white/70">Normkredit</p>
-                        <p class="font-display text-2xl font-extrabold">{{ number_format($credits, 1) }}</p>
+                        <p class="font-display text-2xl font-extrabold">{{ number_format($credits, 2, ',', '.') }}</p>
                     </div>
                     @if($canManageBilling)
                         <a href="{{ route('subscription.tokens.buy', ['group' => $group->id]) }}" class="rounded-2xl bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25">Top-up →</a>
@@ -56,6 +56,8 @@
                 <span>Kamu sedang dalam mode read-only. Hanya owner/admin dengan izin yang bisa mengubah pengaturan.</span>
             </div>
         @endif
+
+        @include('settings._credits')
 
         {{-- Profil Grup --}}
         <h2 class="section-title mt-6">Profil Grup</h2>
@@ -77,9 +79,9 @@
                 <div class="relative mt-1.5">
                     <input id="group_password" type="password" name="password" @if($isReadOnly) readonly @endif class="input-field pr-10 @if($isReadOnly) cursor-not-allowed bg-slate-50 text-slate-500 @endif" placeholder="Masukkan password baru" />
                     @if(! $isReadOnly)
-                    <button type="button" onclick="toggleSettingsGroupPassword()" class="absolute inset-y-0 right-3 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat password">
-                        <svg id="settingsPassShow" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                        <svg id="settingsPassHide" xmlns="http://www.w3.org/2000/svg" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m3 3 18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58a2 2 0 1 0 2.83 2.83"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 5.09A10.94 10.94 0 0 1 12 5c4.48 0 8.27 2.94 9.54 7a11.05 11.05 0 0 1-4.2 5.17"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.61 6.61A11.05 11.05 0 0 0 2.46 12c1.27 4.06 5.06 7 9.54 7 1.58 0 3.09-.37 4.42-1.03"/></svg>
+                    <button type="button" data-password-toggle="group_password" class="absolute inset-y-0 right-3 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat password">
+                        <svg data-eye-icon="off" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg data-eye-icon="on" xmlns="http://www.w3.org/2000/svg" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m3 3 18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58a2 2 0 1 0 2.83 2.83"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 5.09A10.94 10.94 0 0 1 12 5c4.48 0 8.27 2.94 9.54 7a11.05 11.05 0 0 1-4.2 5.17"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.61 6.61A11.05 11.05 0 0 0 2.46 12c1.27 4.06 5.06 7 9.54 7 1.58 0 3.09-.37 4.42-1.03"/></svg>
                     </button>
                     @endif
                 </div>
@@ -218,32 +220,6 @@
             </div>
         </div>
 
-        <script>
-            (function () {
-                const root = document.querySelector('[data-archive-tabs]');
-                if (!root) return;
-                const tabs = root.querySelectorAll('[data-archive-tab]');
-                const panels = document.querySelectorAll('[data-archive-panel]');
-                tabs.forEach((tab) => {
-                    tab.addEventListener('click', () => {
-                        const target = tab.getAttribute('data-archive-tab');
-                        tabs.forEach((t) => {
-                            const active = t === tab;
-                            t.setAttribute('aria-selected', active ? 'true' : 'false');
-                            t.classList.toggle('text-slate-700', active);
-                            t.classList.toggle('border-blue-500', active);
-                            t.classList.toggle('bg-blue-50', active);
-                            t.classList.toggle('text-slate-500', !active);
-                            t.classList.toggle('border-transparent', !active);
-                        });
-                        panels.forEach((p) => {
-                            p.classList.toggle('hidden', p.getAttribute('data-archive-panel') !== target);
-                        });
-                    });
-                });
-            })();
-        </script>
-
         <h2 class="section-title mt-6">Ringkasan Grup</h2>
         <div class="card-soft space-y-2.5">
             <p class="text-xs text-slate-500">Backup, export, dan AI persona tersedia di menu cepat chat. Theme chat diatur dari halaman ini.</p>
@@ -291,7 +267,7 @@
                 </button>
             </div>
 
-            <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-slate-900/45 px-5" data-delete-group-overlay="1">
+            <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-slate-900/45 px-5" data-delete-group-overlay="1" data-expected-name="{{ $group->name }}">
                 <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
                     <p class="text-sm font-bold text-slate-900">Hapus grup "{{ $group->name }}"?</p>
                     <p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Semua pesan, anggota, dan backup akan dihapus. Ketik nama grup untuk konfirmasi.</p>
@@ -306,128 +282,8 @@
                     </div>
                 </div>
             </div>
-
-            <script>
-                (function () {
-                    const openBtn = document.querySelector('[data-open-delete-group]');
-                    const overlay = document.querySelector('[data-delete-group-overlay]');
-                    const closeBtn = document.querySelector('[data-close-delete-group]');
-                    const input = document.querySelector('[data-delete-group-confirm-input]');
-                    const submit = document.querySelector('[data-delete-group-submit]');
-                    const expected = @json($group->name);
-                    if (!openBtn || !overlay || !closeBtn || !input || !submit) return;
-                    const show = () => { overlay.classList.remove('hidden'); overlay.classList.add('flex'); input.value=''; submit.disabled=true; input.focus(); };
-                    const hide = () => { overlay.classList.add('hidden'); overlay.classList.remove('flex'); };
-                    openBtn.addEventListener('click', show);
-                    closeBtn.addEventListener('click', hide);
-                    overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
-                    input.addEventListener('input', () => { submit.disabled = input.value.trim() !== expected; });
-                })();
-            </script>
         @endif
 
         <div class="h-6"></div>
     </section>
-
-    <script>
-        function toggleSettingsGroupPassword() {
-            const input = document.getElementById('group_password');
-            const show = document.getElementById('settingsPassShow');
-            const hide = document.getElementById('settingsPassHide');
-            if (!input) return;
-            const makeVisible = input.type === 'password';
-            input.type = makeVisible ? 'text' : 'password';
-            if (show && hide) {
-                show.classList.toggle('hidden', makeVisible);
-                hide.classList.toggle('hidden', !makeVisible);
-            }
-        }
-
-        (function () {
-            const picker = document.querySelector('[data-chat-theme-picker="1"]');
-            if (!picker) {
-                return;
-            }
-
-            const groupId = String(picker.getAttribute('data-chat-theme-group-id') || 'global');
-            const storageKey = `nc:chatTheme:${groupId}`;
-            const status = picker.querySelector('[data-chat-theme-status="1"]');
-            const options = Array.from(picker.querySelectorAll('[data-chat-theme-option]'));
-            const names = {
-                default: 'Default',
-                midnight: 'Midnight',
-                ocean: 'Ocean',
-                forest: 'Forest',
-                sunset: 'Sunset',
-                slate: 'Slate',
-                charcoal: 'Charcoal',
-            };
-
-            const setActive = (themeId) => {
-                const selected = names[themeId] ? themeId : 'default';
-                options.forEach((button) => {
-                    const isActive = button.getAttribute('data-chat-theme-option') === selected;
-                    button.classList.toggle('ring-2', isActive);
-                    button.classList.toggle('ring-indigo-500', isActive);
-                    button.classList.toggle('border-indigo-400', isActive);
-                });
-                if (status) {
-                    status.textContent = `Theme aktif: ${names[selected] || 'Default'}`;
-                }
-            };
-
-            let initial = 'default';
-            try {
-                const stored = String(window.localStorage.getItem(storageKey) || '').trim().toLowerCase();
-                if (stored && names[stored]) {
-                    initial = stored;
-                }
-            } catch (_error) {
-                initial = 'default';
-            }
-            setActive(initial);
-
-            options.forEach((button) => {
-                button.addEventListener('click', () => {
-                    const next = String(button.getAttribute('data-chat-theme-option') || 'default').toLowerCase();
-                    try {
-                        if (next === 'default') {
-                            window.localStorage.removeItem(storageKey);
-                        } else {
-                            window.localStorage.setItem(storageKey, next);
-                        }
-                    } catch (_error) {
-                        // Ignore storage failures.
-                    }
-                    setActive(next);
-                });
-            });
-        })();
-
-        (function () {
-            if (!window.Echo) {
-                return;
-            }
-
-            const groupId = Number(@json((int) $group->id));
-            const authUserId = Number(@json((int) auth()->id()));
-            if (!groupId || !authUserId) {
-                return;
-            }
-
-            window.Echo.private(`group.${groupId}`).listen('.group.membership.changed', (payload) => {
-                const targetUserId = Number(payload?.target_user_id || 0);
-                if (!targetUserId || targetUserId !== authUserId) {
-                    return;
-                }
-
-                if (String(payload?.action || '') === 'removed') {
-                    window.location.href = @json(route('groups.index'));
-                    return;
-                }
-
-                window.location.reload();
-            });
-        })();
-    </script>
 @endsection

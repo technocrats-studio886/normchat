@@ -1,8 +1,22 @@
 # Normchat API Documentation
 
-Base URL: `https://normchat.technocrats.studio/api`
+Base URL: `https://normchat.twenti.studio/api`
 
-Normchat is a product of Interdotz. All payments are processed through Interdotz Dots Units (DU).
+Payments are processed in Rupiah directly through **Midtrans Snap** (`NORMCHAT_PAYMENT_GATEWAY=midtrans`). Login uses **Google**.
+
+> **Interdotz integration is disabled** (`NORMCHAT_INTERDOTZ_ENABLED=false`): SSO, payments via Interdotz, mailbox, and every `/api/webhooks/interdotz/*`, `/api/product/*`, `/api/transactions*` endpoint below respond `404` until the flag is turned back on. The code is kept intact.
+
+---
+
+## POST `/api/webhooks/midtrans`
+
+Midtrans HTTP notification (set as *Payment Notification URL* in the Midtrans dashboard).
+
+- Verified with `signature_key = SHA512(order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY)`; invalid → `403 {"message": "invalid signature"}`.
+- `settlement`, or `capture` with `fraud_status` `accept`/absent → order paid; `deny`/`cancel`/`expire`/`failure` → failed; anything else stays pending.
+- Idempotent per `order_id` (safe to receive multiple times).
+
+**Response:** `{"message": "processed", "status": "paid" | "failed" | "pending"}` · unknown order → `404`.
 
 ---
 
@@ -15,77 +29,6 @@ API endpoints use either:
 ---
 
 ## Webhooks (Interdotz → Normchat)
-
-### POST `/api/webhooks/interdotz/charge`
-
-Called when a Dots Units charge request is confirmed/rejected by user.
-
-**Request Body:**
-```json
-{
-  "status": "CONFIRMED",
-  "referenceId": "group_create_5_1713000000",
-  "referenceType": "normchat_group_creation",
-  "transaction_id": "txn_abc123",
-  "amount_charged": 175,
-  "balance_after": 825
-}
-```
-
-**Reference Types:**
-| Type | Description | DU Amount |
-|------|-------------|-----------|
-| `normchat_group_creation` | Group creation payment | 175 DU |
-| `normchat_patungan` | Patungan (join group) payment | 25 DU |
-| `normchat_topup` | Normkredit top-up | varies |
-
-**Reference ID Formats:**
-| Type | Format | Example |
-|------|--------|---------|
-| Group creation | `group_create_{groupId}_{timestamp}` | `group_create_5_1713000000` |
-| Patungan | `patungan_{groupId}_{userId}_{timestamp}` | `patungan_5_12_1713000000` |
-| Top-up | `topup_{groupId}_{userId}_{timestamp}` | `topup_5_12_1713000000` |
-
-**Response:**
-```json
-{
-  "message": "processed",
-  "reference_id": "group_create_5_1713000000"
-}
-```
-
----
-
-### POST `/api/webhooks/interdotz/topup`
-
-Called when user purchases normkredit from Interdotz product profile page.
-
-**Request Body:**
-```json
-{
-  "transaction_id": "txn_xyz789",
-  "user_id": "interdotz_user_id",
-  "topup_id": "topup_001",
-  "package_id": "nk_12",
-  "du_charged": 150,
-  "group_id": 5,
-  "metadata": {
-    "group_id": 5
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "message": "topup processed",
-  "normkredits": 12,
-  "tokens": 30000,
-  "group_id": 5
-}
-```
-
----
 
 ### POST `/api/webhooks/interdotz/payment`
 
@@ -148,23 +91,14 @@ Called by Interdotz via `GET /api/user/products/{clientId}/data`.
       }
     ]
   },
-  "topups": [
-    {
-      "id": "nk_12",
-      "name": "12 Normkredit",
-      "normkredits": 12,
-      "tokens": 30000,
-      "du_price": 150,
-      "description": "12 normkredit (30.000 token AI)"
-    }
-  ],
+  "topups": [],
   "transactions": [
     {
       "id": 1,
       "group_id": 5,
-      "source": "group_creation",
-      "normkredits": 12,
-      "du_paid": 175,
+      "source": "group_creation_midtrans",
+      "normkredits": 300,
+      "idr_paid": 30000,
       "reference": "txn_abc123",
       "created_at": "2026-03-01T08:00:00Z"
     }
@@ -176,45 +110,12 @@ Called by Interdotz via `GET /api/user/products/{clientId}/data`.
 
 ### GET `/api/product/topup-packages`
 
-Returns available normkredit packages for purchase.
+Top-up happens inside Normchat in packages of 125 NK paid via QRIS (see *Pricing & Conversion*). This Interdotz endpoint is kept for compatibility and always returns an empty list.
 
 **Response:**
 ```json
 {
-  "packages": [
-    {
-      "id": "nk_12",
-      "name": "12 Normkredit",
-      "normkredits": 12,
-      "tokens": 30000,
-      "du_price": 150,
-      "description": "12 normkredit (30.000 token AI)"
-    },
-    {
-      "id": "nk_24",
-      "name": "24 Normkredit",
-      "normkredits": 24,
-      "tokens": 60000,
-      "du_price": 300,
-      "description": "24 normkredit (60.000 token AI)"
-    },
-    {
-      "id": "nk_48",
-      "name": "48 Normkredit",
-      "normkredits": 48,
-      "tokens": 120000,
-      "du_price": 600,
-      "description": "48 normkredit (120.000 token AI)"
-    },
-    {
-      "id": "nk_100",
-      "name": "100 Normkredit",
-      "normkredits": 100,
-      "tokens": 250000,
-      "du_price": 1250,
-      "description": "100 normkredit (250.000 token AI)"
-    }
-  ]
+  "packages": []
 }
 ```
 
@@ -241,11 +142,11 @@ Returns paginated transaction history for a user.
       "id": "1",
       "type": "CHARGE",
       "status": "SUCCESS",
-      "reference_type": "group_creation",
+      "reference_type": "group_creation_midtrans",
       "reference_id": "txn_abc123",
-      "amount": 175,
-      "normkredits": 12,
-      "tokens": 30000,
+      "amount": 30000,
+      "currency": "IDR",
+      "normkredits": 300,
       "group_id": 5,
       "created_at": "2026-03-01T08:00:00Z"
     }
@@ -266,11 +167,11 @@ Returns a single transaction detail.
   "id": "1",
   "type": "CHARGE",
   "status": "SUCCESS",
-  "reference_type": "group_creation",
+  "reference_type": "group_creation_midtrans",
   "reference_id": "txn_abc123",
-  "amount": 175,
-  "normkredits": 12,
-  "tokens": 30000,
+  "amount": 30000,
+  "currency": "IDR",
+  "normkredits": 300,
   "group_id": 5,
   "user_id": 1,
   "created_at": "2026-03-01T08:00:00Z"
@@ -281,65 +182,18 @@ Returns a single transaction detail.
 
 ## Normchat → Interdotz Integration Flow
 
-### 1. Group Creation (175 DU)
+### 1. Group creation, patungan, and top-up (Midtrans)
 
 ```
-User clicks "Buat Group"
-  → Normchat creates group with status "pending_payment"
-  → Normchat calls POST /api/client/charge/request on Interdotz
-    {
-      userId: "interdotz_user_id",
-      amount: 175,
-      referenceType: "normchat_group_creation",
-      referenceId: "group_create_{groupId}_{timestamp}",
-      description: "Pembuatan grup Normchat: {groupName} (175 DU)",
-      callbackUrl: "https://normchat.technocrats.studio/api/webhooks/interdotz/charge"
-    }
-  → If chargeRequest returns redirectUrl → user redirected to Interdotz
-  → If no redirectUrl → fallback to direct POST /api/client/charge
-  → User confirms → Interdotz charges 175 DU
-  → Interdotz calls webhook → Normchat activates group + 12 normkredit
+Group creation = 250 NK; patungan/top-up = N × 125 NK (only when NORMCHAT_PAYMENT_GATEWAY=interdotz)
+  → Normchat creates a PendingPayment (order NCGRP-/NCJOIN-/NCTOPUP-...) with metadata.credits
+  → Normchat calls Interdotz createMidtransPayment (amount = credits × Rp120 + 0,7% QRIS fee)
+  → User pays on Midtrans, returns to /groups/payment-callback?order=...
+  → Interdotz calls POST /api/webhooks/interdotz/payment (or the callback page polls status)
+  → Normchat activates the group / membership and adds metadata.credits to the group balance
 ```
 
-### 2. Patungan / Join Group (25 DU)
-
-```
-User clicks "Bergabung" on join page
-  → Normchat calls POST /api/client/charge/request on Interdotz
-    {
-      userId: "interdotz_user_id",
-      amount: 25,
-      referenceType: "normchat_patungan",
-      referenceId: "patungan_{groupId}_{userId}_{timestamp}",
-      description: "Patungan bergabung ke grup: {groupName} (25 DU)",
-      callbackUrl: "https://normchat.technocrats.studio/api/webhooks/interdotz/charge"
-    }
-  → User confirms → 25 DU charged
-  → Webhook confirms → user added to group
-```
-
-### 3. Normkredit Top-up (150 DU = 12 Normkredit)
-
-```
-User selects topup package on Normchat or Interdotz product page
-  → Normchat calls POST /api/client/charge/request on Interdotz
-    {
-      userId: "interdotz_user_id",
-      amount: <DU amount based on package>,
-      referenceType: "normchat_topup",
-      referenceId: "topup_{groupId}_{userId}_{timestamp}",
-      description: "Top-up {normkredits} normkredit (... DU)",
-      callbackUrl: "https://normchat.technocrats.studio/api/webhooks/interdotz/charge"
-    }
-  → User confirms → DU charged
-  → Webhook confirms → normkredit added to group
-
-OR from Interdotz product page:
-  → Interdotz calls POST /api/webhooks/interdotz/topup
-  → Normchat converts DU to normkredit and adds to group
-```
-
-### 4. Transaction Log Sync
+### 2. Transaction Log Sync
 
 ```
 Interdotz fetches GET /api/product/data?userId={interdotzUserId}
@@ -354,17 +208,58 @@ Interdotz fetches GET /api/transactions?userId={interdotzUserId}
 
 ## Pricing & Conversion
 
-| Item | DU Cost | Normkredit | Token AI |
-|------|---------|------------|----------|
-| Group creation (owner) | 175 DU | 12 NK included | 30.000 token |
-| Patungan (join group) | 25 DU | — | — |
-| Top-up 12 Normkredit | 150 DU | 12 NK | 30.000 token |
-| Top-up 24 Normkredit | 300 DU | 24 NK | 60.000 token |
-| Top-up 48 Normkredit | 600 DU | 48 NK | 120.000 token |
-| Top-up 100 Normkredit | 1.250 DU | 100 NK | 250.000 token |
-| 1 Normkredit | — | 1 NK | 2.500 token |
-| Prompt token multiplier | — | — | x1.5 |
-| AI image output | — | — | 8.000 token (fixed) |
+Defaults live in `config/normchat.php`; superadmins override them at `/superadmin`.
+
+| Item | Default |
+|------|---------|
+| 1 Normkredit | Rp120 |
+| Group creation | 250 NK = Rp30.000 + QRIS fee 0,7% → **Rp30.210** |
+| Patungan / top-up | packages of 125 NK = Rp15.000 + 0,7% → **Rp15.105** per package |
+| Payment method | QRIS only (Snap `enabled_payments: ["other_qris"]`), one line item incl. fee |
+
+The webhook only grants Normkredit when the paid `gross_amount` ≥ the billed total (incl. fee); otherwise the order is marked `failed` with `gateway_status: amount_mismatch`.
+
+AI usage is charged per request from the real OpenAI cost:
+
+```
+NK = (input × input price + cached input × cached price + output × output price) [USD]
+     × model multiplier × NORMCHAT_USD_TO_IDR ÷ Rupiah per NK
+```
+
+| Category | Model | Multiplier |
+|----------|-------|------------|
+| Cepat | gpt-6-luna | ×2 |
+| Smart (default) | gpt-6.1-sol | ×2,5 |
+| Advanced | gpt-6-astra | ×3 |
+
+Rounded up to 0.01 NK. The answer length adapts to the requester's usable credits
+(`max_completion_tokens` shrinks instead of refusing), so expensive categories stay usable with small balances.
+
+**Images stay inside the chosen category.** The category model writes the image instructions (JSON plan),
+then the category's internal image engine draws or edits the picture (`/v1/images/generations`, or
+`/v1/images/edits` when the user attaches/replies to an image to edit):
+
+| Category | Planner | Image engine |
+|----------|---------|--------------|
+| Cepat | gpt-6-luna | gpt-image-2.5-flare |
+| Smart | gpt-6.1-sol | flare; gpt-image-2.5-sunburst when the plan says `precise` |
+| Advanced | gpt-6-astra | gpt-image-2.5-sunburst |
+
+Both components are billed from real usage at the category multiplier. The Image API may omit `usage`;
+then the engine's `fallback_*` estimates from `config/normchat.php` are used and the log line is marked `estimated`.
+Audio transcription (gpt-4o-mini-transcribe) uses `media_multiplier` (×2). Every charge is recorded in `ai_usage_logs`.
+
+---
+
+## Credit Sharing Rules
+
+The group balance is shown as one number, but it is split into:
+
+- **Shared credits** — usable by every member (optionally capped per member per day by the owner, `groups.member_daily_shared_limit`; the owner is exempt).
+- **Protected credits** — owned by one person; only they can spend them. They can move protected → shared at any time, never the reverse.
+
+Every purchase (group creation, patungan, top-up) has a "share to group" toggle, on by default at **50%**; the rest becomes the buyer's protected credits.
+When someone asks the AI, an estimate is **held** first (`credit_holds`) from the credits *they* may use — shared first by default (per-person setting), then their own protected credits — and settled against actual usage when the reply finishes (unused hold goes back to the pool it came from). Other people's protected credits are never touched.
 
 ---
 
@@ -373,9 +268,8 @@ Interdotz fetches GET /api/transactions?userId={interdotzUserId}
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/client/auth` | POST | Get client access token |
-| `/api/client/charge` | POST | Direct DU charge (fallback) |
-| `/api/client/charge/request` | POST | Request user-approved DU charge |
-| `/api/client/balance` | GET | Check user DU balance |
+| Midtrans payment (Interdotz SDK) | POST | Create a Rupiah payment |
+| Midtrans payment status (Interdotz SDK) | GET | Sync payment status on callback |
 
 ---
 

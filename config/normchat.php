@@ -4,40 +4,80 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | DU Pricing
+    | Normkredit Pricing (defaults)
     |--------------------------------------------------------------------------
     |
-    | Dots Units pricing for each action via Interdotz.
+    | Nilai di sini hanya default. Superadmin bisa menimpanya dari panel
+    | /superadmin (disimpan di tabel app_settings), kecuali kurs USD yang
+    | sengaja tetap di .env.
+    |
+    | Pembelian (QRIS saja):
+    |   buat grup = group_creation_credits NK; patungan & top-up = kelipatan package_credits NK
+    |   harga = NK × rupiah_per_credit, lalu + qris_fee_percent sebagai biaya layanan
+    |
+    | Potongan per request AI:
+    |   biaya OpenAI (USD) × kurs × multiplier model ÷ rupiah_per_credit
+    |   → Normkredit (dibulatkan ke atas 0,01 NK). Gambar & transkripsi memakai media_multiplier.
     |
     */
 
-    'du_group_creation' => (int) env('NORMCHAT_DU_GROUP_CREATION', 175),
-    'du_patungan' => (int) env('NORMCHAT_DU_PATUNGAN', 25),
-    'du_topup_12nk' => (int) env('NORMCHAT_DU_TOPUP_12NK', 150),
+    'pricing' => [
+        'rupiah_per_credit' => 120,
+        'group_creation_credits' => 250,
+        'package_credits' => 125,
+        'max_packages_per_payment' => 20,
+        'qris_fee_percent' => 0.7,
+        'media_multiplier' => 2.0,
+        'max_credits_per_request' => 150,
+        'max_output_tokens' => 4000,
+        'daily_group_credit_limit' => 0,
+    ],
+
+    'usd_to_idr' => (float) env('NORMCHAT_USD_TO_IDR', 17950),
 
     /*
-    |--------------------------------------------------------------------------
-    | IDR Pricing (Midtrans)
-    |--------------------------------------------------------------------------
+    | Mesin gambar internal. Dipilih per kategori AI (kolom ai_models.image_model dan
+    | image_model_precise) dan ditagih dengan multiplier kategorinya. Image API tidak
+    | selalu mengembalikan usage; bila tidak ada, dipakai perkiraan fallback_* di bawah.
     */
+    'image_models' => [
+        'gpt-image-2.5-flare' => [
+            'label' => 'Flare (cepat, sehari-hari)',
+            'text_input_usd_per_mtok' => 5.00,
+            'image_input_usd_per_mtok' => 8.00,
+            'image_output_usd_per_mtok' => 30.00,
+            'quality' => 'medium',
+            'size' => '1024x1024',
+            'fallback_output_tokens' => 1056,
+            'fallback_image_input_tokens' => 1000,
+        ],
+        'gpt-image-2.5-sunburst' => [
+            'label' => 'Sunburst (presisi & editing)',
+            'text_input_usd_per_mtok' => 5.00,
+            'image_input_usd_per_mtok' => 8.00,
+            'image_output_usd_per_mtok' => 30.00,
+            'quality' => 'medium',
+            'size' => '1024x1024',
+            'fallback_output_tokens' => 1056,
+            'fallback_image_input_tokens' => 1000,
+        ],
+    ],
 
-    'idr_group_creation' => (int) env('NORMCHAT_IDR_GROUP_CREATION', 35000),
-    'idr_patungan_min' => (int) env('NORMCHAT_IDR_PATUNGAN_MIN', 5000),
-    'idr_topup_12nk' => (int) env('NORMCHAT_IDR_TOPUP_12NK', 35000),
-    'idr_topup_24nk' => (int) env('NORMCHAT_IDR_TOPUP_24NK', 70000),
-    'idr_topup_48nk' => (int) env('NORMCHAT_IDR_TOPUP_48NK', 140000),
-    'idr_topup_100nk' => (int) env('NORMCHAT_IDR_TOPUP_100NK', 280000),
+    // Transkripsi voice note; ditagih dengan media_multiplier.
+    'transcription_model' => [
+        'model' => env('NORMCHAT_TRANSCRIPTION_MODEL', 'gpt-4o-mini-transcribe'),
+        'input_usd_per_mtok' => 1.25,
+        'output_usd_per_mtok' => 5.00,
+    ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Credits per group creation
-    |--------------------------------------------------------------------------
-    */
+    // Gateway checkout Normkredit: 'midtrans' (Snap langsung) atau 'interdotz'
+    // (Midtrans lewat Interdotz; butuh NORMCHAT_INTERDOTZ_ENABLED=true).
+    'payment_gateway' => env('NORMCHAT_PAYMENT_GATEWAY', 'midtrans'),
 
-    'group_creation_credits_du' => (int) env('NORMCHAT_GROUP_CREATION_CREDITS_DU', 12),
-    'group_creation_credits_idr' => (int) env('NORMCHAT_GROUP_CREATION_CREDITS_IDR', 10),
-    'group_creation_credits' => (int) env('NORMCHAT_GROUP_CREATION_CREDITS', 10),
-    'join_credits' => (int) env('NORMCHAT_JOIN_CREDITS', 15),
+    'superadmin_emails' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('NORMCHAT_SUPERADMIN_EMAILS', 'superadmin@interdotz.com'))
+    ))),
 
     /*
     |--------------------------------------------------------------------------

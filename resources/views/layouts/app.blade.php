@@ -99,10 +99,6 @@
                 $isProfile = request()->routeIs('profile.*');
                 $hideBottomNav = request()->routeIs('chat.*')
                     || request()->routeIs('groups.create')
-                    || request()->routeIs('subscription.pricing')
-                    || request()->routeIs('subscription.payment.*')
-                    || request()->routeIs('subscription.checkout')
-                    || request()->routeIs('subscription.success')
                     || request()->routeIs('settings.*')
                     || request()->routeIs('mailbox.*');
             @endphp

@@ -2,11 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Group;
-use App\Models\Subscription;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class QaRegressionTest extends TestCase
@@ -16,7 +12,6 @@ class QaRegressionTest extends TestCase
     public function test_blackbox_public_pages_are_accessible(): void
     {
         $this->get('/')->assertOk();
-        $this->get('/pricing')->assertOk();
         $this->get('/login')->assertOk();
     }
 
@@ -25,26 +20,11 @@ class QaRegressionTest extends TestCase
         $this->get('/groups')->assertRedirectContains('/login');
     }
 
-    public function test_blackbox_legacy_checkout_routes_redirect_to_new_payment_routes(): void
+    public function test_whitebox_login_offers_google_only(): void
     {
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->get('/checkout')
-            ->assertRedirect('/payment/detail');
-
-        $this->actingAs($user)
-            ->get('/checkout/success')
-            ->assertRedirect('/payment/success');
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('Login dengan Google')
+            ->assertDontSee('Login dengan Interdotz');
     }
-
-    public function test_whitebox_login_uses_provider_logo_assets_in_expected_order(): void
-    {
-        $this->get('/login')->assertSeeInOrder([
-            'Connect ChatGPT',
-            'Connect Claude',
-            'Connect Gemini',
-        ], false);
-    }
-
 }

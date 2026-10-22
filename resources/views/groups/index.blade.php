@@ -17,9 +17,11 @@
                     <h1 class="font-display text-lg font-extrabold text-slate-900">{{ Str::words(Auth::user()->name, 1, '') }}</h1>
                 </div>
             </a>
+            @if(config('services.interdotz.enabled'))
             <a href="{{ route('mailbox.inbox') }}" class="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50" aria-label="Buka mailbox">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
             </a>
+            @endif
         </div>
 
         {{-- Gabung Grup (paling atas) --}}
@@ -34,7 +36,7 @@
                         <p class="text-[11px] text-slate-500">Masukkan ID grup untuk bergabung</p>
                     </div>
                 </div>
-                <form method="GET" action="" class="mt-3 flex items-center gap-2" data-join-by-id-form="1">
+                <form method="GET" action="" class="mt-3 flex items-center gap-2" data-join-by-id-form="{{ url('/join') }}">
                     <input
                         type="text"
                         name="share_id"
@@ -120,19 +122,5 @@
         <a href="{{ route('groups.create') }}" class="btn-cta mt-6">
             + Buat Group Chat Baru
         </a>
-
-        <script>
-            (function () {
-                const form = document.querySelector('[data-join-by-id-form]');
-                const input = document.querySelector('[data-join-by-id-input]');
-                if (!form || !input) return;
-                form.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const id = String(input.value || '').trim();
-                    if (!id) return;
-                    window.location.href = '{{ url('/join') }}/' + encodeURIComponent(id);
-                });
-            })();
-        </script>
     </section>
 @endsection

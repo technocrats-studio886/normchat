@@ -1,0 +1,12 @@
+# Override khusus server ini (tidak di-commit).
+# nginx normchat ikut jaringan `edge` supaya Caddy edge (atomic_host-caddy-1)
+# bisa mem-proxy https://normchat.twenti.studio ke container ini.
+services:
+  nginx:
+    networks:
+      - default
+      - edge
+
+networks:
+  edge:
+    external: true

@@ -22,4 +22,25 @@ class AuditLog extends Model
         'metadata_json' => 'array',
         'created_at' => 'datetime',
     ];
+
+    /**
+     * Catat satu aksi. $target boleh model (tipe & id diambil otomatis) atau null.
+     */
+    public static function record(
+        string $action,
+        ?int $actorId,
+        ?Model $target = null,
+        array $metadata = [],
+        ?int $groupId = null
+    ): self {
+        return static::create([
+            'group_id' => $groupId ?? ($target instanceof Group ? $target->id : null),
+            'actor_id' => $actorId,
+            'action' => $action,
+            'target_type' => $target ? $target::class : null,
+            'target_id' => $target?->getKey(),
+            'metadata_json' => $metadata === [] ? null : $metadata,
+            'created_at' => now(),
+        ]);
+    }
 }

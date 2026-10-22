@@ -36,7 +36,7 @@
                         <p class="mt-1 text-xs text-[#64748B]">{{ $export->created_at?->format('d M Y, H:i') }} • {{ strtoupper($export->file_type) }} • {{ ucfirst($export->status) }}</p>
                     </div>
                     @if($export->status === 'done' && $export->storage_path)
-                        <a href="{{ url('/groups/'.$group->id.'/settings/export/'.$export->id.'/download') }}" class="shrink-0 rounded-lg bg-[#e11d74] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#be185d]">Unduh</a>
+                        <a href="{{ route('settings.export.download', [$group, $export]) }}" class="shrink-0 rounded-lg bg-[#e11d74] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#be185d]">Unduh</a>
                     @endif
                 </div>
             @empty

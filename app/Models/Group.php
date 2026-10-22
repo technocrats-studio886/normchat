@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -25,10 +26,12 @@ class Group extends Model
         'ai_persona_style',
         'ai_persona_guardrails',
         'status',
+        'member_daily_shared_limit',
     ];
 
     protected $casts = [
         'approval_enabled' => 'boolean',
+        'member_daily_shared_limit' => 'float',
     ];
 
     protected static function booted(): void
@@ -84,9 +87,43 @@ class Group extends Model
         return $this->hasOne(Subscription::class);
     }
 
+    /** Grup aktif yang dimiliki atau diikuti (sebagai member aktif) oleh user. */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        return $query->where('status', 'active')
+            ->where(fn (Builder $q) => $q
+                ->where('owner_id', $user->id)
+                ->orWhereHas('members', fn (Builder $m) => $m->active()->where('user_id', $user->id)));
+    }
+
+    public function isOwnedBy(?User $user): bool
+    {
+        return $user !== null && (int) $this->owner_id === (int) $user->id;
+    }
+
+    /** Owner atau admin grup: boleh menghapus pesan siapa pun. */
+    public function isModerator(?User $user): bool
+    {
+        return $this->isOwnedBy($user) || ($user !== null && $this->members()
+            ->active()
+            ->where('user_id', $user->id)
+            ->whereHas('role', fn (Builder $role) => $role->whereIn('key', [Role::OWNER, Role::ADMIN]))
+            ->exists());
+    }
+
+    public function hasActiveMember(?User $user): bool
+    {
+        return $user !== null && $this->members()->active()->where('user_id', $user->id)->exists();
+    }
+
     public function groupToken(): HasOne
     {
         return $this->hasOne(GroupToken::class);
+    }
+
+    public function memberCredits(): HasMany
+    {
+        return $this->hasMany(GroupMemberCredit::class);
     }
 
     public function tokenContributions(): HasMany
@@ -94,30 +131,19 @@ class Group extends Model
         return $this->hasMany(GroupTokenContribution::class);
     }
 
-    public function getModelMultiplier(): float
+    /**
+     * Model AI yang dipakai grup: pilihan owner/admin bila masih aktif di katalog,
+     * selain itu model default dari superadmin.
+     */
+    public function resolvedAiModel(): ?AiModel
     {
-        $provider = $this->ai_provider;
-        $model = $this->ai_model;
-
-        if (! $provider || ! $model) {
-            return 1.0;
+        if ($this->ai_model) {
+            $selected = AiModel::active()->where('model_id', $this->ai_model)->first();
+            if ($selected) {
+                return $selected;
+            }
         }
 
-        return (float) config("ai_models.providers.{$provider}.models.{$model}.multiplier", 1.0);
-    }
-
-    public function getModelLabel(): string
-    {
-        $provider = $this->ai_provider;
-        $model = $this->ai_model;
-
-        if (! $provider || ! $model) {
-            return 'Belum dipilih';
-        }
-
-        $providerLabel = config("ai_models.providers.{$provider}.label", ucfirst($provider));
-        $modelLabel = config("ai_models.providers.{$provider}.models.{$model}.label", $model);
-
-        return "{$providerLabel} - {$modelLabel}";
+        return AiModel::defaultModel();
     }
 }

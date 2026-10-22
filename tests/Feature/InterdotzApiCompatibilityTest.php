@@ -16,10 +16,14 @@ class InterdotzApiCompatibilityTest extends TestCase
     {
         parent::setUp();
 
+        config()->set('services.interdotz.enabled', true);
         config()->set('services.interdotz.client_id', 'test-client-id');
         config()->set('services.interdotz.client_secret', 'test-client-secret');
         config()->set('normchat.allow_interdotz_bearer_only', false);
-        config()->set('app.url', 'https://normchat.technocrats.studio');
+        config()->set('app.url', 'https://normchat.twenti.studio');
+        // Kosongkan agar URL logo diturunkan dari app.url, tidak dari .env lokal.
+        config()->set('normchat.product_logo_url', null);
+        config()->set('normchat.product_icon_url', null);
     }
 
     public function test_product_data_requires_interdotz_client_credentials(): void
@@ -47,10 +51,10 @@ class InterdotzApiCompatibilityTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('client_id', 'test-client-id')
             ->assertJsonPath('app.name', 'Normchat')
-            ->assertJsonPath('app.logo_url', 'https://normchat.technocrats.studio/normchat-logo.png')
-            ->assertJsonPath('app.icon_url', 'https://normchat.technocrats.studio/icons/icon-192.png')
+            ->assertJsonPath('app.logo_url', 'https://normchat.twenti.studio/normchat-logo.png')
+            ->assertJsonPath('app.icon_url', 'https://normchat.twenti.studio/icons/icon-192.png')
             ->assertJsonPath('payload.client_id', 'test-client-id')
-            ->assertJsonPath('payload.app.logo_url', 'https://normchat.technocrats.studio/normchat-logo.png');
+            ->assertJsonPath('payload.app.logo_url', 'https://normchat.twenti.studio/normchat-logo.png');
     }
 
     public function test_transactions_support_limit_alias_and_response_wrapper(): void
@@ -71,8 +75,8 @@ class InterdotzApiCompatibilityTest extends TestCase
             'group_id' => $group->id,
             'user_id' => $user->id,
             'source' => 'topup',
-            'token_amount' => 30000,
-            'price_paid' => 150,
+            'credit_amount' => 300,
+            'price_paid' => 30000,
             'payment_reference' => 'topup_ref_1',
         ]);
 
@@ -85,6 +89,8 @@ class InterdotzApiCompatibilityTest extends TestCase
             ->assertJsonPath('total_items', 1)
             ->assertJsonPath('transactions.0.reference_type', 'topup')
             ->assertJsonPath('transactions.0.referenceType', 'topup')
+            ->assertJsonPath('transactions.0.amount', 30000)
+            ->assertJsonPath('transactions.0.normkredits', 300)
             ->assertJsonPath('payload.totalItems', 1)
             ->assertJsonPath('payload.transactions.0.referenceId', 'topup_ref_1');
     }
@@ -93,9 +99,9 @@ class InterdotzApiCompatibilityTest extends TestCase
     {
         config()->set('normchat.webhook_secret', 'secret-webhook');
 
-        $response = $this->postJson('/api/webhooks/interdotz/charge', [
-            'status' => 'REJECTED',
-            'reference_id' => 'group_create_999_1',
+        $response = $this->postJson('/api/webhooks/interdotz/payment', [
+            'status' => 'settlement',
+            'reference_id' => 'NCGRP-000000-TEST',
         ]);
 
         $response->assertStatus(401)
@@ -110,14 +116,14 @@ class InterdotzApiCompatibilityTest extends TestCase
             ->withHeaders([
                 'X-Webhook-Secret' => 'secret-webhook',
             ])
-            ->postJson('/api/webhooks/interdotz/charge', [
-                'status' => 'REJECTED',
-                'reference_id' => 'group_create_999_1',
-                'reference_type' => 'normchat_group_creation',
+            ->postJson('/api/webhooks/interdotz/payment', [
+                'status' => 'settlement',
+                'reference_id' => 'NCGRP-000000-TEST',
             ]);
 
-        $response->assertOk()
-            ->assertJsonPath('message', 'acknowledged');
+        // Lolos verifikasi secret; order tidak ada sehingga 404, bukan 401.
+        $response->assertNotFound()
+            ->assertJsonPath('message', 'payment not found');
     }
 
     private function clientHeaders(): array

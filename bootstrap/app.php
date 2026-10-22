@@ -14,11 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'llm.connected' => \App\Http\Middleware\EnsureLlmConnected::class,
             'group.permission' => \App\Http\Middleware\EnsureGroupPermission::class,
-            'user.llm.connected' => \App\Http\Middleware\EnsureUserHasLlmConnection::class,
             'interdotz.client' => \App\Http\Middleware\VerifyInterdotzClientRequest::class,
             'interdotz.webhook' => \App\Http\Middleware\VerifyInterdotzWebhookRequest::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperadmin::class,
+            'interdotz.enabled' => \App\Http\Middleware\EnsureInterdotzEnabled::class,
         ]);
 
         // Trust Nginx reverse proxy

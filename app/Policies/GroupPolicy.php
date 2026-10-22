@@ -76,7 +76,7 @@ class GroupPolicy
     }
 
     /**
-     * Invite & accept member — owner OR admin.
+     * Hapus member — owner only.
      */
     public function manageMembers(User $user, Group $group): bool
     {

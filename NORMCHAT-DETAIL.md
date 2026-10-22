@@ -4,7 +4,7 @@
 
 **Normchat** adalah mobile-first group chat platform dengan AI participant. Didesain sebagai chat room berbasis grup di mana anggota bisa berdiskusi secara realtime dan memanggil AI (OpenAI, Claude, Gemini) lewat mention system (@ai, @claude, dll).
 
-- **Domain:** `normchat.technocrats.studio`
+- **Domain:** `normchat.twenti.studio`
 - **Viewport:** Mobile-first web app (PWA-enabled)
 - **Arsitektur:** Server-rendered Blade + Alpine.js, realtime via Laravel Reverb (WebSocket)
 - **Monetisasi:** Subscription-based + token top-up + patungan (crowdfunding) system via Trakteer
@@ -821,7 +821,7 @@ Jika saldo tidak cukup: response tetap dikirim + warning message, saldo dipaksa 
 
 ### Reverb Configuration
 - Internal: `reverb:8080` (HTTP, container-to-container)
-- External: Via Nginx reverse proxy ke `wss://normchat.technocrats.studio:443`
+- External: Via Nginx reverse proxy ke `wss://normchat.twenti.studio:443`
 
 ---
 
@@ -1029,7 +1029,7 @@ Key environment variables dari `docker-compose.yml` dan `.env.example`:
 
 | Variable | Default | Deskripsi |
 |----------|---------|-----------|
-| `APP_URL` | `https://normchat.technocrats.studio` | Base URL aplikasi |
+| `APP_URL` | `https://normchat.twenti.studio` | Base URL aplikasi |
 | `DB_CONNECTION` | `pgsql` | Database driver |
 | `DB_HOST` | `postgres` | Database host |
 | `DB_DATABASE` | `normchat` | Nama database |
@@ -1042,7 +1042,7 @@ Key environment variables dari `docker-compose.yml` dan `.env.example`:
 | `REVERB_APP_SECRET` | - | Reverb secret (required) |
 | `REVERB_HOST` | `reverb` | Internal Reverb host |
 | `REVERB_PORT` | `8080` | Internal Reverb port |
-| `VITE_REVERB_HOST` | `normchat.technocrats.studio` | Public WebSocket host |
+| `VITE_REVERB_HOST` | `normchat.twenti.studio` | Public WebSocket host |
 | `VITE_REVERB_PORT` | `443` | Public WebSocket port |
 | `VITE_REVERB_SCHEME` | `https` | Public WebSocket scheme |
 | `NORMCHAT_STORAGE_ROOT` | `/opt/normchat/storage` | Storage path for attachments/exports/backups |

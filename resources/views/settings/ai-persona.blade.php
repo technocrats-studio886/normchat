@@ -30,6 +30,33 @@
             </div>
         @endif
 
+        <form method="POST" action="{{ route('settings.ai.model.save', $group) }}" class="panel-card mb-3 p-4">
+            @csrf
+            <p class="text-sm font-bold text-[#0F172A]">Model AI grup</p>
+            <div class="mt-3 space-y-2">
+                @forelse($aiModels as $aiModel)
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 @if(! $canManageAiPersona) cursor-not-allowed opacity-70 @endif">
+                        <input type="radio" name="ai_model" value="{{ $aiModel->model_id }}" class="mt-0.5 accent-blue-600"
+                               {{ $currentAiModel?->is($aiModel) ? 'checked' : '' }} @if(! $canManageAiPersona) disabled @endif>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-bold text-slate-800">{{ $aiModel->label }}</span>
+                            @if($aiModel->description)
+                                <span class="block text-xs text-slate-500">{{ $aiModel->description }}</span>
+                            @endif
+                        </span>
+                    </label>
+                @empty
+                    <p class="rounded-xl bg-slate-50 px-3 py-3 text-center text-xs text-slate-500">Belum ada model AI aktif.</p>
+                @endforelse
+            </div>
+            @error('ai_model')
+                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+            @enderror
+            @if($canManageAiPersona && $aiModels->isNotEmpty())
+                <button type="submit" class="btn-cta mt-3 py-2.5 normal-case tracking-normal">Simpan Model</button>
+            @endif
+        </form>
+
         <form method="POST" action="{{ route('settings.ai.persona.save', $group) }}" class="space-y-3">
             @csrf
             <div class="panel-card p-4">

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,290 +14,53 @@ use Illuminate\View\View;
 
 class AuthController extends Controller
 {
-    // ── Landing ──────────────────────────────────────────────
-
     public function landing(Request $request): View|RedirectResponse
     {
-        if ($request->has('next')) {
-            $nextRoute = $request->query('next');
-            if (is_string($nextRoute) && Route::has($nextRoute)) {
-                session()->put('url.intended', route($nextRoute));
-            }
+        $nextRoute = $request->query('next');
+        if (is_string($nextRoute) && Route::has($nextRoute)) {
+            session()->put('url.intended', route($nextRoute));
         }
 
         if (Auth::check()) {
-            return redirect($this->resolvePostLoginRedirect());
+            return redirect()->intended(route('groups.index'));
         }
 
-        return view('auth.landing');
-    }
-
-    // ── Interdotz SSO ───────────────────────────────────────
-
-    public function redirectToInterdotz(): RedirectResponse
-    {
-        if (empty((string) config('services.interdotz.client_id'))) {
-            return redirect()->route('login')
-                ->withErrors(['auth' => 'Interdotz SSO belum dikonfigurasi.']);
-        }
-
-        return redirect()->away($this->ssoUrl('login'));
-    }
-
-    public function registerAtInterdotz(): RedirectResponse
-    {
-        if (empty((string) config('services.interdotz.client_id'))) {
-            return redirect()->route('login')
-                ->withErrors(['auth' => 'Interdotz SSO belum dikonfigurasi.']);
-        }
-
-        return redirect()->away($this->ssoUrl('register'));
-    }
-
-    public function handleInterdotzCallback(Request $request): RedirectResponse
-    {
-        $accessToken = (string) $request->query('access_token', $request->query('accessToken', ''));
-        $refreshToken = (string) $request->query('refresh_token', $request->query('refreshToken', ''));
-
-        if ($accessToken === '') {
-            return redirect()->route('login')
-                ->withErrors(['auth' => 'Login Interdotz dibatalkan atau token tidak diterima.']);
-        }
-
-        $claims = $this->decodeJwtPayload($accessToken);
-        if (! $claims) {
-            return redirect()->route('login')
-                ->withErrors(['auth' => 'Token Interdotz tidak valid.']);
-        }
-
-        $profile = $this->fetchProfile($accessToken);
-
-        $user = $this->createOrLoginUser($claims, $profile, $accessToken, $refreshToken);
-
-        Auth::login($user, true);
-        $request->session()->regenerate();
-
-        AuditLog::create([
-            'actor_id' => $user->id,
-            'action' => 'auth.connect',
-            'target_type' => User::class,
-            'target_id' => $user->id,
-            'metadata_json' => [
-                'provider' => 'interdotz',
-                'method' => 'sso',
-                'ip' => $request->ip(),
-                'user_agent' => (string) $request->userAgent(),
-            ],
-            'created_at' => now(),
+        return view('auth.landing', [
+            'interdotzEnabled' => (bool) config('services.interdotz.enabled'),
         ]);
-
-        return redirect()->route('groups.index');
     }
-
-    // ── Logout ───────────────────────────────────────────────
 
     public function logout(Request $request): RedirectResponse
     {
-        $userId = Auth::id();
-        $refreshToken = Auth::user()?->getRefreshToken();
-
-        if ($refreshToken) {
-            try {
-                Http::timeout(5)->post($this->apiUrl('/api/auth/logout'), [
-                    'refresh_token' => $refreshToken,
-                    'refreshToken' => $refreshToken,
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('Interdotz logout failed', ['error' => $e->getMessage()]);
-            }
-        }
+        $user = $request->user();
+        $this->revokeInterdotzSession($user);
 
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        AuditLog::create([
-            'actor_id' => $userId,
-            'action' => 'auth.logout',
-            'target_type' => User::class,
-            'target_id' => $userId,
-            'metadata_json' => [
-                'ip' => $request->ip(),
-                'user_agent' => (string) $request->userAgent(),
-            ],
-            'created_at' => now(),
+        AuditLog::record('auth.logout', $user?->id, $user, [
+            'ip' => $request->ip(),
+            'user_agent' => (string) $request->userAgent(),
         ]);
 
         return redirect()->route('login');
     }
 
-    // ── Post-login redirect logic ────────────────────────────
-
-    private function resolvePostLoginRedirect(): string
+    private function revokeInterdotzSession(?User $user): void
     {
-        $intended = session()->pull('url.intended');
-        if ($intended) {
-            return $intended;
+        $refreshToken = $user?->getRefreshToken();
+        if (! $refreshToken || ! config('services.interdotz.enabled')) {
+            return;
         }
 
-        return route('groups.index');
-    }
-
-    private function ssoUrl(string $page): string
-    {
-        $base = rtrim((string) config('services.interdotz.sso_base'), '/');
-
-        return $base . '/' . ltrim($page, '/') . '?' . http_build_query([
-            'client_id' => (string) config('services.interdotz.client_id'),
-            'redirect_uri' => (string) config('services.interdotz.redirect_uri', route('auth.interdotz.callback')),
-        ]);
-    }
-
-    private function apiUrl(string $path): string
-    {
-        return rtrim((string) config('services.interdotz.api_base'), '/') . $path;
-    }
-
-    /** @return array<string,mixed>|null */
-    private function decodeJwtPayload(string $jwt): ?array
-    {
-        $parts = explode('.', $jwt);
-        if (count($parts) !== 3) {
-            return null;
-        }
-
-        $payload = strtr($parts[1], '-_', '+/');
-        $padLength = strlen($payload) % 4;
-        if ($padLength > 0) {
-            $payload .= str_repeat('=', 4 - $padLength);
-        }
-
-        $decoded = base64_decode($payload, true);
-        if ($decoded === false) {
-            return null;
-        }
-
-        $json = json_decode($decoded, true);
-        return is_array($json) ? $json : null;
-    }
-
-    /** @return array<string,mixed>|null */
-    private function fetchProfile(string $accessToken): ?array
-    {
         try {
-            $response = Http::withToken($accessToken)
-                ->acceptJson()
-                ->timeout(10)
-                ->get($this->apiUrl('/api/profile'));
-
-            if ($response->successful()) {
-                return (array) ($response->json('payload') ?? []);
-            }
-
-            Log::warning('Interdotz profile fetch failed', [
-                'status' => $response->status(),
-                'body' => $response->body(),
+            Http::timeout(5)->post(rtrim((string) config('services.interdotz.api_base'), '/') . '/api/auth/logout', [
+                'refresh_token' => $refreshToken,
+                'refreshToken' => $refreshToken,
             ]);
         } catch (\Throwable $e) {
-            Log::warning('Interdotz profile fetch threw', ['error' => $e->getMessage()]);
+            Log::warning('Interdotz logout failed', ['error' => $e->getMessage()]);
         }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string,mixed>  $claims
-     * @param  array<string,mixed>|null  $profile
-     */
-    private function createOrLoginUser(array $claims, ?array $profile, string $accessToken, string $refreshToken): User
-    {
-        $interdotzId = (string) (
-            $claims['sub']
-            ?? $claims['userId']
-            ?? $claims['user_id']
-            ?? $claims['id']
-            ?? $claims['username']
-            ?? ''
-        );
-
-        if ($interdotzId === '') {
-            $interdotzId = substr(hash('sha256', $accessToken), 0, 32);
-        }
-
-        $usernameRaw = (string) ($claims['username'] ?? $claims['preferred_username'] ?? $interdotzId);
-        $username = strtolower(substr((string) preg_replace('/[^A-Za-z0-9._-]/', '', $usernameRaw), 0, 40));
-        $email = (string) ($claims['email'] ?? '');
-        $name = (string) (
-            $profile['name']
-            ?? $claims['name']
-            ?? $claims['username']
-            ?? $claims['preferred_username']
-            ?? $interdotzId
-            ?? 'Interdotz User'
-        );
-        $avatar = (string) (
-            $profile['avatar_url']
-            ?? $claims['picture']
-            ?? $claims['avatar']
-            ?? ''
-        );
-
-        if ($email === '') {
-            $email = $interdotzId . '@interdotz.user';
-        }
-
-        $user = User::query()
-            ->where('auth_provider', 'interdotz')
-            ->where('provider_user_id', $interdotzId)
-            ->first();
-
-        if (! $user) {
-            $user = User::query()->where('email', $email)->first();
-        }
-
-        if (! $user) {
-            $user = User::create([
-                'name' => $name,
-                'username' => $username !== '' ? $username : null,
-                'email' => $email,
-                'avatar_url' => $avatar !== '' ? $avatar : null,
-                'auth_provider' => 'interdotz',
-                'provider_user_id' => $interdotzId,
-                'email_verified_at' => now(),
-            ]);
-        } else {
-            $updatePayload = [
-                'name' => $name !== '' ? $name : $user->name,
-                'email' => $email !== '' ? $email : $user->email,
-                'avatar_url' => $avatar !== '' ? $avatar : $user->avatar_url,
-                'auth_provider' => 'interdotz',
-                'provider_user_id' => $interdotzId,
-            ];
-
-            if (! $user->username && $username !== '') {
-                $updatePayload['username'] = $username;
-            }
-
-            $user->update($updatePayload);
-        }
-
-        $expiresAt = isset($claims['exp']) ? Carbon::createFromTimestamp((int) $claims['exp']) : null;
-
-        $user->storeOAuthTokens(
-            $accessToken,
-            $refreshToken !== '' ? $refreshToken : null,
-            $expiresAt,
-        );
-
-        // Resolve and store the interdotz internal ID (ULID) for payment API calls
-        if (! $user->interdotz_id) {
-            $interdotz = app(\App\Services\InterdotzService::class);
-            $internalId = $interdotz->resolveInternalUserId($accessToken);
-            if ($internalId) {
-                $user->update(['interdotz_id' => $internalId]);
-            }
-        }
-
-        return $user;
     }
 }

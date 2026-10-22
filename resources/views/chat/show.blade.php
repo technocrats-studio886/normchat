@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => $group->name.' - Normchat', 'group' => $group])
 
 @section('content')
-    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[#f5f8ff]" data-chat-shell="1" data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
+    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[#f5f8ff]" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}" data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
         @php
             $gt = $group->groupToken;
             $credits = $gt ? $gt->credits : 0;
@@ -274,6 +274,9 @@
                         @else
                             <p class="nc-chat-meta nc-chat-meta--ai mt-1 text-right text-[11px] font-medium" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="ai">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--ai" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
                         @endif
+                        @if($message->aiUsage)
+                            <p class="nc-chat-meta nc-chat-meta--ai text-right text-[10px] font-medium opacity-80" data-ai-cost="1">{{ number_format($message->aiUsage->charged_credits, 2, ',', '.') }} NK · sisa {{ number_format($message->aiUsage->balance_after, 2, ',', '.') }} NK</p>
+                        @endif
                     </div>
                 @else
                     {{-- Other user message - left aligned, white --}}
@@ -519,49 +522,6 @@
             </div>
         @endif
     </section>
-
-    <script>
-        // Device back button routes to groups index (not browser history)
-        (function () {
-            const groupsUrl = @json(route('groups.index'));
-            try { history.pushState({ nc: 'chat' }, '', location.href); } catch (_) {}
-            window.addEventListener('popstate', function () {
-                window.location.replace(groupsUrl);
-            });
-        })();
-
-        // Keep chat shell stable to visual viewport when keyboard opens.
-        (function () {
-            const shell = document.querySelector('[data-chat-shell]');
-            if (!shell || !window.visualViewport) return;
-
-            document.documentElement.style.overscrollBehavior = 'none';
-            document.body.style.overscrollBehavior = 'none';
-            document.body.style.overflow = 'hidden';
-
-            let rafId = null;
-            const applyHeight = () => {
-                const vv = window.visualViewport;
-                const h = Math.max(320, Math.round(vv?.height || window.innerHeight));
-                shell.style.height = h + 'px';
-                shell.style.top = '0px';
-                shell.style.bottom = 'auto';
-                // Keep composer anchored to bottom to avoid double keyboard compensation.
-                document.documentElement.style.setProperty('--nc-keyboard-offset', '0px');
-            };
-
-            const schedule = () => {
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                }
-                rafId = requestAnimationFrame(applyHeight);
-            };
-
-            applyHeight();
-            window.visualViewport.addEventListener('resize', schedule);
-            window.addEventListener('orientationchange', schedule);
-        })();
-    </script>
 @endsection
 
 

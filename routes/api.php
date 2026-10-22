@@ -1,28 +1,30 @@
 <?php
 
+use App\Http\Controllers\Api\InterdotzWebhookController;
+use App\Http\Controllers\Api\MidtransWebhookController;
 use App\Http\Controllers\Api\ProductDataController;
 use App\Http\Controllers\Api\TransactionController;
-use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
 
-// ── Webhooks (no auth — validated by secret/signature) ──────
+// ── Midtrans (aktif) — diverifikasi lewat signature_key ─────
 
-Route::prefix('webhooks/interdotz')->middleware('interdotz.webhook')->group(function () {
-    Route::post('/charge', [WebhookController::class, 'chargeCallback']);
-    Route::post('/topup', [WebhookController::class, 'topupCallback']);
-    Route::post('/payment', [WebhookController::class, 'paymentCallback']);
-});
+Route::post('/webhooks/midtrans', MidtransWebhookController::class)->name('webhooks.midtrans');
 
-// ── Product Data (called by Interdotz with client token) ────
+// ── Interdotz (nonaktif selama NORMCHAT_INTERDOTZ_ENABLED=false) ──
 
-Route::prefix('product')->group(function () {
-    Route::get('/data', [ProductDataController::class, 'show']);
-    Route::get('/topup-packages', [ProductDataController::class, 'topupPackages']);
-});
+Route::middleware('interdotz.enabled')->group(function () {
+    Route::prefix('webhooks/interdotz')->middleware('interdotz.webhook')->group(function () {
+        Route::post('/payment', [InterdotzWebhookController::class, 'paymentCallback']);
+    });
 
-// ── Transactions ────────────────────────────────────────────
+    // Product data (dipanggil Interdotz dengan client token)
+    Route::prefix('product')->group(function () {
+        Route::get('/data', [ProductDataController::class, 'show']);
+        Route::get('/topup-packages', [ProductDataController::class, 'topupPackages']);
+    });
 
-Route::middleware('interdotz.client')->group(function () {
-    Route::get('/transactions', [TransactionController::class, 'index']);
-    Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+    Route::middleware('interdotz.client')->group(function () {
+        Route::get('/transactions', [TransactionController::class, 'index']);
+        Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+    });
 });

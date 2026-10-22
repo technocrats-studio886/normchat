@@ -11,9 +11,15 @@ class GroupTokenContribution extends Model
         'group_id',
         'user_id',
         'source',
-        'token_amount',
+        'credit_amount',
+        'shared_credit_amount',
         'price_paid',
         'payment_reference',
+    ];
+
+    protected $casts = [
+        'credit_amount' => 'float',
+        'shared_credit_amount' => 'float',
     ];
 
     public function group(): BelongsTo

@@ -32,10 +32,10 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL:-https://normchat.technocrats.studio}
+      APP_URL: ${APP_URL:-https://normchat.twenti.studio}
       APP_KEY: ${APP_KEY}
-      MARKETING_URL: ${MARKETING_URL:-https://normchat.technocrats.studio}
-      NORMCHAT_APP_URL: ${NORMCHAT_APP_URL:-https://normchat.technocrats.studio}
+      MARKETING_URL: ${MARKETING_URL:-https://normchat.twenti.studio}
+      NORMCHAT_APP_URL: ${NORMCHAT_APP_URL:-https://normchat.twenti.studio}
       NORMCHAT_MARKETING_PATH: ${NORMCHAT_MARKETING_PATH:-/normchat}
       DB_CONNECTION: pgsql
       DB_HOST: ${DB_HOST:-postgres}
@@ -64,7 +64,7 @@ services:
       REVERB_SERVER_HOST: ${REVERB_SERVER_HOST:-0.0.0.0}
       REVERB_SERVER_PORT: ${REVERB_SERVER_PORT:-8080}
       VITE_REVERB_APP_KEY: ${VITE_REVERB_APP_KEY:-normchat-key}
-      VITE_REVERB_HOST: ${VITE_REVERB_HOST:-normchat.technocrats.studio}
+      VITE_REVERB_HOST: ${VITE_REVERB_HOST:-normchat.twenti.studio}
       VITE_REVERB_PORT: ${VITE_REVERB_PORT:-443}
       VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-normchat_attachments}
@@ -72,7 +72,7 @@ services:
       INTERDOTZ_CLIENT_SECRET: ${INTERDOTZ_CLIENT_SECRET:-}
       INTERDOTZ_API_BASE: ${INTERDOTZ_API_BASE:-https://api-interdotz.technocrats.studio}
       INTERDOTZ_SSO_BASE: ${INTERDOTZ_SSO_BASE:-https://interdotz.technocrats.studio}
-      INTERDOTZ_REDIRECT_URI: ${INTERDOTZ_REDIRECT_URI:-https://normchat.technocrats.studio/sso/interdotz/callback}
+      INTERDOTZ_REDIRECT_URI: ${INTERDOTZ_REDIRECT_URI:-https://normchat.twenti.studio/sso/interdotz/callback}
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,7 +104,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL:-https://normchat.technocrats.studio}
+      APP_URL: ${APP_URL:-https://normchat.twenti.studio}
       APP_KEY: ${APP_KEY}
       DB_CONNECTION: pgsql
       DB_HOST: ${DB_HOST:-postgres}
@@ -159,7 +159,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL:-https://normchat.technocrats.studio}
+      APP_URL: ${APP_URL:-https://normchat.twenti.studio}
       APP_KEY: ${APP_KEY}
       DB_CONNECTION: pgsql
       DB_HOST: ${DB_HOST:-postgres}

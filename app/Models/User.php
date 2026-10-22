@@ -119,4 +119,50 @@ class User extends Authenticatable
             || $this->api_key_encrypted
             || $hasLlmToken;
     }
+
+    /** Username yang ditampilkan: username tersimpan, atau diturunkan dari ID penyedia / email. */
+    public function displayUsername(): string
+    {
+        $clean = fn (string $value) => strtolower(substr((string) preg_replace('/[^A-Za-z0-9._-]/', '', $value), 0, 40));
+
+        if ((string) $this->username !== '') {
+            return (string) $this->username;
+        }
+
+        $providerId = (string) ($this->provider_user_id ?? $this->interdotz_id ?? '');
+        if ($providerId !== '') {
+            return $clean($providerId);
+        }
+
+        $emailPrefix = strstr((string) $this->email, '@', true);
+
+        return is_string($emailPrefix) && $emailPrefix !== '' ? $clean($emailPrefix) : 'user' . $this->id;
+    }
+
+    /** Nama penyedia login untuk ditampilkan ke user. */
+    public function authProviderLabel(): string
+    {
+        return match ($this->auth_provider) {
+            'google' => 'Google',
+            'interdotz' => 'Interdotz SSO',
+            default => ucfirst((string) $this->auth_provider),
+        };
+    }
+
+    /** ID user di Interdotz untuk API pembayaran (ULID internal, fallback ID SSO). */
+    public function interdotzUserId(): string
+    {
+        return (string) ($this->interdotz_id ?: $this->provider_user_id ?: '');
+    }
+
+    /**
+     * Superadmin = email di NORMCHAT_SUPERADMIN_EMAILS. Mengakses panel
+     * /superadmin dan melewati pembayaran.
+     */
+    public function isSuperadmin(): bool
+    {
+        $emails = array_map('strtolower', (array) config('normchat.superadmin_emails', []));
+
+        return $this->email !== null && in_array(strtolower($this->email), $emails, true);
+    }
 }
