@@ -69,7 +69,6 @@ class GroupMembership
             'payment_method' => $funding->paymentMethod,
             'transaction_id' => $funding->reference,
             'normkredits' => $funding->credits,
-            'share_percent' => $funding->sharePercent,
         ];
     }
 }

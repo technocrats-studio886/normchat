@@ -67,12 +67,12 @@ class GroupBackups
     private function readSnapshot(GroupBackup $backup): array
     {
         if (! Storage::disk(self::DISK)->exists($backup->storage_path)) {
-            throw new RuntimeException('File backup tidak ditemukan di storage.');
+            throw new RuntimeException('Cadangan tidak ditemukan.');
         }
 
         $snapshot = json_decode((string) Storage::disk(self::DISK)->get($backup->storage_path), true);
         if (! is_array($snapshot) || ! isset($snapshot['messages'], $snapshot['members'])) {
-            throw new RuntimeException('Format backup tidak valid.');
+            throw new RuntimeException('Cadangan rusak dan tidak bisa dipulihkan.');
         }
 
         return $snapshot;

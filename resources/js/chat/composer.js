@@ -1,6 +1,7 @@
-// Composer chat: lampiran, editor media, reply, aksi pesan, rekam suara, dan pengiriman.
+// Composer chat: lampiran, pilihan AI (model & mode), editor media, reply, aksi pesan, rekam suara, dan pengiriman.
 // Bagian-bagiannya ada di chat/composer/; urutan init mengikuti urutan pendaftaran listener semula.
 
+import { initAiOptions } from './composer/ai-options.js';
 import { initAttachMenu } from './composer/attach-menu.js';
 import { attachmentInput, chatForm } from './composer/elements.js';
 import { initFeedClicks } from './composer/feed-clicks.js';
@@ -22,6 +23,7 @@ export const initComposer = () => {
 	initFeedClicks();
 	initMessageActions();
 	initAttachMenu();
+	initAiOptions();
 	initVoiceRecorder();
 	initComposerInput();
 	initSend();

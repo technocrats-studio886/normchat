@@ -56,7 +56,7 @@
     </label>
 </div>
 @if($errors->any())
-    <div class="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">
+    <div class="mt-3 rounded-xl bg-coral-50 px-3 py-2 text-xs text-coral-700">
         @foreach($errors->all() as $error)
             <p>{{ $error }}</p>
         @endforeach

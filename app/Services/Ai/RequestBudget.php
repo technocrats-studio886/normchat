@@ -26,12 +26,13 @@ final class RequestBudget
     /**
      * @param  int  $inputTokens  perkiraan token input (konteks + prompt)
      * @param  float  $usableCredits  kredit yang boleh dipakai penanya saat ini
+     * @param  int|null  $outputCeiling  plafon jawaban khusus mode (mis. Canvas); null = setelan superadmin
      *
      * @throws InsufficientBudgetException
      */
-    public static function plan(AiModel $model, int $inputTokens, float $usableCredits, NormkreditPricing $pricing): self
+    public static function plan(AiModel $model, int $inputTokens, float $usableCredits, NormkreditPricing $pricing, ?int $outputCeiling = null): self
     {
-        $configuredMax = (int) $pricing->get('max_output_tokens');
+        $configuredMax = $outputCeiling ?? (int) $pricing->get('max_output_tokens');
         $maxPerRequest = (float) $pricing->get('max_credits_per_request');
         $affordable = $maxPerRequest > 0 ? min($usableCredits, $maxPerRequest) : $usableCredits;
 
@@ -63,11 +64,10 @@ final class RequestBudget
         $minimum = $pricing->creditsForCost($model->costUsd($inputTokens, 0, self::MIN_OUTPUT_TOKENS), $model->multiplier);
 
         if ($maxPerRequest > 0 && $minimum > $maxPerRequest) {
-            return 'Permintaan ini terlalu besar (minimal ' . $fmt($minimum) . ' Normkredit, batas ' . $fmt($maxPerRequest)
-                . ' Normkredit per permintaan). Persingkat pesan atau lampiran, atau pilih model yang lebih hemat.';
+            return 'Pesan ini terlalu panjang untuk dijawab. Persingkat pesan atau lampirannya, atau pilih model lain.';
         }
 
-        return 'Kredit yang bisa kamu pakai (' . $fmt($usable) . ' NK) belum cukup untuk menjawab dengan model ' . $model->label
-            . ' (minimal sekitar ' . $fmt($minimum) . ' NK). Top-up Normkredit, minta anggota membagikan kredit ke kredit bersama, atau pilih model yang lebih hemat.';
+        return 'Normkredit tidak cukup untuk model ' . $model->label . ' (sisa ' . $fmt($usable) . ', butuh sekitar ' . $fmt($minimum)
+            . '). Isi Normkredit atau pilih model lain.';
     }
 }

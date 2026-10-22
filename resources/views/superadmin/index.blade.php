@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Superadmin - Normchat'])
+@extends('layouts.app', ['title' => 'Superadmin - Normi Chat'])
 
 @section('content')
     @php
@@ -14,35 +14,35 @@
         <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Superadmin</h1>
 
         @if(session('success'))
-            <div class="mt-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{{ session('success') }}</div>
+            <div class="mt-3 rounded-xl bg-navy-50 px-4 py-3 text-sm font-semibold text-navy-700">{{ session('success') }}</div>
         @endif
 
         {{-- Ringkasan 30 hari --}}
         <h2 class="section-title mt-6">30 hari terakhir</h2>
         <div class="grid grid-cols-2 gap-2">
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Penjualan NK</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtIdr($sales->revenue) }}</p>
                 <p class="text-[11px] text-slate-500">{{ $fmtNk($sales->credits) }} NK · {{ (int) $sales->payments }} bayar</p>
             </div>
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Pemakaian AI</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtNk($usage->charged) }} NK</p>
                 <p class="text-[11px] text-slate-500">{{ (int) $usage->requests }} request · {{ $fmtIdr($usageRevenue) }}</p>
             </div>
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Biaya OpenAI</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtIdr($usage->cost_idr) }}</p>
             </div>
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Margin atas pemakaian</p>
-                <p class="mt-1 text-sm font-bold {{ $usageMargin !== null && $usageMargin < 25 ? 'text-rose-600' : 'text-emerald-700' }}">
+                <p class="mt-1 text-sm font-bold {{ $usageMargin !== null && $usageMargin < 25 ? 'text-coral-600' : 'text-navy-700' }}">
                     {{ $usageMargin === null ? '–' : number_format($usageMargin, 1, ',', '.') . '%' }}
                 </p>
             </div>
         </div>
         @if($usageByModel->isNotEmpty())
-            <div class="mt-2 overflow-x-auto rounded-2xl border border-[#dbe6ff] bg-white shadow-sm">
+            <div class="mt-2 overflow-x-auto rounded-2xl border border-[#E4E9F0] bg-white shadow-sm">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
                         <tr><th class="px-3 py-2">Model</th><th class="px-3 py-2 text-right">Req</th><th class="px-3 py-2 text-right">NK</th><th class="px-3 py-2 text-right">Biaya</th></tr>
@@ -71,7 +71,7 @@
                         <div class="min-w-0">
                             <p class="text-sm font-bold text-slate-900">
                                 {{ $aiModel->label }}
-                                @if($aiModel->is_default)<span class="ml-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">default</span>@endif
+                                @if($aiModel->is_default)<span class="ml-1 rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-semibold text-navy-700">default</span>@endif
                                 @unless($aiModel->is_active)<span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">nonaktif</span>@endunless
                             </p>
                             <p class="truncate font-mono text-[11px] text-slate-500">{{ $aiModel->model_id }}</p>
@@ -83,7 +83,7 @@
                             </p>
                         </div>
                         <div class="shrink-0 text-right">
-                            <p class="text-sm font-extrabold text-blue-600">{{ $fmtNk($sampleCredits[$aiModel->id] ?? 0) }} NK</p>
+                            <p class="text-sm font-extrabold text-navy-600">{{ $fmtNk($sampleCredits[$aiModel->id] ?? 0) }} NK</p>
                             <p class="text-[10px] text-slate-400">contoh</p>
                         </div>
                     </div>
@@ -125,7 +125,7 @@
                         <label for="{{ $key }}" class="text-[11px] font-bold uppercase tracking-wider text-slate-500">{{ $label }}</label>
                         <input id="{{ $key }}" name="{{ $key }}" type="number" step="{{ $step }}" min="0" required value="{{ old($key, $settings[$key]) }}" class="input-field mt-1.5" />
                         @error($key)
-                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            <p class="mt-1 text-xs text-coral-500">{{ $message }}</p>
                         @enderror
                     </div>
                 @endforeach

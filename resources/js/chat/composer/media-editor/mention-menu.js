@@ -98,7 +98,7 @@ export const bindPreviewMentionMenu = (targetInput, targetMenu, suggestions, onA
 
 		targetMenu.innerHTML = filtered
 			.map((item, index) => {
-				const tagTypeClass = item.type === 'ai' ? 'text-emerald-300' : 'text-blue-300';
+				const tagTypeClass = item.type === 'ai' ? 'text-navy-300' : 'text-navy-300';
 				return `<button type="button" data-preview-mention-index="${index}" class="flex w-full items-center justify-between border-b border-white/10 px-3 py-2 text-left text-sm text-white last:border-0 hover:bg-white/10"><span class="font-medium">${escapeHtml(item.label)}</span><span class="text-xs ${tagTypeClass}">${escapeHtml(item.insert)}</span></button>`;
 			})
 			.join('');

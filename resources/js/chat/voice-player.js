@@ -96,7 +96,7 @@ export const initVoicePlayers = (root = document) => {
 			toggle.innerHTML = isPlaying ? pauseIconSvg : playIconSvg;
 			toggle.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
 			player.classList.toggle('ring-1', isPlaying);
-			player.classList.toggle('ring-emerald-300/60', isPlaying);
+			player.classList.toggle('ring-navy-300/60', isPlaying);
 			bars.forEach((bar, index) => {
 				if (!isPlaying) {
 					bar.classList.remove('animate-pulse');

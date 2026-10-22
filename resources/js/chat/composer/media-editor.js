@@ -36,8 +36,8 @@ export const ensureMediaAttachmentPreviewEl = (onClear) => {
 		toolButtons.forEach((button) => {
 			const tool = String(button.getAttribute('data-preview-tool') || '');
 			const isActive = (tool === 'doodle' && state.doodleEnabled) || (tool !== 'doodle' && state.placementMode === tool);
-			button.classList.toggle('bg-emerald-500/80', isActive);
-			button.classList.toggle('text-emerald-950', isActive);
+			button.classList.toggle('bg-navy-500/80', isActive);
+			button.classList.toggle('text-navy-950', isActive);
 			button.classList.toggle('bg-white/14', !isActive);
 			button.classList.toggle('text-white', !isActive);
 		});
@@ -90,9 +90,9 @@ export const ensureMediaAttachmentPreviewEl = (onClear) => {
 			updateToolButtonState();
 			if (state.doodleEnabled) {
 				doodle.resize();
-				showActionToast('Mode coretan aktif');
+				showActionToast('Coretan aktif');
 			} else {
-				showActionToast('Mode coretan dimatikan');
+				showActionToast('Coretan mati');
 			}
 		}
 	});

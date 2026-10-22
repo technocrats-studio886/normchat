@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Group Setting - '.$group->name, 'group' => $group])
+@extends('layouts.app', ['title' => 'Pengaturan Grup - '.$group->name, 'group' => $group])
 
 @section('content')
     <section class="page-shell" data-membership-watch="{{ (int) $group->id }}" data-groups-url="{{ route('groups.index') }}">
@@ -22,7 +22,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 19-7-7 7-7"/></svg>
                 </a>
                 <div>
-                    <p class="text-xs font-medium text-slate-500">Group Setting</p>
+                    <p class="text-xs font-medium text-slate-500">Pengaturan Grup</p>
                     <h1 class="page-title text-xl">{{ $group->name }}</h1>
                 </div>
             </div>
@@ -44,27 +44,27 @@
                         <p class="font-display text-2xl font-extrabold">{{ number_format($credits, 2, ',', '.') }}</p>
                     </div>
                     @if($canManageBilling)
-                        <a href="{{ route('subscription.tokens.buy', ['group' => $group->id]) }}" class="rounded-2xl bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25">Top-up →</a>
+                        <a href="{{ route('subscription.tokens.buy', ['group' => $group->id]) }}" class="rounded-2xl bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25">Isi →</a>
                     @endif
                 </div>
             </div>
         </div>
 
         @if($isReadOnly)
-            <div class="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <div class="mt-4 flex items-start gap-2 rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-xs text-coral-800">
                 <svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
-                <span>Kamu sedang dalam mode read-only. Hanya owner/admin dengan izin yang bisa mengubah pengaturan.</span>
+                <span>Hanya pemilik atau admin yang bisa mengubah pengaturan.</span>
             </div>
         @endif
 
         @include('settings._credits')
 
-        {{-- Profil Grup --}}
-        <h2 class="section-title mt-6">Profil Grup</h2>
+        {{-- Info grup --}}
+        <h2 class="section-title mt-6">Info Grup</h2>
         <form method="POST" action="{{ route('settings.profile.update', $group) }}" class="card-soft space-y-4">
             @csrf
             <div>
-                <label for="group_name" class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Nama Group</label>
+                <label for="group_name" class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Nama Grup</label>
                 <input id="group_name" type="text" name="name" value="{{ old('name', $group->name) }}" required @if($isReadOnly) readonly @endif class="input-field mt-1.5 @if($isReadOnly) cursor-not-allowed bg-slate-50 text-slate-500 @endif" />
             </div>
 
@@ -74,12 +74,12 @@
             </div>
 
             <div>
-                <label for="group_password" class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Password Grup Baru</label>
-                <p class="mt-1 text-[11px] text-slate-400">Kosongkan jika tidak ingin ganti password.</p>
+                <label for="group_password" class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Kata Sandi Baru</label>
+                <p class="mt-1 text-[11px] text-slate-400">Kosongkan jika tidak ingin mengganti.</p>
                 <div class="relative mt-1.5">
                     <input id="group_password" type="password" name="password" @if($isReadOnly) readonly @endif class="input-field pr-10 @if($isReadOnly) cursor-not-allowed bg-slate-50 text-slate-500 @endif" placeholder="Masukkan password baru" />
                     @if(! $isReadOnly)
-                    <button type="button" data-password-toggle="group_password" class="absolute inset-y-0 right-3 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat password">
+                    <button type="button" data-password-toggle="group_password" class="absolute inset-y-0 right-3 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat kata sandi">
                         <svg data-eye-icon="off" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                         <svg data-eye-icon="on" xmlns="http://www.w3.org/2000/svg" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m3 3 18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58a2 2 0 1 0 2.83 2.83"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 5.09A10.94 10.94 0 0 1 12 5c4.48 0 8.27 2.94 9.54 7a11.05 11.05 0 0 1-4.2 5.17"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.61 6.61A11.05 11.05 0 0 0 2.46 12c1.27 4.06 5.06 7 9.54 7 1.58 0 3.09-.37 4.42-1.03"/></svg>
                     </button>
@@ -88,20 +88,20 @@
             </div>
 
             <label class="flex items-center gap-2 text-xs text-slate-600">
-                <input type="checkbox" name="approval_enabled" value="1" class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" {{ old('approval_enabled', $group->approval_enabled) ? 'checked' : '' }} @if($isReadOnly) disabled @endif>
-                Wajib approval sebelum member baru masuk
+                <input type="checkbox" name="approval_enabled" value="1" class="h-4 w-4 rounded border-slate-300 text-navy-600 focus:ring-navy-500" {{ old('approval_enabled', $group->approval_enabled) ? 'checked' : '' }} @if($isReadOnly) disabled @endif>
+                Anggota baru perlu persetujuan
             </label>
 
             @if($isReadOnly)
                 <button type="button" disabled class="w-full cursor-not-allowed rounded-2xl bg-slate-100 py-3 text-sm font-semibold text-slate-400">
-                    Read-Only
+                    Hanya lihat
                 </button>
             @else
-                <button type="submit" class="btn-cta">Simpan Pengaturan</button>
+                <button type="submit" class="btn-cta">Simpan</button>
             @endif
         </form>
 
-        <h2 class="section-title mt-6">User Management</h2>
+        <h2 class="section-title mt-6">Anggota</h2>
         <div class="card-soft space-y-2.5">
             @if(($members ?? collect())->isEmpty())
                 <p class="rounded-xl bg-slate-50 px-3 py-3 text-center text-xs text-slate-500">Belum ada anggota aktif.</p>
@@ -119,11 +119,11 @@
                                 <p class="truncate text-sm font-bold text-slate-800">{{ $memberUser?->name ?? 'User' }}</p>
                                 <p class="mt-0.5 text-[11px] text-slate-500">
                                     @if($isOwnerMember)
-                                        Pemilik Grup
+                                        Pemilik
                                     @elseif($roleKey === 'admin')
                                         Admin
                                     @else
-                                        Member
+                                        Anggota
                                     @endif
                                     @if($isSelfMember)
                                         • Kamu
@@ -132,9 +132,9 @@
                             </div>
 
                             @if($isOwnerMember)
-                                <span class="chip-indigo">Owner</span>
+                                <span class="chip-indigo">Pemilik</span>
                             @elseif(! $canManageMembers)
-                                <span class="chip-slate">Read-only</span>
+                                
                             @elseif($isSelfMember)
                                 <span class="chip-slate">Akun kamu</span>
                             @else
@@ -143,13 +143,13 @@
                                         @csrf
                                         <input type="hidden" name="role" value="{{ $roleKey === 'admin' ? 'member' : 'admin' }}" />
                                         <button type="submit" class="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
-                                            {{ $roleKey === 'admin' ? 'Jadikan Member' : 'Jadikan Admin' }}
+                                            {{ $roleKey === 'admin' ? 'Jadikan anggota' : 'Jadikan admin' }}
                                         </button>
                                     </form>
 
-                                    <form method="POST" action="{{ route('groups.members.remove', ['group' => $group, 'member' => $member]) }}" onsubmit="return confirm('Hapus anggota ini dari grup?');">
+                                    <form method="POST" action="{{ route('groups.members.remove', ['group' => $group, 'member' => $member]) }}" onsubmit="return confirm('Keluarkan anggota ini dari grup?');">
                                         @csrf
-                                        <button type="submit" class="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">Keluarkan</button>
+                                        <button type="submit" class="rounded-lg border border-coral-200 px-2.5 py-1 text-[11px] font-semibold text-coral-600 hover:bg-coral-50">Keluarkan</button>
                                     </form>
                                 </div>
                             @endif
@@ -160,17 +160,17 @@
         </div>
 
         {{-- Media / Tautan / Berkas tabs --}}
-        <h2 class="section-title mt-6">Arsip Grup</h2>
+        <h2 class="section-title mt-6">Media, Tautan & Berkas</h2>
         <div class="card-soft p-0 overflow-hidden">
             <div class="flex border-b border-slate-200" role="tablist" data-archive-tabs>
-                <button type="button" role="tab" aria-selected="true" data-archive-tab="media" class="flex-1 px-3 py-2.5 text-xs font-semibold text-slate-700 border-b-2 border-blue-500 bg-blue-50">Media</button>
+                <button type="button" role="tab" aria-selected="true" data-archive-tab="media" class="flex-1 px-3 py-2.5 text-xs font-semibold text-slate-700 border-b-2 border-navy-500 bg-navy-50">Media</button>
                 <button type="button" role="tab" aria-selected="false" data-archive-tab="links" class="flex-1 px-3 py-2.5 text-xs font-semibold text-slate-500 border-b-2 border-transparent hover:bg-slate-50">Tautan</button>
                 <button type="button" role="tab" aria-selected="false" data-archive-tab="files" class="flex-1 px-3 py-2.5 text-xs font-semibold text-slate-500 border-b-2 border-transparent hover:bg-slate-50">Berkas</button>
             </div>
 
             <div class="p-3" data-archive-panel="media">
                 @if($mediaMessages->isEmpty())
-                    <p class="px-1 py-6 text-center text-xs text-slate-400">Belum ada media di grup ini.</p>
+                    <p class="px-1 py-6 text-center text-xs text-slate-400">Belum ada media.</p>
                 @else
                     <div class="grid grid-cols-3 gap-1.5">
                         @foreach($mediaMessages as $m)
@@ -190,7 +190,7 @@
                         @foreach($linkMessages as $m)
                             @foreach($m->extracted_urls as $url)
                                 <li class="py-2.5">
-                                    <a href="{{ $url }}" target="_blank" rel="noopener" class="block truncate text-sm text-blue-600 hover:underline">{{ $url }}</a>
+                                    <a href="{{ $url }}" target="_blank" rel="noopener" class="block truncate text-sm text-navy-600 hover:underline">{{ $url }}</a>
                                     <p class="mt-0.5 text-[11px] text-slate-400">{{ optional($m->created_at)->format('d M Y H:i') }}</p>
                                 </li>
                             @endforeach
@@ -220,31 +220,26 @@
             </div>
         </div>
 
-        <h2 class="section-title mt-6">Ringkasan Grup</h2>
+        <h2 class="section-title mt-6">Lainnya</h2>
         <div class="card-soft space-y-2.5">
-            <p class="text-xs text-slate-500">Backup, export, dan AI persona tersedia di menu cepat chat. Theme chat diatur dari halaman ini.</p>
             <a href="{{ route('settings.transactions', $group) }}" class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
-                <span>Riwayat Transaksi</span>
+                <span>Riwayat patungan</span>
                 <span aria-hidden="true">></span>
             </a>
         </div>
 
-        <h2 class="section-title mt-6">Theme Chat</h2>
+        <h2 class="section-title mt-6">Tema Chat</h2>
         <div class="card-soft space-y-3" data-chat-theme-picker="1" data-chat-theme-group-id="{{ (int) $group->id }}">
-            <p class="text-xs text-slate-500">Theme berlaku untuk perangkat ini saat membuka chat grup ini.</p>
+            <p class="text-xs text-slate-500">Hanya berlaku di perangkat ini.</p>
             <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4" data-chat-theme-list="1">
                 @foreach ([
-                    ['id' => 'default', 'label' => 'Default', 'color' => '#f5f8ff'],
-                    ['id' => 'midnight', 'label' => 'Midnight', 'color' => '#041126'],
-                    ['id' => 'ocean', 'label' => 'Ocean', 'color' => '#0a4f76'],
-                    ['id' => 'forest', 'label' => 'Forest', 'color' => '#0f5132'],
-                    ['id' => 'sunset', 'label' => 'Sunset', 'color' => '#7c2d12'],
-                    ['id' => 'slate', 'label' => 'Slate', 'color' => '#1e293b'],
-                    ['id' => 'charcoal', 'label' => 'Charcoal', 'color' => '#111827'],
+                    ['id' => 'default', 'label' => 'Default', 'color' => '#F3F5F8'],
+                    ['id' => 'navy', 'label' => 'Navy', 'color' => '#121C29'],
+                    ['id' => 'coral', 'label' => 'Coral', 'color' => '#FFF3F1'],
                 ] as $theme)
                     <button
                         type="button"
-                        class="overflow-hidden rounded-xl border border-slate-200 text-left text-[11px] font-semibold text-slate-700 transition hover:border-indigo-300"
+                        class="overflow-hidden rounded-xl border border-slate-200 text-left text-[11px] font-semibold text-slate-700 transition hover:border-navy-300"
                         data-chat-theme-option="{{ $theme['id'] }}"
                     >
                         <span class="block h-11 w-full" style="background: {{ $theme['color'] }};"></span>
@@ -252,17 +247,42 @@
                     </button>
                 @endforeach
             </div>
-            <p class="text-[11px] text-slate-500" data-chat-theme-status="1">Theme aktif: Default</p>
+            {{-- Pratinjau: kelas yang sama dengan ruang chat, jadi tema langsung terlihat saat dipilih. --}}
+            <div class="space-y-2 rounded-2xl bg-[#F3F5F8] p-3 transition-colors" data-chat-theme-preview="1" aria-hidden="true">
+                <div class="nc-chat-header-card flex items-center gap-2 rounded-2xl border px-3 py-2">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-xl text-[11px] font-bold text-white" style="background: var(--nc-primary);">{{ strtoupper(substr($group->name, 0, 1)) }}</span>
+                    <span class="min-w-0">
+                        <span class="nc-chat-header-title block truncate text-xs font-semibold">{{ $group->name }}</span>
+                        <span class="nc-chat-header-subtitle block text-[10px]">Pratinjau</span>
+                    </span>
+                </div>
+                <div class="max-w-[80%]">
+                    <p class="nc-chat-sender mb-0.5 text-[10px]">Teman</p>
+                    <div class="bubble-other text-xs">Ada yang mau belajar bareng?</div>
+                </div>
+                <div class="max-w-[80%]">
+                    <p class="nc-chat-sender nc-chat-sender--ai mb-0.5 text-[10px] font-semibold">Normi AI</p>
+                    <div class="bubble-ai text-xs">Boleh! Mulai dari bab mana?</div>
+                </div>
+                <div class="flex justify-end">
+                    <div class="bubble-mine max-w-[80%] text-xs">Aku ikut!</div>
+                </div>
+                <div class="composer-pill flex items-center justify-between px-3 py-1.5">
+                    <span class="text-xs" style="color: var(--nc-chat-composer-soft, #94a3b8);">Ketik pesan</span>
+                    <span class="h-6 w-6 rounded-full" style="background: var(--nc-primary);"></span>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500" data-chat-theme-status="1">Tema: Default</p>
             <a href="{{ route('chat.show', $group) }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                Kembali ke chat untuk lihat perubahan
+                Kembali ke chat
             </a>
         </div>
 
         @if((int) $group->owner_id === (int) auth()->id())
-            <h2 class="section-title mt-6 text-rose-600">Zona Berbahaya</h2>
-            <div class="card-soft space-y-3 border border-rose-200">
-                <p class="text-xs text-slate-600">Menghapus grup akan menghilangkan semua pesan, anggota, dan data terkait secara permanen. Tindakan ini tidak dapat dibatalkan.</p>
-                <button type="button" class="w-full rounded-2xl border border-rose-300 bg-rose-50 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-100" data-open-delete-group="1">
+            <h2 class="section-title mt-6 text-coral-600">Hapus Grup</h2>
+            <div class="card-soft space-y-3 border border-coral-200">
+                <p class="text-xs text-slate-600">Semua pesan dan anggota akan hilang permanen dan tidak bisa dikembalikan.</p>
+                <button type="button" class="w-full rounded-2xl border border-coral-300 bg-coral-50 py-3 text-sm font-bold text-coral-600 transition hover:bg-coral-100" data-open-delete-group="1">
                     Hapus Grup
                 </button>
             </div>
@@ -270,14 +290,14 @@
             <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-slate-900/45 px-5" data-delete-group-overlay="1" data-expected-name="{{ $group->name }}">
                 <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
                     <p class="text-sm font-bold text-slate-900">Hapus grup "{{ $group->name }}"?</p>
-                    <p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Semua pesan, anggota, dan backup akan dihapus. Ketik nama grup untuk konfirmasi.</p>
-                    <input type="text" class="input-field mt-3" placeholder="Ketik nama grup persis" data-delete-group-confirm-input="1" autocomplete="off" />
+                    <p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Semua pesan dan anggota akan hilang permanen. Ketik nama grup untuk lanjut.</p>
+                    <input type="text" class="input-field mt-3" placeholder="Nama grup" data-delete-group-confirm-input="1" autocomplete="off" />
                     <div class="mt-4 flex items-center justify-end gap-2">
                         <button type="button" class="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100" data-close-delete-group="1">Batal</button>
                         <form method="POST" action="{{ route('groups.destroy', $group) }}">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="rounded-xl bg-rose-500 px-3 py-2 text-xs font-bold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50" data-delete-group-submit="1" disabled>Hapus permanen</button>
+                            <button type="submit" class="rounded-xl bg-coral-500 px-3 py-2 text-xs font-bold text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-50" data-delete-group-submit="1" disabled>Hapus permanen</button>
                         </form>
                     </div>
                 </div>

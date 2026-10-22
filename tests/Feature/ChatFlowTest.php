@@ -84,17 +84,28 @@ class ChatFlowTest extends TestCase
 
     public function test_ai_mention_and_reply_to_ai_are_queued(): void
     {
-        $this->actingAs($this->member)->postJson($this->url('messages'), ['content' => '@ai tolong bantu'])->assertCreated();
+        $this->actingAs($this->member)->postJson($this->url('messages'), ['content' => '@normi tolong bantu'])->assertCreated();
 
         $aiReply = Message::create(['group_id' => $this->group->id, 'sender_type' => 'ai', 'content' => 'Jawaban']);
         $this->actingAs($this->member)->postJson($this->url('messages'), [
             'content' => 'lanjutkan',
             'reply_to_message_id' => $aiReply->id,
             'reply_quote_text' => '  Jawaban   ',
-        ])->assertCreated()->assertJsonPath('message.reply_to.sender_name', 'NormAI')->assertJsonPath('message.reply_to.quote_text', 'Jawaban');
+        ])->assertCreated()->assertJsonPath('message.reply_to.sender_name', 'Normi AI')->assertJsonPath('message.reply_to.quote_text', 'Jawaban');
 
         $this->assertSame(2, ChatMessageQueue::where('status', 'queued')->count());
         Queue::assertPushed(ProcessGroupChatQueueJob::class, 2);
+    }
+
+    public function test_only_normi_mention_calls_the_ai(): void
+    {
+        foreach (['@ai tolong', '@openai halo', '@chatgpt halo', 'halo @normianto', 'kirim ke tim@normi.chat'] as $content) {
+            $this->actingAs($this->member)->postJson($this->url('messages'), ['content' => $content])->assertCreated();
+        }
+        $this->assertSame(0, ChatMessageQueue::count(), 'Mention lama dan handle mirip tidak memanggil AI.');
+
+        $this->actingAs($this->member)->postJson($this->url('messages'), ['content' => 'Halo @Normi, bantu dong'])->assertCreated();
+        $this->assertSame(1, ChatMessageQueue::count());
     }
 
     public function test_attachments_are_stored_with_detected_type(): void
@@ -177,7 +188,7 @@ class ChatFlowTest extends TestCase
 
     public function test_mentions_notify_members_but_not_the_sender_or_ai(): void
     {
-        $this->actingAs($this->owner)->postJson($this->url('messages'), ['content' => '@siti @ai @budi_santoso cek ini'])->assertCreated();
+        $this->actingAs($this->owner)->postJson($this->url('messages'), ['content' => '@siti @normi @budi_santoso cek ini'])->assertCreated();
 
         Event::assertDispatched(UserMentioned::class, 1);
         Event::assertDispatched(UserMentioned::class, fn (UserMentioned $event) => $event->userId === $this->member->id);

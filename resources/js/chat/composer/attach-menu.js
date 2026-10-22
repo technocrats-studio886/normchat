@@ -1,4 +1,4 @@
-// Menu lampiran (foto, kamera, file, polling) dan panel emoji.
+// Menu plus composer (upload files, polling) dan panel emoji. Mode AI di ai-options.js.
 
 import { refreshAttachmentLabel, syncAttachmentFromInput } from './attachment.js';
 import { attachMenu, attachMenuButton, attachmentInput, cameraButton, cameraInput, emojiButton, emojiPanel, insertAtCursor, mentionInput, voiceButton } from './elements.js';
@@ -61,9 +61,11 @@ export const initAttachMenu = () => {
 		}
 	});
 
+	// Daftar format yang diizinkan server (App\Support\AttachmentRules) ada di atribut accept awal.
+	const allowedAccept = attachmentInput.getAttribute('accept') || '';
 	attachMenu?.querySelector('[data-attach-file]')?.addEventListener('click', () => {
 		attachMenu.classList.add('hidden');
-		attachmentInput.accept = '*/*';
+		attachmentInput.accept = allowedAccept;
 		attachmentInput.removeAttribute('capture');
 		attachmentInput.click();
 	});
@@ -75,7 +77,7 @@ export const initAttachMenu = () => {
 			return;
 		}
 
-		showActionToast('Menu polling belum tersedia');
+		showActionToast('Polling belum bisa dibuat');
 	});
 
 	// Close attach menu on outside click

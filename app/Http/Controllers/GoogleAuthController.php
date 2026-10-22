@@ -16,7 +16,7 @@ class GoogleAuthController extends Controller
     public function redirect(): SymfonyRedirectResponse
     {
         if (! $this->isConfigured()) {
-            return $this->failed('Login Google belum dikonfigurasi.');
+            return $this->failed('Masuk dengan Google belum tersedia.');
         }
 
         return Socialite::driver('google')->redirect();
@@ -25,7 +25,7 @@ class GoogleAuthController extends Controller
     public function callback(Request $request, SocialLogin $login): RedirectResponse
     {
         if (! $this->isConfigured()) {
-            return $this->failed('Login Google belum dikonfigurasi.');
+            return $this->failed('Masuk dengan Google belum tersedia.');
         }
 
         try {
@@ -33,14 +33,14 @@ class GoogleAuthController extends Controller
         } catch (Throwable $e) {
             Log::warning('Google login failed.', ['error' => $e->getMessage()]);
 
-            return $this->failed('Login Google dibatalkan atau gagal. Silakan coba lagi.');
+            return $this->failed('Gagal masuk dengan Google. Coba lagi.');
         }
 
         $email = (string) $googleUser->getEmail();
         $emailVerified = (bool) ($googleUser->user['email_verified'] ?? $googleUser->user['verified_email'] ?? false);
 
         if ($email === '' || ! $emailVerified) {
-            return $this->failed('Email akun Google belum terverifikasi.');
+            return $this->failed('Email Google kamu belum terverifikasi.');
         }
 
         $user = $login->findOrCreate(

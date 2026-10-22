@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Buat Group - Normchat'])
+@extends('layouts.app', ['title' => 'Buat Grup - Normi Chat'])
 
 @section('content')
     <section class="page-shell pt-5">
@@ -6,31 +6,31 @@
             <span aria-hidden="true">&larr;</span> Kembali
         </a>
 
-        <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Buat Group Chat</h1>
-        <p class="mt-1 text-sm text-slate-500">Buat grup, aktifkan AI bersama, lalu undang member untuk patungan Normkredit.</p>
+        <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Buat Grup</h1>
+        <p class="mt-1 text-sm text-slate-500">Ngobrol bareng teman dan pakai Normi AI bersama.</p>
 
         <form method="POST" action="{{ route('groups.store') }}" class="mt-6 space-y-3" id="createGroupForm">
             @csrf
 
-            {{-- Nama Group --}}
+            {{-- Nama grup --}}
             <div class="panel-card px-4 py-3">
-                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nama Group</label>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nama Grup</label>
                 <input type="text" name="name" value="{{ old('name') }}" placeholder="Contoh: Tim Marketing" required class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
             </div>
 
             {{-- Deskripsi --}}
             <div class="panel-card px-4 py-3">
                 <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Deskripsi</label>
-                <textarea name="description" rows="2" placeholder="Deskripsi singkat grup ini" class="mt-1 w-full resize-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400">{{ old('description') }}</textarea>
+                <textarea name="description" rows="2" placeholder="Opsional" class="mt-1 w-full resize-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400">{{ old('description') }}</textarea>
             </div>
 
             {{-- Password --}}
             <div class="panel-card px-4 py-3">
-                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Password Grup</label>
-                <p class="text-xs text-slate-500">Member harus memasukkan password saat join via Share ID.</p>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Kata Sandi Grup</label>
+                <p class="text-xs text-slate-500">Dipakai teman saat bergabung.</p>
                 <div class="relative mt-2">
-                    <input id="groupPasswordInput" type="password" name="password" value="{{ old('password') }}" placeholder="Buat password grup" required minlength="4" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
-                    <button type="button" data-password-toggle="groupPasswordInput" class="absolute inset-y-0 right-2 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat password" title="Lihat password">
+                    <input id="groupPasswordInput" type="password" name="password" value="{{ old('password') }}" placeholder="Buat kata sandi" required minlength="4" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100" />
+                    <button type="button" data-password-toggle="groupPasswordInput" class="absolute inset-y-0 right-2 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat kata sandi" title="Lihat kata sandi">
                         <svg data-eye-icon="off" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z" />
                             <circle cx="12" cy="12" r="3" />
@@ -45,27 +45,26 @@
                 </div>
             </div>
 
-            {{-- Owner Control --}}
+            {{-- Persetujuan anggota baru --}}
             <div class="panel-card px-4 py-3">
-                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Owner Control</label>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Persetujuan</label>
                 <label class="mt-2 flex items-center gap-2 text-xs text-slate-600">
                     <input type="checkbox" name="approval_enabled" value="1" class="rounded border-slate-300" {{ old('approval_enabled') ? 'checked' : '' }}>
-                    Wajib approval sebelum join
+                    Anggota baru perlu persetujuanmu
                 </label>
             </div>
 
             <div class="panel-card px-4 py-3">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Dana AI awal grup</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Normkredit Awal</p>
                 <p class="mt-1 text-sm text-slate-700"><strong>{{ number_format($quote->credits, 0, ',', '.') }} Normkredit</strong> · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</p>
+                <p class="mt-1 text-xs text-slate-500">Dipakai semua anggota untuk Normi AI.</p>
             </div>
-
-            @include('partials.share-picker', ['credits' => $quote->credits])
 
             @include('partials.payment-total', ['quote' => $quote])
 
-            <button type="submit" class="btn-cta">Bayar Rp{{ number_format($quote->total(), 0, ',', '.') }} · Buat Group</button>
+            <button type="submit" class="btn-cta">Buat Grup · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</button>
             @error('payment')
-                <p class="px-1 text-xs text-red-500">{{ $message }}</p>
+                <p class="px-1 text-xs text-coral-500">{{ $message }}</p>
             @enderror
         </form>
     </section>

@@ -21,10 +21,10 @@ const showMentionToast = (payload) => {
 
 	const toast = document.createElement('button');
 	toast.type = 'button';
-	toast.className = 'pointer-events-auto rounded-2xl border border-amber-200 bg-white px-3 py-2 text-left shadow-lg shadow-slate-900/10 transition hover:bg-amber-50';
+	toast.className = 'pointer-events-auto rounded-2xl border border-coral-200 bg-white px-3 py-2 text-left shadow-lg shadow-slate-900/10 transition hover:bg-coral-50';
 	toast.innerHTML = `
-		<p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Tag Masuk</p>
-		<p class="mt-0.5 text-sm font-semibold text-slate-800">${senderName} men-tag kamu di #${groupName}</p>
+		<p class="text-[11px] font-semibold uppercase tracking-wide text-coral-700">Kamu disebut</p>
+		<p class="mt-0.5 text-sm font-semibold text-slate-800">${senderName} menyebutmu di ${groupName}</p>
 		<p class="mt-0.5 text-xs text-slate-500">${previewText}</p>
 	`;
 
@@ -50,8 +50,8 @@ const showMentionToast = (payload) => {
 
 	if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
 		try {
-			new Notification('Normchat mention', {
-				body: `${payload?.sender_name || 'Seseorang'} men-tag kamu di #${payload?.group_name || 'group'}`,
+			new Notification('Normi Chat', {
+				body: `${payload?.sender_name || 'Seseorang'} menyebutmu di ${payload?.group_name || 'grup'}`,
 			});
 		} catch {
 			// Ignore notification API failures in restricted browsers.
@@ -149,7 +149,7 @@ export const initRealtime = () => {
 				return;
 			}
 
-			updateTypingState('ai', String(payload?.sender_name || 'NormAI'), Boolean(payload?.is_typing));
+			updateTypingState('ai', String(payload?.sender_name || 'Normi AI'), Boolean(payload?.is_typing));
 		});
 
 		groupChannel.listen('.message.sent', (payload) => {

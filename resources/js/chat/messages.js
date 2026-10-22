@@ -4,7 +4,7 @@ import { renderAttachment, renderReplyPreview } from './attachments.js';
 import { authUserId, chatFeed } from './context.js';
 import { renderMarkdown, renderMermaidInNode } from './markdown.js';
 import { parsePollContent, refreshPollCardsFromFeed, renderPollCard } from './polls.js';
-import { escapeAttr, escapeHtml, formatCredits } from './utils.js';
+import { escapeAttr, escapeHtml } from './utils.js';
 import { initVoicePlayers } from './voice-player.js';
 
 export const buildMessageNode = (message) => {
@@ -43,13 +43,13 @@ export const buildMessageNode = (message) => {
 	const isPending = message?.is_pending === true;
 
 	if (isMine) {
-		const replyBlock = renderReplyPreview(message, 'blue');
+		const replyBlock = renderReplyPreview(message, 'mine');
 		const inlineTimeHtml = timeText
 			? `<span class="nc-inline-time">${timeText}${editedMarkForMine}</span>`
 			: '';
 		const hasAttachment = Boolean(message?.attachment_url);
 		const shouldMergeAttachmentCaption = hasAttachment && Boolean(content) && !pollData;
-		const attachmentBlock = renderAttachment(message, 'blue', {
+		const attachmentBlock = renderAttachment(message, 'mine', {
 			mergedCaption: shouldMergeAttachmentCaption,
 		});
 		const attachmentWithCaptionBlock = shouldMergeAttachmentCaption
@@ -71,7 +71,7 @@ export const buildMessageNode = (message) => {
 					: `<div class="bubble-mine" data-message-body="1"><span class="whitespace-pre-wrap">${content}</span>${inlineTimeHtml}</div>`))
 			: '';
 		const pendingTail = isPending
-			? `<p class="nc-chat-meta mt-1 text-right text-[11px]"><span class="inline-flex items-center gap-1"><span class="h-2 w-2 animate-pulse rounded-full bg-amber-400"></span>Mengirim...</span></p>`
+			? `<p class="nc-chat-meta mt-1 text-right text-[11px]"><span class="inline-flex items-center gap-1"><span class="h-2 w-2 animate-pulse rounded-full bg-coral-400"></span>Mengirim...</span></p>`
 			: (content ? '' : `<p class="nc-chat-meta mt-1 text-right text-[11px]">${timeText}${editedMarkForMine}</p>`);
 
 		wrapper.className = 'flex justify-end';
@@ -83,7 +83,7 @@ export const buildMessageNode = (message) => {
 				${pendingTail}
 			</div>
 		`;
-		wrapper.dataset.messageSenderName = String(message?.sender_name || 'You');
+		wrapper.dataset.messageSenderName = String(message?.sender_name || 'Kamu');
 		wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
 		wrapper.dataset.messageType = String(message?.message_type || 'text');
 		wrapper.dataset.messageAttachmentMime = String(message?.attachment_mime || '');
@@ -92,18 +92,13 @@ export const buildMessageNode = (message) => {
 	}
 
 	if (isAi) {
-		const replyBlock = renderReplyPreview(message, 'emerald');
-		const aiName = escapeHtml(message?.sender_name || 'NormAI');
-		const attachmentBlock = renderAttachment(message, 'emerald');
+		const replyBlock = renderReplyPreview(message, 'ai');
+		const aiName = escapeHtml(message?.sender_name || 'Normi AI');
+		const attachmentBlock = renderAttachment(message, 'ai');
 		const renderedContent = pollData ? '' : (content ? renderMarkdown(content) : '');
 		const hasRichContent = renderedContent && (renderedContent.includes('<table') || renderedContent.includes('mermaid'));
 		const aiTimeHtml = timeText
 			? `<p class="nc-chat-meta nc-chat-meta--ai mt-1 text-right text-[11px] font-medium">${timeText}${editedMarkForAi}</p>`
-			: '';
-		const chargedCredits = Number(message?.ai_charged_credits);
-		const remainingCredits = Number(message?.group_credits_remaining);
-		const aiCostHtml = message?.ai_charged_credits != null && Number.isFinite(chargedCredits) && Number.isFinite(remainingCredits)
-			? `<p class="nc-chat-meta nc-chat-meta--ai text-right text-[10px] font-medium opacity-80" data-ai-cost="1">${formatCredits(chargedCredits)} NK · sisa ${formatCredits(remainingCredits)} NK</p>`
 			: '';
 		const textBlock = pollData
 			? renderPollCard({ poll: pollData, tone: 'ai', messageId: message?.id, inlineTimeHtml: '' })
@@ -118,9 +113,8 @@ export const buildMessageNode = (message) => {
 			${attachmentBlock}
 			${textBlock}
 			${aiTimeHtml}
-			${aiCostHtml}
 		`;
-		wrapper.dataset.messageSenderName = String(message?.sender_name || 'NormAI');
+		wrapper.dataset.messageSenderName = String(message?.sender_name || 'Normi AI');
 		wrapper.dataset.messageContent = String(message?.content || '').trim() || (message?.message_type === 'image' ? '[Gambar]' : (message?.message_type === 'voice' ? '[Voice note]' : '[Lampiran]'));
 		wrapper.dataset.messageType = String(message?.message_type || 'text');
 		wrapper.dataset.messageAttachmentMime = String(message?.attachment_mime || '');

@@ -29,7 +29,7 @@ class PromptBuilder
 
     public static function chatSystemPrompt(Group $group): string
     {
-        $prompt = 'Kamu adalah AI participant untuk group chat Normchat. Jawab singkat, jelas, relevan konteks grup, dan gunakan Bahasa Indonesia.'
+        $prompt = 'Kamu adalah Normi AI, AI participant di grup chat Normi Chat (dipanggil dengan @normi). Jawab singkat, jelas, relevan konteks grup, dan gunakan Bahasa Indonesia.'
             . "\n\nKamu bisa menggunakan format berikut dalam jawaban:"
             . "\n- **bold** dan *italic* untuk penekanan"
             . "\n- Markdown table untuk data tabular (gunakan | header | format |)"
@@ -147,7 +147,7 @@ class PromptBuilder
     private function replyContext(Message $request, Message $replyTarget): array
     {
         $parts = [];
-        $replySender = $replyTarget->sender_type === 'ai' ? 'NormAI' : ($replyTarget->sender?->name ?? 'User');
+        $replySender = $replyTarget->sender_type === 'ai' ? 'Normi AI' : ($replyTarget->sender?->name ?? 'User');
 
         $replyQuoteText = trim((string) ($request->reply_quote_text ?? ''));
         if ($replyQuoteText !== '') {

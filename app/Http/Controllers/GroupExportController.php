@@ -53,7 +53,7 @@ class GroupExportController extends Controller
         (new GenerateExportJob($export->id))->handle();
 
         return $this->download($group, $export->refresh())
-            ?? back()->withErrors(['export' => 'Export belum berhasil diproses. Coba ulangi beberapa saat lagi.']);
+            ?? back()->withErrors(['export' => 'File belum siap. Coba lagi sebentar lagi.']);
     }
 
     public function show(Group $group, Export $export): StreamedResponse|RedirectResponse
@@ -61,7 +61,7 @@ class GroupExportController extends Controller
         $this->authorize('exportChat', $group);
         abort_unless((int) $export->group_id === (int) $group->id, 404);
 
-        return $this->download($group, $export) ?? back()->withErrors(['export' => 'File export tidak tersedia.']);
+        return $this->download($group, $export) ?? back()->withErrors(['export' => 'File tidak tersedia.']);
     }
 
     private function download(Group $group, Export $export): ?StreamedResponse

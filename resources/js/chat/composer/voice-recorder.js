@@ -24,8 +24,8 @@ export const initVoiceRecorder = () => {
 	};
 
 	const resetRecordingUi = () => {
-		recordVoiceButton?.classList.remove('bg-rose-500');
-		recordVoiceButton?.classList.add('bg-emerald-500');
+		recordVoiceButton?.classList.remove('bg-coral-500');
+		recordVoiceButton?.classList.add('bg-navy-500');
 		recordingIndicator?.classList.add('hidden');
 		voiceRecorderPanel?.classList.add('hidden');
 		voiceRecorderPanel?.classList.remove('flex');
@@ -41,8 +41,8 @@ export const initVoiceRecorder = () => {
 	};
 
 	const showRecordingUi = () => {
-		recordVoiceButton?.classList.remove('bg-emerald-500');
-		recordVoiceButton?.classList.add('bg-rose-500');
+		recordVoiceButton?.classList.remove('bg-navy-500');
+		recordVoiceButton?.classList.add('bg-coral-500');
 		recordingIndicator?.classList.remove('hidden');
 		composerMain?.classList.add('hidden');
 		voiceRecorderPanel?.classList.remove('hidden');

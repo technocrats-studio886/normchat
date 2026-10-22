@@ -26,7 +26,7 @@ export const initMessageActions = () => {
 		if (selectedMessageIds.has(messageId)) {
 			selectedMessageIds.delete(messageId);
 			messageNode.classList.remove('nc-message-selected');
-			showActionToast('Pilihan pesan dibatalkan');
+			showActionToast('Batal memilih');
 			return;
 		}
 
@@ -62,10 +62,10 @@ export const initMessageActions = () => {
 			</div>
 			<div class="nc-popup-body nc-popup-body--quote" data-quote-picker-body>
 				<p class="nc-quote-picker" data-quote-picker-words>${escapeHtml(safeMessageText)}</p>
-				<p class="nc-quote-result" data-quote-picker-result>Pilih teks langsung seperti biasa, lalu tekan tombol di bawah.</p>
+				<p class="nc-quote-result" data-quote-picker-result>Pilih teks, lalu tekan tombol di bawah.</p>
 			</div>
 			<div class="nc-popup-actions">
-				<button type="button" class="nc-popup-btn" data-popup-reply-sel disabled>Balas teks terpilih</button>
+				<button type="button" class="nc-popup-btn" data-popup-reply-sel disabled>Balas teks ini</button>
 			</div>
 		</div>
 	`;
@@ -100,7 +100,7 @@ export const initMessageActions = () => {
 			if (resultEl instanceof HTMLElement) {
 				resultEl.textContent = quote !== ''
 					? `"${quote}"`
-					: 'Pilih teks langsung seperti biasa, lalu tekan tombol di bawah.';
+					: 'Pilih teks, lalu tekan tombol di bawah.';
 			}
 
 			if (btnReplySel instanceof HTMLButtonElement) {
@@ -152,7 +152,7 @@ export const initMessageActions = () => {
 				` : ''}
 			<div class="mt-4 flex items-center justify-end gap-2">
 				<button type="button" data-confirm-cancel class="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">${escapeHtml(cancelLabel)}</button>
-				<button type="button" data-confirm-ok class="rounded-xl px-3 py-2 text-xs font-bold text-white ${danger ? 'bg-rose-500 hover:bg-rose-600' : 'bg-indigo-600 hover:bg-indigo-700'}">${escapeHtml(confirmLabel)}</button>
+				<button type="button" data-confirm-ok class="rounded-xl px-3 py-2 text-xs font-bold text-white ${danger ? 'bg-coral-500 hover:bg-coral-600' : 'bg-navy-600 hover:bg-navy-700'}">${escapeHtml(confirmLabel)}</button>
 			</div>
 		</div>
 	`;
@@ -206,7 +206,7 @@ export const initMessageActions = () => {
 				</button>
 				<button type="button" class="nc-popup-menu-item" data-popup-copy>
 					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-					Salin ke perangkat
+					Salin
 				</button>
 				<button type="button" class="nc-popup-menu-item" data-popup-select-text>
 					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h10M4 17h12"/></svg>
@@ -218,7 +218,7 @@ export const initMessageActions = () => {
 				</button>
 				<button type="button" class="nc-popup-menu-item" data-popup-pin>
 					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 4.5 3.75 3.75m-10.5 9.75 2.625-2.625m0 0 5.625-5.625m-5.625 5.625L3.75 20.25m7.875-4.875 4.875-4.875a2.652 2.652 0 1 0-3.75-3.75L7.875 11.625"/></svg>
-					Sematkan
+					Salin tautan
 				</button>
 				<button type="button" class="nc-popup-menu-item" data-popup-forward>
 					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 10H7a5 5 0 0 0 0 10h4m10-10-4-4m4 4-4 4"/></svg>
@@ -226,7 +226,7 @@ export const initMessageActions = () => {
 				</button>
 				${canEdit ? `<button type="button" class="nc-popup-menu-item" data-popup-edit>
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.93Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125 16.875 4.5"/></svg>
-						Edit cepat
+						Edit
 					</button>` : ''}
 				${canDelete ? `<button type="button" class="nc-popup-menu-item nc-popup-menu-danger" data-popup-delete>
 						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21A48.1 48.1 0 0 0 12 5.5a48.1 48.1 0 0 0-7.228.29m14.456 0-.263 13.883A2.25 2.25 0 0 1 15.916 21.75H8.084a2.25 2.25 0 0 1-2.244-2.077L5.572 5.79m14.456 0c-.338-.052-.676-.107-1.022-.166m-12 .562c.34-.059.68-.114 1.022-.165"/></svg>
@@ -248,7 +248,7 @@ export const initMessageActions = () => {
 		overlay.querySelector('[data-popup-copy]')?.addEventListener('click', () => {
 			if (navigator.clipboard) {
 				navigator.clipboard.writeText(messageText).then(() => {
-					showActionToast('Pesan disalin ke perangkat');
+					showActionToast('Pesan disalin');
 				}).catch(() => {});
 			}
 			dismissPopup();
@@ -265,9 +265,9 @@ export const initMessageActions = () => {
 			const deepLink = `${window.location.origin}${window.location.pathname}#message-${messageId}`;
 			if (navigator.clipboard) {
 				navigator.clipboard.writeText(deepLink).then(() => {
-					showActionToast('Tautan pesan disematkan ke clipboard');
+					showActionToast('Tautan disalin');
 				}).catch(() => {
-					showActionToast('Gagal menyalin tautan pesan');
+					showActionToast('Gagal menyalin tautan');
 				});
 			}
 			highlightMessageInFeed(messageId);
@@ -279,13 +279,13 @@ export const initMessageActions = () => {
 				navigator.share({ text: forwardText }).catch(() => {
 					if (navigator.clipboard) {
 						navigator.clipboard.writeText(forwardText).then(() => {
-							showActionToast('Pesan disalin untuk diteruskan');
+							showActionToast('Pesan disalin');
 						}).catch(() => {});
 					}
 				});
 			} else if (navigator.clipboard) {
 				navigator.clipboard.writeText(forwardText).then(() => {
-					showActionToast('Pesan disalin untuk diteruskan');
+					showActionToast('Pesan disalin');
 				}).catch(() => {});
 			}
 			dismissPopup();
@@ -313,7 +313,7 @@ export const initMessageActions = () => {
 			} catch {
 				// Ignore unsupported selection APIs.
 			}
-			showActionToast('Mode edit aktif. Tekan kirim untuk menyimpan');
+			showActionToast('Ubah pesan, lalu kirim');
 		});
 		overlay.querySelector('[data-popup-delete]')?.addEventListener('click', async () => {
 			dismissPopup();
@@ -324,7 +324,7 @@ export const initMessageActions = () => {
 			}
 			const result = await showConfirmDialog({
 				title: 'Hapus pesan?',
-				message: 'Pesan ini akan dihapus untuk semua anggota grup.',
+				message: 'Pesan akan hilang untuk semua anggota.',
 				confirmLabel: 'Hapus',
 				cancelLabel: 'Batal',
 				danger: true,
@@ -335,7 +335,7 @@ export const initMessageActions = () => {
 
 			const deleteUrl = buildMessageApiUrl(messageId);
 			if (!deleteUrl) {
-				showActionToast('URL hapus pesan tidak tersedia');
+				showActionToast('Gagal menghapus pesan');
 				return;
 			}
 
@@ -354,7 +354,7 @@ export const initMessageActions = () => {
 
 				resetLatestMessageIdFromDom();
 				refreshScrollBottomButton();
-				showActionToast('Pesan dihapus untuk semua');
+				showActionToast('Pesan dihapus');
 			} catch {
 				showActionToast('Gagal menghapus pesan');
 			}

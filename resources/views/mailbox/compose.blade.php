@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Tulis Pesan - Normchat'])
+@extends('layouts.app', ['title' => 'Tulis Pesan - Normi Chat'])
 
 @section('content')
     <section class="px-4 pb-6 pt-5">
@@ -10,7 +10,7 @@
         <p class="mt-1 text-sm text-slate-500">Kirim pesan baru melalui Interdotz Mailbox.</p>
 
         @if(session('error'))
-            <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div class="mt-3 rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm text-coral-700">
                 {{ session('error') }}
             </div>
         @endif
@@ -35,7 +35,7 @@
                     class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                 />
                 @error('to')
-                    <p class="mt-1 text-xs text-rose-500">{{ $message }}</p>
+                    <p class="mt-1 text-xs text-coral-500">{{ $message }}</p>
                 @enderror
             </div>
 
@@ -52,16 +52,16 @@
                     class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                 />
                 @error('subject')
-                    <p class="mt-1 text-xs text-rose-500">{{ $message }}</p>
+                    <p class="mt-1 text-xs text-coral-500">{{ $message }}</p>
                 @enderror
             </div>
 
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white shadow-sm overflow-hidden">
+            <div class="rounded-2xl border border-[#E4E9F0] bg-white shadow-sm overflow-hidden">
                 <label class="block px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Isi Pesan</label>
                 <div id="quill-editor">{!! old('body', '') !!}</div>
                 <input type="hidden" name="body" id="bodyInput" />
                 @error('body')
-                    <p class="px-4 pb-2 text-xs text-rose-500">{{ $message }}</p>
+                    <p class="px-4 pb-2 text-xs text-coral-500">{{ $message }}</p>
                 @enderror
             </div>
 
@@ -82,18 +82,18 @@
             min-height: 200px;
             font-size: 14px;
             line-height: 1.6;
-            color: #1e293b;
+            color: #1E2E43;
             font-family: Inter, sans-serif;
             padding: 12px 16px;
         }
         #quill-editor .ql-editor.ql-blank::before {
-            color: #94a3b8;
+            color: #A1B0C5;
             font-style: normal;
             padding-left: 0;
         }
         .ql-toolbar.ql-snow {
             border: none !important;
-            border-bottom: 1px solid #e2e8f0 !important;
+            border-bottom: 1px solid #E4E9F0 !important;
             padding: 4px 6px !important;
             display: flex;
             flex-wrap: wrap;

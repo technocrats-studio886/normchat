@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Midtrans Snap langsung dengan server key Normchat.
+ * Midtrans Snap langsung dengan server key Normi Chat.
  * Docs: Snap API (/snap/v1/transactions), Status API (/v2/{order_id}/status),
  * notifikasi diverifikasi dengan SHA512(order_id + status_code + gross_amount + server_key).
  */
@@ -36,12 +36,7 @@ class MidtransGateway implements PaymentGateway
                     'order_id' => $request->orderId,
                     'gross_amount' => $request->amount,
                 ],
-                'item_details' => [[
-                    'id' => $request->itemId,
-                    'price' => $request->amount,
-                    'quantity' => 1,
-                    'name' => Str::limit($request->itemName, 50, ''),
-                ]],
+                'item_details' => $this->itemDetails($request),
                 // QRIS saja; bila hanya satu metode, Snap langsung membuka alur QRIS.
                 'enabled_payments' => ['other_qris'],
                 'customer_details' => [
@@ -53,7 +48,7 @@ class MidtransGateway implements PaymentGateway
         } catch (Throwable $e) {
             Log::warning('Midtrans Snap request failed.', ['order_id' => $request->orderId, 'error' => $e->getMessage()]);
 
-            throw new CheckoutFailedException('Gagal menghubungi Midtrans. Coba lagi beberapa saat.');
+            throw new CheckoutFailedException('Pembayaran sedang bermasalah. Coba lagi sebentar lagi.');
         }
 
         $redirectUrl = (string) $response->json('redirect_url', '');
@@ -64,10 +59,32 @@ class MidtransGateway implements PaymentGateway
                 'body' => mb_substr($response->body(), 0, 500),
             ]);
 
-            throw new CheckoutFailedException('Gagal membuat pembayaran Midtrans.');
+            throw new CheckoutFailedException('Pembayaran sedang bermasalah. Coba lagi sebentar lagi.');
         }
 
         return new CheckoutSession($redirectUrl, (string) $response->json('token', ''));
+    }
+
+    /** Item Snap: paket Normkredit, lalu biaya layanan sebagai baris sendiri (jumlahnya = gross_amount). */
+    private function itemDetails(CheckoutRequest $request): array
+    {
+        $items = [[
+            'id' => $request->itemId,
+            'price' => $request->itemPrice(),
+            'quantity' => 1,
+            'name' => Str::limit($request->itemName, 50, ''),
+        ]];
+
+        if ($request->serviceFee > 0) {
+            $items[] = [
+                'id' => 'service-fee',
+                'price' => $request->serviceFee,
+                'quantity' => 1,
+                'name' => Str::limit($request->serviceFeeLabel, 50, ''),
+            ];
+        }
+
+        return $items;
     }
 
     public function fetchStatus(PendingPayment $pending, User $user): ?GatewayTransaction

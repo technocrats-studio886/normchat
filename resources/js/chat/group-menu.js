@@ -27,9 +27,9 @@ export const initGroupMenu = () => {
 			}
 
 			const styleSource = chatShell instanceof HTMLElement ? chatShell : document.documentElement;
-			const primary = getComputedStyle(styleSource).getPropertyValue('--nc-primary').trim() || '#0f766e';
+			const primary = getComputedStyle(styleSource).getPropertyValue('--nc-primary').trim() || '#344458';
 			settingsMenu.style.background = primary;
-			settingsMenu.style.boxShadow = '0 16px 40px rgba(2, 6, 23, 0.35)';
+			settingsMenu.style.boxShadow = '0 16px 40px rgba(18, 28, 41, 0.35)';
 		};
 
 		const formatPollMessage = (question, options) => {
@@ -51,18 +51,18 @@ export const initGroupMenu = () => {
 			overlay.className = 'fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-5';
 			overlay.innerHTML = `
 			<div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
-				<p class="text-sm font-semibold text-slate-900">Create Poll</p>
-				<p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Buat polling cepat dan kirim ke grup.</p>
+				<p class="text-sm font-semibold text-slate-900">Buat Polling</p>
+				<p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Ajak anggota memilih.</p>
 				<div class="mt-3 space-y-2">
-					<input type="text" class="input-field" data-poll-question placeholder="Pertanyaan polling" autocomplete="off" />
-					<input type="text" class="input-field" data-poll-option="0" placeholder="Opsi 1" autocomplete="off" />
-					<input type="text" class="input-field" data-poll-option="1" placeholder="Opsi 2" autocomplete="off" />
-					<input type="text" class="input-field" data-poll-option="2" placeholder="Opsi 3 (opsional)" autocomplete="off" />
-					<input type="text" class="input-field" data-poll-option="3" placeholder="Opsi 4 (opsional)" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-question placeholder="Pertanyaan" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="0" placeholder="Pilihan 1" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="1" placeholder="Pilihan 2" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="2" placeholder="Pilihan 3 (opsional)" autocomplete="off" />
+					<input type="text" class="input-field" data-poll-option="3" placeholder="Pilihan 4 (opsional)" autocomplete="off" />
 				</div>
 				<div class="mt-4 flex items-center justify-end gap-2">
 					<button type="button" data-poll-cancel class="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Batal</button>
-					<button type="button" data-poll-send class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700">Kirim Poll</button>
+					<button type="button" data-poll-send class="rounded-xl bg-navy-600 px-3 py-2 text-xs font-bold text-white hover:bg-navy-700">Kirim</button>
 				</div>
 			</div>
 		`;
@@ -210,7 +210,7 @@ export const initGroupMenu = () => {
 
 			if (target.matches('[data-menu-clear-history]')) {
 				event.preventDefault();
-				const confirmClear = window.confirm('Clear history lokal di perangkat ini?');
+				const confirmClear = window.confirm('Bersihkan chat di perangkat ini? Pesan tetap ada untuk anggota lain.');
 				if (confirmClear && chatFeed) {
 					const hiddenIds = [];
 					chatFeed.querySelectorAll('[data-message-id]').forEach((node) => {

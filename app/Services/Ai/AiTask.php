@@ -44,12 +44,16 @@ final class AiTask
     /**
      * Tentukan panjang jawaban yang masih terbayar oleh kredit penanya, lalu tahan NK-nya.
      *
+     * @param  int|null  $outputCeiling  plafon jawaban khusus mode; null = setelan superadmin
+     * @param  int  $extraInputTokens  input yang belum ada di $messages (mis. hasil pencarian web)
+     *
      * @throws InsufficientBudgetException
      */
-    public function planChat(array $messages): RequestBudget
+    public function planChat(array $messages, ?int $outputCeiling = null, int $extraInputTokens = 0): RequestBudget
     {
         $usable = $this->wallet->balanceFor($this->group, $this->requester)->usable();
-        $this->budget = RequestBudget::plan($this->model, self::estimateInputTokens($messages), $usable, $this->pricing);
+        $inputTokens = self::estimateInputTokens($messages) + $extraInputTokens;
+        $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling);
         $this->reserve($this->budget->holdCredits);
 
         return $this->budget;
@@ -95,6 +99,53 @@ final class AiTask
         }
 
         return [$completion, $model];
+    }
+
+    /**
+     * Riset dengan web search (Responses API). Fallback ke model default katalog sama
+     * seperti complete().
+     *
+     * @return array{0: ChatCompletion, 1: AiModel}
+     */
+    public function research(array $messages, int $timeout = 300): array
+    {
+        $model = $this->model;
+        $maxOutput = $this->budget?->maxOutputTokens ?? (int) $this->pricing->get('max_output_tokens');
+        $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout);
+
+        $fallback = AiModel::defaultModel();
+        if ($completion->looksLikeModelIssue() && $fallback && $fallback->model_id !== $model->model_id) {
+            Log::warning('OpenAI research model failed, retrying with default catalog model.', [
+                'model' => $model->model_id,
+                'fallback' => $fallback->model_id,
+                'status' => $completion->status,
+            ]);
+
+            $model = $fallback;
+            $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout);
+        }
+
+        if (! $completion->successful) {
+            Log::warning('OpenAI research failed.', ['status' => $completion->status, 'body' => mb_substr($completion->errorBody, 0, 500)]);
+        }
+
+        return [$completion, $model];
+    }
+
+    /** Biaya per panggilan web search, ditagih dengan media multiplier seperti biaya alat lain. */
+    public function recordWebSearch(int $calls): void
+    {
+        if ($calls <= 0) {
+            return;
+        }
+
+        $this->meter->add(
+            'web_search',
+            'web_search',
+            $calls * (float) config('normchat.web_search.usd_per_call', 0.01),
+            $this->pricing->mediaMultiplier(),
+            ['calls' => $calls],
+        );
     }
 
     /** Catat biaya satu chat completion ke meter, dengan multiplier model yang dipakai. */

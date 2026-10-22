@@ -46,7 +46,7 @@ export const initSend = () => {
 			message_type: messageType,
 			sender_type: 'user',
 			sender_id: authUserId,
-			sender_name: 'You',
+			sender_name: 'Kamu',
 			content: content || '',
 			reply_to: replyContext && replyContext.id ? replyContext : null,
 			attachment_url: blobUrl,
@@ -87,9 +87,9 @@ export const initSend = () => {
 		pending.node.setAttribute('data-pending-message', 'failed');
 		const timeEl = pending.node.querySelector('p:last-child');
 		if (timeEl instanceof HTMLElement) {
-			timeEl.textContent = 'You • Gagal terkirim';
+			timeEl.textContent = 'Gagal terkirim';
 			timeEl.classList.remove('text-slate-400');
-			timeEl.classList.add('text-rose-500');
+			timeEl.classList.add('text-coral-500');
 		}
 
 		pendingMessagesByLocalId.delete(localId);
@@ -162,18 +162,18 @@ export const initSend = () => {
 
 		if (getEditingMessageId() > 0) {
 			if (!contentText) {
-				showActionToast('Isi pesan tidak boleh kosong saat edit');
+				showActionToast('Pesan tidak boleh kosong');
 				return;
 			}
 
 			if (selectedFile) {
-				showActionToast('Edit teks tidak menerima lampiran baru');
+				showActionToast('Lampiran tidak bisa ditambahkan saat mengedit');
 				return;
 			}
 
 			const updateUrl = buildMessageApiUrl(getEditingMessageId());
 			if (!updateUrl) {
-				showActionToast('URL edit pesan tidak tersedia');
+				showActionToast('Gagal mengubah pesan');
 				return;
 			}
 
@@ -196,9 +196,9 @@ export const initSend = () => {
 				}
 
 				clearEditingState(true);
-				showActionToast('Pesan berhasil diperbarui');
+				showActionToast('Pesan diubah');
 			} catch {
-				showActionToast('Gagal memperbarui pesan');
+				showActionToast('Gagal mengubah pesan');
 			} finally {
 				setSendingUi(false);
 				chatSubmitInFlight = false;

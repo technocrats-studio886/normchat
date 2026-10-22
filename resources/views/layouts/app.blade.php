@@ -9,17 +9,14 @@
         <meta name="auth-user-name" content="{{ auth()->user()->name }}">
     @endauth
     <meta name="theme-color" content="#ffffff">
-    <meta property="og:image" content="{{ asset('normchat-logo.png') }}">
-    <meta name="twitter:image" content="{{ asset('normchat-logo.png') }}">
-    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('icons/icon-512.png') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+    @include('partials.brand-head')
     <link rel="manifest" href="{{ route('pwa.manifest') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-    <title>{{ $title ?? 'Normchat' }}</title>
+    <title>{{ $title ?? 'Normi Chat' }}</title>
+    {{-- Status sidebar desktop dipasang sebelum render agar tidak berkedip (resources/js/ui/sidebar.js). --}}
+    <script>try { if (localStorage.getItem('nc-sidebar') === 'collapsed') document.documentElement.classList.add('nc-sidebar-collapsed'); } catch (e) {}</script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
     <script>mermaid.initialize({startOnLoad:false,theme:'neutral',securityLevel:'loose'});</script>
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
@@ -41,7 +38,7 @@
                 gap: 12px;
                 width: 100%;
                 border-radius: 9999px;
-                background: linear-gradient(135deg, #0f766e 0%, #22c55e 100%);
+                background: #1E2E43;
                 color: #fff;
                 font-weight: 700;
                 text-decoration: none;
@@ -59,11 +56,16 @@
     @endif
 </head>
 <body class="normchat-bg min-h-screen antialiased">
-    <div class="mx-auto min-h-screen w-full max-w-md">
-        <main class="{{ auth()->check() ? 'pb-32' : 'pb-0' }}">
+    @auth
+        <x-desktop-sidebar />
+    @endauth
+    {{-- Mobile: satu kolom max-w-md. Desktop (≥1024px): konten di panel kanan sidebar. --}}
+    <div class="@auth nc-sidebar-push lg:pl-[var(--nc-sidebar-w)] @endauth">
+    <div class="mx-auto min-h-screen w-full max-w-md lg:max-w-2xl">
+        <main class="{{ auth()->check() ? 'pb-32 lg:pb-8' : 'pb-0' }}">
             @if (session('success'))
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm">
+                    <div class="rounded-2xl border border-navy-200 bg-navy-50 px-4 py-3 text-sm font-medium text-navy-700 shadow-sm">
                         {{ session('success') }}
                     </div>
                 </div>
@@ -71,7 +73,7 @@
 
             @if (session('info'))
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700 shadow-sm">
+                    <div class="rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm font-medium text-coral-700 shadow-sm">
                         {{ session('info') }}
                     </div>
                 </div>
@@ -79,7 +81,7 @@
 
             @if ($errors->any())
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
+                    <div class="rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm text-coral-700 shadow-sm">
                         <ul class="space-y-1">
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -103,24 +105,25 @@
                     || request()->routeIs('mailbox.*');
             @endphp
             @unless($hideBottomNav)
-                <nav class="nc-bottom-nav">
+                <nav class="nc-bottom-nav lg:hidden">
                     <div class="nc-bottom-nav-inner">
-                        <a href="{{ route('groups.index') }}" class="{{ $isHome ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Home">
+                        <a href="{{ route('groups.index') }}" class="{{ $isHome ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Beranda">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
-                            HOME
+                            Beranda
                         </a>
                         <a href="{{ route('groups.create') }}" class="{{ $isCreate ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Buat Grup">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
-                            BUAT
+                            Buat
                         </a>
-                        <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Setting">
+                        <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Pengaturan">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
-                            SETTING
+                            Akun
                         </a>
                     </div>
                 </nav>
             @endunless
         @endauth
+    </div>
     </div>
 </body>
 <script>

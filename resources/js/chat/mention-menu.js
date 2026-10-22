@@ -60,7 +60,7 @@ export const initMentionMenu = () => {
 
 			mentionMenu.innerHTML = items
 				.map((item, index) => {
-					const tagTypeClass = item.type === 'ai' ? 'text-emerald-600' : 'text-blue-600';
+					const tagTypeClass = item.type === 'ai' ? 'text-navy-600' : 'text-navy-600';
 					return `<button type="button" data-mention-index="${index}" class="flex w-full items-center justify-between border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 hover:bg-slate-50"><span class="font-medium text-slate-700">${escapeHtml(item.label)}</span><span class="text-xs ${tagTypeClass}">${escapeHtml(item.insert)}</span></button>`;
 				})
 				.join('');

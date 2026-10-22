@@ -44,9 +44,12 @@ class MidtransPaymentFlowTest extends TestCase
             && $request->hasHeader('Authorization', 'Basic ' . base64_encode(self::SERVER_KEY . ':'))
             && $request['transaction_details'] === ['order_id' => $pending->order_id, 'gross_amount' => 30210]
             && $request['enabled_payments'] === ['other_qris']
-            && count($request['item_details']) === 1
-            && $request['item_details'][0]['price'] === 30210
+            // Biaya layanan QRIS baru muncul di Midtrans sebagai baris sendiri; jumlah item = gross_amount.
+            && count($request['item_details']) === 2
+            && $request['item_details'][0]['price'] === 30000
             && str_contains($request['item_details'][0]['name'], '250 Normkredit')
+            && $request['item_details'][1]['price'] === 210
+            && $request['item_details'][1]['name'] === 'Biaya layanan QRIS 0,7%'
             && str_contains($request['callbacks']['finish'], '/groups/payment-callback?order=' . $pending->order_id));
 
         $this->assertSame('pending_payment', Group::firstOrFail()->status);
@@ -68,7 +71,7 @@ class MidtransPaymentFlowTest extends TestCase
             ->from('/groups/create')
             ->post('/groups', ['name' => 'Kelas BD', 'password' => '1234'])
             ->assertRedirect('/groups/create')
-            ->assertSessionHasErrors(['payment' => 'Gagal membuat pembayaran Midtrans.']);
+            ->assertSessionHasErrors(['payment' => 'Pembayaran sedang bermasalah. Coba lagi sebentar lagi.']);
 
         $this->assertSame(0, Group::withTrashed()->count());
         $this->assertSame(0, PendingPayment::count());
@@ -81,7 +84,7 @@ class MidtransPaymentFlowTest extends TestCase
 
         $this->actingAs(User::factory()->create())
             ->post('/groups', ['name' => 'Kelas BD', 'password' => '1234'])
-            ->assertSessionHasErrors(['payment' => 'Sistem pembayaran belum dikonfigurasi.']);
+            ->assertSessionHasErrors(['payment' => 'Pembayaran belum tersedia. Coba lagi nanti.']);
 
         Http::assertNothingSent();
     }
@@ -144,7 +147,7 @@ class MidtransPaymentFlowTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get("/groups/payment-callback?order={$pending->order_id}")
             ->assertRedirect(route('groups.index'))
-            ->assertSessionHas('info', 'Referensi pembayaran tidak ditemukan.');
+            ->assertSessionHas('info', 'Pembayaran tidak ditemukan.');
     }
 
     public function test_paid_topup_callback_shows_success_page(): void

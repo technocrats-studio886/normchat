@@ -68,7 +68,7 @@ class MentionNotifier
         }
     }
 
-    /** Saran mention untuk composer: NormAI lalu anggota lain. */
+    /** Saran mention untuk composer: Normi AI lalu anggota lain. */
     public function suggestionsFor(Group $group, User $viewer): array
     {
         $users = $this->participants($group)
@@ -82,7 +82,7 @@ class MentionNotifier
             ->values()
             ->all();
 
-        return [['type' => 'ai', 'label' => 'AI Assistant', 'insert' => '@ai'], ...$users];
+        return [['type' => 'ai', 'label' => 'Normi AI', 'insert' => '@normi'], ...$users];
     }
 
     /** @return list<string> */

@@ -9,19 +9,17 @@ const initPackagePicker = (root) => {
 	const unitCredits = Number(root.dataset.unitCredits);
 	const unitBase = Number(root.dataset.unitBase);
 	const maxPackages = Number(root.dataset.maxPackages);
-	const feePercent = Number(root.dataset.feePercent);
 	const submitLabel = root.dataset.submitLabel || '';
 
 	const sync = () => {
 		const packages = Math.min(maxPackages, Math.max(1, Math.floor(Number(input.value) || 1)));
 		input.value = packages;
+		// Hanya harga paket; biaya layanan QRIS ditambahkan Midtrans di halaman pembayaran.
 		const base = unitBase * packages;
-		// Sama dengan NormkreditPricing::serviceFee() (dibulatkan ke atas).
-		const fee = Math.ceil(Math.round(base * feePercent / 100 * 1e6) / 1e6);
 		root.querySelector('[data-package-credits]').textContent = formatCredits(unitCredits * packages);
 		form.dispatchEvent(new CustomEvent('credits-change', { detail: { credits: unitCredits * packages } }));
-		form.querySelector('[data-quote-total]').textContent = formatIdr(base + fee);
-		form.querySelector('[data-package-submit]').textContent = `Bayar ${formatIdr(base + fee)} · ${submitLabel}`;
+		form.querySelector('[data-quote-total]').textContent = formatIdr(base);
+		form.querySelector('[data-package-submit]').textContent = `${submitLabel} · ${formatIdr(base)}`;
 	};
 
 	root.querySelectorAll('[data-package-step]').forEach((button) => {

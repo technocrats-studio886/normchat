@@ -66,8 +66,8 @@ export const mediaPreviewTemplate = `
 		<p class="mt-2 hidden px-3 text-center text-xs text-white/80" data-attachment-preview-media-caption></p>
 		<div class="px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-2">
 			<div class="flex items-center gap-2 rounded-2xl bg-white/12 px-3 py-2.5 backdrop-blur">
-				<input type="text" class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60" data-attachment-preview-caption-input placeholder="Tambah keterangan..." />
-				<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-emerald-950 hover:bg-emerald-400" data-attachment-preview-caption-send aria-label="Kirim lampiran">
+				<input type="text" class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60" data-attachment-preview-caption-input placeholder="Tambah keterangan" />
+				<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-navy-500 text-navy-950 hover:bg-navy-400" data-attachment-preview-caption-send aria-label="Kirim lampiran">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 3.105a.75.75 0 0 1 .818-.164l12 5.25a.75.75 0 0 1 0 1.374l-12 5.25A.75.75 0 0 1 2.9 14.18l1.2-4.18a.75.75 0 0 0 0-.4l-1.2-4.18a.75.75 0 0 1 .205-.815Z" /></svg>
 				</button>
 			</div>
@@ -93,14 +93,14 @@ export const mediaPreviewTemplate = `
 			</div>
 			<div class="flex items-center gap-1" data-preview-text-color-controls>
 				<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-white" data-preview-text-color="#ffffff" aria-label="Warna putih"></button>
-				<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-yellow-300" data-preview-text-color="#fde047" aria-label="Warna kuning"></button>
-				<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-cyan-300" data-preview-text-color="#67e8f9" aria-label="Warna cyan"></button>
-				<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-rose-400" data-preview-text-color="#fb7185" aria-label="Warna rose"></button>
+				<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-navy-900" data-preview-text-color="#1E2E43" aria-label="Warna navy"></button>
+				<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-coral-500" data-preview-text-color="#FB6856" aria-label="Warna coral"></button>
+				<button type="button" class="h-7 w-7 rounded-full border border-white/40 bg-coral-200" data-preview-text-color="#FECCC5" aria-label="Warna coral muda"></button>
 			</div>
 		</div>
 		<div class="mt-4 flex items-center justify-end gap-2">
 			<button type="button" class="rounded-xl px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/10" data-preview-text-cancel>Batal</button>
-			<button type="button" class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-emerald-950 hover:bg-emerald-400" data-preview-text-apply>Terapkan</button>
+			<button type="button" class="rounded-xl bg-navy-500 px-4 py-2 text-sm font-bold text-navy-950 hover:bg-navy-400" data-preview-text-apply>Terapkan</button>
 		</div>
 	</div>
 `;

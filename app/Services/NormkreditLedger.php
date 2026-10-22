@@ -20,14 +20,13 @@ class NormkreditLedger
 
     public function credit(Group $group, User $user, Funding $funding, string $source): GroupTokenContribution
     {
-        $split = $this->wallet->deposit($group, $user, $funding->credits, $funding->sharePercent);
+        $this->wallet->deposit($group, $funding->credits);
 
         return GroupTokenContribution::create([
             'group_id' => $group->id,
             'user_id' => $user->id,
             'source' => $source,
             'credit_amount' => $funding->credits,
-            'shared_credit_amount' => $split['shared'],
             'price_paid' => $funding->paidAmount,
             'payment_reference' => $funding->reference,
         ]);

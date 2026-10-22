@@ -64,13 +64,13 @@ export const initFeedClicks = () => {
 			<div class="mx-auto flex h-full w-full max-w-md touch-none items-center justify-center overflow-hidden p-3" data-media-swipe-stage="1">
 				<video src="${safeUrl}" controls playsinline preload="metadata" class="max-h-full w-full select-none rounded-2xl bg-black object-contain" autoplay data-media-preview-el="1"></video>
 			</div>
-			<p class="pointer-events-none absolute inset-x-0 bottom-6 px-4 text-center text-xs font-medium text-white/70">Geser video ke arah mana saja untuk menutup</p>
+			<p class="pointer-events-none absolute inset-x-0 bottom-6 px-4 text-center text-xs font-medium text-white/70">Geser untuk menutup</p>
 		`
 			: `
 			<div class="mx-auto flex h-full w-full max-w-md touch-none items-center justify-center overflow-hidden p-3" data-media-swipe-stage="1">
 				<img src="${safeUrl}" alt="${safeName}" class="max-h-full w-full select-none rounded-2xl object-contain" draggable="false" data-media-preview-el="1" />
 			</div>
-			<p class="pointer-events-none absolute inset-x-0 bottom-6 px-4 text-center text-xs font-medium text-white/70">Geser gambar ke arah mana saja untuk menutup</p>
+			<p class="pointer-events-none absolute inset-x-0 bottom-6 px-4 text-center text-xs font-medium text-white/70">Geser untuk menutup</p>
 		`;
 
 		const close = () => {
@@ -184,9 +184,9 @@ export const initFeedClicks = () => {
 			link.click();
 			link.remove();
 			URL.revokeObjectURL(objectUrl);
-			showActionToast('Lampiran diunduh');
+			showActionToast('Diunduh');
 		} catch {
-			showActionToast('Gagal mengunduh lampiran');
+			showActionToast('Gagal mengunduh');
 		}
 	};
 
@@ -211,7 +211,7 @@ export const initFeedClicks = () => {
 				}
 
 				if (!highlightMessageInFeed(targetId, replyQuote)) {
-					showActionToast('Pesan yang direply tidak ditemukan');
+					showActionToast('Pesan asli tidak ditemukan');
 				}
 				return;
 			}
@@ -264,7 +264,7 @@ export const initFeedClicks = () => {
 
 			const voteUrl = buildPollVoteUrl(pollId);
 			if (!voteUrl) {
-				showActionToast('Vote poll belum tersedia');
+				showActionToast('Polling belum bisa dipilih');
 				return;
 			}
 
@@ -284,9 +284,9 @@ export const initFeedClicks = () => {
 				}
 
 				refreshPollCardsFromFeed();
-				showActionToast('Vote tersimpan');
+				showActionToast('Pilihan tersimpan');
 			} catch {
-				showActionToast('Gagal mengirim vote');
+				showActionToast('Gagal memilih. Coba lagi');
 			} finally {
 				delete voteButton.dataset.pollSubmitting;
 				voteButton.disabled = false;

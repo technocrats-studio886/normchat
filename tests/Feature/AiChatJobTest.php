@@ -49,7 +49,7 @@ class AiChatJobTest extends TestCase
             'status' => 'active',
             'ai_model' => 'gpt-6-luna',
         ]);
-        app(CreditWallet::class)->deposit($this->group, $this->owner, 300, 100);
+        app(CreditWallet::class)->deposit($this->group, 300);
     }
 
     public function test_message_without_mention_is_ignored(): void
@@ -71,7 +71,7 @@ class AiChatJobTest extends TestCase
             ]),
         ]);
 
-        $this->runAi(['content' => '@ai buatkan file markdown ringkasan diskusi']);
+        $this->runAi(['content' => '@normi buatkan file markdown ringkasan diskusi']);
 
         $reply = Message::where('sender_type', 'ai')->firstOrFail();
         $this->assertNotNull($reply->attachment_path);
@@ -98,7 +98,7 @@ class AiChatJobTest extends TestCase
         ]);
 
         $this->runAi([
-            'content' => '@ai',
+            'content' => '@normi',
             'message_type' => 'voice',
             'attachment_disk' => 'normchat_attachments',
             'attachment_path' => 'group-1/voice.webm',
@@ -131,7 +131,7 @@ class AiChatJobTest extends TestCase
                 ]),
         ]);
 
-        $this->runAi(['content' => '@ai halo']);
+        $this->runAi(['content' => '@normi halo']);
 
         $default = AiModel::defaultModel();
         $log = AiUsageLog::firstOrFail();
@@ -143,7 +143,7 @@ class AiChatJobTest extends TestCase
     {
         Http::fake(['api.openai.com/v1/chat/completions' => Http::response(['error' => 'boom'], 500)]);
 
-        $this->runAi(['content' => '@ai halo']);
+        $this->runAi(['content' => '@normi halo']);
 
         $this->assertSame(0, AiUsageLog::count());
         $this->assertSame(300.0, $this->group->groupToken->fresh()->credits);

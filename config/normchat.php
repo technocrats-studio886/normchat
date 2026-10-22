@@ -63,6 +63,12 @@ return [
         ],
     ],
 
+    // Web search Deep Research: biaya per panggilan alat (USD), ditagih dengan media_multiplier.
+    // Token hasil pencarian sudah ikut terhitung di usage input model.
+    'web_search' => [
+        'usd_per_call' => (float) env('NORMCHAT_WEB_SEARCH_USD_PER_CALL', 0.01),
+    ],
+
     // Transkripsi voice note; ditagih dengan media_multiplier.
     'transcription_model' => [
         'model' => env('NORMCHAT_TRANSCRIPTION_MODEL', 'gpt-4o-mini-transcribe'),

@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 /**
- * Data Normchat untuk halaman profil produk di Interdotz (nonaktif selama
+ * Data Normi Chat untuk halaman profil produk di Interdotz (nonaktif selama
  * NORMCHAT_INTERDOTZ_ENABLED=false). Setiap kunci snake_case punya kembaran camelCase.
  */
 class ProductDataController extends Controller
@@ -77,7 +77,7 @@ class ProductDataController extends Controller
         return $this->snapshot($this->profile($user, null, $ownedGroups->count(), $memberGroups->count()), $groups, $transactions, 'ok');
     }
 
-    /** GET /api/product/topup-packages — Normchat tidak menjual paket lewat Interdotz. */
+    /** GET /api/product/topup-packages — Normi Chat tidak menjual paket lewat Interdotz. */
     public function topupPackages(): JsonResponse
     {
         return response()->json([
@@ -133,7 +133,7 @@ class ProductDataController extends Controller
         };
 
         return [
-            'name' => 'Normchat',
+            'name' => 'Normi Chat',
             'base_url' => $baseUrl,
             'landing_url' => rtrim((string) config('app.normchat_app_url', $baseUrl), '/') . '/' . trim((string) config('app.normchat_marketing_path', '/normchat'), '/'),
             'logo_url' => $absolute((string) config('normchat.product_logo_url', ''), '/normchat-logo.png'),

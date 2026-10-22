@@ -1,44 +1,44 @@
-@extends('layouts.app', ['title' => 'Join Group - Normchat'])
+@extends('layouts.app', ['title' => 'Gabung Grup - Normi Chat'])
 
 @section('content')
     <section class="page-shell flex flex-col items-center justify-center px-6 pt-10">
         <div class="w-full max-w-sm">
             <h1 class="font-display text-xl font-extrabold text-slate-900">{{ $group->name }}</h1>
-            <p class="mt-1 text-xs text-slate-400">ID: {{ $group->share_id }}</p>
+            <p class="mt-1 text-xs text-slate-400">Kode grup: {{ $group->share_id }}</p>
 
             @if($group->description)
                 <p class="mt-1 text-sm text-slate-500">{{ $group->description }}</p>
             @endif
 
             @if($alreadyMember)
-                <div class="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                    Anda sudah menjadi member group ini.
+                <div class="mt-6 rounded-xl border border-navy-200 bg-navy-50 px-4 py-3 text-sm text-navy-700">
+                    Kamu sudah bergabung di grup ini.
                 </div>
                 <a href="{{ route('chat.show', $group) }}" class="btn-cta mt-4 block text-center">
-                    Masuk ke Chat
+                    Buka Chat
                 </a>
             @else
                 {{-- payment errors shown by layout --}}
 
-                <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <p class="text-sm font-semibold text-amber-800">Gabung dengan ikut patungan dana AI grup</p>
-                    <p class="mt-1 text-xs text-amber-700">Kredit bersama grup saat ini: <strong>{{ number_format((float) ($group->groupToken?->shared_credits ?? 0), 2, ',', '.') }} NK</strong>.</p>
-                    @if($group->member_daily_shared_limit)
-                        <p class="mt-1 text-xs text-amber-700">Owner membatasi pemakaian kredit bersama {{ number_format($group->member_daily_shared_limit, 2, ',', '.') }} NK per anggota per hari.</p>
+                <div class="mt-5 rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3">
+                    <p class="text-sm font-semibold text-coral-800">Gabung dengan ikut patungan</p>
+                    <p class="mt-1 text-xs text-coral-700">Saldo grup: <strong>{{ number_format((float) ($group->groupToken?->credits ?? 0), 2, ',', '.') }} Normkredit</strong>. Patunganmu menambah saldo ini dan dipakai bersama.</p>
+                    @if($group->member_daily_credit_limit)
+                        <p class="mt-1 text-xs text-coral-700">Batas pemakaian: {{ number_format($group->member_daily_credit_limit, 2, ',', '.') }} Normkredit per anggota per hari.</p>
                     @endif
                 </div>
 
                 <form method="POST" action="{{ route('groups.join.submit', $group->share_id) }}" class="mt-5 space-y-3">
                     @csrf
 
-                    {{-- Password --}}
+                    {{-- Kata sandi --}}
                     <div class="panel-card px-4 py-3">
-                        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Password Grup</label>
+                        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Kata Sandi Grup</label>
                         <div class="relative mt-1">
                             <input id="joinGroupPasswordInput" type="password" name="password" required
-                                   placeholder="Masukkan password grup"
+                                   placeholder="Masukkan kata sandi"
                                    class="w-full bg-transparent pr-10 text-sm text-slate-900 outline-none placeholder:text-slate-400" />
-                            <button type="button" data-password-toggle="joinGroupPasswordInput" class="absolute inset-y-0 right-0 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat password" title="Lihat password">
+                            <button type="button" data-password-toggle="joinGroupPasswordInput" class="absolute inset-y-0 right-0 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat kata sandi" title="Lihat kata sandi">
                                 <svg data-eye-icon="off" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z" />
                                     <circle cx="12" cy="12" r="3" />
@@ -53,15 +53,15 @@
                         </div>
                     </div>
                     @if($errors->has('password'))
-                        <p class="text-xs text-rose-600">{{ $errors->first('password') }}</p>
+                        <p class="text-xs text-coral-600">{{ $errors->first('password') }}</p>
                     @endif
 
                     @include('partials.package-picker', [
                         'label' => 'Patungan',
-                        'submitLabel' => 'Bergabung',
+                        'submitLabel' => 'Gabung',
                     ])
                     @error('payment')
-                        <p class="text-xs text-rose-600">{{ $message }}</p>
+                        <p class="text-xs text-coral-600">{{ $message }}</p>
                     @enderror
                 </form>
             @endif

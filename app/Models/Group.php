@@ -26,12 +26,12 @@ class Group extends Model
         'ai_persona_style',
         'ai_persona_guardrails',
         'status',
-        'member_daily_shared_limit',
+        'member_daily_credit_limit',
     ];
 
     protected $casts = [
         'approval_enabled' => 'boolean',
-        'member_daily_shared_limit' => 'float',
+        'member_daily_credit_limit' => 'float',
     ];
 
     protected static function booted(): void
@@ -119,11 +119,6 @@ class Group extends Model
     public function groupToken(): HasOne
     {
         return $this->hasOne(GroupToken::class);
-    }
-
-    public function memberCredits(): HasMany
-    {
-        return $this->hasMany(GroupMemberCredit::class);
     }
 
     public function tokenContributions(): HasMany

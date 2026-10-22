@@ -45,14 +45,14 @@ class ProfilePagesTest extends TestCase
     {
         $user = User::factory()->create();
         $group = Group::create(['name' => 'G', 'owner_id' => $user->id, 'password_hash' => Hash::make('1'), 'status' => 'active']);
-        AuditLog::record('auth.connect', $user->id, $user, ['ip' => '1.1.1.1']);
-        AuditLog::create(['actor_id' => $user->id, 'action' => 'auth.connect', 'metadata_json' => ['ip' => '9.9.9.9'], 'created_at' => now()->subMonths(2)]);
+        AuditLog::record('auth.connect', $user->id, $user, ['ip' => '1.1.1.1', 'city' => 'Balikpapan']);
+        AuditLog::create(['actor_id' => $user->id, 'action' => 'auth.connect', 'metadata_json' => ['ip' => '9.9.9.9', 'city' => 'Samarinda'], 'created_at' => now()->subMonths(2)]);
         foreach (['topup_midtrans' => 15105, 'patungan_midtrans' => 15105] as $source => $paid) {
             GroupTokenContribution::create(['group_id' => $group->id, 'user_id' => $user->id, 'source' => $source, 'credit_amount' => 125, 'price_paid' => $paid]);
         }
 
-        $this->actingAs($user)->get('/profile/login-history?range=week')->assertOk()->assertSee('1.1.1.1')->assertDontSee('9.9.9.9');
-        $this->actingAs($user)->get('/profile/login-history?range=all')->assertOk()->assertSee('9.9.9.9');
+        $this->actingAs($user)->get('/profile/login-history?range=week')->assertOk()->assertSee('Balikpapan')->assertDontSee('Samarinda')->assertDontSee('1.1.1.1');
+        $this->actingAs($user)->get('/profile/login-history?range=all')->assertOk()->assertSee('Samarinda');
 
         $this->actingAs($user)->get('/profile/transactions?source=topup')->assertOk()->assertViewHas('totalCount', 1)->assertViewHas('totalSpentIdr', 30210);
     }

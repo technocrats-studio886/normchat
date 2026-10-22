@@ -24,7 +24,7 @@ class GoogleAuthTest extends TestCase
 
     public function test_login_page_offers_google(): void
     {
-        $this->get('/login')->assertOk()->assertSee('Login dengan Google')->assertSee(route('auth.google.redirect'), false);
+        $this->get('/login')->assertOk()->assertSee('Masuk dengan Google')->assertSee(route('auth.google.redirect'), false);
     }
 
     public function test_redirect_goes_to_google_consent_screen(): void
@@ -38,7 +38,7 @@ class GoogleAuthTest extends TestCase
 
         $this->get('/auth/google/redirect')
             ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['auth' => 'Login Google belum dikonfigurasi.']);
+            ->assertSessionHasErrors(['auth' => 'Masuk dengan Google belum tersedia.']);
     }
 
     public function test_callback_creates_user_and_logs_in(): void
@@ -74,7 +74,7 @@ class GoogleAuthTest extends TestCase
 
         $this->get('/auth/google/callback')
             ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['auth' => 'Email akun Google belum terverifikasi.']);
+            ->assertSessionHasErrors(['auth' => 'Email Google kamu belum terverifikasi.']);
 
         $this->assertGuest();
     }

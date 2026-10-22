@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AiMode;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -25,17 +26,25 @@ class Message extends Model
         'attachment_mime',
         'attachment_original_name',
         'attachment_size',
+        'ai_model',
+        'ai_mode',
     ];
 
-    /** Penanda yang membuat pesan diteruskan ke AI. */
-    public const AI_MENTIONS = ['@ai', '@openai', '@chatgpt'];
+    protected $casts = [
+        'ai_mode' => AiMode::class,
+    ];
 
-    /** Pesan ditujukan ke AI bila menyebut salah satu mention, atau membalas pesan AI. */
+    /** Penanda yang membuat pesan diteruskan ke AI (Normi AI). */
+    public const AI_MENTIONS = ['@normi'];
+
+    /**
+     * Pesan ditujukan ke AI bila menyebut @normi sebagai kata utuh (bukan @normianto),
+     * atau membalas pesan AI.
+     */
     public static function isAiPrompt(string $content, ?self $replyTarget = null): bool
     {
-        $normalized = strtolower($content);
         foreach (self::AI_MENTIONS as $mention) {
-            if (str_contains($normalized, $mention)) {
+            if (preg_match('/(?<![\\w@])' . preg_quote($mention, '/') . '(?![\\w])/iu', $content) === 1) {
                 return true;
             }
         }

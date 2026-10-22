@@ -45,11 +45,6 @@ export const chatApiRequest = async (url, { method = 'GET', body } = {}) => {
 	return payload;
 };
 
-export const formatCredits = (value) => Number(value || 0).toLocaleString('id-ID', {
-	minimumFractionDigits: 2,
-	maximumFractionDigits: 2,
-});
-
 export const escapeHtml = (text) => String(text)
 	.replace(/&/g, '&amp;')
 	.replace(/</g, '&lt;')

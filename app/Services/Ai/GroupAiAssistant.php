@@ -2,32 +2,36 @@
 
 namespace App\Services\Ai;
 
+use App\Enums\AiMode;
 use App\Events\MessageSent;
 use App\Events\TypingStatus;
 use App\Exceptions\InsufficientBudgetException;
+use App\Models\AiModel;
 use App\Models\AiUsageLog;
 use App\Models\Group;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\AiDocumentGenerator;
 use App\Services\Ai\Responders\AiResponder;
+use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Ai\Responders\ChatResponder;
 use App\Services\Ai\Responders\DocumentResponder;
 use App\Services\Ai\Responders\ImageResponder;
+use App\Services\Ai\Responders\ResearchResponder;
 use App\Services\Chat\MessagePresenter;
 use App\Services\Credits\CreditWallet;
 use App\Services\NormkreditPricing;
 use Throwable;
 
 /**
- * NormAI di dalam grup: memutuskan apakah sebuah pesan perlu dijawab, memilih jenis
+ * Normi AI di dalam grup: memutuskan apakah sebuah pesan perlu dijawab, memilih jenis
  * balasan, menagih Normkredit sesuai pemakaian nyata, lalu memposting balasannya.
  */
 class GroupAiAssistant
 {
     private const CONTEXT_MESSAGES = 16;
 
-    private const BUSY_MESSAGE = 'AI sedang sibuk dan belum bisa merespons saat ini. Coba lagi beberapa saat.';
+    private const BUSY_MESSAGE = 'Normi AI sedang sibuk. Coba lagi sebentar lagi.';
 
     public function __construct(
         private readonly NormkreditPricing $pricing,
@@ -57,7 +61,7 @@ class GroupAiAssistant
             return;
         }
 
-        event(new TypingStatus($group->id, 'ai', null, 'NormAI', true));
+        event(new TypingStatus($group->id, 'ai', null, 'Normi AI', true));
         try {
             $reply = $this->responderFor($message)->respond($task);
         } catch (InsufficientBudgetException $e) {
@@ -68,7 +72,7 @@ class GroupAiAssistant
             $task->releaseHold();
             throw $e;
         } finally {
-            event(new TypingStatus($group->id, 'ai', null, 'NormAI', false));
+            event(new TypingStatus($group->id, 'ai', null, 'Normi AI', false));
         }
 
         [$reply, $creditsDue, $charged] = $this->bill($task, $reply);
@@ -85,23 +89,25 @@ class GroupAiAssistant
     /** @return AiTask|string task siap jalan, atau pesan penolakan untuk grup */
     private function prepareTask(Group $group, User $owner, User $requester, Message $message): AiTask|string
     {
-        $model = $group->resolvedAiModel();
+        // Model pilihan anggota di composer, bila masih aktif; selain itu model grup.
+        $model = ($message->ai_model ? AiModel::active()->where('model_id', $message->ai_model)->first() : null)
+            ?? $group->resolvedAiModel();
         if (! $model) {
-            return 'Belum ada model AI yang aktif. Hubungi admin Normchat.';
+            return 'Normi AI belum bisa dipakai. Coba lagi nanti.';
         }
 
         if ($this->wallet->balanceFor($group, $requester)->usable() <= 0) {
-            return 'Kredit Normkredit yang bisa kamu pakai di grup ini habis. Top-up Normkredit atau minta anggota lain membagikan kreditnya ke kredit bersama.';
+            return 'Normkredit grup habis. Isi Normkredit untuk lanjut.';
         }
 
         $dailyLimit = (float) $this->pricing->get('daily_group_credit_limit');
         if ($dailyLimit > 0 && $this->spentToday($group) >= $dailyLimit) {
-            return 'Batas pemakaian AI grup hari ini (' . $this->formatCredits($dailyLimit) . ' Normkredit) sudah tercapai. Coba lagi besok.';
+            return 'Batas pemakaian Normi AI hari ini sudah tercapai. Coba lagi besok.';
         }
 
         $client = OpenAiClient::forOwner($owner);
         if (! $client) {
-            return 'AI belum dikonfigurasi. Hubungi admin untuk mengisi OPENAI_API_KEY agar fitur @ai aktif.';
+            return 'Normi AI belum bisa dipakai. Coba lagi nanti.';
         }
 
         $recentMessages = Message::query()
@@ -118,6 +124,17 @@ class GroupAiAssistant
 
     private function responderFor(Message $message): AiResponder
     {
+        $mode = match ($message->ai_mode) {
+            AiMode::Image => new ImageResponder(),
+            AiMode::Canvas => new CanvasResponder(),
+            AiMode::DeepResearch => new ResearchResponder(),
+            AiMode::GuidedLearning => new ChatResponder(ModePrompts::GUIDED_LEARNING, 'guided_learning'),
+            null => null,
+        };
+        if ($mode !== null) {
+            return $mode;
+        }
+
         $content = (string) $message->content;
         if (ImageResponder::wantsImage($content)) {
             return new ImageResponder();
@@ -149,8 +166,7 @@ class GroupAiAssistant
         $charged = $task->settle($creditsDue);
         if ($charged + 0.00001 < $creditsDue) {
             // Pemakaian aktual melebihi kredit yang boleh dipakai: jawaban tetap dikirim.
-            $reply = $reply->withNote('Kredit yang bisa kamu pakai tidak mencukupi. Terpotong ' . $this->formatCredits($charged)
-                . ' dari ' . $this->formatCredits($creditsDue) . ' Normkredit. Top-up Normkredit untuk melanjutkan penggunaan AI.');
+            $reply = $reply->withNote('Normkredit grup habis. Isi Normkredit untuk lanjut.');
         }
 
         return [$reply, $creditsDue, $charged];
@@ -211,7 +227,7 @@ class GroupAiAssistant
 
     private function broadcast(Message $aiMessage, ?float $chargedCredits, float $groupCredits): void
     {
-        event(new MessageSent($aiMessage->group_id, $this->presenter->present($aiMessage, 'NormAI', [
+        event(new MessageSent($aiMessage->group_id, $this->presenter->present($aiMessage, 'Normi AI', [
             'ai_charged_credits' => $chargedCredits,
             'group_credits_remaining' => $groupCredits,
         ])));
@@ -226,7 +242,7 @@ class GroupAiAssistant
             'content' => $text,
         ]);
 
-        event(new MessageSent($group->id, $this->presenter->present($message, 'NormAI')));
+        event(new MessageSent($group->id, $this->presenter->present($message, 'Normi AI')));
     }
 
     private function spentToday(Group $group): float
@@ -235,10 +251,5 @@ class GroupAiAssistant
             ->where('group_id', $group->id)
             ->where('created_at', '>=', now()->startOfDay())
             ->sum('charged_credits');
-    }
-
-    private function formatCredits(float $credits): string
-    {
-        return number_format($credits, 2, ',', '.');
     }
 }

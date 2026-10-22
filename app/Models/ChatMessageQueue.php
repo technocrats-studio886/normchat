@@ -31,7 +31,7 @@ class ChatMessageQueue extends Model
         return $this->belongsTo(Message::class);
     }
 
-    /** Antrekan pesan untuk NormAI, kecuali sudah ada antrean aktif untuknya. */
+    /** Antrekan pesan untuk Normi AI, kecuali sudah ada antrean aktif untuknya. */
     public static function enqueue(Message $message): void
     {
         $alreadyActive = static::query()

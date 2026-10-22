@@ -18,7 +18,7 @@ class InterdotzIntegrationTest extends TestCase
     public function test_interdotz_routes_are_disabled_by_default(): void
     {
         config()->set('services.interdotz.enabled', false);
-        $this->get('/login')->assertOk()->assertDontSee('Login dengan Interdotz');
+        $this->get('/login')->assertOk()->assertDontSee('Masuk dengan Interdotz');
 
         $user = User::factory()->create();
 

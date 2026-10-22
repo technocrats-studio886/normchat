@@ -1,5 +1,6 @@
 import './bootstrap';
 import { loadSavedChatTheme, initChatThemePicker } from './chat/theme.js';
+import { initCanvas } from './chat/canvas.js';
 import { initChatShell } from './chat/shell.js';
 import { initRenderedFeed } from './chat/feed.js';
 import { initReadState } from './chat/read-state.js';
@@ -16,15 +17,15 @@ import { initGroupSearch } from './ui/group-search.js';
 import { initJoinById } from './ui/join-by-id.js';
 import { initPackagePickers } from './ui/package-picker.js';
 import { initPasswordToggles } from './ui/password-toggle.js';
-import { initSharePickers } from './ui/share-picker.js';
 import { initShareButtons } from './ui/share-buttons.js';
+import { initSidebar } from './ui/sidebar.js';
 
 // Dulu script inline di view (berjalan sebelum app.js), jadi tetap diinisialisasi paling awal.
 initChatShell();
+initSidebar();
 initPasswordToggles();
 initAvatarPreview();
 initJoinById();
-initSharePickers();
 initPackagePickers();
 initArchiveTabs();
 initDeleteGroupDialog();
@@ -40,5 +41,6 @@ initComposer();
 initMentionMenu();
 initGroupMenu();
 initMessageSearch();
+initCanvas();
 initGroupSearch();
 initShareButtons();

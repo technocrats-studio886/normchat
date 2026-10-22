@@ -126,8 +126,10 @@ export const renderMarkdown = (escaped) => {
 	return out.join('\n');
 };
 
+// Teks sudah di-escape sebelum masuk sini, jadi URL tidak bisa keluar dari atribut href.
 const inlineFormat = (text) => {
 	return text
+		.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer nofollow" class="font-medium underline underline-offset-2">$1</a>')
 		.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 		.replace(/\*(.+?)\*/g, '<em>$1</em>')
 		.replace(/`([^`]+)`/g, '<code class="rounded bg-slate-200 px-1 py-0.5 text-xs">$1</code>');
@@ -144,7 +146,7 @@ export const renderMermaidInNode = (node) => {
 			const { svg } = await mermaid.render(id + '-svg', block.textContent);
 			block.innerHTML = svg;
 		} catch {
-			block.classList.add('text-xs', 'text-rose-400');
+			block.classList.add('text-xs', 'text-coral-400');
 		}
 	});
 };

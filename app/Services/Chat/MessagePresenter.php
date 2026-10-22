@@ -43,6 +43,6 @@ class MessagePresenter
 
     private function senderName(Message $message): string
     {
-        return $message->sender_type === 'ai' ? 'NormAI' : ($message->sender?->name ?? 'User');
+        return $message->sender_type === 'ai' ? 'Normi AI' : ($message->sender?->name ?? 'User');
     }
 }

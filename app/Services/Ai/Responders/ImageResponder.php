@@ -27,7 +27,7 @@ final class ImageResponder implements AiResponder
     /** Perkiraan panjang instruksi gambar, untuk menahan NK sebelum instruksinya ada. */
     private const ESTIMATED_PROMPT_TOKENS = 300;
 
-    private const PLANNER_PROMPT = "Kamu menyiapkan instruksi untuk mesin pembuat gambar di grup chat Normchat.\n"
+    private const PLANNER_PROMPT = "Kamu menyiapkan instruksi untuk mesin pembuat gambar di grup chat Normi Chat.\n"
         . "Baca permintaan terbaru beserta konteks percakapan dan gambar yang dilampirkan, lalu balas HANYA dengan JSON:\n"
         . '{"prompt": "instruksi gambar yang detail dalam bahasa Inggris (subjek, gaya, komposisi, warna, teks dalam gambar bila ada)", '
         . '"precise": false, "use_reference": false, "caption": "satu kalimat Bahasa Indonesia untuk grup"}' . "\n"
@@ -58,10 +58,10 @@ final class ImageResponder implements AiResponder
             : $task->client->generateImage($engine, $plan['prompt'], $config['size'], $config['quality']);
 
         if ($result->blockedByContentPolicy()) {
-            return AiReply::notice('image', 'Tidak bisa membuat gambar ini karena melanggar kebijakan konten (misalnya: tokoh nyata, konten sensitif). Coba dengan deskripsi lain ya!');
+            return AiReply::notice('image', 'Gambar ini tidak bisa dibuat. Coba deskripsi lain ya.');
         }
         if (! $result->successful()) {
-            return AiReply::notice('image', 'Gagal membuat gambar, coba lagi nanti.');
+            return AiReply::notice('image', 'Gagal membuat gambar. Coba lagi nanti.');
         }
 
         $this->recordEngineUsage($task, $engine, $config, $plan['prompt'], $result, $useReference);

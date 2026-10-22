@@ -49,7 +49,7 @@ class ProfileController extends Controller
 
         $user->update($updates);
 
-        return redirect()->route('profile.account')->with('success', 'Akun berhasil diperbarui.');
+        return redirect()->route('profile.account')->with('success', 'Profil disimpan.');
     }
 
     public function storage(Request $request, StorageUsage $storage): View

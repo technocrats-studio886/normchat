@@ -66,7 +66,7 @@ class RequestBudgetTest extends TestCase
     public function test_too_little_credit_for_a_minimal_answer_is_refused(): void
     {
         $this->expectException(InsufficientBudgetException::class);
-        $this->expectExceptionMessage('belum cukup untuk menjawab dengan model Advanced');
+        $this->expectExceptionMessage('Normkredit tidak cukup untuk model Advanced');
 
         RequestBudget::plan($this->model('gpt-6-astra'), 3000, 5, $this->pricing);
     }
@@ -82,7 +82,7 @@ class RequestBudgetTest extends TestCase
         $this->assertLessThanOrEqual(40.0, $budget->holdCredits);
     }
 
-    public function test_member_with_little_shared_credit_can_still_use_advanced(): void
+    public function test_member_with_little_group_credit_can_still_use_advanced(): void
     {
         Event::fake([MessageSent::class, TypingStatus::class]);
         Http::fake(['api.openai.com/v1/chat/completions' => Http::response([
@@ -90,17 +90,17 @@ class RequestBudgetTest extends TestCase
             'usage' => ['prompt_tokens' => 3000, 'completion_tokens' => 500],
         ])]);
 
-        [$group, $member] = $this->groupWithSharedCredits(80, 'gpt-6-astra');
-        $this->ask($group, $member, '@ai jelaskan arsitektur microservice');
+        [$group, $member] = $this->groupWithCredits(80, 'gpt-6-astra');
+        $this->ask($group, $member, '@normi jelaskan arsitektur microservice');
 
         Http::assertSent(fn ($request) => $request['model'] === 'gpt-6-astra'
             && $request['max_completion_tokens'] < 4000
             && $request['max_completion_tokens'] > RequestBudget::MIN_OUTPUT_TOKENS);
 
-        // Biaya aktual 3.000/500 token Advanced = 24,69 NK, dipotong dari kredit bersama.
+        // Biaya aktual 3.000/500 token Advanced = 24,69 NK, dipotong dari kredit grup.
         $this->assertSame(24.69, AiUsageLog::firstOrFail()->charged_credits);
-        $this->assertSame(55.31, app(CreditWallet::class)->balanceFor($group, $member)->shared);
-        $this->assertStringContainsString('Jawaban dibatasi', (string) Message::where('sender_type', 'ai')->value('content'));
+        $this->assertSame(55.31, app(CreditWallet::class)->balanceFor($group, $member)->groupTotal);
+        $this->assertStringContainsString('Jawaban dipersingkat', (string) Message::where('sender_type', 'ai')->value('content'));
     }
 
     private function model(string $modelId): AiModel
@@ -108,8 +108,8 @@ class RequestBudgetTest extends TestCase
         return AiModel::where('model_id', $modelId)->firstOrFail();
     }
 
-    /** @return array{0: Group, 1: User} grup dengan $shared NK kredit bersama dan member tanpa kredit terlindungi */
-    private function groupWithSharedCredits(float $shared, string $modelId): array
+    /** @return array{0: Group, 1: User} grup dengan $credits NK kredit grup dan satu member */
+    private function groupWithCredits(float $credits, string $modelId): array
     {
         $owner = User::factory()->create();
         $member = User::factory()->create();
@@ -127,7 +127,7 @@ class RequestBudgetTest extends TestCase
             'status' => 'active',
             'joined_at' => now(),
         ]);
-        app(CreditWallet::class)->deposit($group, $owner, $shared, 100);
+        app(CreditWallet::class)->deposit($group, $credits);
 
         return [$group, $member];
     }

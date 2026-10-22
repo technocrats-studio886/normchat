@@ -34,12 +34,12 @@ export const bindAnnotations = (el, state, mentionSuggestions, refreshTools) => 
 
 	const selectAnnotation = (node) => {
 		if (selectedAnnotation && selectedAnnotation !== node) {
-			selectedAnnotation.classList.remove('ring-2', 'ring-emerald-300', 'ring-offset-1', 'ring-offset-black/40');
+			selectedAnnotation.classList.remove('ring-2', 'ring-navy-300', 'ring-offset-1', 'ring-offset-black/40');
 		}
 
 		selectedAnnotation = node instanceof HTMLElement ? node : null;
 		if (selectedAnnotation) {
-			selectedAnnotation.classList.add('ring-2', 'ring-emerald-300', 'ring-offset-1', 'ring-offset-black/40');
+			selectedAnnotation.classList.add('ring-2', 'ring-navy-300', 'ring-offset-1', 'ring-offset-black/40');
 		}
 	};
 
@@ -160,15 +160,15 @@ export const bindAnnotations = (el, state, mentionSuggestions, refreshTools) => 
 	const updateStickerUi = () => {
 		stickerButtons.forEach((button) => {
 			const isActive = button.getAttribute('data-preview-sticker') === selectedSticker;
-			button.classList.toggle('bg-emerald-500/85', isActive);
+			button.classList.toggle('bg-navy-500/85', isActive);
 			button.classList.toggle('bg-white/18', !isActive);
 		});
 
 		stickerSizeButtons.forEach((button) => {
 			const size = Number(button.getAttribute('data-preview-sticker-size') || 0);
 			const active = Math.abs(size - stickerSize) < 0.1;
-			button.classList.toggle('bg-emerald-500/85', active);
-			button.classList.toggle('text-emerald-950', active);
+			button.classList.toggle('bg-navy-500/85', active);
+			button.classList.toggle('text-navy-950', active);
 			button.classList.toggle('bg-white/25', !active);
 			button.classList.toggle('text-white', !active);
 		});
@@ -178,8 +178,8 @@ export const bindAnnotations = (el, state, mentionSuggestions, refreshTools) => 
 		textSizeButtons.forEach((button) => {
 			const size = Number(button.getAttribute('data-preview-text-size') || 0);
 			const active = Math.abs(size - textSize) < 0.1;
-			button.classList.toggle('bg-emerald-500/85', active);
-			button.classList.toggle('text-emerald-950', active);
+			button.classList.toggle('bg-navy-500/85', active);
+			button.classList.toggle('text-navy-950', active);
 			button.classList.toggle('bg-white/20', !active);
 			button.classList.toggle('text-white', !active);
 		});
@@ -188,7 +188,7 @@ export const bindAnnotations = (el, state, mentionSuggestions, refreshTools) => 
 			const color = String(button.getAttribute('data-preview-text-color') || '#ffffff').toLowerCase();
 			const active = color === String(textColor).toLowerCase();
 			button.classList.toggle('ring-2', active);
-			button.classList.toggle('ring-emerald-300', active);
+			button.classList.toggle('ring-navy-300', active);
 			button.classList.toggle('ring-offset-1', active);
 			button.classList.toggle('ring-offset-black/70', active);
 		});
@@ -304,14 +304,14 @@ export const bindAnnotations = (el, state, mentionSuggestions, refreshTools) => 
 
 		const value = String(textInput.value || '').trim();
 		if (!value) {
-			showActionToast('Teks belum diisi');
+			showActionToast('Teks masih kosong');
 			textInput.focus();
 			return;
 		}
 
 		createTextAnnotation(pendingTextPlacement.x, pendingTextPlacement.y, value);
 		closeTextEditor();
-		showActionToast('Teks ditambahkan, drag untuk atur posisi');
+		showActionToast('Teks ditambahkan. Geser untuk memindahkan');
 	};
 
 	textApplyButton?.addEventListener('click', applyTextPlacement);

@@ -15,8 +15,8 @@ export const initArchiveTabs = () => {
 				const active = other === tab;
 				other.setAttribute('aria-selected', active ? 'true' : 'false');
 				other.classList.toggle('text-slate-700', active);
-				other.classList.toggle('border-blue-500', active);
-				other.classList.toggle('bg-blue-50', active);
+				other.classList.toggle('border-navy-500', active);
+				other.classList.toggle('bg-navy-50', active);
 				other.classList.toggle('text-slate-500', !active);
 				other.classList.toggle('border-transparent', !active);
 			});

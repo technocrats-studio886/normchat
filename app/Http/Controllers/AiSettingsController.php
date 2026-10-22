@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
-/** Kategori AI dan persona NormAI untuk satu grup. */
+/** Kategori AI dan persona Normi AI untuk satu grup. */
 class AiSettingsController extends Controller
 {
     public function edit(Request $request, Group $group): View
@@ -36,7 +36,7 @@ class AiSettingsController extends Controller
         $group->update(['ai_model' => $modelId]);
         AuditLog::record('settings.update_ai_model', $request->user()->id, $group, ['ai_model' => $modelId]);
 
-        return back()->with('success', 'Model AI grup berhasil diganti.');
+        return back()->with('success', 'Model berhasil disimpan.');
     }
 
     public function updatePersona(Request $request, Group $group): RedirectResponse
@@ -51,6 +51,6 @@ class AiSettingsController extends Controller
         $group->update($validated);
         AuditLog::record('settings.update_ai_persona', $request->user()->id, $group, ['updated_fields' => array_keys($validated)]);
 
-        return back()->with('success', 'AI Persona berhasil disimpan.');
+        return back()->with('success', 'Kepribadian Normi AI disimpan.');
     }
 }

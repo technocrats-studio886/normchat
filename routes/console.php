@@ -25,7 +25,7 @@ Artisan::command('interdotz:sync-client-profile {--token=} {--dry-run} {--logo-u
     $iconUrl = trim((string) ($this->option('icon-url') ?: config('normchat.product_icon_url') ?: ($appUrl.'/icons/icon-192.png')));
 
     $payload = [
-        'name' => 'Normchat',
+        'name' => 'Normi Chat',
         'baseUrl' => $appUrl,
         'redirectUrl' => (string) config('services.interdotz.redirect_uri', $appUrl.'/sso/interdotz/callback'),
         'webhookUrl' => $appUrl.'/api/webhooks/interdotz/payment',
@@ -73,8 +73,8 @@ Artisan::command('interdotz:sync-client-profile {--token=} {--dry-run} {--logo-u
         return Command::FAILURE;
     }
 
-    $this->info('Normchat client profile berhasil disinkronkan ke Interdotz.');
+    $this->info('Normi Chat client profile berhasil disinkronkan ke Interdotz.');
     $this->line((string) json_encode($response->json(), JSON_UNESCAPED_SLASHES));
 
     return Command::SUCCESS;
-})->purpose('Sync Normchat client profile and image metadata to Interdotz backend');
+})->purpose('Sync Normi Chat client profile and image metadata to Interdotz backend');

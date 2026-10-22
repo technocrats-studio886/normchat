@@ -65,16 +65,16 @@ export const renderPollCard = ({ poll, tone = 'other', messageId = 0, inlineTime
 
 	const colorMap = {
 		mine: {
-			card: 'bg-indigo-500 text-white border-indigo-400',
-			question: 'text-indigo-50',
-			meta: 'text-indigo-100/90',
-			option: 'bg-indigo-400/45 border-indigo-300/70 text-white hover:bg-indigo-300/55',
+			card: 'bg-navy-500 text-white border-navy-400',
+			question: 'text-navy-50',
+			meta: 'text-navy-100/90',
+			option: 'bg-navy-400/45 border-navy-300/70 text-white hover:bg-navy-300/55',
 		},
 		ai: {
-			card: 'bg-emerald-50 text-emerald-900 border-emerald-200',
-			question: 'text-emerald-900',
-			meta: 'text-emerald-700',
-			option: 'bg-white border-emerald-200 text-emerald-900 hover:bg-emerald-100',
+			card: 'bg-navy-50 text-navy-900 border-navy-200',
+			question: 'text-navy-900',
+			meta: 'text-navy-700',
+			option: 'bg-white border-navy-200 text-navy-900 hover:bg-navy-100',
 		},
 		other: {
 			card: 'bg-white text-slate-800 border-slate-200',
@@ -118,7 +118,7 @@ export const renderPollCard = ({ poll, tone = 'other', messageId = 0, inlineTime
 			<p class="text-[11px] font-semibold uppercase tracking-wide ${palette.meta}">Polling</p>
 			<p class="mt-1 text-sm font-semibold ${palette.question}">${safeQuestion}</p>
 			<div class="mt-2 space-y-1.5">${optionsHtml}</div>
-			<p class="mt-2 text-[11px] ${palette.meta}" data-poll-summary>Belum ada vote</p>
+			<p class="mt-2 text-[11px] ${palette.meta}" data-poll-summary>Belum ada yang memilih</p>
 			${inlineTimeHtml}
 		</div>
 	`;
@@ -335,23 +335,23 @@ export const refreshPollCardsFromFeed = () => {
 
 			const ratio = totalVotes > 0 ? Math.max(0, Math.min(100, Math.round((count / totalVotes) * 100))) : 0;
 			row.style.backgroundImage = ratio > 0
-				? `linear-gradient(90deg, rgba(14, 165, 233, 0.16) ${ratio}%, rgba(0,0,0,0) ${ratio}%)`
+				? `linear-gradient(90deg, rgba(113, 134, 163, 0.16) ${ratio}%, rgba(0,0,0,0) ${ratio}%)`
 				: '';
 
 			const isMine = optionNumber > 0 && optionNumber === myVoteOption;
 			row.classList.toggle('ring-2', isMine);
-			row.classList.toggle('ring-cyan-400', isMine);
+			row.classList.toggle('ring-navy-400', isMine);
 			row.classList.toggle('ring-offset-1', isMine);
 		});
 
 		const summary = card.querySelector('[data-poll-summary]');
 		if (summary instanceof HTMLElement) {
 			if (totalVotes <= 0) {
-				summary.textContent = 'Belum ada vote';
+				summary.textContent = 'Belum ada yang memilih';
 			} else if (myVoteOption > 0) {
-				summary.textContent = `${totalVotes} vote • Kamu pilih opsi ${myVoteOption}`;
+				summary.textContent = `${totalVotes} suara • Kamu memilih nomor ${myVoteOption}`;
 			} else {
-				summary.textContent = `${totalVotes} vote`;
+				summary.textContent = `${totalVotes} suara`;
 			}
 		}
 	});

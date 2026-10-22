@@ -43,7 +43,7 @@ class DatabaseSeeder extends Seeder
         ];
 
         $group = Group::create([
-            'name' => 'Normchat Core Team',
+            'name' => 'Normi Chat Core Team',
             'description' => 'Ruang kolaborasi produk dan AI assistant.',
             'owner_id' => $owner->id,
             'password_hash' => Hash::make('norm1234'),
@@ -80,7 +80,7 @@ class DatabaseSeeder extends Seeder
                 'group_id' => $group->id,
                 'sender_type' => 'user',
                 'sender_id' => $owner->id,
-                'content' => 'Selamat datang di Normchat. Kita mulai kickoff hari ini.',
+                'content' => 'Selamat datang di Normi Chat. Kita mulai kickoff hari ini.',
                 'created_at' => now()->subMinutes(5),
                 'updated_at' => now()->subMinutes(5),
             ],

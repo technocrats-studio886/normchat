@@ -25,7 +25,7 @@ class SettingsController extends Controller
         $this->authorize('view', $group);
         $user = $request->user();
 
-        $group->load(['groupToken', 'members.user', 'members.role', 'memberCredits.user']);
+        $group->load(['groupToken', 'members.user', 'members.role']);
         $canEditProfile = $user->can('editGroupProfile', $group);
 
         return view('settings.show', [
@@ -72,7 +72,7 @@ class SettingsController extends Controller
             'password_updated' => isset($updates['password_hash']),
         ]);
 
-        return back()->with('success', 'Pengaturan grup berhasil disimpan.');
+        return back()->with('success', 'Pengaturan disimpan.');
     }
 
     public function transactionHistory(Group $group): View

@@ -4,7 +4,10 @@ namespace App\Services\Ai;
 
 use Illuminate\Http\Client\Response;
 
-/** Hasil satu panggilan chat completions, dengan usage yang sudah dinormalisasi. */
+/**
+ * Hasil satu panggilan model (chat completions, atau Responses API untuk web search),
+ * dengan usage yang sudah dinormalisasi.
+ */
 final class ChatCompletion
 {
     /** @param array{input_tokens: int, cached_input_tokens: int, output_tokens: int} $usage */
@@ -15,6 +18,9 @@ final class ChatCompletion
         public readonly array $usage,
         public readonly int $status,
         public readonly string $errorBody,
+        /** @var list<array{url: string, title: string}> sumber dari web search */
+        public readonly array $citations = [],
+        public readonly int $webSearchCalls = 0,
     ) {
     }
 
@@ -33,6 +39,53 @@ final class ChatCompletion
             ],
             $response->status(),
             $response->successful() ? '' : (string) $response->body(),
+        );
+    }
+
+    /** Responses API: teks dari item `message`, sumber dari anotasi url_citation. */
+    public static function fromResponsesApi(Response $response): self
+    {
+        $text = '';
+        $citations = [];
+        $searchCalls = 0;
+        foreach ((array) $response->json('output', []) as $item) {
+            if (($item['type'] ?? '') === 'web_search_call') {
+                $searchCalls++;
+                continue;
+            }
+            if (($item['type'] ?? '') !== 'message') {
+                continue;
+            }
+            foreach ((array) ($item['content'] ?? []) as $part) {
+                if (($part['type'] ?? '') !== 'output_text') {
+                    continue;
+                }
+                $text .= (string) ($part['text'] ?? '');
+                foreach ((array) ($part['annotations'] ?? []) as $annotation) {
+                    $url = (string) ($annotation['url'] ?? '');
+                    if (($annotation['type'] ?? '') === 'url_citation' && $url !== '') {
+                        $citations[$url] = ['url' => $url, 'title' => (string) ($annotation['title'] ?? $url)];
+                    }
+                }
+            }
+        }
+
+        $usage = (array) $response->json('usage', []);
+        $incomplete = $response->json('status') === 'incomplete';
+
+        return new self(
+            $response->successful(),
+            $text !== '' ? $text : null,
+            $incomplete ? 'length' : ($response->successful() ? 'stop' : null),
+            [
+                'input_tokens' => (int) ($usage['input_tokens'] ?? 0),
+                'cached_input_tokens' => (int) data_get($usage, 'input_tokens_details.cached_tokens', 0),
+                'output_tokens' => (int) ($usage['output_tokens'] ?? 0),
+            ],
+            $response->status(),
+            $response->successful() ? '' : (string) $response->body(),
+            array_values($citations),
+            $searchCalls,
         );
     }
 

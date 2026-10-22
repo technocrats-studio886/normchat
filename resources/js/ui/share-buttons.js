@@ -24,7 +24,7 @@ export const initShareButtons = () => {
 	document.querySelectorAll('[data-share-group-url]').forEach((button) => {
 		button.addEventListener('click', async () => {
 			const url = button.getAttribute('data-share-group-url') || '';
-			const groupName = button.getAttribute('data-share-group-name') || 'Normchat Group';
+			const groupName = button.getAttribute('data-share-group-name') || 'Normi Chat';
 			if (!url) {
 				return;
 			}
@@ -38,13 +38,13 @@ export const initShareButtons = () => {
 			};
 
 			const sharePayload = {
-				title: `Join #${groupName}`,
-				text: `Gabung ke group #${groupName} di Normchat`,
+				title: `Gabung ${groupName}`,
+				text: `Yuk gabung ke grup ${groupName} di Normi Chat`,
 				url,
 			};
 
 			const openFallbackShareMenu = () => {
-				const message = `Gabung ke group #${groupName} di Normchat`;
+				const message = `Yuk gabung ke grup ${groupName} di Normi Chat`;
 				const encodedMessage = encodeURIComponent(`${message}\n${url}`);
 				const encodedTextOnly = encodeURIComponent(message);
 				const encodedUrl = encodeURIComponent(url);
@@ -63,7 +63,7 @@ export const initShareButtons = () => {
 					<a class="rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-700" target="_blank" rel="noopener noreferrer" href="mailto:?subject=${encodeURIComponent(`Join #${groupName}`)}&body=${encodedMessage}">Email</a>
 				</div>
 				<div class="mt-2 grid grid-cols-2 gap-2 text-sm">
-					<button type="button" data-share-copy-link="1" class="rounded-xl bg-emerald-600 px-3 py-2 font-semibold text-white">Copy Link</button>
+					<button type="button" data-share-copy-link="1" class="rounded-xl bg-navy-600 px-3 py-2 font-semibold text-white">Salin Link</button>
 					<button type="button" data-share-close-menu="1" class="rounded-xl bg-slate-100 px-3 py-2 font-semibold text-slate-700">Tutup</button>
 				</div>
 			`;

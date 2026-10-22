@@ -38,12 +38,12 @@ final class DocumentResponder implements AiResponder
         try {
             [$completion, $model] = $task->complete($messages, 90);
             if (! $completion->successful) {
-                return AiReply::notice('document', 'Gagal membuat dokumen, coba lagi nanti.');
+                return AiReply::notice('document', 'Gagal membuat dokumen. Coba lagi nanti.');
             }
 
             $markdown = trim((string) $completion->text);
             if ($markdown === '') {
-                return AiReply::notice('document', 'Gagal membuat dokumen: respons AI kosong.');
+                return AiReply::notice('document', 'Gagal membuat dokumen. Coba lagi nanti.');
             }
 
             // Buang code fence bila model membungkus keluarannya.
@@ -52,12 +52,12 @@ final class DocumentResponder implements AiResponder
 
             $document = app(AiDocumentGenerator::class)->storeDocument((int) $task->group->id, $this->format, $markdown, $titleHint);
             if (! $document) {
-                return AiReply::notice('document', 'Gagal merender dokumen ke format ' . strtoupper($this->format) . '.');
+                return AiReply::notice('document', 'Gagal membuat dokumen. Coba lagi nanti.');
             }
         } catch (Throwable $e) {
             Log::error('Document generation exception.', ['error' => $e->getMessage()]);
 
-            return AiReply::notice('document', 'Gagal membuat dokumen: ' . $e->getMessage());
+            return AiReply::notice('document', 'Gagal membuat dokumen. Coba lagi nanti.');
         }
 
         $task->recordChat('document', $model, $completion);

@@ -24,7 +24,7 @@ class QaRegressionTest extends TestCase
     {
         $this->get('/login')
             ->assertOk()
-            ->assertSee('Login dengan Google')
-            ->assertDontSee('Login dengan Interdotz');
+            ->assertSee('Masuk dengan Google')
+            ->assertDontSee('Masuk dengan Interdotz');
     }
 }

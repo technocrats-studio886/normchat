@@ -76,9 +76,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/groups/{group}/settings/ai-persona', [AiSettingsController::class, 'updatePersona'])->middleware('group.permission')->name('settings.ai.persona.save');
     Route::post('/groups/{group}/settings/ai-model', [AiSettingsController::class, 'updateModel'])->middleware('group.permission')->name('settings.ai.model.save');
 
-    // Pembagian Normkredit (bersama vs terlindungi)
-    Route::post('/groups/{group}/credits/share', [GroupCreditController::class, 'share'])->middleware('group.permission')->name('groups.credits.share');
-    Route::post('/groups/{group}/credits/order', [GroupCreditController::class, 'order'])->middleware('group.permission')->name('groups.credits.order');
+    // Batas harian kredit grup per anggota (owner)
     Route::post('/groups/{group}/credits/limit', [GroupCreditController::class, 'limit'])->middleware('group.permission')->name('groups.credits.limit');
     Route::post('/groups/{group}/settings/export', [GroupExportController::class, 'store'])->middleware('group.permission')->name('settings.export');
     Route::get('/groups/{group}/settings/export/{export}/download', [GroupExportController::class, 'show'])->name('settings.export.download');
@@ -127,16 +125,19 @@ Route::middleware('auth')->group(function () {
 // ── PWA ──────────────────────────────────────────────────────
 Route::get('/manifest.webmanifest', function () {
     return Response::json([
-        'name' => 'Normchat',
-        'short_name' => 'Normchat',
+        'name' => 'Normi Chat',
+        'short_name' => 'Normi Chat',
         'start_url' => '/groups',
         'display' => 'standalone',
         'background_color' => '#ffffff',
         'theme_color' => '#ffffff',
+        // Layar pembuka Android dibangun dari ikon 512 + background_color ini.
         'icons' => [
             ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
             ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
-            ['src' => '/apple-touch-icon.png', 'sizes' => '180x180', 'type' => 'image/png', 'purpose' => 'any'],
+            ['src' => '/icons/icon-maskable-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'maskable'],
+            ['src' => '/icons/icon-maskable-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
+            ['src' => '/favicon.svg', 'sizes' => 'any', 'type' => 'image/svg+xml', 'purpose' => 'any'],
         ],
     ], 200, ['Content-Type' => 'application/manifest+json']);
 })->name('pwa.manifest');

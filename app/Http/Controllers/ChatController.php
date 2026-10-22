@@ -7,6 +7,7 @@ use App\Events\MessageSent;
 use App\Events\MessageUpdated;
 use App\Http\Requests\SendMessageRequest;
 use App\Jobs\ProcessGroupChatQueueJob;
+use App\Models\AiModel;
 use App\Models\AuditLog;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
@@ -55,7 +56,7 @@ class ChatController extends Controller
 
         $messages = Message::query()
             ->where('group_id', $group->id)
-            ->with(['sender:id,name', 'replyToMessage.sender:id,name', 'aiUsage:id,response_message_id,charged_credits,balance_after'])
+            ->with(['sender:id,name', 'replyToMessage.sender:id,name'])
             ->withCount('versions')
             ->orderByDesc('id')
             ->take(self::VISIBLE_MESSAGES)
@@ -73,6 +74,8 @@ class ChatController extends Controller
             'lastReadMessageId' => $lastReadMessageId,
             'latestMessageId' => $latestMessageId,
             'unreadCount' => $latestMessageId > 0 ? $this->unreadCount($group, $lastReadMessageId) : 0,
+            'aiModels' => AiModel::active()->get(['model_id', 'label', 'description']),
+            'defaultAiModel' => $group->resolvedAiModel()?->model_id,
         ]);
     }
 
@@ -127,6 +130,8 @@ class ChatController extends Controller
                 ]);
 
                 if (Message::isAiPrompt($content, $replyTarget)) {
+                    // Pilihan composer hanya berarti bagi pesan yang memang ditujukan ke AI.
+                    $message->update(['ai_model' => $request->aiModel(), 'ai_mode' => $request->aiMode()]);
                     ChatMessageQueue::enqueue($message);
                 }
 
@@ -135,7 +140,7 @@ class ChatController extends Controller
                 return $message;
             });
         } catch (LockTimeoutException) {
-            return back()->withErrors(['content' => 'Chat sedang sibuk. Coba kirim ulang dalam beberapa detik.']);
+            return back()->withErrors(['content' => 'Gagal mengirim. Coba lagi.']);
         }
 
         $message->loadCount('versions');
@@ -239,16 +244,24 @@ class ChatController extends Controller
             || in_array($message->message_type, ['image', 'voice', 'video'], true)
             || $mime === 'application/pdf';
 
+        $headers = [
+            'Content-Type' => $mime,
+            'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+        // Lampiran tidak boleh berjalan sebagai halaman di asal normi.chat. PDF dikecualikan:
+        // viewer PDF Chrome menolak dokumen ber-sandbox, dan PDF tidak menjalankan skrip halaman.
+        if ($mime !== 'application/pdf') {
+            $headers['Content-Security-Policy'] = 'sandbox';
+        }
+
         return response()->stream(function () use ($stream) {
             fpassthru($stream);
             if (is_resource($stream)) {
                 fclose($stream);
             }
-        }, 200, [
-            'Content-Type' => $mime,
-            'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
-            'Cache-Control' => 'private, max-age=3600',
-        ]);
+        }, 200, $headers);
     }
 
     private function membership(Group $group, Request $request): ?GroupMember

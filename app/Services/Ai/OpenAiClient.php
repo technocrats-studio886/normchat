@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-/** Satu-satunya tempat Normchat berbicara HTTP dengan OpenAI. */
+/** Satu-satunya tempat Normi Chat berbicara HTTP dengan OpenAI. */
 class OpenAiClient
 {
     private const BASE_URL = 'https://api.openai.com/v1';
@@ -48,6 +48,49 @@ class OpenAiClient
 
             return ChatCompletion::failed($e->getMessage());
         }
+    }
+
+    /**
+     * Responses API dengan alat web search. $messages memakai format chat completions
+     * (system + riwayat + user) dan diubah ke format input Responses API di sini.
+     */
+    public function research(string $model, array $messages, int $maxOutputTokens, int $timeout = 300): ChatCompletion
+    {
+        $instructions = [];
+        $input = [];
+        foreach ($messages as $message) {
+            if (($message['role'] ?? '') === 'system') {
+                $instructions[] = (string) $message['content'];
+                continue;
+            }
+            $input[] = ['role' => $message['role'], 'content' => self::responsesContent($message['content'] ?? '', $message['role'])];
+        }
+
+        try {
+            return ChatCompletion::fromResponsesApi(Http::withToken($this->token)->timeout($timeout)->post(self::BASE_URL . '/responses', [
+                'model' => $model,
+                'instructions' => implode("\n\n", $instructions),
+                'input' => $input,
+                'tools' => [['type' => 'web_search']],
+                'max_output_tokens' => $maxOutputTokens,
+            ]));
+        } catch (Throwable $e) {
+            Log::error('OpenAI research request failed.', ['model' => $model, 'error' => $e->getMessage()]);
+
+            return ChatCompletion::failed($e->getMessage());
+        }
+    }
+
+    /** Bagian pesan chat completions (text / image_url) → Responses API (input_text / input_image). */
+    private static function responsesContent(string|array $content, string $role): string|array
+    {
+        if (is_string($content) || $role === 'assistant') {
+            return is_string($content) ? $content : collect($content)->pluck('text')->filter()->implode("\n");
+        }
+
+        return array_map(fn (array $part) => ($part['type'] ?? '') === 'image_url'
+            ? ['type' => 'input_image', 'image_url' => (string) data_get($part, 'image_url.url')]
+            : ['type' => 'input_text', 'text' => (string) ($part['text'] ?? '')], $content);
     }
 
     public function generateImage(string $model, string $prompt, string $size, string $quality): ImageResult

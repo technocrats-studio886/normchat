@@ -54,16 +54,17 @@ class ProfileActivityTest extends TestCase
 
         $this->actingAs($user)->get('/profile')
             ->assertOk()
-            ->assertSee('Login History')
-            ->assertSee('Riwayat Transaksi');
+            ->assertSee('Riwayat Masuk')
+            ->assertSee('Riwayat Pembayaran');
 
         $this->actingAs($user)->get('/profile/login-history')
             ->assertOk()
-            ->assertSee('10.10.10.10');
+            // Detail teknis (IP, user agent) tidak ditampilkan; cukup perangkat dan status.
+            ->assertSee('Masuk')->assertDontSee('10.10.10.10')->assertDontSee('Mozilla/5.0');
 
         $this->actingAs($user)->get('/profile/transactions')
             ->assertOk()
-            ->assertSee('Top-up normkredit')
+            ->assertSee('Isi Normkredit')
             ->assertSee('Rp30.000');
     }
 

@@ -28,7 +28,7 @@ export const initComposerInput = () => {
 
 			event.preventDefault();
 			clearEditingState(true);
-			showActionToast('Mode edit dibatalkan');
+			showActionToast('Batal mengedit');
 		});
 
 		mentionInput.addEventListener('input', resizeComposerInput);

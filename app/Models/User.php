@@ -144,7 +144,7 @@ class User extends Authenticatable
     {
         return match ($this->auth_provider) {
             'google' => 'Google',
-            'interdotz' => 'Interdotz SSO',
+            'interdotz' => 'Interdotz',
             default => ucfirst((string) $this->auth_provider),
         };
     }

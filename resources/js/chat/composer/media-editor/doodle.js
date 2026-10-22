@@ -40,8 +40,8 @@ export const bindDoodle = (el, state) => {
 		penSizeButtons.forEach((button) => {
 			const size = Number(button.getAttribute('data-preview-pen-size') || 0);
 			const active = Math.abs(size - penSize) < 0.1;
-			button.classList.toggle('bg-emerald-500/80', active);
-			button.classList.toggle('text-emerald-950', active);
+			button.classList.toggle('bg-navy-500/80', active);
+			button.classList.toggle('text-navy-950', active);
 			button.classList.toggle('bg-white/25', !active);
 			button.classList.toggle('text-white', !active);
 		});
@@ -67,7 +67,7 @@ export const bindDoodle = (el, state) => {
 		ctx.lineCap = 'round';
 		ctx.lineJoin = 'round';
 		ctx.lineWidth = penSize;
-		ctx.strokeStyle = '#f8fafc';
+		ctx.strokeStyle = '#F3F5F8';
 		ctx.globalCompositeOperation = 'source-over';
 	};
 
@@ -117,7 +117,7 @@ export const bindDoodle = (el, state) => {
 			const ctx = previewDoodleCanvas.getContext('2d');
 			if (ctx) {
 				ctx.beginPath();
-				ctx.fillStyle = '#f8fafc';
+				ctx.fillStyle = '#F3F5F8';
 				ctx.arc(point.x, point.y, penSize / 2, 0, Math.PI * 2);
 				ctx.fill();
 			}
@@ -166,7 +166,7 @@ export const bindDoodle = (el, state) => {
 						ctx.lineWidth = penSize;
 					}
 				}
-				showActionToast(`Ketebalan pena: ${penSize}px`);
+				showActionToast(`Ukuran pena: ${penSize}`);
 			});
 		});
 		updatePenSizeUi();

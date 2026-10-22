@@ -102,6 +102,12 @@ class NormkreditPricing
         return new PaymentQuote($credits, $baseAmount, $this->serviceFee($baseAmount));
     }
 
+    /** Persentase biaya layanan QRIS untuk ditampilkan: 0.7 → "0,7". */
+    public function feePercentLabel(): string
+    {
+        return rtrim(rtrim(number_format((float) $this->get('qris_fee_percent'), 2, ',', '.'), '0'), ',');
+    }
+
     /** Biaya layanan QRIS, dibulatkan ke atas ke rupiah. */
     public function serviceFee(int $baseAmount): int
     {

@@ -167,7 +167,7 @@ class NormkreditPricingTest extends TestCase
         $group = $this->makeGroup($owner, 300);
         $group->update(['ai_model' => 'gpt-6.1-sol']);
 
-        $this->runAi($group, $owner, '@ai jelaskan normalisasi database');
+        $this->runAi($group, $owner, '@normi jelaskan normalisasi database');
 
         Http::assertSent(fn ($request) => $request['model'] === 'gpt-6.1-sol'
             && $request['max_completion_tokens'] === 4000
@@ -194,12 +194,12 @@ class NormkreditPricingTest extends TestCase
         $group = $this->makeGroup($owner, 0.5);
         $group->update(['ai_model' => 'gpt-6.1-sol']);
 
-        $this->runAi($group, $owner, '@ai halo');
+        $this->runAi($group, $owner, '@normi halo');
 
         Http::assertNothingSent();
         $this->assertSame(0, AiUsageLog::count());
         $this->assertSame(0.5, $group->groupToken->fresh()->credits);
-        $this->assertStringContainsString('belum cukup', (string) Message::where('sender_type', 'ai')->value('content'));
+        $this->assertStringContainsString('tidak cukup', (string) Message::where('sender_type', 'ai')->value('content'));
     }
 
     public function test_daily_group_limit_blocks_further_requests(): void
@@ -219,7 +219,7 @@ class NormkreditPricingTest extends TestCase
             'charged_credits' => 1,
         ]);
 
-        $this->runAi($group, $owner, '@ai halo');
+        $this->runAi($group, $owner, '@normi halo');
 
         Http::assertNothingSent();
         $this->assertStringContainsString('Batas pemakaian', (string) Message::where('sender_type', 'ai')->value('content'));
@@ -284,13 +284,14 @@ class NormkreditPricingTest extends TestCase
         $group = $this->makeGroup($owner, 300);
 
         $this->actingAs($owner)->get('/groups/create')
-            ->assertOk()->assertSee('250 Normkredit')->assertSee('Rp30.210')->assertSee('biaya layanan QRIS 0,7%')->assertDontSee('DU');
+            ->assertOk()->assertSee('250 Normkredit')->assertSee('Buat Grup · Rp30.000')->assertDontSee('Rp30.210')
+            ->assertDontSee('Biaya layanan QRIS')->assertDontSee('DU');
 
         $this->actingAs($owner)->get("/tokens/buy?group={$group->id}")
-            ->assertOk()->assertSee('125 Normkredit')->assertSee('Rp15.105')->assertSee('300,00 NK');
+            ->assertOk()->assertSee('125 Normkredit')->assertSee('Rp15.000')->assertDontSee('Rp15.105')->assertSee('300,00 Normkredit');
 
         $this->actingAs(User::factory()->create())->get("/join/{$group->share_id}")
-            ->assertOk()->assertSee('125 Normkredit')->assertSee('Rp15.105')->assertDontSee('Dots Units');
+            ->assertOk()->assertSee('125 Normkredit')->assertSee('Rp15.000')->assertDontSee('Rp15.105')->assertDontSee('Dots Units');
 
         $this->actingAs($owner)->get("/groups/{$group->id}/settings/ai-persona")
             ->assertOk()->assertSee('Cepat')->assertSee('Smart')->assertSee('Advanced');
@@ -308,7 +309,8 @@ class NormkreditPricingTest extends TestCase
         ]);
 
         $this->actingAs($owner)->get("/groups/{$group->id}/chat")
-            ->assertOk()->assertSee('14,70 NK · sisa 285,30 NK');
+            // Biaya per jawaban tidak ditampilkan di chat; saldo dilihat di pengaturan grup.
+            ->assertOk()->assertSee('Normi AI')->assertDontSee('14,70')->assertDontSee('285,30');
     }
 
     private function makeGroup(User $owner, float $credits): Group
@@ -330,7 +332,7 @@ class NormkreditPricingTest extends TestCase
         ]);
 
         // Seluruhnya kredit bersama agar tes pricing tidak dipengaruhi aturan pembagian.
-        app(CreditWallet::class)->deposit($group, $owner, $credits, 100);
+        app(CreditWallet::class)->deposit($group, $credits);
 
         return $group->fresh('groupToken');
     }

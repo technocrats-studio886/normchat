@@ -60,7 +60,6 @@ class PaymentFulfillment
                 $meta = (array) ($locked->metadata_json ?? []);
                 $this->grant($purpose, $group, $user, new Funding(
                     (float) ($meta['credits'] ?? 0),
-                    (float) ($meta['share_percent'] ?? Funding::DEFAULT_SHARE_PERCENT),
                     $paidAmount,
                     $reference,
                     $paymentMethod,

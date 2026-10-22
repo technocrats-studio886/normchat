@@ -47,14 +47,14 @@ class ImageRoutingTest extends TestCase
             'status' => 'active',
             'ai_model' => 'gpt-6-luna',
         ]);
-        app(CreditWallet::class)->deposit($this->group, $this->owner, 500, 100);
+        app(CreditWallet::class)->deposit($this->group, 500);
     }
 
     public function test_fast_category_plans_with_luna_and_draws_with_flare(): void
     {
         $this->fakeOpenAi(['prompt' => 'An orange cat, watercolor', 'precise' => false, 'caption' => 'Kucing oranye cat air.']);
 
-        $this->ask('@ai buatkan gambar kucing oranye');
+        $this->ask('@normi buatkan gambar kucing oranye');
 
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/chat/completions')
             && $request['model'] === 'gpt-6-luna'
@@ -89,8 +89,8 @@ class ImageRoutingTest extends TestCase
             'api.openai.com/v1/images/generations' => Http::response(['data' => [['b64_json' => base64_encode('png')]]]),
         ]);
 
-        $this->ask('@ai buatkan gambar poster bertuliskan NORMCHAT');
-        $this->ask('@ai buatkan gambar senja di laut');
+        $this->ask('@normi buatkan gambar poster bertuliskan NORMCHAT');
+        $this->ask('@normi buatkan gambar senja di laut');
 
         $engines = collect(Http::recorded())
             ->filter(fn ($pair) => str_ends_with($pair[0]->url(), '/images/generations'))
@@ -108,7 +108,7 @@ class ImageRoutingTest extends TestCase
         $this->group->update(['ai_model' => 'gpt-6-astra']);
         $this->fakeOpenAi(['prompt' => 'Game character concept art', 'precise' => false]);
 
-        $this->ask('@ai buatkan gambar karakter game');
+        $this->ask('@normi buatkan gambar karakter game');
 
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/chat/completions') && $request['model'] === 'gpt-6-astra');
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/images/generations') && $request['model'] === 'gpt-image-2.5-sunburst');
@@ -133,7 +133,7 @@ class ImageRoutingTest extends TestCase
             'api.openai.com/v1/images/edits' => Http::response(['data' => [['b64_json' => base64_encode('edited-png')]]]),
         ]);
 
-        $this->ask('@ai gambarkan ulang foto ini dengan latar biru', $photo->id);
+        $this->ask('@normi gambarkan ulang foto ini dengan latar biru', $photo->id);
 
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/images/edits')
             && collect($request->data())->contains(fn ($part) => ($part['name'] ?? null) === 'image[]' && ($part['contents'] ?? null) === 'original-png'));
@@ -150,7 +150,7 @@ class ImageRoutingTest extends TestCase
             'api.openai.com/v1/images/generations' => Http::response(['data' => [['b64_json' => base64_encode('png')]]]),
         ]);
 
-        $this->ask('@ai buatkan gambar rumah adat Toraja');
+        $this->ask('@normi buatkan gambar rumah adat Toraja');
 
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/images/generations') && $request['prompt'] === 'rumah adat Toraja');
         $this->assertSame(['image'], array_column(AiUsageLog::firstOrFail()->breakdown_json['lines'], 'component'));
@@ -163,7 +163,7 @@ class ImageRoutingTest extends TestCase
             'api.openai.com/v1/images/generations' => Http::response(['data' => [['b64_json' => base64_encode('png')]]]),
         ]);
 
-        $this->ask('@ai buatkan gambar sepeda merah');
+        $this->ask('@normi buatkan gambar sepeda merah');
 
         $image = collect(AiUsageLog::firstOrFail()->breakdown_json['lines'])->firstWhere('component', 'image');
         $this->assertSame(1056, $image['tokens']['output_tokens']);
@@ -177,12 +177,12 @@ class ImageRoutingTest extends TestCase
             'api.openai.com/v1/images/generations' => Http::response(['error' => ['code' => 'server_error']], 500),
         ]);
 
-        $this->ask('@ai buatkan gambar sepeda merah');
+        $this->ask('@normi buatkan gambar sepeda merah');
 
         $this->assertSame(0, AiUsageLog::count());
         $this->assertSame(500.0, $this->group->groupToken->fresh()->credits);
         $this->assertSame(0.0, (float) $this->group->groupToken->fresh()->reserved_credits);
-        $this->assertSame('Gagal membuat gambar, coba lagi nanti.', Message::where('sender_type', 'ai')->value('content'));
+        $this->assertSame('Gagal membuat gambar. Coba lagi nanti.', Message::where('sender_type', 'ai')->value('content'));
     }
 
     private function fakeOpenAi(array $plan): void

@@ -1,5 +1,6 @@
 // Markup lampiran pesan (gambar, voice, video, file) dan pratinjau reply.
 
+import { renderCanvasCard } from './canvas.js';
 import { escapeAttr, escapeHtml } from './utils.js';
 
 export const formatAudioTime = (seconds) => {
@@ -39,16 +40,17 @@ export const pauseIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 
 const voiceWaveHeights = ['h-2', 'h-3', 'h-2', 'h-4', 'h-2', 'h-3', 'h-4', 'h-2', 'h-3', 'h-2', 'h-4', 'h-2'];
 
 const buildVoicePlayerMarkup = (safeUrl, sourceType, palette) => {
-	const isMine = palette === 'blue';
+	const isMine = palette === 'mine';
 	const playerClass = isMine
 		? 'border-white/15 text-white'
-		: (palette === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-100 text-slate-800');
+		: (palette === 'ai' ? 'border-coral-200 bg-coral-50 text-coral-900' : 'border-slate-200 bg-slate-100 text-slate-800');
 	const playerStyle = isMine ? 'style="background: var(--nc-mine);"' : '';
-	const buttonClass = isMine ? 'bg-white/20 text-white' : 'bg-emerald-500 text-white';
-	const sliderClass = isMine ? '' : 'accent-emerald-500';
+	const tone = palette === 'ai' ? 'coral' : 'navy';
+	const buttonClass = isMine ? 'bg-white/20 text-white' : (tone === 'coral' ? 'bg-coral-500 text-white' : 'bg-navy-500 text-white');
+	const sliderClass = isMine ? '' : (tone === 'coral' ? 'accent-coral-500' : 'accent-navy-500');
 	const sliderStyle = isMine ? 'style="accent-color: rgba(255,255,255,0.85);"' : '';
 	const timerClass = isMine ? 'text-white/80' : 'text-slate-500';
-	const waveClass = isMine ? 'bg-white/70' : 'bg-emerald-500/70';
+	const waveClass = isMine ? 'bg-white/70' : (tone === 'coral' ? 'bg-coral-500/70' : 'bg-navy-500/70');
 	const waveHtml = voiceWaveHeights
 		.map((heightClass) => `<span class="${heightClass} w-0.5 rounded-full ${waveClass} opacity-45" data-voice-bar></span>`)
 		.join('');
@@ -59,7 +61,7 @@ const buildVoicePlayerMarkup = (safeUrl, sourceType, palette) => {
 				<source src="${safeUrl}" type="${sourceType}">
 			</audio>
 			<div class="flex items-center gap-2">
-				<button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${buttonClass}" data-voice-toggle aria-label="Play voice note" aria-pressed="false">
+				<button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${buttonClass}" data-voice-toggle aria-label="Putar" aria-pressed="false">
 					${playIconSvg}
 				</button>
 				<div class="min-w-0 flex-1">
@@ -71,7 +73,7 @@ const buildVoicePlayerMarkup = (safeUrl, sourceType, palette) => {
 					</div>
 				</div>
 			</div>
-			<p class="mt-1 hidden text-[11px] ${timerClass}" data-voice-fallback-note>Audio mode kompatibilitas aktif. Tap player native di bawah.</p>
+			<p class="mt-1 hidden text-[11px] ${timerClass}" data-voice-fallback-note>Putar lewat pemutar di bawah.</p>
 		</div>
 	`;
 };
@@ -84,6 +86,10 @@ export const renderAttachment = (message, palette = 'slate', options = {}) => {
 
 	const mergedCaption = options?.mergedCaption === true;
 
+	if (String(message?.message_type || '').toLowerCase() === 'canvas') {
+		return renderCanvasCard(message);
+	}
+
 	const mime = String(message?.attachment_mime || '').toLowerCase();
 	const type = String(message?.message_type || 'text').toLowerCase();
 	const attachmentName = escapeHtml(message?.attachment_original_name || 'Lampiran');
@@ -93,7 +99,7 @@ export const renderAttachment = (message, palette = 'slate', options = {}) => {
 	const isVideo = type === 'video' || mime.startsWith('video/');
 
 	if (type === 'image' || mime.startsWith('image/')) {
-		const border = palette === 'blue' ? 'border-blue-200 bg-blue-50' : (palette === 'emerald' ? 'border-emerald-100 bg-emerald-50' : 'border-slate-200 bg-white');
+		const border = palette === 'mine' ? 'border-navy-200 bg-navy-50' : (palette === 'ai' ? 'border-coral-100 bg-coral-50' : 'border-slate-200 bg-white');
 		if (mergedCaption) {
 			return `
 				<a href="${safeUrl}" class="block overflow-hidden rounded-t-[20px]" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="${safeNameAttr}" data-attachment-frame="1">
@@ -110,9 +116,9 @@ export const renderAttachment = (message, palette = 'slate', options = {}) => {
 	}
 
 	if (isVideo) {
-		const frameClass = palette === 'blue'
-			? 'border-blue-200 bg-blue-50'
-			: (palette === 'emerald' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white');
+		const frameClass = palette === 'mine'
+			? 'border-navy-200 bg-navy-50'
+			: (palette === 'ai' ? 'border-coral-200 bg-coral-50' : 'border-slate-200 bg-white');
 		if (mergedCaption) {
 			return `
 				<button type="button" class="block w-full overflow-hidden rounded-t-[20px] bg-black" data-message-body="1" data-attachment-open="1" data-attachment-kind="video" data-attachment-url="${safeUrl}" data-attachment-name="${safeNameAttr}" data-attachment-frame="1">
@@ -140,9 +146,9 @@ export const renderAttachment = (message, palette = 'slate', options = {}) => {
 		return buildVoicePlayerMarkup(safeUrl, sourceType, palette).replace('data-voice-player="1"', 'data-voice-player="1" data-message-body="1"');
 	}
 
-	const fileToneClass = palette === 'blue'
-		? 'border-blue-200 bg-blue-50 text-blue-800'
-		: (palette === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700');
+	const fileToneClass = palette === 'mine'
+		? 'border-navy-200 bg-navy-50 text-navy-800'
+		: (palette === 'ai' ? 'border-coral-200 bg-coral-50 text-coral-800' : 'border-slate-200 bg-white text-slate-700');
 	const fileMarginClass = mergedCaption ? '' : 'mb-2';
 
 	return `
@@ -178,9 +184,9 @@ export const renderReplyPreview = (message, palette = 'slate') => {
 	}
 
 	const safeSummary = escapeHtml(summary.slice(0, 120));
-	const toneClass = palette === 'blue'
+	const toneClass = palette === 'mine'
 		? 'nc-reply-chip--mine'
-		: (palette === 'emerald' ? 'nc-reply-chip--ai' : 'nc-reply-chip--other');
+		: (palette === 'ai' ? 'nc-reply-chip--ai' : 'nc-reply-chip--other');
 
 	return `
 		<button type="button" data-reply-jump="${replyTo.id}" data-reply-quote="${safeQuoteAttr}" class="nc-reply-chip ${toneClass} mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">

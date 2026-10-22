@@ -1,11 +1,12 @@
-// Pencarian grup di beranda.
+// Pencarian grup: di beranda mobile dan di sidebar desktop. Tiap kotak pencarian
+// menyaring kartu di dalam wadah [data-group-search-scope] miliknya sendiri.
 
 export const initGroupSearch = () => {
-	(() => {
-		const searchInput = document.querySelector('[data-group-search-input]');
-		const emptyEl = document.querySelector('[data-group-search-empty]');
-		if (!searchInput) return;
-		const cards = Array.from(document.querySelectorAll('[data-group-card]'));
+	document.querySelectorAll('[data-group-search-input]').forEach((searchInput) => {
+		const scope = searchInput.closest('[data-group-search-scope]') || document;
+		const emptyEl = scope.querySelector('[data-group-search-empty]');
+		const cards = Array.from(scope.querySelectorAll('[data-group-card]'));
+
 		searchInput.addEventListener('input', () => {
 			const q = searchInput.value.trim().toLowerCase();
 			let matches = 0;
@@ -17,5 +18,5 @@ export const initGroupSearch = () => {
 			});
 			if (emptyEl) emptyEl.classList.toggle('hidden', matches > 0 || !q);
 		});
-	})();
+	});
 };

@@ -9,7 +9,7 @@ use Throwable;
 
 class DocxChatExporter implements ChatExporter
 {
-    private const LINK_STYLE = ['color' => '2563EB', 'underline' => 'single'];
+    private const LINK_STYLE = ['color' => '1E2E43', 'underline' => 'single'];
 
     /** @var list<string> berkas gambar sementara, dihapus setelah dokumen ditulis */
     private array $tempFiles = [];
@@ -23,7 +23,7 @@ class DocxChatExporter implements ChatExporter
     {
         $word = new PhpWord();
         $section = $word->addSection();
-        $section->addTitle('Normchat Export - ' . $groupName, 1);
+        $section->addTitle('Normi Chat Export - ' . $groupName, 1);
         $section->addText('Generated at: ' . now()->format('Y-m-d H:i:s'));
         $section->addTextBreak(1);
 

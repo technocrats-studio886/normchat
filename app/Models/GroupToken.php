@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Saldo Normkredit grup yang terlihat (1 NK = Rp120 secara default, desimal 0,01 NK).
  *
- * remaining_credits = kredit bersama + seluruh kredit terlindungi yang belum ditahan.
+ * remaining_credits = kredit grup yang belum ditahan; dipakai penuh oleh semua anggota.
  * Perubahan saldo hanya lewat App\Services\Credits\CreditWallet.
  */
 class GroupToken extends Model
@@ -19,7 +19,6 @@ class GroupToken extends Model
         'total_credits',
         'used_credits',
         'remaining_credits',
-        'shared_credits',
         'reserved_credits',
     ];
 
@@ -27,7 +26,6 @@ class GroupToken extends Model
         'total_credits' => 'float',
         'used_credits' => 'float',
         'remaining_credits' => 'float',
-        'shared_credits' => 'float',
         'reserved_credits' => 'float',
     ];
 
@@ -52,7 +50,6 @@ class GroupToken extends Model
             'total_credits' => 0,
             'used_credits' => 0,
             'remaining_credits' => 0,
-            'shared_credits' => 0,
             'reserved_credits' => 0,
         ]);
     }

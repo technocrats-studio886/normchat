@@ -4,13 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#c0267a">
-    <meta name="description" content="Normchat — chatting ramean dengan AI, lebih mudah lebih murah. Satu grup, satu saldo, satu asisten AI yang dipakai bareng seluruh tim dan komunitas.">
-    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192.png') }}">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('icons/icon-512.png') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
-    <title>Normchat — Chatting Ramean dengan AI, Lebih Mudah Lebih Murah</title>
+    <meta name="theme-color" content="#121C29">
+    <meta name="description" content="Normi Chat — chatting ramean dengan AI, lebih mudah lebih murah. Satu grup, satu saldo, satu asisten AI yang dipakai bareng seluruh tim dan komunitas.">
+    @include('partials.brand-head')
+    <title>Normi Chat — Chatting Ramean dengan AI, Lebih Mudah Lebih Murah</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@700;800&display=swap" rel="stylesheet">
@@ -18,16 +15,17 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --nc-pink: #c0267a;
-            --nc-magenta: #d63384;
-            --nc-orange: #f59e0b;
-            --nc-peach: #f97316;
-            --nc-dark: #1a1a2e;
-            --nc-dark-2: #16213e;
-            --nc-text: #f1f1f1;
-            --nc-text-soft: #b8b8cc;
-            --nc-grad: linear-gradient(135deg, #c0267a, #e8456b, #f97316, #f59e0b);
-            --nc-grad-btn: linear-gradient(135deg, #c0267a 0%, #f97316 100%);
+            /* Palet logo: latar navy, aksen coral. Tanpa gradasi. */
+            --nc-pink: #FB6856;
+            --nc-magenta: #FB6856;
+            --nc-orange: #FB6856;
+            --nc-peach: #FC8474;
+            --nc-dark: #121C29;
+            --nc-dark-2: #1E2E43;
+            --nc-text: #F3F5F8;
+            --nc-text-soft: #A1B0C5;
+            --nc-grad: #FB6856;
+            --nc-grad-btn: #FB6856;
         }
 
         html { scroll-behavior: smooth; }
@@ -76,11 +74,8 @@
             text-decoration: none;
         }
         .logo-img {
-            width: 36px;
+            width: 34px;
             height: 36px;
-            border-radius: 10px;
-            background: #fff;
-            padding: 3px;
         }
         .logo-text {
             font-family: 'Poppins', sans-serif;
@@ -112,19 +107,6 @@
             text-align: center;
             position: relative;
         }
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: -60px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: min(500px, 92vw);
-            height: min(500px, 92vw);
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(192,38,122,0.15) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
         .hero-badge {
             display: inline-flex;
             align-items: center;
@@ -164,10 +146,7 @@
             overflow-wrap: anywhere;
         }
         .hero h1 .grad {
-            background: var(--nc-grad);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--nc-pink);
         }
 
         .hero-sub {
@@ -203,11 +182,11 @@
             border: none;
             cursor: pointer;
             transition: transform 0.15s, box-shadow 0.2s;
-            box-shadow: 0 4px 24px -6px rgba(192,38,122,0.35);
+            box-shadow: 0 4px 24px -6px rgba(251, 104, 86,0.35);
         }
         .btn-main:hover {
             transform: translateY(-1px);
-            box-shadow: 0 8px 32px -6px rgba(192,38,122,0.45);
+            box-shadow: 0 8px 32px -6px rgba(251, 104, 86,0.45);
         }
         .btn-main:active { transform: scale(0.98); }
 
@@ -264,7 +243,7 @@
             transition: border-color 0.25s, background 0.25s;
         }
         .feature-card:hover {
-            border-color: rgba(192,38,122,0.25);
+            border-color: rgba(251, 104, 86,0.25);
             background: rgba(255,255,255,0.05);
         }
         .feature-icon {
@@ -275,8 +254,8 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 16px;
-            background: rgba(192,38,122,0.12);
-            color: #e8456b;
+            background: rgba(251, 104, 86,0.12);
+            color: #E94E3C;
             font-size: 18px;
         }
         .feature-card h3 {
@@ -373,8 +352,8 @@
             max-width: 480px;
             margin: 0 auto;
             border-radius: 20px;
-            border: 1px solid rgba(192,38,122,0.2);
-            background: linear-gradient(160deg, rgba(192,38,122,0.08) 0%, rgba(249,115,22,0.06) 100%);
+            border: 1px solid rgba(251, 104, 86,0.2);
+            background: rgba(251, 104, 86, 0.06);
             padding: 36px 32px;
             text-align: center;
         }
@@ -430,8 +409,8 @@
             width: 20px;
             height: 20px;
             border-radius: 6px;
-            background: rgba(192,38,122,0.12);
-            color: #e8456b;
+            background: rgba(251, 104, 86,0.12);
+            color: #E94E3C;
             font-size: 11px;
             font-weight: 700;
             display: inline-flex;
@@ -452,11 +431,11 @@
             border: none;
             cursor: pointer;
             transition: transform 0.15s, box-shadow 0.2s;
-            box-shadow: 0 4px 24px -6px rgba(192,38,122,0.3);
+            box-shadow: 0 4px 24px -6px rgba(251, 104, 86,0.3);
         }
         .pricing-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 8px 32px -6px rgba(192,38,122,0.4);
+            box-shadow: 0 8px 32px -6px rgba(251, 104, 86,0.4);
         }
 
         /* ── Footer ─── */
@@ -646,8 +625,8 @@
     <header class="site-header">
         <div class="container header-inner">
             <a href="{{ $landingUrl }}" class="logo-link">
-                <img src="{{ asset('normchat-logo.png') }}" alt="Normchat" class="logo-img" />
-                <span class="logo-text">Normchat</span>
+                <img src="{{ asset('brand/logo-mark-white.svg') }}" alt="Normi Chat" class="logo-img" />
+                <span class="logo-text">Normi Chat</span>
             </a>
             <a href="{{ $loginToSubscriptionUrl }}" class="header-cta">Masuk</a>
         </div>
@@ -668,7 +647,7 @@
                 </h1>
 
                 <p class="hero-sub fade-up fade-up-d2">
-                    Normchat menyatukan grup chat dan asisten AI dalam satu ruang.
+                    Normi Chat menyatukan grup chat dan asisten AI dalam satu ruang.
                     Kumpulkan tim atau komunitasmu, patungan Normkredit, lalu pakai AI bareng —
                     tanpa ribet langganan sendiri-sendiri.
                 </p>
@@ -745,13 +724,13 @@
         <!-- Value Spotlight -->
         <section class="pricing" id="kenapa-normchat">
             <div class="container">
-                <p class="section-label">Kenapa Normchat</p>
+                <p class="section-label">Kenapa Normi Chat</p>
                 <h2 class="section-title">Bukan sekadar grup chat — ini AI yang dipakai bareng.</h2>
 
                 <div class="pricing-card fade-up">
                     <p class="pricing-label">AI-first Group Experience</p>
                     <p class="pricing-name">Satu ruang chat, satu saldo AI, untuk seluruh anggota.</p>
-                    <p class="pricing-desc">Fokus tim tetap di percakapan. Normchat yang mengurus AI, saldo, dan konteksnya — biar kamu cukup berpikir dan mengerjakan.</p>
+                    <p class="pricing-desc">Fokus tim tetap di percakapan. Normi Chat yang mengurus AI, saldo, dan konteksnya — biar kamu cukup berpikir dan mengerjakan.</p>
 
                     <ul class="pricing-features">
                         <li>Onboarding singkat via Share ID + password</li>
@@ -771,7 +750,7 @@
     <!-- Footer -->
     <footer class="site-footer">
         <div class="container">
-            <p class="footer-text">&copy; {{ date('Y') }} Normchat — chatting ramean dengan AI, lebih mudah lebih murah.</p>
+            <p class="footer-text">&copy; {{ date('Y') }} Normi Chat — chatting ramean dengan AI, lebih mudah lebih murah.</p>
         </div>
     </footer>
 </body>

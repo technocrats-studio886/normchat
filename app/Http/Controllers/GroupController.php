@@ -64,16 +64,14 @@ class GroupController extends Controller
         ]);
 
         if ($isSuperadmin) {
-            $this->membership->activateGroup($group, $user, Funding::bypass($quote->credits, $request->sharePercent(), $this->bypassReference('GROUP')));
+            $this->membership->activateGroup($group, $user, Funding::bypass($quote->credits, $this->bypassReference('GROUP')));
 
             return redirect()->route('chat.show', $group)
-                ->with('success', 'Group "' . $group->name . '" berhasil dibuat!');
+                ->with('success', 'Grup "' . $group->name . '" berhasil dibuat.');
         }
 
         try {
-            return redirect()->away($this->checkout->start($user, $group, PaymentPurpose::GroupCreate, $quote, [
-                'share_percent' => $request->sharePercent(),
-            ]));
+            return redirect()->away($this->checkout->start($user, $group, PaymentPurpose::GroupCreate, $quote));
         } catch (CheckoutFailedException $e) {
             $group->forceDelete();
 
@@ -108,26 +106,25 @@ class GroupController extends Controller
         }
 
         if ($group->hasActiveMember($user)) {
-            return redirect()->route('chat.show', $group)->with('info', 'Anda sudah menjadi member group ini.');
+            return redirect()->route('chat.show', $group)->with('info', 'Kamu sudah bergabung di grup ini.');
         }
 
         if (! Hash::check($request->validated('password'), $group->password_hash)) {
-            return back()->withErrors(['password' => 'Password grup salah.'])->withInput();
+            return back()->withErrors(['password' => 'Kata sandi salah.'])->withInput();
         }
 
         $quote = $this->pricing->quotePackages($request->packages());
 
         if ($user->isSuperadmin()) {
-            $this->membership->activateJoin($group, $user, Funding::bypass($quote->credits, $request->sharePercent(), $this->bypassReference('JOIN')));
+            $this->membership->activateJoin($group, $user, Funding::bypass($quote->credits, $this->bypassReference('JOIN')));
 
             return redirect()->route('chat.show', $group)
-                ->with('success', 'Berhasil bergabung ke group "' . $group->name . '"!');
+                ->with('success', 'Kamu bergabung ke grup "' . $group->name . '".');
         }
 
         try {
             return redirect()->away($this->checkout->start($user, $group, PaymentPurpose::GroupJoin, $quote, [
                 'share_id' => $shareId,
-                'share_percent' => $request->sharePercent(),
             ]));
         } catch (CheckoutFailedException $e) {
             return back()->withErrors(['payment' => $e->getMessage()]);
@@ -142,11 +139,11 @@ class GroupController extends Controller
         abort_unless((int) $member->group_id === (int) $group->id, 404);
 
         if ((int) $member->user_id === (int) $group->owner_id) {
-            return back()->withErrors(['member' => 'Owner tidak dapat diubah rolenya dari menu ini.']);
+            return back()->withErrors(['member' => 'Peran pemilik grup tidak bisa diubah.']);
         }
 
         if ((int) $member->user_id === (int) $request->user()->id) {
-            return back()->withErrors(['member' => 'Kamu tidak dapat mengubah role akun sendiri dari menu ini.']);
+            return back()->withErrors(['member' => 'Kamu tidak bisa mengubah peranmu sendiri.']);
         }
 
         $roleKey = $request->validate(['role' => ['required', 'in:' . Role::ADMIN . ',' . Role::MEMBER]])['role'];
@@ -155,7 +152,7 @@ class GroupController extends Controller
         AuditLog::record('group.member_role_changed', $request->user()->id, $member, ['role' => $roleKey], $group->id);
         event(new GroupMembershipChanged((int) $group->id, (int) $member->user_id, 'role_changed', $roleKey));
 
-        return back()->with('success', 'Role member berhasil diperbarui.');
+        return back()->with('success', 'Peran anggota diperbarui.');
     }
 
     public function removeMember(Request $request, Group $group, GroupMember $member): RedirectResponse
@@ -164,11 +161,11 @@ class GroupController extends Controller
         abort_unless((int) $member->group_id === (int) $group->id, 404);
 
         if ((int) $member->user_id === (int) $group->owner_id) {
-            return back()->withErrors(['member' => 'Owner tidak dapat dihapus dari group.']);
+            return back()->withErrors(['member' => 'Pemilik grup tidak bisa dikeluarkan.']);
         }
 
         if ((int) $member->user_id === (int) $request->user()->id) {
-            return back()->withErrors(['member' => 'Kamu tidak dapat menghapus akun sendiri dari group.']);
+            return back()->withErrors(['member' => 'Kamu tidak bisa mengeluarkan dirimu sendiri.']);
         }
 
         $member->delete();
@@ -176,7 +173,7 @@ class GroupController extends Controller
         AuditLog::record('group.member_removed', $request->user()->id, $member, [], $group->id);
         event(new GroupMembershipChanged((int) $group->id, (int) $member->user_id, 'removed', null));
 
-        return back()->with('success', 'Member berhasil dihapus dari group.');
+        return back()->with('success', 'Anggota dikeluarkan dari grup.');
     }
 
     public function destroy(Request $request, Group $group): RedirectResponse

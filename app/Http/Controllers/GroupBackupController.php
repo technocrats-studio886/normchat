@@ -18,7 +18,7 @@ class GroupBackupController extends Controller
 
         CreateBackupSnapshotJob::dispatch($group->id, $request->user()->id);
 
-        return back()->with('success', 'Job backup snapshot dikirim ke queue Redis.');
+        return back()->with('success', 'Cadangan sedang dibuat.');
     }
 
     public function restore(Request $request, Group $group, GroupBackup $backup, GroupBackups $backups): RedirectResponse
@@ -34,6 +34,6 @@ class GroupBackupController extends Controller
             return back()->withErrors(['backup' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Backup berhasil dipulihkan. Riwayat recovery telah dicatat.');
+        return back()->with('success', 'Chat berhasil dipulihkan.');
     }
 }

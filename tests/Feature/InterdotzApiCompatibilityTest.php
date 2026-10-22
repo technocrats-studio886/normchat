@@ -50,7 +50,7 @@ class InterdotzApiCompatibilityTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('client_id', 'test-client-id')
-            ->assertJsonPath('app.name', 'Normchat')
+            ->assertJsonPath('app.name', 'Normi Chat')
             ->assertJsonPath('app.logo_url', 'https://normchat.twenti.studio/normchat-logo.png')
             ->assertJsonPath('app.icon_url', 'https://normchat.twenti.studio/icons/icon-192.png')
             ->assertJsonPath('payload.client_id', 'test-client-id')

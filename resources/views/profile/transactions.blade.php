@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Riwayat Transaksi - Normchat'])
+@extends('layouts.app', ['title' => 'Riwayat Pembayaran - Normi Chat'])
 
 @section('content')
     <section class="px-4 pb-6 pt-5">
@@ -7,39 +7,39 @@
             Kembali
         </a>
 
-        <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Riwayat Transaksi</h1>
-        <p class="mt-1 text-sm text-slate-500">Semua pembayaran yang pernah kamu lakukan di Normchat.</p>
+        <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Riwayat Pembayaran</h1>
+        <p class="mt-1 text-sm text-slate-500">Semua pembayaranmu.</p>
 
         {{-- Summary stats --}}
         <div class="mt-4 grid grid-cols-2 gap-2">
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Total Dibayar</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">Rp{{ number_format($totalSpentIdr, 0, ',', '.') }}</p>
             </div>
-            <div class="rounded-2xl border border-[#dbe6ff] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Normkredit</p>
-                <p class="mt-1 text-sm font-bold text-emerald-700">+{{ number_format($totalCreditsEarned, 2, ',', '.') }}</p>
+                <p class="mt-1 text-sm font-bold text-navy-700">+{{ number_format($totalCreditsEarned, 2, ',', '.') }}</p>
             </div>
         </div>
 
         {{-- Filters --}}
         <form method="GET" action="{{ route('profile.transactions') }}" class="mt-5 flex flex-wrap items-center gap-2">
-            <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Filter</label>
-            <select name="range" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+            <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tampilkan</label>
+            <select name="range" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
                 <option value="all" {{ $range === 'all' ? 'selected' : '' }}>Semua</option>
                 <option value="week" {{ $range === 'week' ? 'selected' : '' }}>1 Minggu</option>
                 <option value="month" {{ $range === 'month' ? 'selected' : '' }}>1 Bulan</option>
                 <option value="3month" {{ $range === '3month' ? 'selected' : '' }}>3 Bulan</option>
             </select>
 
-            <select name="source" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-                <option value="all" {{ $source === 'all' ? 'selected' : '' }}>Semua Jenis</option>
-                <option value="group_creation" {{ $source === 'group_creation' ? 'selected' : '' }}>Pembuatan Grup</option>
-                <option value="patungan" {{ $source === 'patungan' ? 'selected' : '' }}>Patungan</option>
-                <option value="topup" {{ $source === 'topup' ? 'selected' : '' }}>Top-up</option>
+            <select name="source" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
+                <option value="all" {{ $source === 'all' ? 'selected' : '' }}>Semua</option>
+                <option value="group_creation" {{ $source === 'group_creation' ? 'selected' : '' }}>Buat grup</option>
+                <option value="patungan" {{ $source === 'patungan' ? 'selected' : '' }}>Gabung grup</option>
+                <option value="topup" {{ $source === 'topup' ? 'selected' : '' }}>Isi Normkredit</option>
             </select>
 
-            <select name="sort" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+            <select name="sort" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
                 <option value="desc" {{ $sortDir === 'desc' ? 'selected' : '' }}>Terbaru</option>
                 <option value="asc" {{ $sortDir === 'asc' ? 'selected' : '' }}>Terlama</option>
             </select>
@@ -52,19 +52,19 @@
             @forelse($transactions as $item)
                 @php
                     $sourceLabel = match($item->source) {
-                        'patungan' => 'Patungan gabung',
-                        'patungan_midtrans' => 'Patungan gabung',
-                        'topup' => 'Top-up normkredit',
-                        'topup_midtrans' => 'Top-up normkredit',
-                        'interdotz_topup', 'interdotz_charge_topup' => 'Top-up normkredit',
-                        'group_creation' => 'Pembuatan grup',
-                        'group_creation_midtrans' => 'Pembuatan grup',
-                        default => ucfirst(str_replace('_', ' ', (string) $item->source)),
+                        'patungan' => 'Gabung grup',
+                        'patungan_midtrans' => 'Gabung grup',
+                        'topup' => 'Isi Normkredit',
+                        'topup_midtrans' => 'Isi Normkredit',
+                        'interdotz_topup', 'interdotz_charge_topup' => 'Isi Normkredit',
+                        'group_creation' => 'Buat grup',
+                        'group_creation_midtrans' => 'Buat grup',
+                        default => 'Lainnya',
                     };
                     $sourceColor = match($item->source) {
-                        'patungan', 'patungan_midtrans' => 'bg-indigo-50 text-indigo-600',
-                        'topup', 'topup_midtrans', 'interdotz_topup', 'interdotz_charge_topup' => 'bg-emerald-50 text-emerald-600',
-                        'group_creation', 'group_creation_midtrans' => 'bg-amber-50 text-amber-600',
+                        'patungan', 'patungan_midtrans' => 'bg-navy-50 text-navy-600',
+                        'topup', 'topup_midtrans', 'interdotz_topup', 'interdotz_charge_topup' => 'bg-navy-50 text-navy-600',
+                        'group_creation', 'group_creation_midtrans' => 'bg-coral-50 text-coral-600',
                         default => 'bg-slate-50 text-slate-600',
                     };
                     $groupName = $item->group?->name ?? 'Tanpa grup';
@@ -92,14 +92,14 @@
                                     <p class="text-xs font-bold text-slate-900">
                                                                                     Rp{{ number_format((int) $item->price_paid, 0, ',', '.') }}
                                     </p>
-                                    <p class="text-[10px] font-semibold text-emerald-600">+{{ number_format((float) $item->credit_amount, 2, ',', '.') }} normkredit</p>
+                                    <p class="text-[10px] font-semibold text-navy-600">+{{ number_format((float) $item->credit_amount, 2, ',', '.') }} Normkredit</p>
                                 </div>
                             </div>
                             <div class="mt-1.5 flex items-center justify-between gap-2">
                                 <p class="text-[10px] text-slate-400">{{ $item->created_at?->timezone(config('app.display_timezone', config('app.timezone')))->format('d M Y, H:i') }}</p>
                             </div>
                             @if($item->payment_reference)
-                                <p class="mt-1 truncate font-mono text-[10px] text-slate-400">{{ $item->payment_reference }}</p>
+                                <p class="mt-1 truncate font-mono text-[10px] text-slate-400">No. transaksi: {{ $item->payment_reference }}</p>
                             @endif
                         </div>
                     </div>
@@ -107,8 +107,8 @@
             @empty
                 <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-8 w-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
-                    <p class="mt-2 text-sm font-semibold text-slate-600">Belum ada transaksi</p>
-                    <p class="mt-1 text-xs text-slate-400">Pembayaran yang kamu lakukan akan muncul di sini.</p>
+                    <p class="mt-2 text-sm font-semibold text-slate-600">Belum ada pembayaran</p>
+                    <p class="mt-1 text-xs text-slate-400">Pembayaranmu akan muncul di sini.</p>
                 </div>
             @endforelse
         </div>

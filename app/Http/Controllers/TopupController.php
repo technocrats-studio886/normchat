@@ -36,7 +36,7 @@ class TopupController extends Controller
 
         if (! $group) {
             return redirect()->route('groups.index')
-                ->with('info', 'Top-up Normkredit hanya bisa dilakukan dari dalam grup.');
+                ->with('info', 'Isi Normkredit dari halaman grup.');
         }
 
         session([self::SESSION_GROUP_KEY => (int) $group->id]);
@@ -49,12 +49,12 @@ class TopupController extends Controller
         $lockedGroupId = (int) session(self::SESSION_GROUP_KEY, 0);
         if ($lockedGroupId <= 0) {
             return redirect()->route('groups.index')
-                ->withErrors(['payment' => 'Top-up Normkredit harus dimulai dari halaman grup.']);
+                ->withErrors(['payment' => 'Isi Normkredit dari halaman grup.']);
         }
 
         if ($lockedGroupId !== (int) $request->validated('group_id')) {
             return redirect()->route('groups.index')
-                ->withErrors(['payment' => 'Top-up harus dilakukan dari grup aktif yang sama.']);
+                ->withErrors(['payment' => 'Isi Normkredit dari halaman grup.']);
         }
 
         $user = $request->user();
@@ -64,7 +64,7 @@ class TopupController extends Controller
         $quote = $this->pricing->quotePackages($request->packages());
 
         if ($user->isSuperadmin()) {
-            $ledger->credit($group, $user, Funding::bypass($quote->credits, $request->sharePercent(), 'SA-TOPUP-' . strtoupper(Str::random(8))), 'topup');
+            $ledger->credit($group, $user, Funding::bypass($quote->credits, 'SA-TOPUP-' . strtoupper(Str::random(8))), 'topup');
 
             return redirect()->route('subscription.tokens.buy.success')->with('token_purchase', [
                 'normkredits' => $quote->credits,
@@ -76,9 +76,7 @@ class TopupController extends Controller
         }
 
         try {
-            return redirect()->away($checkout->start($user, $group, PaymentPurpose::Topup, $quote, [
-                'share_percent' => $request->sharePercent(),
-            ]));
+            return redirect()->away($checkout->start($user, $group, PaymentPurpose::Topup, $quote));
         } catch (CheckoutFailedException $e) {
             return back()->withErrors(['payment' => $e->getMessage()]);
         }

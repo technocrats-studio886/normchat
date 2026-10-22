@@ -22,7 +22,7 @@ class PaymentCallbackController extends Controller
             ->first();
 
         if (! $pending) {
-            return redirect()->route('groups.index')->with('info', 'Referensi pembayaran tidak ditemukan.');
+            return redirect()->route('groups.index')->with('info', 'Pembayaran tidak ditemukan.');
         }
 
         if ($pending->status === 'pending') {
@@ -33,9 +33,9 @@ class PaymentCallbackController extends Controller
         return match ($pending->status) {
             'paid' => $this->redirectAfterPaid($pending),
             'failed', 'expired' => redirect()->route('groups.index')
-                ->with('info', 'Pembayaran gagal atau kedaluwarsa. Silakan coba kembali.'),
+                ->with('info', 'Pembayaran gagal atau sudah kedaluwarsa. Coba lagi.'),
             default => redirect()->route('groups.index')
-                ->with('info', 'Pembayaran sedang diproses. Mohon tunggu beberapa saat.'),
+                ->with('info', 'Pembayaran sedang diproses. Tunggu sebentar.'),
         };
     }
 
@@ -46,10 +46,10 @@ class PaymentCallbackController extends Controller
 
         return match (PaymentPurpose::tryFrom((string) $pending->payment_type)) {
             PaymentPurpose::GroupCreate, PaymentPurpose::GroupJoin => $group
-                ? redirect()->route('chat.show', $group)->with('success', 'Pembayaran berhasil dikonfirmasi.')
-                : redirect()->route('groups.index')->with('success', 'Pembayaran berhasil dikonfirmasi.'),
+                ? redirect()->route('chat.show', $group)->with('success', 'Pembayaran berhasil.')
+                : redirect()->route('groups.index')->with('success', 'Pembayaran berhasil.'),
             PaymentPurpose::Topup => redirect()->route('subscription.tokens.buy.success')
-                ->with('success', 'Top-up berhasil dikonfirmasi.')
+                ->with('success', 'Normkredit berhasil ditambahkan.')
                 ->with('token_purchase', [
                     'group_name' => (string) ($meta['group_name'] ?? $group?->name ?? 'Grup'),
                     'normkredits' => (int) ($meta['credits'] ?? 0),
@@ -57,7 +57,7 @@ class PaymentCallbackController extends Controller
                     'payment_method' => 'midtrans',
                     'payment_unit' => 'IDR',
                 ]),
-            default => redirect()->route('groups.index')->with('success', 'Pembayaran berhasil dikonfirmasi.'),
+            default => redirect()->route('groups.index')->with('success', 'Pembayaran berhasil.'),
         };
     }
 }

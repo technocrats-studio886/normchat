@@ -219,7 +219,7 @@ class AiDocumentGenerator
             }
         }
 
-        return 'Dokumen NormAI';
+        return 'Dokumen Normi AI';
     }
 
     private function splitParagraphs(string $markdown): array

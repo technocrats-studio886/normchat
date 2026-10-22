@@ -7,6 +7,7 @@ use App\Exceptions\CheckoutFailedException;
 use App\Models\Group;
 use App\Models\PendingPayment;
 use App\Models\User;
+use App\Services\NormkreditPricing;
 use Illuminate\Support\Str;
 
 /**
@@ -15,8 +16,10 @@ use Illuminate\Support\Str;
  */
 class NormkreditCheckout
 {
-    public function __construct(private readonly PaymentGateway $gateway)
-    {
+    public function __construct(
+        private readonly PaymentGateway $gateway,
+        private readonly NormkreditPricing $pricing,
+    ) {
     }
 
     /**
@@ -27,12 +30,13 @@ class NormkreditCheckout
     public function start(User $user, Group $group, PaymentPurpose $purpose, PaymentQuote $quote, array $metadata = []): string
     {
         if (! $this->gateway->isConfigured()) {
-            throw new CheckoutFailedException('Sistem pembayaran belum dikonfigurasi.');
+            throw new CheckoutFailedException('Pembayaran belum tersedia. Coba lagi nanti.');
         }
 
         $orderId = $this->uniqueOrderId($purpose->orderPrefix());
 
-        // Biaya layanan dilebur ke satu item agar tagihan QRIS hanya satu baris.
+        // Halaman Normi Chat hanya menampilkan harga paket; biaya layanan QRIS baru muncul
+        // sebagai baris tersendiri di halaman pembayaran Midtrans.
         $session = $this->gateway->createCheckout(new CheckoutRequest(
             customer: $user,
             orderId: $orderId,
@@ -40,6 +44,8 @@ class NormkreditCheckout
             itemId: $purpose->itemId((int) $group->id),
             itemName: $purpose->itemName((string) $group->name, $quote->credits),
             finishUrl: route('groups.payment.callback', ['order' => $orderId]),
+            serviceFee: $quote->serviceFee,
+            serviceFeeLabel: 'Biaya layanan QRIS ' . $this->pricing->feePercentLabel() . '%',
         ));
 
         PendingPayment::create([

@@ -12,13 +12,16 @@ use Throwable;
 
 /**
  * Memproses antrean pesan satu grup secara berurutan (dikunci per grup) dan
- * menyerahkan tiap pesan ke NormAI.
+ * menyerahkan tiap pesan ke Normi AI.
  */
 class ProcessGroupChatQueueJob implements ShouldQueue
 {
     use Queueable;
 
     public int $tries = 3;
+
+    /** Deep Research, Canvas, dan gambar bisa memakan beberapa menit. */
+    public int $timeout = 600;
 
     public function __construct(public int $groupId)
     {
@@ -27,7 +30,7 @@ class ProcessGroupChatQueueJob implements ShouldQueue
 
     public function handle(): void
     {
-        $lock = Cache::lock('group-chat-queue:' . $this->groupId, 30);
+        $lock = Cache::lock('group-chat-queue:' . $this->groupId, $this->timeout);
 
         if (! $lock->get()) {
             $this->release(2);
