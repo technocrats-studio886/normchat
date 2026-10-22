@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\Message;
-use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
@@ -36,51 +35,12 @@ class DatabaseSeeder extends Seeder
             'provider_user_id' => 'admin-demo-1',
         ]);
 
+        $this->call(RolePermissionSeeder::class);
+
         $roles = [
-            'owner' => Role::create(['key' => 'owner', 'name' => 'Owner', 'description' => 'Pemilik grup']),
-            'admin' => Role::create(['key' => 'admin', 'name' => 'Admin', 'description' => 'Operator grup']),
-            'member' => Role::create(['key' => 'member', 'name' => 'Member', 'description' => 'Anggota grup']),
-            'ai' => Role::create(['key' => 'ai', 'name' => 'AI', 'description' => 'AI participant']),
+            'owner' => Role::forKey(Role::OWNER),
+            'admin' => Role::forKey(Role::ADMIN),
         ];
-
-        $permissionKeys = [
-            'add_member',
-            'remove_member',
-            'add_ai',
-            'change_password',
-            'set_approval',
-            'export_chat',
-            'recover_history',
-            'manage_billing',
-            'pin_message',
-            'delete_message',
-            'view_audit_log',
-        ];
-
-        $permissionMap = [];
-
-        foreach ($permissionKeys as $key) {
-            $permission = Permission::create([
-                'key' => $key,
-                'name' => str($key)->replace('_', ' ')->title(),
-                'description' => 'Permission '.$key,
-            ]);
-
-            $permissionMap[$key] = $permission->id;
-            $roles['owner']->permissions()->syncWithoutDetaching($permission->id);
-        }
-
-        foreach (['add_member', 'remove_member', 'export_chat', 'pin_message', 'delete_message', 'view_audit_log'] as $adminKey) {
-            if (isset($permissionMap[$adminKey])) {
-                $roles['admin']->permissions()->syncWithoutDetaching($permissionMap[$adminKey]);
-            }
-        }
-
-        foreach (['export_chat'] as $memberKey) {
-            if (isset($permissionMap[$memberKey])) {
-                $roles['member']->permissions()->syncWithoutDetaching($permissionMap[$memberKey]);
-            }
-        }
 
         $group = Group::create([
             'name' => 'Normchat Core Team',

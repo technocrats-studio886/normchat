@@ -70,10 +70,6 @@ return [
         'output_usd_per_mtok' => 5.00,
     ],
 
-    // Gateway checkout Normkredit: 'midtrans' (Snap langsung) atau 'interdotz'
-    // (Midtrans lewat Interdotz; butuh NORMCHAT_INTERDOTZ_ENABLED=true).
-    'payment_gateway' => env('NORMCHAT_PAYMENT_GATEWAY', 'midtrans'),
-
     'superadmin_emails' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env('NORMCHAT_SUPERADMIN_EMAILS', 'superadmin@interdotz.com'))

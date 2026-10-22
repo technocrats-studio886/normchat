@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f7720c5f211faebd8709171f9bff2481",
+    "content-hash": "9ec61a7549b4b7fc0938976d76a71715",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -1524,107 +1524,6 @@
                 }
             ],
             "time": "2025-08-22T14:27:06+00:00"
-        },
-        {
-            "name": "interdotz/sdk-laravel",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/technocrats-studio886/interdotz-sdk-laravel.git",
-                "reference": "732cd18f769579a33741c941661fa485bd274c3f"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/technocrats-studio886/interdotz-sdk-laravel/zipball/732cd18f769579a33741c941661fa485bd274c3f",
-                "reference": "732cd18f769579a33741c941661fa485bd274c3f",
-                "shasum": ""
-            },
-            "require": {
-                "illuminate/contracts": "^11.0|^12.0|^13.0",
-                "illuminate/support": "^11.0|^12.0|^13.0",
-                "interdotz/sdk-php": "^1.0",
-                "php": "^8.2"
-            },
-            "require-dev": {
-                "mockery/mockery": "^1.6",
-                "orchestra/testbench": "^9.0",
-                "phpunit/phpunit": "^11.0"
-            },
-            "default-branch": true,
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Interdotz\\Laravel\\InterdotzServiceProvider"
-                    ],
-                    "aliases": {
-                        "Interdotz": "Interdotz\\Laravel\\Facades\\Interdotz"
-                    }
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Interdotz\\Laravel\\": "src/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "Interdotz\\Laravel\\Tests\\": "tests/"
-                }
-            },
-            "license": [
-                "MIT"
-            ],
-            "description": "Laravel wrapper for the Interdotz PHP SDK",
-            "support": {
-                "source": "https://github.com/technocrats-studio886/interdotz-sdk-laravel/tree/main",
-                "issues": "https://github.com/technocrats-studio886/interdotz-sdk-laravel/issues"
-            },
-            "time": "2026-04-18T21:23:38+00:00"
-        },
-        {
-            "name": "interdotz/sdk-php",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/technocrats-studio886/interdotz-sdk-php.git",
-                "reference": "4e197dcef66dbe7cbcf1a212730788c20b972791"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/technocrats-studio886/interdotz-sdk-php/zipball/4e197dcef66dbe7cbcf1a212730788c20b972791",
-                "reference": "4e197dcef66dbe7cbcf1a212730788c20b972791",
-                "shasum": ""
-            },
-            "require": {
-                "guzzlehttp/guzzle": "^7.0",
-                "php": "^8.2"
-            },
-            "require-dev": {
-                "mockery/mockery": "^1.6",
-                "phpunit/phpunit": "^11.0"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Interdotz\\Sdk\\": "src/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "Interdotz\\Sdk\\Tests\\": "tests/"
-                }
-            },
-            "license": [
-                "MIT"
-            ],
-            "description": "Official PHP SDK for Interdotz ecosystem",
-            "support": {
-                "source": "https://github.com/technocrats-studio886/interdotz-sdk-php/tree/main",
-                "issues": "https://github.com/technocrats-studio886/interdotz-sdk-php/issues"
-            },
-            "time": "2026-04-21T15:38:21+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -10376,19 +10275,9 @@
             "time": "2025-12-08T11:19:18+00:00"
         }
     ],
-    "aliases": [
-        {
-            "package": "interdotz/sdk-php",
-            "version": "dev-main",
-            "alias": "1.0.0",
-            "alias_normalized": "1.0.0.0"
-        }
-    ],
+    "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "interdotz/sdk-laravel": 20,
-        "interdotz/sdk-php": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

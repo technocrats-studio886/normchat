@@ -27,7 +27,6 @@ class MidtransPaymentFlowTest extends TestCase
         parent::setUp();
 
         config()->set('normchat.superadmin_emails', []);
-        config()->set('normchat.payment_gateway', 'midtrans');
         config()->set('services.midtrans.server_key', self::SERVER_KEY);
         config()->set('services.midtrans.is_production', false);
     }

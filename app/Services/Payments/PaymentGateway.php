@@ -6,7 +6,7 @@ use App\Exceptions\CheckoutFailedException;
 use App\Models\PendingPayment;
 use App\Models\User;
 
-/** Penyedia halaman pembayaran. Implementasi aktif dipilih lewat config normchat.payment_gateway. */
+/** Penyedia halaman pembayaran. Implementasi aktif: MidtransGateway. */
 interface PaymentGateway
 {
     public function name(): string;
