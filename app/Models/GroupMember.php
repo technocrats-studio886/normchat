@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
@@ -15,11 +16,19 @@ class GroupMember extends Model
         'invited_by',
         'approved_by',
         'joined_at',
+        'last_read_message_id',
+        'last_read_at',
     ];
 
     protected $casts = [
         'joined_at' => 'datetime',
+        'last_read_at' => 'datetime',
     ];
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active');
+    }
 
     public function group(): BelongsTo
     {

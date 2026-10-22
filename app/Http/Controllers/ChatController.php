@@ -2,306 +2,265 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MessageDeleted;
 use App\Events\MessageSent;
+use App\Events\MessageUpdated;
+use App\Http\Requests\SendMessageRequest;
+use App\Jobs\ProcessGroupChatQueueJob;
 use App\Models\AuditLog;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
+use App\Models\GroupMember;
 use App\Models\Message;
-use App\Jobs\ProcessGroupChatQueueJob;
-use Illuminate\Http\UploadedFile;
+use App\Models\MessageVersion;
+use App\Models\PollVote;
+use App\Services\Chat\AttachmentStorage;
+use App\Services\Chat\MentionNotifier;
+use App\Services\Chat\MessagePresenter;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatController extends Controller
 {
-    public function openLast(): RedirectResponse
-    {
-        $userId = (int) Auth::id();
-        $lastGroupId = (int) session('last_chat_group_id', 0);
+    private const VISIBLE_MESSAGES = 80;
 
-        if ($lastGroupId > 0) {
-            $lastGroup = Group::query()
-                ->where('id', $lastGroupId)
-                ->where(function ($query) use ($userId) {
-                    $query->where('owner_id', $userId)
-                        ->orWhereHas('members', fn ($q) => $q->where('user_id', $userId)->where('status', 'active'));
-                })
-                ->first();
-
-            if ($lastGroup) {
-                return redirect()->route('chat.show', $lastGroup);
-            }
-        }
-
-        $fallbackGroup = Group::query()
-            ->where('owner_id', $userId)
-            ->orWhereHas('members', fn ($q) => $q->where('user_id', $userId)->where('status', 'active'))
-            ->latest('updated_at')
-            ->first();
-
-        if ($fallbackGroup) {
-            return redirect()->route('chat.show', $fallbackGroup);
-        }
-
-        return redirect()->route('groups.index');
+    public function __construct(
+        private readonly MessagePresenter $presenter,
+        private readonly MentionNotifier $mentions,
+    ) {
     }
 
-    public function show(Group $group): View
+    /** Buka chat terakhir yang dikunjungi, atau grup yang paling baru aktif. */
+    public function openLast(Request $request): RedirectResponse
+    {
+        $groups = Group::query()->visibleTo($request->user());
+        $group = (clone $groups)->find((int) session('last_chat_group_id', 0))
+            ?? $groups->latest('updated_at')->first();
+
+        return $group ? redirect()->route('chat.show', $group) : redirect()->route('groups.index');
+    }
+
+    public function show(Request $request, Group $group): View
     {
         $this->authorize('chat', $group);
-
         session(['last_chat_group_id' => $group->id]);
 
-        $group->load(['owner', 'members.user', 'aiConnections']);
+        $group->load(['owner', 'members.user', 'members.role', 'groupToken']);
 
         $messages = Message::query()
             ->where('group_id', $group->id)
-            ->with('sender:id,name')
+            ->with(['sender:id,name', 'replyToMessage.sender:id,name', 'aiUsage:id,response_message_id,charged_credits,balance_after'])
+            ->withCount('versions')
             ->orderByDesc('id')
-            ->take(80)
+            ->take(self::VISIBLE_MESSAGES)
             ->get()
             ->reverse()
             ->values();
 
-        $activeGroupAi = $group->aiConnections->first();
-        $ownerProvider = $activeGroupAi ? ucfirst((string) $activeGroupAi->provider) : null;
-        $mentionSuggestions = $this->buildMentionSuggestions($group, $activeGroupAi?->provider);
+        $lastReadMessageId = (int) ($this->membership($group, $request)?->last_read_message_id ?? 0);
+        $latestMessageId = (int) Message::where('group_id', $group->id)->max('id');
 
         return view('chat.show', [
             'group' => $group,
             'messages' => $messages,
-            'ownerProvider' => $ownerProvider,
-            'activeAi' => $ownerProvider ? collect([$ownerProvider]) : collect(),
-            'activeGroupAi' => $activeGroupAi,
-            'mentionSuggestions' => $mentionSuggestions,
+            'mentionSuggestions' => $this->mentions->suggestionsFor($group, $request->user()),
+            'lastReadMessageId' => $lastReadMessageId,
+            'latestMessageId' => $latestMessageId,
+            'unreadCount' => $latestMessageId > 0 ? $this->unreadCount($group, $lastReadMessageId) : 0,
         ]);
     }
 
-    public function store(Request $request, Group $group): RedirectResponse|JsonResponse
+    public function markRead(Request $request, Group $group): JsonResponse
     {
         $this->authorize('chat', $group);
+        $requestedId = (int) ($request->validate(['last_read_message_id' => ['nullable', 'integer']])['last_read_message_id'] ?? 0);
 
-        $validated = $request->validate([
-            'content' => ['nullable', 'string', 'max:3000'],
-            'attachment' => ['nullable', 'file', 'max:15360', 'mimes:jpg,jpeg,png,webp,gif,heic,heif,mp3,wav,ogg,webm,mp4,aac,m4a'],
-        ]);
-
-        $content = trim((string) ($validated['content'] ?? ''));
-        $attachment = $request->file('attachment');
-
-        if ($content === '' && ! $attachment instanceof UploadedFile) {
-            return back()->withErrors(['content' => 'Kirim teks, gambar, atau voice note.'])->withInput();
+        $member = $this->membership($group, $request);
+        if (! $member) {
+            return response()->json(['ok' => false, 'message' => 'membership_not_found'], 404);
         }
 
+        $latestMessageId = (int) Message::where('group_id', $group->id)->max('id');
+        if ($latestMessageId <= 0) {
+            return response()->json(['ok' => true, 'last_read_message_id' => (int) $member->last_read_message_id, 'unread_count' => 0]);
+        }
+
+        $targetReadId = $requestedId > 0 ? min($requestedId, $latestMessageId) : $latestMessageId;
+        if ($targetReadId > (int) $member->last_read_message_id) {
+            $member->update(['last_read_message_id' => $targetReadId, 'last_read_at' => now()]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'last_read_message_id' => (int) $member->last_read_message_id,
+            'unread_count' => $this->unreadCount($group, (int) $member->last_read_message_id),
+        ]);
+    }
+
+    public function store(SendMessageRequest $request, Group $group, AttachmentStorage $attachments): RedirectResponse|JsonResponse
+    {
+        $this->authorize('chat', $group);
+        $user = $request->user();
+        $content = $request->content();
+
         try {
-            $message = Cache::lock('group-chat-submit:'.$group->id, 10)->block(3, function () use ($group, $content, $attachment) {
-                $messageType = $this->resolveMessageType($attachment);
+            // Dikunci per grup agar urutan pesan dan antrean AI tetap berurutan.
+            $message = Cache::lock('group-chat-submit:' . $group->id, 10)->block(3, function () use ($request, $group, $user, $content, $attachments) {
+                $replyTarget = Message::where('group_id', $group->id)->find((int) $request->input('reply_to_message_id'));
+                $quote = $request->replyQuoteText();
 
-                $attachmentPath = null;
-                $attachmentDisk = null;
-                $attachmentMime = null;
-                $attachmentSize = null;
-                $attachmentOriginalName = null;
-
-                if ($attachment instanceof UploadedFile) {
-                    $attachmentDisk = 'normchat_attachments';
-                    $extension = strtolower((string) $attachment->getClientOriginalExtension());
-                    $clientMime = strtolower((string) $attachment->getClientMimeType());
-                    $safeExtension = $extension !== '' ? $extension : ($messageType === 'image' ? 'jpg' : 'webm');
-                    $attachmentPath = sprintf(
-                        'group-%d/%s/%s.%s',
-                        $group->id,
-                        now()->format('Y/m'),
-                        (string) Str::uuid(),
-                        $safeExtension
-                    );
-
-                    Storage::disk($attachmentDisk)->put($attachmentPath, file_get_contents($attachment->getRealPath()));
-
-                    $attachmentMime = $this->normalizeAttachmentMime($messageType, $clientMime, $safeExtension);
-                    $attachmentSize = (int) $attachment->getSize();
-                    $attachmentOriginalName = (string) $attachment->getClientOriginalName();
-                }
-
-                $createdMessage = Message::create([
+                $message = Message::create([
                     'group_id' => $group->id,
-                    'message_type' => $messageType,
+                    'message_type' => 'text',
                     'sender_type' => 'user',
-                    'sender_id' => Auth::id(),
+                    'sender_id' => $user->id,
+                    'reply_to_message_id' => $replyTarget?->id,
+                    'reply_quote_text' => $replyTarget && $quote !== '' ? $quote : null,
                     'content' => $content !== '' ? $content : null,
-                    'attachment_disk' => $attachmentDisk,
-                    'attachment_path' => $attachmentPath,
-                    'attachment_mime' => $attachmentMime,
-                    'attachment_original_name' => $attachmentOriginalName,
-                    'attachment_size' => $attachmentSize,
+                    ...($request->hasFile('attachment') ? $attachments->store($request->file('attachment'), $group) : []),
                 ]);
 
-                if ($messageType === 'text') {
-                    ChatMessageQueue::create([
-                        'group_id' => $group->id,
-                        'message_id' => $createdMessage->id,
-                        'status' => 'queued',
-                        'queued_at' => now(),
-                    ]);
+                if (Message::isAiPrompt($content, $replyTarget)) {
+                    ChatMessageQueue::enqueue($message);
                 }
 
-                AuditLog::create([
-                    'group_id' => $group->id,
-                    'actor_id' => Auth::id(),
-                    'action' => 'chat.send_message',
-                    'target_type' => Message::class,
-                    'target_id' => $createdMessage->id,
-                    'created_at' => now(),
-                ]);
+                AuditLog::record('chat.send_message', $user->id, $message, [], $group->id);
 
-                return $createdMessage;
+                return $message;
             });
         } catch (LockTimeoutException) {
             return back()->withErrors(['content' => 'Chat sedang sibuk. Coba kirim ulang dalam beberapa detik.']);
         }
 
-        if ($message->message_type === 'text') {
+        $message->loadCount('versions');
+        if ($message->isAddressedToAi()) {
             ProcessGroupChatQueueJob::dispatch($group->id);
         }
 
-        $payload = [
-            'id' => $message->id,
-            'message_type' => $message->message_type,
-            'sender_type' => $message->sender_type,
-            'sender_id' => $message->sender_id,
-            'sender_name' => Auth::user()?->name,
-            'content' => $message->content,
-            'attachment_url' => $message->attachment_path
-                ? route('chat.attachment', ['group' => $group->id, 'message' => $message->id])
-                : null,
-            'attachment_mime' => $message->attachment_mime,
-            'attachment_original_name' => $message->attachment_original_name,
-            'created_at' => optional($message->created_at)->toIso8601String(),
-        ];
-
+        $payload = $this->presenter->present($message, $user->name, ['group_credits_remaining' => $group->groupToken?->credits ?? 0]);
         event(new MessageSent($group->id, $payload));
 
-        if ($request->expectsJson()) {
-            return response()->json([
-                'ok' => true,
-                'message' => $payload,
-            ], 201);
+        if ($content !== '') {
+            $this->mentions->notify($group, $message, $user, $content);
         }
 
-        return redirect()->route('chat.show', $group);
+        return $request->expectsJson()
+            ? response()->json(['ok' => true, 'message' => $payload], 201)
+            : redirect()->route('chat.show', $group);
+    }
+
+    public function update(Request $request, Group $group, Message $message): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+
+        $user = $request->user();
+        abort_unless($message->sender_type === 'user' && (int) $message->sender_id === (int) $user->id, 403);
+
+        $nextContent = trim((string) $request->validate(['content' => ['required', 'string', 'max:3000']])['content']);
+        if ($nextContent === '') {
+            return response()->json(['ok' => false, 'message' => 'content_required'], 422);
+        }
+
+        $previousContent = (string) ($message->content ?? '');
+        if ($previousContent !== $nextContent) {
+            MessageVersion::create([
+                'message_id' => $message->id,
+                'version_number' => max(((int) $message->versions()->max('version_number')) + 1, 1),
+                'content_snapshot' => $previousContent,
+                'edited_by' => $user->id,
+                'edited_at' => now(),
+            ]);
+            $message->update(['content' => $nextContent]);
+
+            // Hanya mention yang baru ditambahkan yang diberi notifikasi.
+            $newHandles = array_values(array_diff($this->mentions->handlesIn($nextContent), $this->mentions->handlesIn($previousContent)));
+            $this->mentions->notify($group, $message, $user, $nextContent, $newHandles);
+
+            if ($message->isAddressedToAi()) {
+                ChatMessageQueue::enqueue($message);
+                ProcessGroupChatQueueJob::dispatch($group->id);
+            }
+
+            AuditLog::record('chat.edit_message', $user->id, $message, [
+                'old_length' => mb_strlen($previousContent),
+                'new_length' => mb_strlen($nextContent),
+            ], $group->id);
+        }
+
+        $message->loadCount('versions');
+        $payload = $this->presenter->present($message, $user->name, ['group_credits_remaining' => $group->groupToken?->credits ?? 0]);
+        event(new MessageUpdated((int) $group->id, $payload));
+
+        return response()->json(['ok' => true, 'message' => $payload]);
+    }
+
+    public function destroy(Request $request, Group $group, Message $message): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+
+        $user = $request->user();
+        abort_unless($group->isModerator($user), 403);
+
+        PollVote::where('poll_message_id', $message->id)->delete();
+        $message->delete();
+
+        event(new MessageDeleted((int) $group->id, (int) $message->id, (int) $user->id, (string) $user->name));
+        AuditLog::record('chat.delete_message', $user->id, $message, [
+            'sender_type' => $message->sender_type,
+            'sender_id' => $message->sender_id,
+            'message_type' => $message->message_type,
+        ], $group->id);
+
+        return response()->json(['ok' => true, 'message_id' => (int) $message->id]);
     }
 
     public function attachment(Group $group, Message $message): StreamedResponse
     {
         $this->authorize('chat', $group);
-
         abort_unless((int) $message->group_id === (int) $group->id, 404);
         abort_if(! $message->attachment_path || ! $message->attachment_disk, 404);
 
-        return Storage::disk($message->attachment_disk)->response(
-            $message->attachment_path,
-            $message->attachment_original_name ?? basename($message->attachment_path),
-            [
-                'Content-Type' => $message->attachment_mime ?: 'application/octet-stream',
-                'Cache-Control' => 'private, max-age=3600',
-            ]
-        );
-    }
+        $disk = Storage::disk($message->attachment_disk);
+        abort_unless($disk->exists($message->attachment_path), 404);
+        $stream = $disk->readStream($message->attachment_path);
+        abort_unless(is_resource($stream), 404);
 
-    private function resolveMessageType(?UploadedFile $attachment): string
-    {
-        if (! $attachment instanceof UploadedFile) {
-            return 'text';
-        }
+        $mime = $message->attachment_mime ?: 'application/octet-stream';
+        $filename = $message->attachment_original_name ?? basename($message->attachment_path);
+        $inline = preg_match('#^(image|audio|video)/#', $mime) === 1
+            || in_array($message->message_type, ['image', 'voice', 'video'], true)
+            || $mime === 'application/pdf';
 
-        $mime = strtolower((string) $attachment->getMimeType());
-        $clientMime = strtolower((string) $attachment->getClientMimeType());
-        $extension = strtolower((string) $attachment->getClientOriginalExtension());
-        if (str_starts_with($mime, 'image/')) {
-            return 'image';
-        }
-
-        if (str_starts_with($mime, 'audio/') || str_starts_with($clientMime, 'audio/')) {
-            return 'voice';
-        }
-
-        // Some desktop/mobile browsers return video/webm for microphone recordings.
-        if ($extension === 'webm' && (str_starts_with($mime, 'video/') || str_starts_with($clientMime, 'video/'))) {
-            return 'voice';
-        }
-
-        if (in_array($extension, ['mp3', 'wav', 'ogg', 'aac', 'm4a'], true)) {
-            return 'voice';
-        }
-
-        return 'file';
-    }
-
-    private function normalizeAttachmentMime(string $messageType, string $clientMime, string $extension): string
-    {
-        if ($messageType === 'voice') {
-            if ($clientMime !== '' && str_starts_with($clientMime, 'audio/')) {
-                return $clientMime;
+        return response()->stream(function () use ($stream) {
+            fpassthru($stream);
+            if (is_resource($stream)) {
+                fclose($stream);
             }
-
-            return match ($extension) {
-                'mp3' => 'audio/mpeg',
-                'wav' => 'audio/wav',
-                'ogg' => 'audio/ogg',
-                'aac' => 'audio/aac',
-                'm4a' => 'audio/m4a',
-                default => 'audio/webm',
-            };
-        }
-
-        return $clientMime !== '' ? $clientMime : 'application/octet-stream';
+        }, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
     }
 
-    private function buildMentionSuggestions(Group $group, ?string $activeProvider): array
+    private function membership(Group $group, Request $request): ?GroupMember
     {
-        $users = collect([$group->owner])
-            ->merge($group->members->pluck('user'))
-            ->filter()
-            ->unique('id')
-            ->map(fn ($user) => [
-                'type' => 'user',
-                'label' => (string) $user->name,
-                'insert' => '@'.strtolower(str_replace(' ', '_', (string) $user->name)),
-            ])
-            ->values();
+        return GroupMember::query()->active()->where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
+    }
 
-        $providerKey = match (strtolower((string) $activeProvider)) {
-            'chatgpt' => 'openai',
-            'anthropic' => 'claude',
-            'google' => 'gemini',
-            default => strtolower((string) $activeProvider),
-        };
-        $aiMentions = match ($providerKey) {
-            'openai' => [
-                ['type' => 'ai', 'label' => 'AI (OpenAI)', 'insert' => '@ai'],
-                ['type' => 'ai', 'label' => 'ChatGPT', 'insert' => '@chatgpt'],
-            ],
-            'claude' => [
-                ['type' => 'ai', 'label' => 'AI (Claude)', 'insert' => '@ai'],
-                ['type' => 'ai', 'label' => 'Claude', 'insert' => '@claude'],
-            ],
-            'gemini' => [
-                ['type' => 'ai', 'label' => 'AI (Gemini)', 'insert' => '@ai'],
-                ['type' => 'ai', 'label' => 'Gemini', 'insert' => '@gemini'],
-            ],
-            default => [
-                ['type' => 'ai', 'label' => 'AI', 'insert' => '@ai'],
-            ],
-        };
-
-        return collect($aiMentions)->merge($users)->values()->all();
+    private function unreadCount(Group $group, int $lastReadMessageId): int
+    {
+        return (int) Message::query()
+            ->where('group_id', $group->id)
+            ->when($lastReadMessageId > 0, fn ($query) => $query->where('id', '>', $lastReadMessageId))
+            ->count();
     }
 }

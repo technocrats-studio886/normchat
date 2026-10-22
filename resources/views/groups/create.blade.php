@@ -1,79 +1,72 @@
 @extends('layouts.app', ['title' => 'Buat Group - Normchat'])
 
 @section('content')
-    <section class="page-shell pt-4">
-        <h1 class="mb-4 text-xl font-extrabold text-slate-900 font-display">Buat Group Chat</h1>
+    <section class="page-shell pt-5">
+        <a href="{{ route('groups.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700">
+            <span aria-hidden="true">&larr;</span> Kembali
+        </a>
 
-        <form method="POST" action="{{ route('groups.store') }}" class="space-y-3">
+        <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Buat Group Chat</h1>
+        <p class="mt-1 text-sm text-slate-500">Buat grup, aktifkan AI bersama, lalu undang member untuk patungan Normkredit.</p>
+
+        <form method="POST" action="{{ route('groups.store') }}" class="mt-6 space-y-3" id="createGroupForm">
             @csrf
 
             {{-- Nama Group --}}
             <div class="panel-card px-4 py-3">
-                <input type="text" name="name" value="{{ old('name') }}" placeholder="Nama Group" required class="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nama Group</label>
+                <input type="text" name="name" value="{{ old('name') }}" placeholder="Contoh: Tim Marketing" required class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
             </div>
 
             {{-- Deskripsi --}}
             <div class="panel-card px-4 py-3">
-                <textarea name="description" rows="2" placeholder="Deskripsi Group" class="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 resize-none">{{ old('description') }}</textarea>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Deskripsi</label>
+                <textarea name="description" rows="2" placeholder="Deskripsi singkat grup ini" class="mt-1 w-full resize-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400">{{ old('description') }}</textarea>
             </div>
 
-            {{-- Password (wajib) --}}
+            {{-- Password --}}
             <div class="panel-card px-4 py-3">
-                <h3 class="text-sm font-bold text-slate-900">Password Grup</h3>
-                <p class="text-xs text-slate-500">Member harus memasukkan password saat bergabung via Share ID.</p>
-                <input type="password" name="password" value="{{ old('password') }}" placeholder="Buat password grup" required minlength="4" class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none" />
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Password Grup</label>
+                <p class="text-xs text-slate-500">Member harus memasukkan password saat join via Share ID.</p>
+                <div class="relative mt-2">
+                    <input id="groupPasswordInput" type="password" name="password" value="{{ old('password') }}" placeholder="Buat password grup" required minlength="4" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                    <button type="button" data-password-toggle="groupPasswordInput" class="absolute inset-y-0 right-2 inline-flex items-center text-slate-400 hover:text-slate-600" aria-label="Lihat password" title="Lihat password">
+                        <svg data-eye-icon="off" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <svg data-eye-icon="on" xmlns="http://www.w3.org/2000/svg" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m3 3 18 18" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58a2 2 0 1 0 2.83 2.83" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.88 5.09A10.94 10.94 0 0 1 12 5c4.48 0 8.27 2.94 9.54 7a11.05 11.05 0 0 1-4.2 5.17" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.61 6.61A11.05 11.05 0 0 0 2.46 12c1.27 4.06 5.06 7 9.54 7 1.58 0 3.09-.37 4.42-1.03" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             {{-- Owner Control --}}
             <div class="panel-card px-4 py-3">
-                <h3 class="text-sm font-bold text-slate-900">Owner Control</h3>
-                <p class="text-xs text-slate-500">Member masuk hanya melalui Share ID + password</p>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Owner Control</label>
                 <label class="mt-2 flex items-center gap-2 text-xs text-slate-600">
-                    <input type="checkbox" name="approval_enabled" value="1" class="rounded border-slate-300">
+                    <input type="checkbox" name="approval_enabled" value="1" class="rounded border-slate-300" {{ old('approval_enabled') ? 'checked' : '' }}>
                     Wajib approval sebelum join
                 </label>
             </div>
 
-            {{-- AI Provider info (auto from owner) --}}
             <div class="panel-card px-4 py-3">
-                <h3 class="text-sm font-bold text-slate-900">AI Provider</h3>
-                <p class="text-xs text-slate-500">Otomatis menggunakan provider yang kamu connect saat login.</p>
-                <div class="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                    @php
-                        $authProvider = Auth::user()->auth_provider;
-                        $providerLogoPng = "provider-logos/{$authProvider}.png";
-                        $providerLogoSvg = "provider-logos/{$authProvider}.svg";
-                        $providerLogoFile = file_exists(public_path($providerLogoPng))
-                            ? $providerLogoPng
-                            : (file_exists(public_path($providerLogoSvg)) ? $providerLogoSvg : null);
-                        $providerLabel = match($authProvider) {
-                            'chatgpt' => 'ChatGPT',
-                            'claude' => 'Claude',
-                            'gemini' => 'Gemini',
-                            default => ucfirst($authProvider),
-                        };
-                        $providerColor = match($authProvider) {
-                            'chatgpt' => 'bg-[#10A37F]',
-                            'claude' => 'bg-[#D97706]',
-                            'gemini' => 'bg-[#4285F4]',
-                            default => 'bg-slate-500',
-                        };
-                    @endphp
-                    @if($providerLogoFile)
-                        <img src="{{ asset($providerLogoFile) }}" alt="{{ $providerLabel }} Logo" class="h-6 w-6 rounded-md object-contain" />
-                    @else
-                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md {{ $providerColor }} text-white">
-                            <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 24C12 24 12 12 24 12C12 12 12 0 12 0C12 0 12 12 0 12C12 12 12 24 12 24Z"/>
-                            </svg>
-                        </span>
-                    @endif
-                    <span class="text-sm font-semibold text-slate-700">{{ $providerLabel }}</span>
-                    <span class="ml-auto text-xs text-emerald-600 font-semibold">Connected</span>
-                </div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Dana AI awal grup</p>
+                <p class="mt-1 text-sm text-slate-700"><strong>{{ number_format($quote->credits, 0, ',', '.') }} Normkredit</strong> · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</p>
             </div>
 
-            <button type="submit" class="btn-cta">Create Group</button>
+            @include('partials.share-picker', ['credits' => $quote->credits])
+
+            @include('partials.payment-total', ['quote' => $quote])
+
+            <button type="submit" class="btn-cta">Bayar Rp{{ number_format($quote->total(), 0, ',', '.') }} · Buat Group</button>
+            @error('payment')
+                <p class="px-1 text-xs text-red-500">{{ $message }}</p>
+            @enderror
         </form>
     </section>
 @endsection

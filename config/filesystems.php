@@ -1,5 +1,12 @@
 <?php
 
+$configuredNormchatStorageRoot = trim((string) env('NORMCHAT_STORAGE_ROOT', ''));
+$defaultNormchatStorageRoot = storage_path('app/normchat');
+$normchatStorageRoot = ($configuredNormchatStorageRoot !== '' && is_dir($configuredNormchatStorageRoot))
+    ? $configuredNormchatStorageRoot
+    : $defaultNormchatStorageRoot;
+$normchatStorageRoot = rtrim($normchatStorageRoot, '/');
+
 return [
 
     /*
@@ -62,28 +69,28 @@ return [
 
         'normchat_root' => [
             'driver' => 'local',
-            'root' => env('NORMCHAT_STORAGE_ROOT', '/opt/normchat/storage'),
+            'root' => $normchatStorageRoot,
             'throw' => false,
             'report' => false,
         ],
 
         'normchat_exports' => [
             'driver' => 'local',
-            'root' => env('NORMCHAT_STORAGE_ROOT', '/opt/normchat/storage').'/exports',
+            'root' => $normchatStorageRoot.'/exports',
             'throw' => false,
             'report' => false,
         ],
 
         'normchat_backups' => [
             'driver' => 'local',
-            'root' => env('NORMCHAT_STORAGE_ROOT', '/opt/normchat/storage').'/backups',
+            'root' => $normchatStorageRoot.'/backups',
             'throw' => false,
             'report' => false,
         ],
 
         'normchat_attachments' => [
             'driver' => 'local',
-            'root' => env('NORMCHAT_STORAGE_ROOT', '/opt/normchat/storage').'/attachments',
+            'root' => $normchatStorageRoot.'/attachments',
             'throw' => false,
             'report' => false,
         ],

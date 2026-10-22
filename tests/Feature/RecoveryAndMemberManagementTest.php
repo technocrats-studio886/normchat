@@ -24,7 +24,7 @@ class RecoveryAndMemberManagementTest extends TestCase
         Storage::fake('normchat_backups');
 
         $owner = User::factory()->create();
-        $admin = User::factory()->create();
+        $member = User::factory()->create();
 
         $group = Group::query()->create([
             'name' => 'Recovery Group',
@@ -43,12 +43,13 @@ class RecoveryAndMemberManagementTest extends TestCase
             'included_seats' => 2,
         ]);
 
-        $adminRole = Role::query()->create(['key' => 'admin', 'name' => 'Admin']);
+        // Admin boleh restore (policy 15 April); member biasa tidak.
+        $memberRole = Role::query()->create(['key' => 'member', 'name' => 'Member']);
 
         GroupMember::query()->create([
             'group_id' => $group->id,
-            'user_id' => $admin->id,
-            'role_id' => $adminRole->id,
+            'user_id' => $member->id,
+            'role_id' => $memberRole->id,
             'status' => 'active',
             'joined_at' => now(),
         ]);
@@ -80,7 +81,7 @@ class RecoveryAndMemberManagementTest extends TestCase
             'created_at' => now(),
         ]);
 
-        $this->actingAs($admin)
+        $this->actingAs($member)
             ->post(route('settings.backup.restore', [$group, $backup]), ['reason' => 'test'])
             ->assertForbidden();
     }
@@ -153,7 +154,7 @@ class RecoveryAndMemberManagementTest extends TestCase
         ]);
     }
 
-    public function test_member_remove_requires_remove_member_permission(): void
+    public function test_only_owner_can_remove_member(): void
     {
         $owner = User::factory()->create();
         $admin = User::factory()->create();
@@ -195,14 +196,16 @@ class RecoveryAndMemberManagementTest extends TestCase
             'joined_at' => now(),
         ]);
 
-        $this->actingAs($admin)
-            ->post(route('groups.members.remove', [$group, $memberMembership]))
-            ->assertForbidden();
-
+        // Sejak policy 15 April, hapus member khusus owner — admin tetap ditolak
+        // walau rolenya punya permission remove_member.
         $removePermission = Permission::query()->create(['key' => 'remove_member', 'name' => 'Remove Member']);
         $adminRole->permissions()->attach($removePermission->id);
 
         $this->actingAs($admin)
+            ->post(route('groups.members.remove', [$group, $memberMembership]))
+            ->assertForbidden();
+
+        $this->actingAs($owner)
             ->post(route('groups.members.remove', [$group, $memberMembership]))
             ->assertRedirect();
 

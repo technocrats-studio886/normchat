@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4f61cda947bef312eabab66a21522484",
+    "content-hash": "f7720c5f211faebd8709171f9bff2481",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -1524,6 +1524,107 @@
                 }
             ],
             "time": "2025-08-22T14:27:06+00:00"
+        },
+        {
+            "name": "interdotz/sdk-laravel",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/technocrats-studio886/interdotz-sdk-laravel.git",
+                "reference": "732cd18f769579a33741c941661fa485bd274c3f"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/technocrats-studio886/interdotz-sdk-laravel/zipball/732cd18f769579a33741c941661fa485bd274c3f",
+                "reference": "732cd18f769579a33741c941661fa485bd274c3f",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "interdotz/sdk-php": "^1.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "mockery/mockery": "^1.6",
+                "orchestra/testbench": "^9.0",
+                "phpunit/phpunit": "^11.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Interdotz\\Laravel\\InterdotzServiceProvider"
+                    ],
+                    "aliases": {
+                        "Interdotz": "Interdotz\\Laravel\\Facades\\Interdotz"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Interdotz\\Laravel\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Interdotz\\Laravel\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Laravel wrapper for the Interdotz PHP SDK",
+            "support": {
+                "source": "https://github.com/technocrats-studio886/interdotz-sdk-laravel/tree/main",
+                "issues": "https://github.com/technocrats-studio886/interdotz-sdk-laravel/issues"
+            },
+            "time": "2026-04-18T21:23:38+00:00"
+        },
+        {
+            "name": "interdotz/sdk-php",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/technocrats-studio886/interdotz-sdk-php.git",
+                "reference": "4e197dcef66dbe7cbcf1a212730788c20b972791"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/technocrats-studio886/interdotz-sdk-php/zipball/4e197dcef66dbe7cbcf1a212730788c20b972791",
+                "reference": "4e197dcef66dbe7cbcf1a212730788c20b972791",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "mockery/mockery": "^1.6",
+                "phpunit/phpunit": "^11.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Interdotz\\Sdk\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Interdotz\\Sdk\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Official PHP SDK for Interdotz ecosystem",
+            "support": {
+                "source": "https://github.com/technocrats-studio886/interdotz-sdk-php/tree/main",
+                "issues": "https://github.com/technocrats-studio886/interdotz-sdk-php/issues"
+            },
+            "time": "2026-04-21T15:38:21+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -5349,6 +5450,57 @@
                 "source": "https://github.com/MyIntervals/PHP-CSS-Parser/tree/v9.3.0"
             },
             "time": "2026-03-03T17:31:43+00:00"
+        },
+        {
+            "name": "smalot/pdfparser",
+            "version": "v2.12.5",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/smalot/pdfparser.git",
+                "reference": "2cfa0d92bd557875c9f52a75fde0e8392302a354"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/smalot/pdfparser/zipball/2cfa0d92bd557875c9f52a75fde0e8392302a354",
+                "reference": "2cfa0d92bd557875c9f52a75fde0e8392302a354",
+                "shasum": ""
+            },
+            "require": {
+                "ext-iconv": "*",
+                "ext-zlib": "*",
+                "php": ">=7.1",
+                "symfony/polyfill-mbstring": "^1.18"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-0": {
+                    "Smalot\\PdfParser\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0"
+            ],
+            "authors": [
+                {
+                    "name": "Sebastien MALOT",
+                    "email": "sebastien@malot.fr"
+                }
+            ],
+            "description": "Pdf parser library. Can read and extract information from pdf file.",
+            "homepage": "https://www.pdfparser.org",
+            "keywords": [
+                "extract",
+                "parse",
+                "parser",
+                "pdf",
+                "text"
+            ],
+            "support": {
+                "issues": "https://github.com/smalot/pdfparser/issues",
+                "source": "https://github.com/smalot/pdfparser/tree/v2.12.5"
+            },
+            "time": "2026-04-17T11:37:58+00:00"
         },
         {
             "name": "symfony/clock",
@@ -10224,9 +10376,19 @@
             "time": "2025-12-08T11:19:18+00:00"
         }
     ],
-    "aliases": [],
+    "aliases": [
+        {
+            "package": "interdotz/sdk-php",
+            "version": "dev-main",
+            "alias": "1.0.0",
+            "alias_normalized": "1.0.0.0"
+        }
+    ],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "interdotz/sdk-laravel": 20,
+        "interdotz/sdk-php": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

@@ -6,12 +6,6 @@ return [
     |--------------------------------------------------------------------------
     | Third Party Services
     |--------------------------------------------------------------------------
-    |
-    | This file is for storing the credentials for third party services such
-    | as Mailgun, Postmark, AWS and more. This file provides the de facto
-    | location for this type of information, allowing packages to have
-    | a conventional file to locate the various service credentials.
-    |
     */
 
     'postmark' => [
@@ -35,37 +29,40 @@ return [
         ],
     ],
 
+    /*
+    | Interdotz (SSO, pembayaran via Interdotz, mailbox, API produk). Dinonaktifkan
+    | sementara: kodenya tetap ada, route-nya membalas 404 selama `enabled` false.
+    */
+    'interdotz' => [
+        'enabled' => filter_var(env('NORMCHAT_INTERDOTZ_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'client_id' => env('INTERDOTZ_CLIENT_ID'),
+        'client_secret' => env('INTERDOTZ_CLIENT_SECRET'),
+        'admin_bearer_token' => env('INTERDOTZ_ADMIN_BEARER_TOKEN'),
+        'api_base' => env('INTERDOTZ_API_BASE', 'https://api-interdotz.technocrats.studio'),
+        'sso_base' => env('INTERDOTZ_SSO_BASE', 'https://interdotz.technocrats.studio'),
+        'redirect_uri' => env('INTERDOTZ_REDIRECT_URI', env('APP_URL') . '/sso/interdotz/callback'),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('GOOGLE_REDIRECT_URI'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/auth/google/callback'),
+    ],
+
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'is_production' => filter_var(env('MIDTRANS_IS_PRODUCTION', false), FILTER_VALIDATE_BOOL),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | AI Provider OAuth (Connect with ChatGPT / Claude / Gemini)
+    | AI Provider API Keys (server-side fallback)
     |--------------------------------------------------------------------------
     */
 
-    /*
-    |--------------------------------------------------------------------------
-    | AI Provider Configuration
-    |--------------------------------------------------------------------------
-    | ChatGPT & Claude: API key-based connect (no OAuth available)
-    | Gemini: Google OAuth2
-    */
-
-    'ai_providers' => [
-        // Gemini uses real Google OAuth2
-        'gemini' => [
-            'client_id' => env('GEMINI_CLIENT_ID', env('GOOGLE_CLIENT_ID')),
-            'client_secret' => env('GEMINI_CLIENT_SECRET', env('GOOGLE_CLIENT_SECRET')),
-            'authorize_url' => env('GEMINI_AUTHORIZE_URL', 'https://accounts.google.com/o/oauth2/v2/auth'),
-            'token_url' => env('GEMINI_TOKEN_URL', 'https://oauth2.googleapis.com/token'),
-            'userinfo_url' => env('GEMINI_USERINFO_URL', 'https://www.googleapis.com/oauth2/v3/userinfo'),
-            'scopes' => env('GEMINI_SCOPES', 'openid profile email https://www.googleapis.com/auth/generative-language'),
-            'redirect' => env('APP_URL') . '/oauth/callback/gemini',
-        ],
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
     ],
 
 ];
