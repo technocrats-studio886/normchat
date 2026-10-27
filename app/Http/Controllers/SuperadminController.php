@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class SuperadminController extends Controller
@@ -121,7 +122,19 @@ class SuperadminController extends Controller
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'image_model' => ['required', Rule::in(array_keys((array) config('normchat.image_models')))],
             'image_model_precise' => ['nullable', Rule::in(array_keys((array) config('normchat.image_models')))],
+            // Kunci saldo (App\Services\Credits\ModelAccess), dalam kelipatan modal grup. Kosong = tanpa kunci.
+            'unlock_multiple' => ['nullable', 'numeric', 'min:0', 'max:20'],
+            'lock_multiple' => ['nullable', 'numeric', 'min:0', 'max:20'],
         ]);
+
+        if ((float) ($validated['unlock_multiple'] ?? 0) > 0) {
+            if ((float) ($validated['lock_multiple'] ?? 0) > (float) $validated['unlock_multiple']) {
+                throw ValidationException::withMessages(['lock_multiple' => 'Ambang terkunci tidak boleh lebih besar dari ambang terbuka.']);
+            }
+        } else {
+            $validated['unlock_multiple'] = null;
+            $validated['lock_multiple'] = null;
+        }
 
         $validated['sort_order'] = (int) ($validated['sort_order'] ?? 0);
         $validated['is_active'] = $request->boolean('is_active');

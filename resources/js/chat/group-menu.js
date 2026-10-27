@@ -1,4 +1,4 @@
-// Menu pengaturan cepat grup di halaman chat (polling, tema, hapus grup).
+// Menu pengaturan cepat grup di halaman chat (polling, hapus grup).
 
 import { chatMessagesBaseUrl, setPollComposerOpener } from './composer.js';
 import { chatFeed, chatShell, hiddenMessagesStorageKey } from './context.js';
@@ -48,7 +48,7 @@ export const initGroupMenu = () => {
 			}
 
 			const overlay = document.createElement('div');
-			overlay.className = 'fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-5';
+			overlay.className = 'fixed inset-0 z-[90] flex items-center justify-center bg-navy-950/45 px-5';
 			overlay.innerHTML = `
 			<div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
 				<p class="text-sm font-semibold text-slate-900">Buat Polling</p>
@@ -154,7 +154,7 @@ export const initGroupMenu = () => {
 			}
 
 			const toast = document.createElement('div');
-			toast.className = 'fixed left-1/2 bottom-24 z-[75] -translate-x-1/2 rounded-full bg-slate-900/95 px-3 py-1.5 text-xs font-medium text-white shadow-lg';
+			toast.className = 'fixed left-1/2 bottom-24 z-[75] -translate-x-1/2 rounded-full bg-navy-950/95 px-3 py-1.5 text-xs font-medium text-white shadow-lg';
 			toast.textContent = message;
 			document.body.appendChild(toast);
 			window.setTimeout(() => {

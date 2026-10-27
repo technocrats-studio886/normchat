@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\InterdotzService;
+use App\Support\SafeHtml;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -153,7 +154,7 @@ class MailboxController extends Controller
         $result = $this->interdotz->sendMail([
             'recipient_email' => trim($validated['to']),
             'subject' => trim($validated['subject']),
-            'body' => $validated['body'],
+            'body' => SafeHtml::clean($validated['body']),
         ], $token, $this->getInterdotzUserId());
 
         if ($result) {

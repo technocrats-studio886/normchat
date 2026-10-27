@@ -10,14 +10,14 @@
         <p class="mt-1 text-sm text-slate-500">File yang kamu kirim di semua grup.</p>
 
         {{-- Total --}}
-        <div class="mt-5 rounded-2xl border border-[#E4E9F0] bg-white px-5 py-5 text-center shadow-sm">
+        <div class="mt-5 rounded-2xl border border-[var(--nc-line)] bg-white px-5 py-5 text-center shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Total Terpakai</p>
             <p class="mt-1 font-display text-3xl font-extrabold text-navy-600">{{ $storage['total_human'] }}</p>
             <p class="mt-1 text-[11px] text-slate-500">Gambar, video, dan file.</p>
         </div>
 
         {{-- Distribusi file --}}
-        <div class="mt-4 rounded-2xl border border-[#E4E9F0] bg-white px-4 py-4 shadow-sm">
+        <div class="mt-4 rounded-2xl border border-[var(--nc-line)] bg-white px-4 py-4 shadow-sm">
             <h2 class="text-sm font-bold text-slate-900">Berdasarkan Jenis</h2>
             <p class="mt-0.5 text-[11px] text-slate-500">Yang paling banyak kamu kirim.</p>
 
@@ -60,7 +60,7 @@
         </div>
 
         {{-- Detail per grup --}}
-        <div class="mt-4 rounded-2xl border border-[#E4E9F0] bg-white px-4 py-4 shadow-sm">
+        <div class="mt-4 rounded-2xl border border-[var(--nc-line)] bg-white px-4 py-4 shadow-sm">
             <h2 class="text-sm font-bold text-slate-900">Per Grup</h2>
             <p class="mt-0.5 text-[11px] text-slate-500">Dari yang paling besar.</p>
 

@@ -71,9 +71,9 @@ class ImageRoutingTest extends TestCase
 
         // Penyusun (Luna): (500 × $0,10 + 100 × $0,50) / 1M = $0,0001
         // Flare: (20 × $5 + 1.056 × $30) / 1M = $0,03178
-        // ($0,0001 + $0,03178) × 2 × 17.950 ÷ 120 = 9,537 → 9,54 NK
+        // ($0,0001 + $0,03178) × 1,5 × 17.950 ÷ 120 = 7,153 → 7,16 NK
         $log = AiUsageLog::firstOrFail();
-        $this->assertSame(['image', 'gpt-6-luna', 9.54, 2.0], [$log->kind, $log->model, $log->charged_credits, $log->multiplier]);
+        $this->assertSame(['image', 'gpt-6-luna', 7.16, 1.5], [$log->kind, $log->model, $log->charged_credits, $log->multiplier]);
         $this->assertSame(['image_planner', 'image'], array_column($log->breakdown_json['lines'], 'component'));
         $this->assertSame('gpt-image-2.5-flare', $log->breakdown_json['lines'][1]['model']);
     }

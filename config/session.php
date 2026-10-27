@@ -32,7 +32,9 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+    // Tidak boleh lebih pendek dari batas tidak aktif normchat.session_idle_days, walau .env lama
+    // masih berisi nilai kecil; batas sebenarnya ditegakkan App\Http\Middleware\EndIdleSession.
+    'lifetime' => max((int) env('SESSION_LIFETIME', 0), (int) env('NORMCHAT_SESSION_IDLE_DAYS', 5) * 24 * 60),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 

@@ -3,6 +3,7 @@
 namespace App\Services\Credits;
 
 use App\Exceptions\InsufficientBudgetException;
+use App\Models\AiModel;
 use App\Models\CreditHold;
 use App\Models\Group;
 use App\Models\GroupToken;
@@ -15,11 +16,17 @@ use Illuminate\Support\Facades\DB;
  * - Normkredit grup satu kantong: semua anggota memakainya penuh (dibatasi kuota harian
  *   per anggota hanya bila owner mengaturnya).
  * - Request AI menahan estimasi (hold) lalu diselesaikan sesuai pemakaian aktual (settle).
+ * - Kategori yang dikunci saldo (ModelAccess) tidak boleh menahan modal grup; status buka/tutupnya
+ *   diperbarui setiap saldo berubah.
  *
  * Semua operasi mengunci baris group_tokens agar saldo tidak bocor saat paralel.
  */
 class CreditWallet
 {
+    public function __construct(private readonly ModelAccess $access)
+    {
+    }
+
     /** Tambah kredit dari pembelian ke saldo grup. */
     public function deposit(Group $group, float $credits): void
     {
@@ -29,6 +36,7 @@ class CreditWallet
                 'total_credits' => $token->total_credits + $credits,
                 'remaining_credits' => $token->remaining_credits + $credits,
             ]);
+            $this->access->sync($token);
         });
     }
 
@@ -40,18 +48,22 @@ class CreditWallet
     }
 
     /**
-     * Tahan $amount NK untuk request $user.
+     * Tahan $amount NK untuk request $user dengan $model.
      *
      * @throws InsufficientBudgetException bila kredit yang boleh dipakai tidak cukup
      */
-    public function hold(Group $group, User $user, float $amount): CreditHold
+    public function hold(Group $group, User $user, float $amount, ?AiModel $model = null): CreditHold
     {
-        return DB::transaction(function () use ($group, $user, $amount) {
+        return DB::transaction(function () use ($group, $user, $amount, $model) {
             $token = $this->lockToken($group);
             $balance = new CreditBalance($token->remaining_credits, $this->dailyQuotaLeft($group, $user));
 
             if ($amount > $balance->usable() + 0.00001) {
                 throw new InsufficientBudgetException($this->insufficientMessage($amount, $balance));
+            }
+
+            if ($model && $token->remaining_credits - $amount < $this->access->floor($model) - 0.00001) {
+                throw new InsufficientBudgetException($this->access->floorMessage($model, (float) $token->remaining_credits));
             }
 
             $token->update([
@@ -105,6 +117,7 @@ class CreditWallet
                 'used_credits' => round($token->used_credits + $charged, 4),
             ]);
             $hold->update(['amount' => $charged, 'status' => CreditHold::SETTLED]);
+            $this->access->sync($token);
 
             return $charged;
         });
@@ -125,6 +138,7 @@ class CreditWallet
                 'reserved_credits' => max(0, round($token->reserved_credits - $hold->amount, 4)),
             ]);
             $hold->update(['status' => CreditHold::RELEASED]);
+            $this->access->sync($token);
         });
     }
 

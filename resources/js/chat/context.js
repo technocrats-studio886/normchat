@@ -3,7 +3,6 @@
 export const chatShell = document.querySelector('[data-chat-shell]');
 export const chatFeed = document.querySelector('[data-chat-feed]');
 export const groupId = chatFeed?.getAttribute('data-chat-group-id');
-export const chatThemeStorageKey = `nc:chatTheme:${groupId || 'global'}`;
 export const hiddenMessagesStorageKey = `nc:hiddenMessages:${groupId || 'global'}`;
 const authUserIdFromFeed = Number(chatFeed?.getAttribute('data-auth-user-id') || 0);
 const authUserIdFromMeta = Number(document.querySelector('meta[name="auth-user-id"]')?.getAttribute('content') || 0);

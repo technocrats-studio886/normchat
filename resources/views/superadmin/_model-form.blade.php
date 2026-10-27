@@ -33,6 +33,15 @@
         <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500" for="multiplier">Multiplier ×</label>
         <input id="multiplier" name="multiplier" type="number" step="0.01" min="1" max="20" required value="{{ old('multiplier', $m?->multiplier ?? 2) }}" class="input-field mt-1.5" />
     </div>
+    {{-- Kunci saldo grup (App\Services\Credits\ModelAccess): kelipatan modal pembuatan grup. --}}
+    @php($groupCreationCredits = app(\App\Services\NormkreditPricing::class)->groupCreationCredits())
+    @foreach(['unlock_multiple' => 'Terbuka saat saldo grup ≥ … × modal', 'lock_multiple' => 'Terkunci lagi saat saldo < … × modal'] as $field => $fieldLabel)
+        <div>
+            <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500" for="{{ $field }}">{{ $fieldLabel }}</label>
+            <input id="{{ $field }}" name="{{ $field }}" type="number" step="0.1" min="0" max="20" value="{{ old($field, $m?->{$field}) }}" placeholder="Kosong = tanpa kunci" class="input-field mt-1.5" />
+        </div>
+    @endforeach
+    <p class="col-span-2 text-[11px] text-slate-500">Modal grup sekarang {{ $groupCreationCredits }} NK. Contoh 2 dan 1: terbuka di {{ 2 * $groupCreationCredits }} NK, terkunci lagi di bawah {{ $groupCreationCredits }} NK, dan model ini tidak boleh memakai {{ $groupCreationCredits }} NK terakhir.</p>
     @foreach(['image_model' => 'Mesin gambar', 'image_model_precise' => 'Mesin gambar presisi (opsional)'] as $field => $fieldLabel)
         <div>
             <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500" for="{{ $field }}">{{ $fieldLabel }}</label>

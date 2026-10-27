@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => $group->name.' - Normi Chat', 'group' => $group])
 
 @section('content')
-    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[#F3F5F8] lg:left-[var(--nc-sidebar-w)] lg:right-0 lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-x-0 nc-sidebar-push" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}" data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
+    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[var(--nc-chat-bg)] lg:left-[var(--nc-sidebar-w)] lg:right-0 lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-x-0 nc-sidebar-push" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}" data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
         @php
             $gt = $group->groupToken;
             $credits = $gt ? $gt->credits : 0;
@@ -361,13 +361,15 @@
                 <input type="hidden" name="reply_to_message_id" value="" data-reply-to-input="1" />
                 <input type="hidden" name="reply_quote_text" value="" data-reply-quote-input="1" />
 
-                <div class="hidden items-center justify-between border-b border-navy-100 bg-navy-50/70 px-4 py-2" data-reply-preview="1">
-                    <div class="flex min-w-0 items-center gap-2">
+                <div class="hidden items-center justify-between gap-2 border-b border-navy-100 bg-navy-50/70 px-4 py-2" data-reply-preview="1">
+                    {{-- Ketuk untuk membuka pesan penuh dan memilih bagian yang dibalas (resources/js/chat/composer/quote-picker.js). --}}
+                    <div class="flex min-w-0 flex-1 cursor-pointer items-center gap-2" role="button" tabindex="0" title="Pilih bagian yang dibalas" data-reply-preview-open="1">
                         <div class="h-8 w-1 shrink-0 rounded-full" style="background: var(--nc-primary);"></div>
-                        <div class="min-w-0">
+                        <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-bold text-slate-700" data-reply-preview-sender="1">Balas pesan</p>
                             <p class="truncate text-xs text-slate-600" data-reply-preview-content="1"></p>
                         </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h10M4 17h12"/></svg>
                     </div>
                     <button type="button" class="rounded-md p-1 text-slate-400 hover:bg-navy-100" data-reply-clear="1" aria-label="Batalkan balasan">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
@@ -447,7 +449,9 @@
                     @if($aiModels->isNotEmpty())
                         <div class="composer-popover right-0 w-64 hidden" data-model-menu="1" role="menu">
                             @foreach($aiModels as $aiModel)
-                                <button type="button" class="composer-menu-item" data-ai-model-option="{{ $aiModel->model_id }}" data-ai-model-name="{{ $aiModel->label }}" role="menuitemradio" aria-checked="false">
+                                @php($gate = $modelGates[$aiModel->model_id] ?? null)
+                                <button type="button" class="composer-menu-item" data-ai-model-option="{{ $aiModel->model_id }}" data-ai-model-name="{{ $aiModel->label }}" role="menuitemradio" aria-checked="false"
+                                    @if($gate) data-ai-model-locked="{{ $gate['locked'] ? '1' : '0' }}" data-ai-model-open-at="{{ $gate['open_at'] }}" data-ai-model-floor="{{ $gate['floor'] }}" aria-disabled="{{ $gate['locked'] ? 'true' : 'false' }}" @endif>
                                     <span class="inline-flex h-5 w-5 items-center justify-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="hidden h-4 w-4" viewBox="0 0 20 20" fill="currentColor" data-ai-check="1"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
                                     </span>
@@ -458,6 +462,13 @@
                                         @endif
                                     </span>
                                 </button>
+                                @if($gate)
+                                    {{-- Kategori dikunci saldo grup (App\Services\Credits\ModelAccess). --}}
+                                    <a href="{{ route('subscription.tokens.buy', ['group' => $group->id]) }}" class="composer-menu-note {{ $gate['locked'] ? '' : 'hidden' }}" data-ai-model-lock-note="{{ $aiModel->model_id }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path stroke-linecap="round" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                                        <span>Terbuka saat saldo grup ≥ {{ $gate['open_at_label'] }} NK · <span class="font-semibold underline">Isi Normkredit</span></span>
+                                    </a>
+                                @endif
                             @endforeach
                         </div>
                     @endif
@@ -466,7 +477,7 @@
                 </div>
 
                 <div class="hidden items-center gap-4 rounded-2xl bg-[#121C29] px-4 py-3 text-white shadow-xl" data-voice-recorder-panel="1">
-                    <button type="button" class="shrink-0 text-slate-300 transition hover:text-white" data-voice-cancel="1" aria-label="Hapus rekaman" title="Hapus rekaman">
+                    <button type="button" class="shrink-0 text-navy-200 transition hover:text-white" data-voice-cancel="1" aria-label="Hapus rekaman" title="Hapus rekaman">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673A2.25 2.25 0 0 1 15.916 21.75H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.088-2.201a51.964 51.964 0 0 0-3.324 0c-1.178.037-2.088 1.021-2.088 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                         </svg>
@@ -540,7 +551,7 @@
         </div>
 
         @if($viewerIsOwner)
-            <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-slate-900/45 px-5" data-delete-group-menu-overlay="1">
+            <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-navy-950/45 px-5" data-delete-group-menu-overlay="1">
                 <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
                     <p class="text-sm font-bold text-slate-900">Hapus grup "{{ $group->name }}"?</p>
                     <p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Semua pesan dan anggota akan hilang permanen. Ketik nama grup untuk lanjut.</p>
@@ -557,6 +568,7 @@
             </div>
         @endif
     </section>
+
 @endsection
 
 

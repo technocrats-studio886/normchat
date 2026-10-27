@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="id">
+@php
+    // Tema tampilan user (App\Support\Themes); dipasang server-side agar tidak berkedip.
+    $uiTheme = \App\Support\Themes::resolve(auth()->user()?->theme);
+@endphp
+<html lang="id" data-theme="{{ $uiTheme }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,7 +12,7 @@
         <meta name="auth-user-id" content="{{ auth()->id() }}">
         <meta name="auth-user-name" content="{{ auth()->user()->name }}">
     @endauth
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="{{ \App\Support\Themes::OPTIONS[$uiTheme]['browser'] }}">
     @include('partials.brand-head')
     <link rel="manifest" href="{{ route('pwa.manifest') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,9 +20,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <title>{{ $title ?? 'Normi Chat' }}</title>
     {{-- Status sidebar desktop dipasang sebelum render agar tidak berkedip (resources/js/ui/sidebar.js). --}}
-    <script>try { if (localStorage.getItem('nc-sidebar') === 'collapsed') document.documentElement.classList.add('nc-sidebar-collapsed'); } catch (e) {}</script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-    <script>mermaid.initialize({startOnLoad:false,theme:'neutral',securityLevel:'loose'});</script>
+    {{-- Semua <script> butuh nonce dari Content-Security-Policy (App\Http\Middleware\AddContentSecurityPolicy). --}}
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">try { if (localStorage.getItem('nc-sidebar') === 'collapsed') document.documentElement.classList.add('nc-sidebar-collapsed'); } catch (e) {}</script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}"></script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">mermaid.initialize({startOnLoad:false,theme:'neutral',securityLevel:'strict'});</script>
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @php
             $viteEntries = ['resources/css/app.css'];
@@ -126,7 +131,7 @@
     </div>
     </div>
 </body>
-<script>
+<script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.getRegistrations().then((registrations) => {

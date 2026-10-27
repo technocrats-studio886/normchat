@@ -10,6 +10,7 @@ use App\Models\Message;
 use App\Models\RecoveryLog;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Files\StoredFiles;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -66,11 +67,12 @@ class GroupBackups
 
     private function readSnapshot(GroupBackup $backup): array
     {
-        if (! Storage::disk(self::DISK)->exists($backup->storage_path)) {
+        $content = app(StoredFiles::class)->get(self::DISK, (string) $backup->storage_path);
+        if ($content === null) {
             throw new RuntimeException('Cadangan tidak ditemukan.');
         }
 
-        $snapshot = json_decode((string) Storage::disk(self::DISK)->get($backup->storage_path), true);
+        $snapshot = json_decode($content, true);
         if (! is_array($snapshot) || ! isset($snapshot['messages'], $snapshot['members'])) {
             throw new RuntimeException('Cadangan rusak dan tidak bisa dipulihkan.');
         }

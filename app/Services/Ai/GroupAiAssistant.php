@@ -9,6 +9,7 @@ use App\Exceptions\InsufficientBudgetException;
 use App\Models\AiModel;
 use App\Models\AiUsageLog;
 use App\Models\Group;
+use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\AiDocumentGenerator;
@@ -20,6 +21,7 @@ use App\Services\Ai\Responders\ImageResponder;
 use App\Services\Ai\Responders\ResearchResponder;
 use App\Services\Chat\MessagePresenter;
 use App\Services\Credits\CreditWallet;
+use App\Services\Credits\ModelAccess;
 use App\Services\NormkreditPricing;
 use Throwable;
 
@@ -36,6 +38,7 @@ class GroupAiAssistant
     public function __construct(
         private readonly NormkreditPricing $pricing,
         private readonly CreditWallet $wallet,
+        private readonly ModelAccess $access,
         private readonly MessagePresenter $presenter,
     ) {
     }
@@ -100,6 +103,11 @@ class GroupAiAssistant
             return 'Normkredit grup habis. Isi Normkredit untuk lanjut.';
         }
 
+        $token = GroupToken::forGroup((int) $group->id);
+        if (! $this->access->isUnlocked($token, $model)) {
+            return $this->access->lockedMessage($model, $token);
+        }
+
         $dailyLimit = (float) $this->pricing->get('daily_group_credit_limit');
         if ($dailyLimit > 0 && $this->spentToday($group) >= $dailyLimit) {
             return 'Batas pemakaian Normi AI hari ini sudah tercapai. Coba lagi besok.';
@@ -119,7 +127,7 @@ class GroupAiAssistant
             ->values()
             ->all();
 
-        return new AiTask($group, $requester, $message, $recentMessages, $model, $client, $this->pricing, $this->wallet);
+        return new AiTask($group, $requester, $message, $recentMessages, $model, $client, $this->pricing, $this->wallet, $this->access);
     }
 
     private function responderFor(Message $message): AiResponder
@@ -181,7 +189,7 @@ class GroupAiAssistant
             'sender_id' => null,
             'reply_to_message_id' => $request->id,
             'reply_quote_text' => $quote !== '' ? $quote : null,
-            'content' => $reply->text,
+            'content' => self::withoutReplyMarkers($reply->text),
         ];
 
         if ($reply->attachment) {
@@ -196,6 +204,19 @@ class GroupAiAssistant
         }
 
         return Message::create($attributes);
+    }
+
+    /**
+     * Penanda balasan dari format riwayat lama ("[reply]", "[reply mengutip: "…"]") yang
+     * kadang ditiru model di akhir jawabannya; tidak boleh tampil ke grup.
+     */
+    public static function withoutReplyMarkers(?string $text): ?string
+    {
+        if ($text === null) {
+            return null;
+        }
+
+        return trim((string) preg_replace('/[ \t]*\[reply(?: mengutip: "[^"\n]*")?\]/iu', '', $text));
     }
 
     private function logUsage(AiTask $task, AiReply $reply, Message $aiMessage, float $creditsDue, float $charged, float $balanceAfter): void

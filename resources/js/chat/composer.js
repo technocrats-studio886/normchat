@@ -7,6 +7,7 @@ import { attachmentInput, chatForm } from './composer/elements.js';
 import { initFeedClicks } from './composer/feed-clicks.js';
 import { initComposerInput } from './composer/input.js';
 import { initMessageActions } from './composer/message-actions.js';
+import { initReplyPreviewPicker } from './composer/quote-picker.js';
 import { initReply } from './composer/reply.js';
 import { initSend } from './composer/send.js';
 import { initVoiceRecorder } from './composer/voice-recorder.js';
@@ -20,6 +21,7 @@ export const initComposer = () => {
 	}
 
 	initReply();
+	initReplyPreviewPicker();
 	initFeedClicks();
 	initMessageActions();
 	initAttachMenu();

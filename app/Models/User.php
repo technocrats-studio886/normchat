@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Crypt;
     'refresh_token_encrypted',
     'token_expires_at',
     'api_key_encrypted',
+    'theme',
 ])]
 #[Hidden(['password', 'remember_token', 'access_token_encrypted', 'refresh_token_encrypted', 'api_key_encrypted'])]
 class User extends Authenticatable

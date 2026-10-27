@@ -13,7 +13,7 @@
             @csrf
 
             {{-- Avatar + info card (clickable avatar to change photo) --}}
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-4 py-4 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-4 py-4 shadow-sm">
                 <div class="flex items-center gap-4">
                     <label for="avatar" class="relative inline-flex h-16 w-16 items-center justify-center overflow-visible cursor-pointer group shrink-0" title="Ganti foto">
                         @if($user->avatar_url)

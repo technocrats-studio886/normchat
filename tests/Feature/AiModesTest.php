@@ -13,6 +13,7 @@ use App\Models\GroupMember;
 use App\Models\Message;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Ai\GroupAiAssistant;
 use App\Services\Credits\CreditWallet;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
@@ -65,6 +66,8 @@ class AiModesTest extends TestCase
 
     public function test_model_chosen_in_composer_overrides_group_model(): void
     {
+        // Advanced terbuka mulai 500 NK (ModelAccess).
+        app(CreditWallet::class)->deposit($this->group, 200);
         $this->fakeChat('Jawaban');
 
         $this->runAi(['content' => '@normi halo', 'ai_model' => 'gpt-6-astra']);
@@ -199,11 +202,11 @@ class AiModesTest extends TestCase
         $reply = Message::where('sender_type', 'ai')->firstOrFail();
         $this->assertStringContainsString('[BPS](https://bps.go.id/inflasi)', (string) $reply->content);
 
-        // Token Cepat: (2.000 × 0,10 + 1.000 × 0,50) / 1M × 2 = $0,0014; 2 pencarian × $0,01 × 2 = $0,04
-        // → $0,0414 × 17.950 ÷ 120 = 6,1928 → 6,20 NK
+        // Token Cepat: (2.000 × 0,10 + 1.000 × 0,50) / 1M × 1,5 = $0,00105; 2 pencarian × $0,01 × 2 (media) = $0,04
+        // → $0,04105 × 17.950 ÷ 120 = 6,1404 → 6,15 NK
         $log = AiUsageLog::firstOrFail();
         $this->assertSame('research', $log->kind);
-        $this->assertSame(6.2, $log->charged_credits);
+        $this->assertSame(6.15, $log->charged_credits);
         $this->assertContains('web_search', array_column($log->breakdown_json['lines'], 'component'));
     }
 
@@ -271,6 +274,33 @@ class AiModesTest extends TestCase
             ->assertDontSee('data-ai-model-option="gpt-5.4-mini"', false)
             ->assertSee('data-ai-mode-option="deep_research"', false)
             ->assertSee('Unggah file');
+    }
+
+    public function test_reply_markers_stay_out_of_ai_history_and_answers(): void
+    {
+        $question = Message::create(['group_id' => $this->group->id, 'sender_type' => 'user', 'sender_id' => $this->owner->id, 'content' => '@normi siapa Messi?']);
+        $answer = Message::create(['group_id' => $this->group->id, 'sender_type' => 'ai', 'reply_to_message_id' => $question->id, 'content' => 'Lionel Messi adalah pesepak bola Argentina.']);
+        // Model kadang meniru penanda format riwayat lama di akhir jawabannya.
+        $this->fakeChat('Oh, maksudmu Cristiano Ronaldo. [reply]');
+
+        $this->runAi(['content' => '@normi maksudku Ronaldo', 'reply_to_message_id' => $answer->id, 'reply_quote_text' => 'pesepak bola Argentina']);
+
+        Http::assertSent(function (Request $request) {
+            $history = collect($request['messages'])->slice(1, -1);
+            $assistant = $history->firstWhere('role', 'assistant');
+
+            return $assistant['content'] === 'Lionel Messi adalah pesepak bola Argentina.'
+                && ! str_contains(json_encode($request['messages']), '[reply');
+        });
+        $this->assertSame('Oh, maksudmu Cristiano Ronaldo.', Message::where('sender_type', 'ai')->latest('id')->value('content'));
+    }
+
+    public function test_reply_marker_cleanup_keeps_the_rest_of_the_answer(): void
+    {
+        $this->assertSame('Ronaldo meraih 5 Ballon d’Or.', GroupAiAssistant::withoutReplyMarkers('Ronaldo meraih 5 Ballon d’Or. [reply]'));
+        $this->assertSame("Baris satu\nBaris dua", GroupAiAssistant::withoutReplyMarkers("Baris satu [reply mengutip: \"bola\"]\nBaris dua"));
+        $this->assertSame('Tanda [penting] tetap ada.', GroupAiAssistant::withoutReplyMarkers('Tanda [penting] tetap ada.'));
+        $this->assertNull(GroupAiAssistant::withoutReplyMarkers(null));
     }
 
     private function fakeChat(string $content): void

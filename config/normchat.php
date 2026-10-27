@@ -1,6 +1,24 @@
 <?php
 
 return [
+    // Sesi login berakhir setelah sekian hari tanpa aksi user (App\Http\Middleware\EndIdleSession).
+    'session_idle_days' => (int) env('NORMCHAT_SESSION_IDLE_DAYS', 5),
+
+    // Cache Redis untuk file di S3 (App\Services\Files\StoredFiles): file sampai ukuran ini
+    // disimpan isinya; ukuran semua file disimpan. File tidak pernah ditimpa, jadi aman di-cache.
+    'files' => [
+        'cache_max_kb' => 2048,
+        'cache_hours' => 24,
+    ],
+
+    // Content-Security-Policy (App\Http\Middleware\AddContentSecurityPolicy): alamat realtime Reverb
+    // yang dibuka browser, sama dengan VITE_REVERB_* yang dibundel ke JS.
+    'csp' => [
+        'realtime' => env('VITE_REVERB_HOST') ? [
+            (env('VITE_REVERB_SCHEME', 'https') === 'https' ? 'wss://' : 'ws://') . env('VITE_REVERB_HOST') . ':' . env('VITE_REVERB_PORT', 443),
+            (env('VITE_REVERB_SCHEME', 'https') === 'https' ? 'wss://' : 'ws://') . env('VITE_REVERB_HOST'),
+        ] : [],
+    ],
 
     /*
     |--------------------------------------------------------------------------

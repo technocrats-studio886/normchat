@@ -50,7 +50,7 @@ export const initShareButtons = () => {
 				const encodedUrl = encodeURIComponent(url);
 
 				const backdrop = document.createElement('div');
-				backdrop.className = 'fixed inset-0 z-[90] bg-slate-900/40 p-4';
+				backdrop.className = 'fixed inset-0 z-[90] bg-navy-950/40 p-4';
 
 				const panel = document.createElement('div');
 				panel.className = 'absolute bottom-4 left-4 right-4 rounded-2xl bg-white p-3 shadow-2xl';

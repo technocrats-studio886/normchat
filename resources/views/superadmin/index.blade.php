@@ -20,21 +20,21 @@
         {{-- Ringkasan 30 hari --}}
         <h2 class="section-title mt-6">30 hari terakhir</h2>
         <div class="grid grid-cols-2 gap-2">
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Penjualan NK</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtIdr($sales->revenue) }}</p>
                 <p class="text-[11px] text-slate-500">{{ $fmtNk($sales->credits) }} NK · {{ (int) $sales->payments }} bayar</p>
             </div>
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Pemakaian AI</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtNk($usage->charged) }} NK</p>
                 <p class="text-[11px] text-slate-500">{{ (int) $usage->requests }} request · {{ $fmtIdr($usageRevenue) }}</p>
             </div>
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Biaya OpenAI</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtIdr($usage->cost_idr) }}</p>
             </div>
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Margin atas pemakaian</p>
                 <p class="mt-1 text-sm font-bold {{ $usageMargin !== null && $usageMargin < 25 ? 'text-coral-600' : 'text-navy-700' }}">
                     {{ $usageMargin === null ? '–' : number_format($usageMargin, 1, ',', '.') . '%' }}
@@ -42,7 +42,7 @@
             </div>
         </div>
         @if($usageByModel->isNotEmpty())
-            <div class="mt-2 overflow-x-auto rounded-2xl border border-[#E4E9F0] bg-white shadow-sm">
+            <div class="mt-2 overflow-x-auto rounded-2xl border border-[var(--nc-line)] bg-white shadow-sm">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
                         <tr><th class="px-3 py-2">Model</th><th class="px-3 py-2 text-right">Req</th><th class="px-3 py-2 text-right">NK</th><th class="px-3 py-2 text-right">Biaya</th></tr>
@@ -66,7 +66,7 @@
         <p class="-mt-1 mb-2 text-[11px] text-slate-500">Contoh = 1 request 3.000 token input + 500 output.</p>
         <div class="space-y-2">
             @forelse($aiModels as $aiModel)
-                <a href="{{ route('superadmin.models.edit', $aiModel) }}" class="block rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:bg-slate-50 {{ $aiModel->is_active ? '' : 'opacity-60' }}">
+                <a href="{{ route('superadmin.models.edit', $aiModel) }}" class="block rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:bg-slate-50 {{ $aiModel->is_active ? '' : 'border-dashed' }}">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <p class="text-sm font-bold text-slate-900">
@@ -80,6 +80,9 @@
                                 ${{ rtrim(rtrim(number_format($aiModel->output_usd_per_mtok, 4), '0'), '.') }} out ·
                                 ×{{ rtrim(rtrim(number_format($aiModel->multiplier, 2), '0'), '.') }}
                                 · gambar: {{ $aiModel->image_model }}@if($aiModel->image_model_precise) / {{ $aiModel->image_model_precise }}@endif
+                                @if($aiModel->isGated())
+                                    · kunci: buka {{ rtrim(rtrim(number_format($aiModel->unlock_multiple, 2), '0'), '.') }}× / tutup {{ rtrim(rtrim(number_format((float) $aiModel->lock_multiple, 2), '0'), '.') }}× modal
+                                @endif
                             </p>
                         </div>
                         <div class="shrink-0 text-right">

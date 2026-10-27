@@ -71,10 +71,10 @@ export const mediaPreviewTemplate = `
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 3.105a.75.75 0 0 1 .818-.164l12 5.25a.75.75 0 0 1 0 1.374l-12 5.25A.75.75 0 0 1 2.9 14.18l1.2-4.18a.75.75 0 0 0 0-.4l-1.2-4.18a.75.75 0 0 1 .205-.815Z" /></svg>
 				</button>
 			</div>
-			<div class="mt-2 hidden rounded-xl border border-white/20 bg-slate-900/90 shadow-lg" data-preview-caption-mention-menu></div>
+			<div class="mt-2 hidden rounded-xl border border-white/20 bg-navy-950/90 shadow-lg" data-preview-caption-mention-menu></div>
 		</div>
 	</div>
-	<div class="absolute inset-0 z-[75] hidden bg-slate-950/90 px-4 pb-6 pt-14" data-preview-text-editor>
+	<div class="absolute inset-0 z-[75] hidden bg-navy-950/90 px-4 pb-6 pt-14" data-preview-text-editor>
 		<div class="flex items-center justify-between text-white">
 			<p class="text-sm font-semibold">Tambah teks</p>
 			<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white hover:bg-white/20" data-preview-text-close aria-label="Tutup editor teks">
@@ -83,7 +83,7 @@ export const mediaPreviewTemplate = `
 		</div>
 		<div class="mt-4 rounded-2xl bg-white/12 p-3">
 			<input type="text" class="w-full rounded-xl border border-white/25 bg-black/20 px-3 py-3 text-base text-white outline-none placeholder:text-white/60" data-preview-text-input placeholder="Ketik teks" autocomplete="off" />
-			<div class="mt-2 hidden rounded-xl border border-white/20 bg-slate-900/90 shadow-lg" data-preview-text-mention-menu></div>
+			<div class="mt-2 hidden rounded-xl border border-white/20 bg-navy-950/90 shadow-lg" data-preview-text-mention-menu></div>
 		</div>
 		<div class="mt-3 flex items-center justify-between gap-3">
 			<div class="flex items-center gap-1" data-preview-text-size-controls>

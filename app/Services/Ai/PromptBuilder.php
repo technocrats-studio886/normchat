@@ -5,11 +5,9 @@ namespace App\Services\Ai;
 use App\Models\Group;
 use App\Models\Message;
 use App\Services\AttachmentTextExtractor;
+use App\Services\Files\StoredFiles;
 use App\Services\NormkreditPricing;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use Throwable;
 
 /**
  * Menyusun konteks percakapan grup untuk model AI: riwayat pesan, isi lampiran
@@ -181,19 +179,21 @@ class PromptBuilder
 
     private function contextLine(Message $row): string
     {
+        // Jawaban Normi AI selalu tercatat sebagai balasan; penanda di riwayat asisten ditiru model
+        // ke jawabannya ("... [reply]"), jadi penanda hanya untuk pesan user, di depan.
         $replyQuoteText = trim((string) ($row->reply_quote_text ?? ''));
-        $replyMeta = (int) ($row->reply_to_message_id ?? 0) > 0
-            ? ($replyQuoteText !== '' ? " [reply mengutip: \"{$replyQuoteText}\"]" : ' [reply]')
+        $replyPrefix = $row->sender_type !== 'ai' && (int) ($row->reply_to_message_id ?? 0) > 0
+            ? ($replyQuoteText !== '' ? "(membalas, mengutip \"{$replyQuoteText}\") " : '(membalas pesan sebelumnya) ')
             : '';
 
         $content = trim((string) $row->content);
         if ($content !== '') {
-            return $content . $replyMeta;
+            return $replyPrefix . $content;
         }
 
         $messageType = strtolower((string) ($row->message_type ?? 'text'));
         if ($messageType === 'image') {
-            return '[Pesan sebelumnya berisi gambar]' . $replyMeta;
+            return $replyPrefix . '[Pesan sebelumnya berisi gambar]';
         }
 
         if ($messageType === 'file' && $row->attachment_path) {
@@ -201,19 +201,19 @@ class PromptBuilder
             $documentText = $this->documentText($row);
 
             return $documentText !== null
-                ? "[Dokumen \"{$label}\"]\n" . mb_substr($documentText, 0, 1500) . $replyMeta
-                : "[Pesan sebelumnya berisi lampiran file: {$label}]" . $replyMeta;
+                ? $replyPrefix . "[Dokumen \"{$label}\"]\n" . mb_substr($documentText, 0, 1500)
+                : $replyPrefix . "[Pesan sebelumnya berisi lampiran file: {$label}]";
         }
 
         if ($messageType === 'voice') {
             $transcript = $this->transcript($row);
 
             return $transcript !== null
-                ? '[Transkrip audio] ' . $transcript . $replyMeta
-                : '[Pesan sebelumnya berisi audio]' . $replyMeta;
+                ? $replyPrefix . '[Transkrip audio] ' . $transcript
+                : $replyPrefix . '[Pesan sebelumnya berisi audio]';
         }
 
-        return '[Pesan sebelumnya berisi lampiran]' . $replyMeta;
+        return $replyPrefix . '[Pesan sebelumnya berisi lampiran]';
     }
 
     private function documentText(Message $message): ?string
@@ -287,26 +287,8 @@ class PromptBuilder
             return null;
         }
 
-        try {
-            $disk = Storage::disk($message->attachment_disk);
-            if (! $disk->exists($message->attachment_path)) {
-                return null;
-            }
+        $binary = app(StoredFiles::class)->get($message->attachment_disk, $message->attachment_path, $maxBytes);
 
-            if ($maxBytes !== null) {
-                $size = (int) $disk->size($message->attachment_path);
-                if ($size <= 0 || $size > $maxBytes) {
-                    return null;
-                }
-            }
-
-            $binary = $disk->get($message->attachment_path);
-
-            return $binary === '' || $binary === null ? null : $binary;
-        } catch (Throwable $e) {
-            Log::warning('Failed to load attachment for AI context.', ['message_id' => $message->id, 'error' => $e->getMessage()]);
-
-            return null;
-        }
+        return $binary === '' ? null : $binary;
     }
 }

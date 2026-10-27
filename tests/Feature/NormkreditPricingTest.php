@@ -42,7 +42,7 @@ class NormkreditPricingTest extends TestCase
         $catalog = AiModel::active()->get()->mapWithKeys(fn (AiModel $m) => [$m->label => [$m->model_id, $m->multiplier]]);
 
         $this->assertEquals([
-            'Cepat' => ['gpt-6-luna', 2.0],
+            'Cepat' => ['gpt-6-luna', 1.5],
             'Smart' => ['gpt-6.1-sol', 2.5],
             'Advanced' => ['gpt-6-astra', 3.0],
         ], $catalog->all());

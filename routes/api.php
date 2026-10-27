@@ -1,10 +1,14 @@
 <?php
 
+use App\Http\Controllers\Api\CspReportController;
 use App\Http\Controllers\Api\InterdotzWebhookController;
 use App\Http\Controllers\Api\MidtransWebhookController;
 use App\Http\Controllers\Api\ProductDataController;
 use App\Http\Controllers\Api\TransactionController;
 use Illuminate\Support\Facades\Route;
+
+// Laporan pelanggaran Content-Security-Policy dari browser (App\Http\Middleware\AddContentSecurityPolicy).
+Route::post('/csp-report', CspReportController::class)->middleware('throttle:60,1')->name('csp.report');
 
 // ── Midtrans (aktif) — diverifikasi lewat signature_key ─────
 

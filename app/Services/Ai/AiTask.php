@@ -9,6 +9,7 @@ use App\Models\Group;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\Credits\CreditWallet;
+use App\Services\Credits\ModelAccess;
 use App\Services\NormkreditPricing;
 use Illuminate\Support\Facades\Log;
 
@@ -36,6 +37,7 @@ final class AiTask
         public readonly OpenAiClient $client,
         public readonly NormkreditPricing $pricing,
         private readonly CreditWallet $wallet,
+        private readonly ModelAccess $access,
     ) {
         $this->meter = new UsageMeter();
         $this->prompts = new PromptBuilder($client, $this->meter, $pricing);
@@ -51,9 +53,18 @@ final class AiTask
      */
     public function planChat(array $messages, ?int $outputCeiling = null, int $extraInputTokens = 0): RequestBudget
     {
-        $usable = $this->wallet->balanceFor($this->group, $this->requester)->usable();
+        $balance = $this->wallet->balanceFor($this->group, $this->requester);
+        // Kategori yang dikunci saldo tidak boleh memakai modal grup.
+        $floor = $this->access->floor($this->model);
+        $usable = max(0.0, min($balance->usable(), $balance->groupTotal - $floor));
         $inputTokens = self::estimateInputTokens($messages) + $extraInputTokens;
-        $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling);
+        try {
+            $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling);
+        } catch (InsufficientBudgetException $e) {
+            throw $floor > 0 && $usable < $balance->usable()
+                ? new InsufficientBudgetException($this->access->floorMessage($this->model, $balance->groupTotal))
+                : $e;
+        }
         $this->reserve($this->budget->holdCredits);
 
         return $this->budget;
@@ -62,7 +73,7 @@ final class AiTask
     /** @throws InsufficientBudgetException */
     public function reserve(float $credits): void
     {
-        $this->hold = $this->wallet->hold($this->group, $this->requester, $credits);
+        $this->hold = $this->wallet->hold($this->group, $this->requester, $credits, $this->model);
     }
 
     /**

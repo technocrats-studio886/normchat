@@ -147,7 +147,7 @@
                                         </button>
                                     </form>
 
-                                    <form method="POST" action="{{ route('groups.members.remove', ['group' => $group, 'member' => $member]) }}" onsubmit="return confirm('Keluarkan anggota ini dari grup?');">
+                                    <form method="POST" action="{{ route('groups.members.remove', ['group' => $group, 'member' => $member]) }}" data-confirm="Keluarkan anggota ini dari grup?">
                                         @csrf
                                         <button type="submit" class="rounded-lg border border-coral-200 px-2.5 py-1 text-[11px] font-semibold text-coral-600 hover:bg-coral-50">Keluarkan</button>
                                     </form>
@@ -228,56 +228,6 @@
             </a>
         </div>
 
-        <h2 class="section-title mt-6">Tema Chat</h2>
-        <div class="card-soft space-y-3" data-chat-theme-picker="1" data-chat-theme-group-id="{{ (int) $group->id }}">
-            <p class="text-xs text-slate-500">Hanya berlaku di perangkat ini.</p>
-            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4" data-chat-theme-list="1">
-                @foreach ([
-                    ['id' => 'default', 'label' => 'Default', 'color' => '#F3F5F8'],
-                    ['id' => 'navy', 'label' => 'Navy', 'color' => '#121C29'],
-                    ['id' => 'coral', 'label' => 'Coral', 'color' => '#FFF3F1'],
-                ] as $theme)
-                    <button
-                        type="button"
-                        class="overflow-hidden rounded-xl border border-slate-200 text-left text-[11px] font-semibold text-slate-700 transition hover:border-navy-300"
-                        data-chat-theme-option="{{ $theme['id'] }}"
-                    >
-                        <span class="block h-11 w-full" style="background: {{ $theme['color'] }};"></span>
-                        <span class="block px-2 py-1.5">{{ $theme['label'] }}</span>
-                    </button>
-                @endforeach
-            </div>
-            {{-- Pratinjau: kelas yang sama dengan ruang chat, jadi tema langsung terlihat saat dipilih. --}}
-            <div class="space-y-2 rounded-2xl bg-[#F3F5F8] p-3 transition-colors" data-chat-theme-preview="1" aria-hidden="true">
-                <div class="nc-chat-header-card flex items-center gap-2 rounded-2xl border px-3 py-2">
-                    <span class="flex h-7 w-7 items-center justify-center rounded-xl text-[11px] font-bold text-white" style="background: var(--nc-primary);">{{ strtoupper(substr($group->name, 0, 1)) }}</span>
-                    <span class="min-w-0">
-                        <span class="nc-chat-header-title block truncate text-xs font-semibold">{{ $group->name }}</span>
-                        <span class="nc-chat-header-subtitle block text-[10px]">Pratinjau</span>
-                    </span>
-                </div>
-                <div class="max-w-[80%]">
-                    <p class="nc-chat-sender mb-0.5 text-[10px]">Teman</p>
-                    <div class="bubble-other text-xs">Ada yang mau belajar bareng?</div>
-                </div>
-                <div class="max-w-[80%]">
-                    <p class="nc-chat-sender nc-chat-sender--ai mb-0.5 text-[10px] font-semibold">Normi AI</p>
-                    <div class="bubble-ai text-xs">Boleh! Mulai dari bab mana?</div>
-                </div>
-                <div class="flex justify-end">
-                    <div class="bubble-mine max-w-[80%] text-xs">Aku ikut!</div>
-                </div>
-                <div class="composer-pill flex items-center justify-between px-3 py-1.5">
-                    <span class="text-xs" style="color: var(--nc-chat-composer-soft, #94a3b8);">Ketik pesan</span>
-                    <span class="h-6 w-6 rounded-full" style="background: var(--nc-primary);"></span>
-                </div>
-            </div>
-            <p class="text-[11px] text-slate-500" data-chat-theme-status="1">Tema: Default</p>
-            <a href="{{ route('chat.show', $group) }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                Kembali ke chat
-            </a>
-        </div>
-
         @if((int) $group->owner_id === (int) auth()->id())
             <h2 class="section-title mt-6 text-coral-600">Hapus Grup</h2>
             <div class="card-soft space-y-3 border border-coral-200">
@@ -287,7 +237,7 @@
                 </button>
             </div>
 
-            <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-slate-900/45 px-5" data-delete-group-overlay="1" data-expected-name="{{ $group->name }}">
+            <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-navy-950/45 px-5" data-delete-group-overlay="1" data-expected-name="{{ $group->name }}">
                 <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
                     <p class="text-sm font-bold text-slate-900">Hapus grup "{{ $group->name }}"?</p>
                     <p class="mt-1.5 text-[13px] leading-relaxed text-slate-600">Semua pesan dan anggota akan hilang permanen. Ketik nama grup untuk lanjut.</p>

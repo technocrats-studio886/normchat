@@ -129,7 +129,7 @@ class ChatFlowTest extends TestCase
 
         $image = Message::where('message_type', 'image')->first();
         $this->actingAs($this->owner)->get($this->url("messages/{$image->id}/attachment"))
-            ->assertOk()->assertHeader('Content-Disposition', 'inline; filename="foto.png"');
+            ->assertOk()->assertHeader('Content-Disposition', 'inline; filename=foto.png');
     }
 
     public function test_sender_can_edit_and_previous_content_is_versioned(): void

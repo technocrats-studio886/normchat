@@ -12,19 +12,25 @@ use App\Models\AuditLog;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
 use App\Models\GroupMember;
+use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\MessageVersion;
 use App\Models\PollVote;
+use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Chat\AttachmentStorage;
 use App\Services\Chat\MentionNotifier;
 use App\Services\Chat\MessagePresenter;
+use App\Services\Credits\ModelAccess;
+use App\Services\Files\StoredFiles;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatController extends Controller
@@ -47,7 +53,7 @@ class ChatController extends Controller
         return $group ? redirect()->route('chat.show', $group) : redirect()->route('groups.index');
     }
 
-    public function show(Request $request, Group $group): View
+    public function show(Request $request, Group $group, ModelAccess $access): View
     {
         $this->authorize('chat', $group);
         session(['last_chat_group_id' => $group->id]);
@@ -66,6 +72,8 @@ class ChatController extends Controller
 
         $lastReadMessageId = (int) ($this->membership($group, $request)?->last_read_message_id ?? 0);
         $latestMessageId = (int) Message::where('group_id', $group->id)->max('id');
+        $aiModels = AiModel::active()->get(['model_id', 'label', 'description', 'unlock_multiple', 'lock_multiple']);
+        $token = GroupToken::forGroup((int) $group->id);
 
         return view('chat.show', [
             'group' => $group,
@@ -74,7 +82,14 @@ class ChatController extends Controller
             'lastReadMessageId' => $lastReadMessageId,
             'latestMessageId' => $latestMessageId,
             'unreadCount' => $latestMessageId > 0 ? $this->unreadCount($group, $lastReadMessageId) : 0,
-            'aiModels' => AiModel::active()->get(['model_id', 'label', 'description']),
+            'aiModels' => $aiModels,
+            // Kategori yang dikunci saldo grup: status sekarang dan ambang buka/tutupnya.
+            'modelGates' => $aiModels->filter->isGated()->mapWithKeys(fn (AiModel $aiModel) => [$aiModel->model_id => [
+                'locked' => ! $access->isUnlocked($token, $aiModel),
+                'open_at' => $access->openAt($aiModel),
+                'open_at_label' => $access->format($access->openAt($aiModel)),
+                'floor' => $access->floor($aiModel),
+            ]]),
             'defaultAiModel' => $group->resolvedAiModel()?->model_id,
         ]);
     }
@@ -227,26 +242,57 @@ class ChatController extends Controller
         return response()->json(['ok' => true, 'message_id' => (int) $message->id]);
     }
 
-    public function attachment(Group $group, Message $message): StreamedResponse
+    /**
+     * Halaman web canvas untuk iframe pratinjau. Dokumen srcdoc mewarisi CSP normi.chat (skrip
+     * canvas akan diblokir), jadi canvas disajikan sendiri: sandbox tanpa allow-same-origin membuat
+     * skripnya berjalan di origin terpisah yang tidak bisa menyentuh sesi atau halaman normi.chat.
+     */
+    public function canvas(Group $group, Message $message, StoredFiles $files): Response
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless($message->message_type === CanvasResponder::MESSAGE_TYPE
+            && $message->attachment_mime === CanvasResponder::MIME_WEB
+            && $message->attachment_path && $message->attachment_disk, 404);
+
+        $html = $files->get($message->attachment_disk, $message->attachment_path);
+        abort_unless(is_string($html), 404);
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Content-Security-Policy' => 'sandbox allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads; '
+                . "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'",
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
+    }
+
+    public function attachment(Group $group, Message $message, StoredFiles $files): StreamedResponse
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
         abort_if(! $message->attachment_path || ! $message->attachment_disk, 404);
 
-        $disk = Storage::disk($message->attachment_disk);
-        abort_unless($disk->exists($message->attachment_path), 404);
-        $stream = $disk->readStream($message->attachment_path);
+        // File kecil dari cache Redis, file besar langsung dari S3.
+        $size = $files->size($message->attachment_disk, $message->attachment_path);
+        $stream = $size === null ? null : $files->stream($message->attachment_disk, $message->attachment_path);
         abort_unless(is_resource($stream), 404);
 
         $mime = $message->attachment_mime ?: 'application/octet-stream';
-        $filename = $message->attachment_original_name ?? basename($message->attachment_path);
+        $filename = str_replace(['/', '\\'], '_', (string) ($message->attachment_original_name ?: basename($message->attachment_path)));
         $inline = preg_match('#^(image|audio|video)/#', $mime) === 1
             || in_array($message->message_type, ['image', 'voice', 'video'], true)
             || $mime === 'application/pdf';
 
         $headers = [
             'Content-Type' => $mime,
-            'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
+            // Nama berkas dari user: di-escape & diberi versi ASCII agar tidak bisa merusak header.
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                $inline ? HeaderUtils::DISPOSITION_INLINE : HeaderUtils::DISPOSITION_ATTACHMENT,
+                $filename,
+                (string) preg_replace('/[^\x20-\x7E]|[%"\\\\\/]/', '_', Str::ascii($filename)) ?: 'lampiran'
+            ),
+            'Content-Length' => (string) $size,
             'Cache-Control' => 'private, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',
         ];

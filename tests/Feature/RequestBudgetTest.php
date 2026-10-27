@@ -82,7 +82,7 @@ class RequestBudgetTest extends TestCase
         $this->assertLessThanOrEqual(40.0, $budget->holdCredits);
     }
 
-    public function test_member_with_little_group_credit_can_still_use_advanced(): void
+    public function test_advanced_answer_is_shortened_to_credit_above_the_group_capital(): void
     {
         Event::fake([MessageSent::class, TypingStatus::class]);
         Http::fake(['api.openai.com/v1/chat/completions' => Http::response([
@@ -90,7 +90,10 @@ class RequestBudgetTest extends TestCase
             'usage' => ['prompt_tokens' => 3000, 'completion_tokens' => 500],
         ])]);
 
-        [$group, $member] = $this->groupWithCredits(80, 'gpt-6-astra');
+        // Advanced terbuka di 500 NK lalu turun ke 330: hanya 80 NK di atas modal 250 yang boleh dipakai.
+        [$group, $member] = $this->groupWithCredits(500, 'gpt-6-astra');
+        $wallet = app(CreditWallet::class);
+        $wallet->settle($wallet->hold($group, $member, 170), 170);
         $this->ask($group, $member, '@normi jelaskan arsitektur microservice');
 
         Http::assertSent(fn ($request) => $request['model'] === 'gpt-6-astra'
@@ -99,7 +102,7 @@ class RequestBudgetTest extends TestCase
 
         // Biaya aktual 3.000/500 token Advanced = 24,69 NK, dipotong dari kredit grup.
         $this->assertSame(24.69, AiUsageLog::firstOrFail()->charged_credits);
-        $this->assertSame(55.31, app(CreditWallet::class)->balanceFor($group, $member)->groupTotal);
+        $this->assertSame(305.31, app(CreditWallet::class)->balanceFor($group, $member)->groupTotal);
         $this->assertStringContainsString('Jawaban dipersingkat', (string) Message::where('sender_type', 'ai')->value('content'));
     }
 

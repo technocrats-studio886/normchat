@@ -77,10 +77,10 @@ class AiChatJobTest extends TestCase
         $this->assertNotNull($reply->attachment_path);
         $this->assertStringEndsWith('.md', $reply->attachment_original_name);
 
-        // Cepat: (1.000 × 0,10 + 1.000 × 0,50) / 1M = $0,0006 × 2 × 17.950 ÷ 120 = 0,1795 → 0,18 NK
+        // Cepat: (1.000 × 0,10 + 1.000 × 0,50) / 1M = $0,0006 × 1,5 × 17.950 ÷ 120 = 0,1346 → 0,14 NK
         $log = AiUsageLog::firstOrFail();
         $this->assertSame('document', $log->kind);
-        $this->assertSame(0.18, $log->charged_credits);
+        $this->assertSame(0.14, $log->charged_credits);
     }
 
     public function test_voice_note_transcription_is_billed_with_the_reply(): void
@@ -110,18 +110,20 @@ class AiChatJobTest extends TestCase
             && collect($request->data())->contains(fn ($part) => ($part['name'] ?? null) === 'model'
                 && ($part['contents'] ?? null) === 'gpt-4o-mini-transcribe'));
 
-        // Chat $0,0006 × 2 (Cepat) + transkripsi (1.000 × 1,25 + 200 × 5) / 1M = $0,00225 × 2 (media)
-        // = $0,0057 × 17.950 ÷ 120 = 0,8526 → 0,86 NK
+        // Chat $0,0006 × 1,5 (Cepat) + transkripsi (1.000 × 1,25 + 200 × 5) / 1M = $0,00225 × 2 (media)
+        // = $0,0054 × 17.950 ÷ 120 = 0,8078 → 0,81 NK
         $log = AiUsageLog::firstOrFail();
         $transcription = collect($log->breakdown_json['lines'])->firstWhere('component', 'transcription');
         $this->assertEqualsWithDelta(0.00225, $transcription['cost_usd'], 1e-9);
         $this->assertSame(2.0, (float) $transcription['multiplier']);
-        $this->assertSame(0.86, $log->charged_credits);
+        $this->assertSame(0.81, $log->charged_credits);
     }
 
     public function test_failed_model_falls_back_to_default_catalog_model_and_its_price(): void
     {
         $this->group->update(['ai_model' => 'gpt-6-astra']);
+        // Advanced terbuka mulai 500 NK (ModelAccess).
+        app(CreditWallet::class)->deposit($this->group, 200);
         Http::fake([
             'api.openai.com/v1/chat/completions' => Http::sequence()
                 ->push(['error' => ['message' => 'The model gpt-6-astra does not exist']], 404)

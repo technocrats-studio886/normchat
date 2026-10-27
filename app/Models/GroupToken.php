@@ -20,6 +20,7 @@ class GroupToken extends Model
         'used_credits',
         'remaining_credits',
         'reserved_credits',
+        'unlocked_models',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class GroupToken extends Model
         'used_credits' => 'float',
         'remaining_credits' => 'float',
         'reserved_credits' => 'float',
+        'unlocked_models' => 'array',
     ];
 
     public function group(): BelongsTo

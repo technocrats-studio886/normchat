@@ -25,5 +25,3 @@ Thumbs.db
 
 .claude/
 /backups/
-
-docker-compose.override.yml

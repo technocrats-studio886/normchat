@@ -75,7 +75,7 @@ Error `Class "Redis" not found` akan hilang jika jalan via Docker karena image P
 
 1. Siapkan env untuk Docker:
 ```bash
-cp .env.docker.example .env
+cp .env.example .env
 ```
 
 2. Jalankan semua service:

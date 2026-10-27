@@ -56,7 +56,7 @@ export const initFeedClicks = () => {
 		const safeUrl = escapeAttr(url);
 		const safeName = escapeHtml(name || 'Lampiran');
 		const overlay = document.createElement('div');
-		overlay.className = 'fixed inset-0 z-[95] bg-slate-950';
+		overlay.className = 'fixed inset-0 z-[95] bg-navy-950';
 
 		const isVideo = kind === 'video';
 		overlay.innerHTML = isVideo

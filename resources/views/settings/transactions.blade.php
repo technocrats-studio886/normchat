@@ -8,10 +8,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
             </a>
-            <h1 class="font-display text-xl font-extrabold text-[#121C29]">Riwayat Patungan</h1>
+            <h1 class="font-display text-xl font-extrabold text-[var(--nc-text)]">Riwayat Patungan</h1>
         </div>
 
-        <p class="mb-4 text-sm text-[#64748B]">Siapa saja yang menambah Normkredit grup ini.</p>
+        <p class="mb-4 text-sm text-slate-500">Siapa saja yang menambah Normkredit grup ini.</p>
 
         <div class="space-y-3">
             @forelse ($contributions as $c)
@@ -33,11 +33,11 @@
                         default => 'bg-slate-100 text-slate-700',
                     };
                 @endphp
-                <div class="rounded-xl border border-[#C9D2DF] bg-white px-4 py-3">
+                <div class="rounded-xl border border-[var(--nc-line-strong)] bg-white px-4 py-3">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="truncate text-sm font-semibold text-[#121C29]">{{ $c->user->name ?? 'User tidak diketahui' }}</p>
-                            <p class="mt-0.5 text-xs text-[#64748B]">{{ $c->created_at?->timezone(config('app.display_timezone', config('app.timezone')))->format('d M Y, H:i') }}</p>
+                            <p class="truncate text-sm font-semibold text-[var(--nc-text)]">{{ $c->user->name ?? 'User tidak diketahui' }}</p>
+                            <p class="mt-0.5 text-xs text-slate-500">{{ $c->created_at?->timezone(config('app.display_timezone', config('app.timezone')))->format('d M Y, H:i') }}</p>
                             @if($c->payment_reference)
                                 <p class="mt-1 truncate text-[11px] font-mono text-slate-400">No. transaksi: {{ $c->payment_reference }}</p>
                             @endif
@@ -47,7 +47,7 @@
                     <div class="mt-3 flex items-end justify-between gap-3">
                         <div>
                             <p class="text-[10px] uppercase tracking-wide text-slate-400">Dibayar</p>
-                            <p class="text-sm font-bold text-[#121C29]">
+                            <p class="text-sm font-bold text-[var(--nc-text)]">
                                                                     Rp{{ number_format((int) $c->price_paid, 0, ',', '.') }}
                             </p>
                         </div>
@@ -58,7 +58,7 @@
                     </div>
                 </div>
             @empty
-                <div class="rounded-xl border border-dashed border-[#C9D2DF] bg-white p-5 text-center text-sm text-[#64748B]">
+                <div class="rounded-xl border border-dashed border-[var(--nc-line-strong)] bg-white p-5 text-center text-sm text-slate-500">
                     Belum ada patungan.
                 </div>
             @endforelse

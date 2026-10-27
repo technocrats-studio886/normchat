@@ -29,7 +29,7 @@
                 $mailId = $mail['id'] ?? $mail['mail_id'] ?? $mail['_id'] ?? '';
             @endphp
 
-            <div class="mt-4 rounded-2xl border border-[#E4E9F0] bg-white px-4 py-4 shadow-sm">
+            <div class="mt-4 rounded-2xl border border-[var(--nc-line)] bg-white px-4 py-4 shadow-sm">
                 @if($isReply)
                     <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-navy-50 px-2 py-0.5 text-[10px] font-semibold text-navy-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 10 4 15l5 5M4 15h11a5 5 0 0 0 5-5V4"/></svg>
@@ -60,7 +60,7 @@
                 </div>
 
                 <div class="mt-3 prose prose-sm prose-slate max-w-none text-sm text-slate-800 leading-relaxed">
-                    {!! $body !!}
+                    {!! \App\Support\SafeHtml::clean(is_string($body) ? $body : '') !!}
                 </div>
             </div>
 
@@ -68,7 +68,7 @@
                 <a href="{{ route('mailbox.compose', ['reply_to' => is_array($from) ? ($from['email'] ?? '') : $from, 'subject' => 'Re: ' . $subject]) }}" class="btn-cta flex-1 text-center">
                     Balas
                 </a>
-                <form method="POST" action="{{ route('mailbox.destroy', $mailId) }}" onsubmit="return confirm('Hapus pesan ini?')" class="flex-shrink-0">
+                <form method="POST" action="{{ route('mailbox.destroy', $mailId) }}" data-confirm="Hapus pesan ini?" class="flex-shrink-0">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="flex h-11 w-11 items-center justify-center rounded-2xl border border-coral-200 bg-coral-50 text-coral-500 transition hover:bg-coral-100">
@@ -85,7 +85,7 @@
         @endif
     </section>
 
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         (function () {
             document.querySelectorAll('time[data-mail-time="abs"]').forEach((el) => {
                 const t = new Date(el.getAttribute('datetime'));

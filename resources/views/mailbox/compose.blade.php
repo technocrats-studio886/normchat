@@ -56,9 +56,9 @@
                 @enderror
             </div>
 
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white shadow-sm overflow-hidden">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white shadow-sm overflow-hidden">
                 <label class="block px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Isi Pesan</label>
-                <div id="quill-editor">{!! old('body', '') !!}</div>
+                <div id="quill-editor">{!! \App\Support\SafeHtml::clean(old('body', '')) !!}</div>
                 <input type="hidden" name="body" id="bodyInput" />
                 @error('body')
                     <p class="px-4 pb-2 text-xs text-coral-500">{{ $message }}</p>
@@ -76,7 +76,7 @@
 
     {{-- Quill Rich Text Editor --}}
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js" nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}"></script>
     <style>
         #quill-editor .ql-editor {
             min-height: 200px;
@@ -146,7 +146,7 @@
             max-width: 200px;
         }
     </style>
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         document.addEventListener('DOMContentLoaded', function () {
             var quill = new Quill('#quill-editor', {
                 theme: 'snow',

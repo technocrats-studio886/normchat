@@ -28,7 +28,7 @@ trap 'on_error ${LINENO}' ERR
 cd "$PROJECT_DIR"
 
 [[ -f docker-compose.yml ]] || fail "File docker-compose.yml tidak ditemukan di ${PROJECT_DIR}."
-[[ -f .env ]] || fail "File .env tidak ditemukan. Buat dulu dari .env.docker.example dan isi secret production."
+[[ -f .env ]] || fail "File .env tidak ditemukan. Buat dulu dari .env.example dan isi secret production."
 
 command -v git >/dev/null 2>&1 || fail "git tidak tersedia di server."
 command -v docker >/dev/null 2>&1 || fail "docker tidak tersedia di server."

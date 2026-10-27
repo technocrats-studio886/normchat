@@ -6,7 +6,7 @@ export const showActionToast = (message) => {
 	}
 
 	const toast = document.createElement('div');
-	toast.className = 'fixed left-1/2 bottom-24 z-[75] -translate-x-1/2 rounded-full bg-slate-900/95 px-3 py-1.5 text-xs font-medium text-white shadow-lg';
+	toast.className = 'fixed left-1/2 bottom-24 z-[75] -translate-x-1/2 rounded-full bg-navy-950/95 px-3 py-1.5 text-xs font-medium text-white shadow-lg';
 	toast.textContent = message;
 	document.body.appendChild(toast);
 	window.setTimeout(() => {

@@ -7,6 +7,31 @@ $normchatStorageRoot = ($configuredNormchatStorageRoot !== '' && is_dir($configu
     : $defaultNormchatStorageRoot;
 $normchatStorageRoot = rtrim($normchatStorageRoot, '/');
 
+// File user (lampiran, export, backup, avatar): di S3 bila NORMCHAT_STORAGE=s3 (produksi), masing-masing
+// di folder sendiri dalam satu bucket; selain itu di disk lokal. Dibaca lewat App\Services\Files\StoredFiles
+// yang men-cache ukuran & isi file kecil di Redis agar tidak selalu meminta ke AWS.
+$normchatDisk = fn (string $folder): array => env('NORMCHAT_STORAGE', 'local') === 's3'
+    ? [
+        'driver' => 's3',
+        'key' => env('AWS_ACCESS_KEY_ID'),
+        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'region' => env('AWS_DEFAULT_REGION'),
+        'bucket' => env('AWS_BUCKET'),
+        'endpoint' => env('AWS_ENDPOINT'),
+        'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+        'root' => $folder,
+        'visibility' => 'private',
+        // Gagal simpan/baca harus terlihat, bukan diam-diam menghasilkan pesan tanpa file.
+        'throw' => true,
+        'report' => true,
+    ]
+    : [
+        'driver' => 'local',
+        'root' => $normchatStorageRoot.'/'.$folder,
+        'throw' => false,
+        'report' => false,
+    ];
+
 return [
 
     /*
@@ -74,26 +99,13 @@ return [
             'report' => false,
         ],
 
-        'normchat_exports' => [
-            'driver' => 'local',
-            'root' => $normchatStorageRoot.'/exports',
-            'throw' => false,
-            'report' => false,
-        ],
+        'normchat_exports' => $normchatDisk('exports'),
 
-        'normchat_backups' => [
-            'driver' => 'local',
-            'root' => $normchatStorageRoot.'/backups',
-            'throw' => false,
-            'report' => false,
-        ],
+        'normchat_backups' => $normchatDisk('backups'),
 
-        'normchat_attachments' => [
-            'driver' => 'local',
-            'root' => $normchatStorageRoot.'/attachments',
-            'throw' => false,
-            'report' => false,
-        ],
+        'normchat_attachments' => $normchatDisk('attachments'),
+
+        'normchat_avatars' => $normchatDisk('avatars'),
 
     ],
 

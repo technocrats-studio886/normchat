@@ -4,13 +4,12 @@ namespace App\Services\Exports;
 
 use App\Models\Message;
 use App\Services\Chat\PollService;
-use Illuminate\Support\Facades\Storage;
-use Throwable;
+use App\Services\Files\StoredFiles;
 
 /** Menyiapkan pesan grup menjadi ExportEntry: pengirim, tautan, polling, dan lampiran. */
 class ChatExportBuilder
 {
-    public function __construct(private readonly PollService $polls)
+    public function __construct(private readonly PollService $polls, private readonly StoredFiles $files)
     {
     }
 
@@ -82,13 +81,8 @@ class ChatExportBuilder
             return null;
         }
 
-        try {
-            $disk = Storage::disk($message->attachment_disk);
-            $binary = $disk->exists($message->attachment_path) ? $disk->get($message->attachment_path) : null;
+        $binary = $this->files->get($message->attachment_disk, (string) $message->attachment_path);
 
-            return $binary !== '' ? $binary : null;
-        } catch (Throwable) {
-            return null;
-        }
+        return $binary !== '' ? $binary : null;
     }
 }

@@ -7,6 +7,7 @@ use App\Services\Ai\AiReply;
 use App\Services\Ai\AiTask;
 use App\Services\Ai\ModePrompts;
 use App\Services\Ai\PromptBuilder;
+use App\Services\Files\StoredFiles;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -118,11 +119,7 @@ final class CanvasResponder implements AiResponder
             return null;
         }
 
-        try {
-            $content = Storage::disk($message->attachment_disk ?: 'normchat_attachments')->get($message->attachment_path);
-        } catch (Throwable) {
-            return null;
-        }
+        $content = app(StoredFiles::class)->get($message->attachment_disk ?: 'normchat_attachments', $message->attachment_path);
 
         return is_string($content) && $content !== ''
             ? ['name' => (string) $message->attachment_original_name, 'content' => mb_substr($content, 0, self::MAX_PREVIOUS_CHARS)]

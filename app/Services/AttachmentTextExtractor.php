@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\Message;
+use App\Services\Files\StoredFiles;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class AttachmentTextExtractor
@@ -29,17 +29,13 @@ class AttachmentTextExtractor
         }
 
         try {
-            $disk = Storage::disk($message->attachment_disk);
-            if (! $disk->exists($message->attachment_path)) {
-                return null;
-            }
-
-            $size = (int) $disk->size($message->attachment_path);
-            if ($size <= 0 || $size > self::MAX_BYTES) {
-                return null;
-            }
-
-            $text = $this->extractByType($disk->path($message->attachment_path), $extension, $mime);
+            // Pembaca PDF/DOCX butuh file di disk; file di S3 disalin sementara.
+            $text = app(StoredFiles::class)->withLocalCopy(
+                $message->attachment_disk,
+                $message->attachment_path,
+                fn (string $path) => $this->extractByType($path, $extension, $mime),
+                self::MAX_BYTES
+            );
             if ($text === null || trim($text) === '') {
                 return null;
             }

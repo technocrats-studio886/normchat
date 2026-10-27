@@ -2,6 +2,7 @@
 
 namespace App\Services\Auth;
 
+use App\Http\Middleware\EndIdleSession;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -53,8 +54,10 @@ class SocialLogin
 
     public function signIn(User $user, Request $request, string $provider, string $method = 'sso'): void
     {
-        Auth::login($user, true);
+        // Tanpa "remember me": sesi berakhir setelah 5 hari tidak aktif (EndIdleSession).
+        Auth::login($user);
         $request->session()->regenerate();
+        $request->session()->put(EndIdleSession::LAST_ACTIVITY, now()->getTimestamp());
 
         AuditLog::record('auth.connect', $user->id, $user, [
             'provider' => $provider,

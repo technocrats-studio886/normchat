@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\GenerateExportJob;
 use App\Models\Export;
 use App\Models\Group;
+use App\Services\Files\StoredFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -66,7 +67,7 @@ class GroupExportController extends Controller
 
     private function download(Group $group, Export $export): ?StreamedResponse
     {
-        if ($export->status !== 'done' || ! $export->storage_path || ! Storage::disk(self::DISK)->exists($export->storage_path)) {
+        if ($export->status !== 'done' || ! $export->storage_path || app(StoredFiles::class)->size(self::DISK, $export->storage_path) === null) {
             return null;
         }
 

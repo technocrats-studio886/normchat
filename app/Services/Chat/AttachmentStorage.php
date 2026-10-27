@@ -3,6 +3,7 @@
 namespace App\Services\Chat;
 
 use App\Models\Group;
+use App\Support\AttachmentRules;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -15,6 +16,9 @@ class AttachmentStorage
     private const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'aac', 'm4a'];
 
     private const VIDEO_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm', '3gp', 'mkv'];
+
+    /** Hasil deteksi yang tidak memberi informasi; tipe dari browser dipakai sebagai gantinya. */
+    private const UNKNOWN_MIME_TYPES = ['', 'application/octet-stream', 'application/x-empty', 'inode/x-empty'];
 
     /**
      * @return array{message_type: string, attachment_disk: string, attachment_path: string,
@@ -32,7 +36,7 @@ class AttachmentStorage
             'message_type' => $type,
             'attachment_disk' => self::DISK,
             'attachment_path' => $path,
-            'attachment_mime' => $this->mimeFor($type, strtolower((string) $file->getClientMimeType()), $extension),
+            'attachment_mime' => $this->mimeFor($type, strtolower((string) $file->getClientMimeType()), $extension, strtolower((string) $file->getMimeType())),
             'attachment_size' => (int) $file->getSize(),
             'attachment_original_name' => (string) $file->getClientOriginalName(),
         ];
@@ -54,7 +58,7 @@ class AttachmentStorage
         };
     }
 
-    private function mimeFor(string $type, string $clientMime, string $extension): string
+    private function mimeFor(string $type, string $clientMime, string $extension, string $detectedMime): string
     {
         if ($type === 'voice') {
             return str_starts_with($clientMime, 'audio/') ? $clientMime : match ($extension) {
@@ -78,6 +82,10 @@ class AttachmentStorage
             };
         }
 
-        return $clientMime !== '' ? $clientMime : 'application/octet-stream';
+        // Tipe dari browser bisa dipalsukan (mis. teks biasa diaku text/html); pakai hasil deteksi
+        // isi berkas, dan tipe yang bisa dijalankan browser tidak pernah disimpan.
+        $mime = in_array($detectedMime, self::UNKNOWN_MIME_TYPES, true) ? $clientMime : $detectedMime;
+
+        return $mime !== '' && ! AttachmentRules::isBlockedMime($mime) ? $mime : 'application/octet-stream';
     }
 }

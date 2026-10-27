@@ -54,7 +54,12 @@ final class AttachmentRules
 
     public static function hasBlockedContent(UploadedFile $file): bool
     {
-        return in_array(strtolower((string) $file->getMimeType()), self::BLOCKED_MIME_TYPES, true);
+        return self::isBlockedMime((string) $file->getMimeType());
+    }
+
+    public static function isBlockedMime(string $mime): bool
+    {
+        return in_array(strtolower(trim(explode(';', $mime)[0])), self::BLOCKED_MIME_TYPES, true);
     }
 
     /** Nilai atribut `accept` untuk pemilih berkas di browser. */

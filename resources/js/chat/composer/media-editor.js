@@ -16,7 +16,7 @@ export const ensureMediaAttachmentPreviewEl = (onClear) => {
 
 	el = document.createElement('div');
 	el.setAttribute('data-attachment-preview-media', '1');
-	el.className = 'fixed inset-0 left-1/2 z-[55] hidden w-full max-w-md -translate-x-1/2 bg-slate-950/95';
+	el.className = 'fixed inset-0 left-1/2 z-[55] hidden w-full max-w-md -translate-x-1/2 bg-navy-950/95';
 	el.innerHTML = mediaPreviewTemplate;
 
 	el.querySelector('[data-attachment-preview-media-clear]')?.addEventListener('click', onClear);

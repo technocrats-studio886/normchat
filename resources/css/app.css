@@ -46,6 +46,16 @@
         --nc-text-soft: var(--color-navy-600);
         --nc-muted: var(--color-navy-400);
         --nc-line: var(--color-navy-100);
+        --nc-line-strong: var(--color-navy-200);
+        /* Bawaan Tailwind (#90A1B9) hanya 2,6:1 di atas putih; dipakai untuk label & teks samar. */
+        --color-slate-400: #7C8A9E;
+        /* Warna teks untuk utilitas navy/coral yang dipetakan ke warna utama (lihat remap di bawah). */
+        --nc-primary-text: var(--nc-primary);
+        --nc-primary-text-strong: var(--nc-primary-hover);
+        /* Warna dasar campuran tint navy/coral (lihat remap utilitas di bawah): putih di tema terang. */
+        --nc-tint-base: #ffffff;
+        --nc-chat-bg: var(--color-navy-50);
+        --nc-warn-text: var(--color-coral-800);
 
         /* Navy = warna utama (aksi, pesan sendiri); coral = aksen (Normi AI, badge, sorotan). */
         --nc-primary: var(--color-navy-900);
@@ -68,6 +78,132 @@
             0 1px 2px rgba(0, 0, 0, 0.04);
         --nc-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08),
             0 2px 4px -1px rgba(0, 0, 0, 0.04);
+    }
+
+    /* ── Tema (data-theme di <html>, dipilih di Profil; App\Support\Themes) ── */
+    [data-theme="navy"] {
+        color-scheme: dark;
+        /* Nilai ditulis langsung: skala navy/coral di bawah ikut diganti dalam blok yang sama. */
+        --nc-bg: #121C29;
+        --nc-surface: #1A2738;
+        --nc-surface-2: #233247;
+        --nc-text: #F3F5F8;
+        --nc-text-soft: #A1B0C5;
+        --nc-muted: #8C9BB1;
+        --nc-line: rgba(161, 176, 197, 0.22);
+        --nc-line-strong: rgba(161, 176, 197, 0.36);
+        /* Coral yang cukup gelap untuk teks putih (4,6:1) dan teks putih/80 (3,4:1); coral-500 hanya 2,9:1. */
+        --nc-primary: #D04436;
+        --nc-primary-light: rgba(208, 68, 54, 0.16);
+        --nc-primary-hover: #B23A2D;
+        /* Teks berwarna utama di atas latar gelap butuh coral terang. */
+        --nc-primary-text: #FC8474;
+        --nc-primary-text-strong: #FDA99E;
+        --nc-accent: #FB6856;
+        --nc-accent-soft: rgba(251, 104, 86, 0.14);
+        --nc-mine: #40536C;
+        --nc-ai-soft: rgba(251, 104, 86, 0.14);
+        --nc-tint-base: #1A2738;
+        --nc-chat-bg: #121C29;
+        --nc-warn-text: #FDA99E;
+        --nc-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.35);
+        --nc-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
+
+        /* Skala slate dibalik: teks gelap jadi terang, latar terang jadi gelap. */
+        --color-slate-50: #1A2738;
+        --color-slate-100: #233247;
+        --color-slate-200: #2E3F56;
+        --color-slate-300: #4A5D77;
+        --color-slate-400: #8C9BB1;
+        --color-slate-500: #A1AEC0;
+        --color-slate-600: #B4BFCE;
+        --color-slate-700: #C6CFDC;
+        --color-slate-800: #DCE2EA;
+        --color-slate-900: #EEF1F5;
+        --color-slate-950: #F7F9FB;
+
+        /* Tint terang navy/coral (latar & garis, termasuk varian /opasitas) jadi tint gelap;
+           teks coral gelap yang dipakai di atas tint itu jadi terang. Navy 400–950 tetap,
+           karena dipakai sebagai latar gelap (tombol, overlay, panel rekaman). */
+        --color-navy-50: #1C2A3C;
+        --color-navy-100: #26364B;
+        --color-navy-200: #34465E;
+        --color-navy-300: #4A5D77;
+        --color-coral-50: #33232A;
+        --color-coral-100: #43292D;
+        --color-coral-200: #633836;
+        --color-coral-300: #8A4741;
+        --color-coral-700: #FDA99E;
+        --color-coral-800: #FECCC5;
+        --color-coral-900: #FFE4E0;
+
+        --nc-chat-meta: #A1B0C5;
+        --nc-chat-meta-strong: #F3F5F8;
+        --nc-chat-header-bg: rgba(30, 46, 67, 0.92);
+        --nc-chat-header-border: rgba(161, 176, 197, 0.25);
+        --nc-chat-header-title: #F3F5F8;
+        --nc-chat-header-subtitle: #A1B0C5;
+        --nc-chat-reply-mine-bg: rgba(18, 28, 41, 0.45);
+        --nc-chat-reply-mine-border: #FB6856;
+        --nc-chat-reply-mine-text: #F3F5F8;
+        --nc-chat-reply-ai-bg: rgba(251, 104, 86, 0.14);
+        --nc-chat-reply-ai-border: rgba(251, 104, 86, 0.4);
+        --nc-chat-reply-ai-text: #FFE4E0;
+        --nc-chat-reply-other-bg: rgba(18, 28, 41, 0.45);
+        --nc-chat-reply-other-border: rgba(161, 176, 197, 0.25);
+        --nc-chat-reply-other-text: #F3F5F8;
+        --nc-chat-other-bg: #1E2E43;
+        --nc-chat-other-text: #F3F5F8;
+        --nc-chat-other-border: rgba(161, 176, 197, 0.25);
+        --nc-chat-ai-bg: rgba(251, 104, 86, 0.16);
+        --nc-chat-ai-text: #FFE4E0;
+        --nc-chat-ai-border: rgba(251, 104, 86, 0.4);
+        --nc-chat-composer-bg: #121C29;
+        --nc-chat-composer-input-bg: #1E2E43;
+        --nc-chat-composer-text: #F3F5F8;
+        --nc-chat-composer-soft: #A1B0C5;
+        --nc-chat-composer-line: rgba(161, 176, 197, 0.25);
+    }
+
+    [data-theme="coral"] {
+        --nc-bg: var(--color-coral-50);
+        --nc-surface-2: var(--color-coral-100);
+        --nc-line: var(--color-coral-200);
+        --nc-line-strong: var(--color-coral-300);
+        --nc-chat-bg: var(--color-coral-50);
+
+        --nc-chat-meta: var(--color-coral-700);
+        --nc-chat-meta-strong: var(--color-navy-950);
+        --nc-chat-header-bg: rgba(255, 255, 255, 0.95);
+        --nc-chat-header-border: var(--color-coral-200);
+        --nc-chat-header-title: var(--color-navy-950);
+        --nc-chat-header-subtitle: var(--color-coral-700);
+        --nc-chat-reply-mine-bg: rgba(255, 255, 255, 0.16);
+        --nc-chat-reply-mine-border: var(--color-navy-900);
+        --nc-chat-reply-mine-text: var(--color-navy-950);
+        --nc-chat-reply-ai-bg: var(--color-coral-50);
+        --nc-chat-reply-ai-border: var(--color-coral-300);
+        --nc-chat-reply-ai-text: var(--color-coral-900);
+        --nc-chat-reply-other-bg: var(--color-coral-50);
+        --nc-chat-reply-other-border: var(--color-coral-200);
+        --nc-chat-reply-other-text: var(--color-navy-950);
+        --nc-chat-other-bg: #ffffff;
+        --nc-chat-other-text: var(--color-navy-950);
+        --nc-chat-other-border: var(--color-coral-200);
+        --nc-chat-ai-bg: var(--color-coral-100);
+        --nc-chat-ai-text: var(--color-coral-900);
+        --nc-chat-ai-border: var(--color-coral-300);
+        --nc-chat-composer-bg: var(--color-coral-50);
+        --nc-chat-composer-input-bg: #ffffff;
+        --nc-chat-composer-text: var(--color-navy-950);
+        --nc-chat-composer-soft: var(--color-coral-700);
+        --nc-chat-composer-line: var(--color-coral-200);
+    }
+
+    /* Preflight Tailwind memberi placeholder 50% warna teks: terlalu pucat di kedua tema. */
+    ::placeholder {
+        color: var(--color-slate-400);
+        opacity: 1;
     }
 
     body {
@@ -104,7 +240,8 @@
 
     /* ── Inputs ──────────────────────────────────── */
     .input-field {
-        @apply w-full rounded-2xl border bg-white px-4 py-3 text-sm outline-none transition;
+        @apply w-full rounded-2xl border px-4 py-3 text-sm outline-none transition;
+        background: var(--nc-surface);
         border-color: var(--nc-line);
     }
     .input-field:focus {
@@ -122,7 +259,8 @@
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-700 transition active:scale-[0.98];
+        @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-slate-700 transition active:scale-[0.98];
+        background: var(--nc-surface);
         border: 1px solid var(--nc-line);
     }
     .btn-secondary:hover { background: var(--nc-surface-2); }
@@ -173,7 +311,7 @@
     }
     .nc-bottom-nav-inner {
         @apply flex items-center justify-around rounded-full px-2 py-2;
-        background: rgba(255, 255, 255, 0.92);
+        background: color-mix(in srgb, var(--nc-surface) 92%, transparent);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         border: 1px solid var(--nc-line);
@@ -205,7 +343,8 @@
     .page-shell { @apply min-h-screen px-4 pb-32 pt-5; }
 
     .panel-card {
-        @apply rounded-2xl bg-white;
+        @apply rounded-2xl;
+        background: var(--nc-surface);
         border: 1px solid var(--nc-line);
         box-shadow: var(--nc-shadow-soft);
     }
@@ -215,7 +354,8 @@
         border: 1px solid var(--nc-line);
     }
     .card-soft {
-        @apply rounded-2xl bg-white p-4;
+        @apply rounded-2xl p-4;
+        background: var(--nc-surface);
         border: 1px solid var(--nc-line);
         box-shadow: var(--nc-shadow-soft);
     }
@@ -369,9 +509,9 @@
     .meta-time { @apply text-[10px] font-medium; color: var(--nc-muted); }
     .nc-edited-mark {
         @apply ml-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold;
-        border-color: #C9D2DF;
-        color: #64748b;
-        background: #F3F5F8;
+        border-color: var(--nc-line-strong);
+        color: var(--color-slate-500);
+        background: var(--nc-bg);
     }
     .nc-edited-mark--mine {
         border-color: rgba(255, 255, 255, 0.4);
@@ -384,9 +524,9 @@
         background: var(--color-coral-100);
     }
     .nc-edited-mark--other {
-        border-color: #C9D2DF;
-        color: #64748b;
-        background: #F3F5F8;
+        border-color: var(--nc-line-strong);
+        color: var(--color-slate-500);
+        background: var(--nc-bg);
     }
 
     .nc-message-edited-flash {
@@ -446,13 +586,13 @@
         @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold;
     }
     .chip-indigo {
-        background: color-mix(in srgb, var(--nc-primary) 10%, #ffffff);
-        color: var(--nc-primary-hover);
+        background: color-mix(in srgb, var(--nc-primary) 10%, var(--nc-tint-base));
+        color: var(--nc-primary-text-strong);
     }
-    .chip-emerald { background: #F3F5F8; color: #29374A; }
-    .chip-amber { background: #FFF3F1; color: #A1342A; }
-    .chip-rose { background: #FFF3F1; color: #A1342A; }
-    .chip-slate { background: #F3F5F8; color: #475569; }
+    .chip-emerald { background: var(--nc-bg); color: var(--nc-text); }
+    .chip-amber { background: color-mix(in srgb, var(--color-coral-500) 8%, var(--nc-tint-base)); color: var(--nc-warn-text); }
+    .chip-rose { background: color-mix(in srgb, var(--color-coral-500) 8%, var(--nc-tint-base)); color: var(--nc-warn-text); }
+    .chip-slate { background: var(--nc-bg); color: var(--color-slate-600); }
 
     /* ── Composer ────────────────────────────────── */
     /* Textbar ala Gemini: satu pill — [+] [teks] [model ▾] [mic/kirim], chip mode di atasnya. */
@@ -503,8 +643,14 @@
     .composer-menu-item.is-selected {
         background: rgba(161, 176, 197, 0.16);
     }
+    .composer-menu-item[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+    .composer-menu-item[aria-disabled="true"]:hover { background: transparent; }
+    .composer-menu-note {
+        @apply -mt-1 mb-1 flex items-start gap-1.5 px-3 pb-1.5 pl-11 text-[11px] leading-snug;
+        color: var(--nc-text-soft);
+    }
     .composer-input::placeholder {
-        color: var(--nc-chat-composer-soft, #A1B0C5);
+        color: var(--nc-chat-composer-soft, var(--color-navy-400));
     }
     .composer-iconbtn {
         @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition;
@@ -725,7 +871,8 @@
     .sheet-overlay.is-open { opacity: 1; pointer-events: auto; }
 
     .sheet-panel {
-        @apply fixed inset-x-0 z-[61] mx-auto w-full max-w-md rounded-t-3xl bg-white p-5 transition;
+        @apply fixed inset-x-0 z-[61] mx-auto w-full max-w-md rounded-t-3xl p-5 transition;
+        background: var(--nc-surface);
         bottom: 0;
         transform: translateY(100%);
         box-shadow: 0 -8px 30px -10px rgba(0, 0, 0, 0.15);
@@ -748,7 +895,7 @@
     }
     .nc-popup-card {
         width: 100%; max-width: 320px;
-        background: #fff; border-radius: 20px;
+        background: var(--nc-surface); border-radius: 20px;
         box-shadow: 0 8px 32px -4px rgba(0,0,0,0.25);
         overflow: hidden;
         animation: ncSlideUp 180ms ease;
@@ -774,7 +921,7 @@
         transition: background 100ms;
     }
     .nc-popup-menu-item:hover { background: var(--nc-surface-2); }
-    .nc-popup-menu-item:active { background: #E4E9F0; }
+    .nc-popup-menu-item:active { background: var(--nc-line); }
     .nc-popup-menu-item svg { color: var(--nc-text-soft); flex-shrink: 0; }
     .nc-popup-menu-danger { color: var(--nc-danger); }
     .nc-popup-menu-danger svg { color: var(--nc-danger); }
@@ -783,6 +930,32 @@
         box-shadow: inset 0 0 0 2px rgba(113, 134, 163, 0.35);
         border-radius: 14px;
         background-color: rgba(113, 134, 163, 0.06);
+    }
+
+    /* Swipe ke kanan untuk membalas (resources/js/chat/composer/message-actions.js) */
+    .nc-swipe-reply-icon {
+        position: absolute; top: 50%; z-index: 1;
+        display: flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 9999px;
+        background: var(--nc-surface-2); color: var(--nc-text-soft);
+        opacity: 0; pointer-events: none;
+        transform: translateY(-50%) scale(0.6);
+        transition: background 120ms, color 120ms;
+    }
+    .nc-swipe-reply-icon.is-ready { background: var(--nc-primary); color: #fff; }
+
+    /* Pemilih bagian yang dibalas (resources/js/chat/composer/quote-picker.js) */
+    .nc-popup-card--wide { max-width: 440px; }
+    .nc-popup-card--wide .nc-quote-picker { max-height: 45vh; white-space: normal; line-height: 1.6; }
+
+    /* Pemilih tema di Profil (resources/views/profile/show.blade.php) */
+    .nc-theme-option[aria-checked="true"] {
+        border-color: var(--nc-primary);
+        box-shadow: 0 0 0 2px var(--nc-primary);
+    }
+    .nc-theme-sample {
+        background: var(--nc-chat-bg);
+        border: 1px solid var(--nc-line);
     }
 
     /* Select-text sub-popup keeps old style */
@@ -821,7 +994,7 @@
         border: 1px solid var(--nc-line);
         border-radius: 12px;
         padding: 12px;
-        background: #ffffff;
+        background: var(--nc-surface);
         line-height: 1.8;
         white-space: pre-wrap;
         cursor: text;
@@ -844,7 +1017,7 @@
     .nc-quote-result {
         margin: 10px 0 0;
         border-radius: 10px;
-        background: #F3F5F8;
+        background: var(--nc-surface-2);
         color: var(--nc-text-soft);
         font-size: 12px;
         line-height: 1.45;
@@ -866,7 +1039,7 @@
     .nc-popup-btn-select {
         background: var(--nc-surface-2); color: var(--nc-text);
     }
-    .nc-popup-btn-select:hover:not(:disabled) { background: #E4E9F0; }
+    .nc-popup-btn-select:hover:not(:disabled) { background: var(--nc-line); }
     .nc-popup-btn:disabled {
         opacity: 0.4; cursor: not-allowed;
     }
@@ -932,17 +1105,17 @@
     .text-navy-600,
     .text-navy-600,
     .text-navy-700 {
-        color: var(--nc-primary) !important;
+        color: var(--nc-primary-text) !important;
     }
     .text-navy-800,
     .text-navy-900,
     .text-navy-700 {
-        color: var(--nc-primary-hover) !important;
+        color: var(--nc-primary-text-strong) !important;
     }
     .bg-navy-50,
     .bg-navy-50,
     .bg-navy-100 {
-        background-color: color-mix(in srgb, var(--nc-primary) 10%, #ffffff) !important;
+        background-color: color-mix(in srgb, var(--nc-primary) 10%, var(--nc-tint-base)) !important;
     }
     .bg-navy-500,
     .bg-navy-600,
@@ -956,20 +1129,20 @@
         background-color: color-mix(in srgb, var(--nc-primary) 55%, transparent) !important;
     }
     .bg-navy-200 {
-        background-color: color-mix(in srgb, var(--nc-primary) 22%, #ffffff) !important;
+        background-color: color-mix(in srgb, var(--nc-primary) 22%, var(--nc-tint-base)) !important;
     }
     .border-navy-100,
     .border-navy-200,
     .border-navy-200,
     .border-navy-300 {
-        border-color: color-mix(in srgb, var(--nc-primary) 32%, #ffffff) !important;
+        border-color: color-mix(in srgb, var(--nc-primary) 32%, var(--nc-tint-base)) !important;
     }
     .border-navy-400,
     .border-navy-400 {
-        border-color: color-mix(in srgb, var(--nc-primary) 48%, #ffffff) !important;
+        border-color: color-mix(in srgb, var(--nc-primary) 48%, var(--nc-tint-base)) !important;
     }
     .border-navy-300\/70 {
-        border-color: color-mix(in srgb, var(--nc-primary) 70%, #ffffff) !important;
+        border-color: color-mix(in srgb, var(--nc-primary) 70%, var(--nc-tint-base)) !important;
     }
     .border-navy-500,
     .border-navy-500 {
@@ -977,18 +1150,18 @@
     }
     .focus\:border-navy-400:focus,
     .focus\:border-navy-500:focus {
-        border-color: color-mix(in srgb, var(--nc-primary) 56%, #ffffff) !important;
+        border-color: color-mix(in srgb, var(--nc-primary) 56%, var(--nc-tint-base)) !important;
     }
     .focus\:ring-navy-100:focus,
     .focus\:ring-navy-500:focus {
-        --tw-ring-color: color-mix(in srgb, var(--nc-primary) 24%, #ffffff) !important;
+        --tw-ring-color: color-mix(in srgb, var(--nc-primary) 24%, var(--nc-tint-base)) !important;
     }
     .accent-navy-600 {
         accent-color: var(--nc-primary) !important;
     }
     .hover\:text-navy-700:hover,
     .hover\:text-navy-700:hover {
-        color: var(--nc-primary-hover) !important;
+        color: var(--nc-primary-text-strong) !important;
     }
     .text-navy-50 {
         color: color-mix(in srgb, var(--nc-primary) 8%, #ffffff) !important;
@@ -998,7 +1171,7 @@
     }
     .hover\:bg-navy-100:hover,
     .hover\:bg-navy-50:hover {
-        background-color: color-mix(in srgb, var(--nc-primary) 14%, #ffffff) !important;
+        background-color: color-mix(in srgb, var(--nc-primary) 14%, var(--nc-tint-base)) !important;
     }
     .hover\:bg-navy-300\/55:hover {
         background-color: color-mix(in srgb, var(--nc-primary-hover) 55%, transparent) !important;
@@ -1011,14 +1184,14 @@
     .text-coral-400,
     .text-coral-500,
     .text-coral-600 {
-        color: var(--nc-primary) !important;
+        color: var(--nc-primary-text) !important;
     }
     .text-coral-700 {
-        color: var(--nc-primary-hover) !important;
+        color: var(--nc-primary-text-strong) !important;
     }
     .bg-coral-50,
     .bg-coral-100 {
-        background-color: color-mix(in srgb, var(--nc-primary) 10%, #ffffff) !important;
+        background-color: color-mix(in srgb, var(--nc-primary) 10%, var(--nc-tint-base)) !important;
     }
     .bg-coral-500 {
         background-color: var(--nc-primary) !important;
@@ -1029,11 +1202,11 @@
     .border-coral-100,
     .border-coral-200,
     .border-coral-300 {
-        border-color: color-mix(in srgb, var(--nc-primary) 28%, #ffffff) !important;
+        border-color: color-mix(in srgb, var(--nc-primary) 28%, var(--nc-tint-base)) !important;
     }
     .hover\:bg-coral-50:hover,
     .hover\:bg-coral-100:hover {
-        background-color: color-mix(in srgb, var(--nc-primary) 14%, #ffffff) !important;
+        background-color: color-mix(in srgb, var(--nc-primary) 14%, var(--nc-tint-base)) !important;
     }
     .hover\:bg-coral-500:hover {
         background-color: color-mix(in srgb, var(--nc-primary) 88%, #344458) !important;
@@ -1042,7 +1215,7 @@
         background-color: var(--nc-primary-hover) !important;
     }
     .hover\:text-coral-700:hover {
-        color: var(--nc-primary-hover) !important;
+        color: var(--nc-primary-text-strong) !important;
     }
     .shadow-coral-900\/15,
     .shadow-coral-900\/20,
@@ -1054,4 +1227,18 @@
 
     /* ── Misc ────────────────────────────────────── */
     .divider-soft { height: 1px; background: var(--nc-line); }
+}
+
+/* Tema gelap: bg-white solid jadi permukaan gelap. :where menjaga spesifisitas setara utilitas,
+   jadi hover:bg-* tetap menang. bg-white/xx (lapisan putih di atas warna) sengaja tidak diubah. */
+@layer utilities {
+    :where([data-theme="navy"]) .bg-white { background-color: var(--nc-surface); }
+    :where([data-theme="navy"]) .text-navy-950 { color: var(--nc-text); }
+    :where([data-theme="navy"]) .ring-white { --tw-ring-color: var(--nc-surface); }
+    :where([data-theme="navy"]) .text-navy-100 { color: #E4E9F0; }
+    :where([data-theme="navy"]) .text-navy-200 { color: #C9D2DF; }
+    :where([data-theme="navy"]) .text-navy-300 { color: #A1B0C5; }
+    :where([data-theme="navy"]) .text-coral-100 { color: #FFE4E0; }
+    :where([data-theme="navy"]) .text-coral-200 { color: #FECCC5; }
+    :where([data-theme="navy"]) .text-coral-300 { color: #FDA99E; }
 }

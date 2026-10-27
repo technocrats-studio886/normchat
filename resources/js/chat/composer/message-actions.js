@@ -7,6 +7,7 @@ import { refreshScrollBottomButton, resetLatestMessageIdFromDom } from '../read-
 import { chatApiRequest, escapeHtml } from '../utils.js';
 import { clearSelectedAttachment } from './attachment.js';
 import { buildMessageApiUrl, mentionInput, replyToInput } from './elements.js';
+import { openQuotePicker } from './quote-picker.js';
 import { clearEditingState, clearReplyTarget, getEditingMessageId, setReplyTarget, setReplyTargetWithText, startEditing } from './reply.js';
 import { showActionToast } from './toast.js';
 
@@ -37,109 +38,18 @@ export const initMessageActions = () => {
 
 	/* ── Message popup (long-press) ── */
 	let activePopup = null;
-	let activePopupCleanup = null;
 	const dismissPopup = () => {
-		if (typeof activePopupCleanup === 'function') {
-			activePopupCleanup();
-		}
-		activePopupCleanup = null;
 		if (activePopup) {
 			activePopup.remove();
 			activePopup = null;
 		}
 	};
 
-	const showSelectTextPopup = (messageNode, sender, messageText) => {
-		dismissPopup();
-		const safeMessageText = String(messageText || '').trim();
-		const selectOverlay = document.createElement('div');
-		selectOverlay.className = 'nc-popup-overlay';
-		selectOverlay.innerHTML = `
-		<div class="nc-popup-card" onclick="event.stopPropagation()">
-			<div class="nc-popup-header">
-				<span class="nc-popup-sender">${escapeHtml(sender)}</span>
-				<button type="button" class="nc-popup-close" data-popup-close>&times;</button>
-			</div>
-			<div class="nc-popup-body nc-popup-body--quote" data-quote-picker-body>
-				<p class="nc-quote-picker" data-quote-picker-words>${escapeHtml(safeMessageText)}</p>
-				<p class="nc-quote-result" data-quote-picker-result>Pilih teks, lalu tekan tombol di bawah.</p>
-			</div>
-			<div class="nc-popup-actions">
-				<button type="button" class="nc-popup-btn" data-popup-reply-sel disabled>Balas teks ini</button>
-			</div>
-		</div>
-	`;
-		document.body.appendChild(selectOverlay);
-		activePopup = selectOverlay;
-
-		const wordsContainer = selectOverlay.querySelector('[data-quote-picker-words]');
-		const resultEl = selectOverlay.querySelector('[data-quote-picker-result]');
-		const btnReplySel = selectOverlay.querySelector('[data-popup-reply-sel]');
-		const getSelectedQuote = () => {
-			const selection = window.getSelection();
-			if (!selection || selection.rangeCount === 0) {
-				return '';
-			}
-
-			const selectedText = String(selection.toString() || '').trim();
-			if (selectedText === '' || !(wordsContainer instanceof HTMLElement)) {
-				return '';
-			}
-
-			const selectionRange = selection.getRangeAt(0);
-			const commonNode = selectionRange.commonAncestorContainer;
-			if (!wordsContainer.contains(commonNode)) {
-				return '';
-			}
-
-			return selectedText;
-		};
-
-		const renderSelectionState = () => {
-			const quote = getSelectedQuote();
-			if (resultEl instanceof HTMLElement) {
-				resultEl.textContent = quote !== ''
-					? `"${quote}"`
-					: 'Pilih teks, lalu tekan tombol di bawah.';
-			}
-
-			if (btnReplySel instanceof HTMLButtonElement) {
-				btnReplySel.disabled = quote === '';
-			}
-		};
-
-		renderSelectionState();
-		document.addEventListener('selectionchange', renderSelectionState);
-		activePopupCleanup = () => {
-			document.removeEventListener('selectionchange', renderSelectionState);
-		};
-
-		const cleanup = () => {
-			activePopupCleanup = null;
-			document.removeEventListener('selectionchange', renderSelectionState);
-			dismissPopup();
-		};
-
-		selectOverlay.addEventListener('click', (e) => {
-			if (e.target === selectOverlay) {
-				cleanup();
-			}
-		});
-		selectOverlay.querySelector('[data-popup-close]')?.addEventListener('click', cleanup);
-		btnReplySel?.addEventListener('click', () => {
-			const text = getSelectedQuote();
-			cleanup();
-			if (text) {
-				setReplyTargetWithText(messageNode, text);
-			}
-		});
-	};
-
 	const viewerIsModerator = String(chatFeed?.getAttribute('data-viewer-is-moderator') || '0') === '1';
 
 	const showConfirmDialog = ({ title, message, confirmLabel = 'Hapus', cancelLabel = 'Batal', danger = true, checkboxLabel = '', checkboxDefault = false, checkboxDisabled = false } = {}) => new Promise((resolve) => {
 		const overlay = document.createElement('div');
-		overlay.className = 'fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-5';
+		overlay.className = 'fixed inset-0 z-[90] flex items-center justify-center bg-navy-950/45 px-5';
 		overlay.innerHTML = `
 		<div class="w-full max-w-xs rounded-2xl bg-white p-5 shadow-2xl">
 			<p class="text-sm font-semibold text-slate-900">${escapeHtml(title || 'Konfirmasi')}</p>
@@ -197,7 +107,7 @@ export const initMessageActions = () => {
 		const overlay = document.createElement('div');
 		overlay.className = 'nc-popup-overlay';
 		overlay.innerHTML = `
-		<div class="nc-popup-card" onclick="event.stopPropagation()">
+		<div class="nc-popup-card">
 			<div class="nc-popup-preview">${escapeHtml(messageText.length > 200 ? messageText.slice(0, 200) + '...' : messageText)}</div>
 			<div class="nc-popup-menu">
 				<button type="button" class="nc-popup-menu-item" data-popup-reply>
@@ -241,6 +151,7 @@ export const initMessageActions = () => {
 		overlay.addEventListener('click', (e) => {
 			if (e.target === overlay) dismissPopup();
 		});
+		overlay.querySelector('.nc-popup-card')?.addEventListener('click', (e) => e.stopPropagation());
 		overlay.querySelector('[data-popup-reply]')?.addEventListener('click', () => {
 			dismissPopup();
 			setReplyTarget(messageNode);
@@ -254,7 +165,8 @@ export const initMessageActions = () => {
 			dismissPopup();
 		});
 		overlay.querySelector('[data-popup-select-text]')?.addEventListener('click', () => {
-			showSelectTextPopup(messageNode, sender, messageText);
+			dismissPopup();
+			openQuotePicker(messageNode, { onPick: (quote) => setReplyTargetWithText(messageNode, quote) });
 		});
 		overlay.querySelector('[data-popup-select-message]')?.addEventListener('click', () => {
 			dismissPopup();
@@ -363,13 +275,19 @@ export const initMessageActions = () => {
 
 	if (chatFeed instanceof HTMLElement) {
 		const SWIPE_THRESHOLD = 56;
+		const SWIPE_MAX = 90;
+		const AXIS_LOCK_PX = 10;
 		const LONG_PRESS_MS = 520;
 		let startX = 0;
 		let startY = 0;
 		let activeNode = null;
+		let pointerId = null;
+		// null = arah belum jelas, 'x' = sedang swipe balas, 'y' = user menggulir.
+		let axis = null;
 		let longPressTimer = null;
 		let swipeReplyReady = false;
-		let swipeReplyHapticSent = false;
+		let swipeIcon = null;
+		let suppressClickUntil = 0;
 
 		const clearLongPress = () => {
 			if (longPressTimer) {
@@ -386,11 +304,39 @@ export const initMessageActions = () => {
 			}
 		};
 
+		/** Ikon balas di sisi kiri bubble; ikut bergeser bersama pesan dan makin jelas mendekati ambang. */
+		const showSwipeIcon = (node) => {
+			const bubble = node.classList.contains('justify-end') ? node.firstElementChild : node;
+			const offset = (bubble instanceof HTMLElement ? bubble.getBoundingClientRect().left : 0) - node.getBoundingClientRect().left;
+			swipeIcon = document.createElement('span');
+			swipeIcon.className = 'nc-swipe-reply-icon';
+			swipeIcon.setAttribute('aria-hidden', 'true');
+			swipeIcon.style.left = `${offset - 36}px`;
+			swipeIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 0 1 0 10H9m-6-10 4-4m-4 4 4 4"/></svg>';
+			node.style.position = 'relative';
+			node.appendChild(swipeIcon);
+		};
+
+		const removeSwipeIcon = (node) => {
+			swipeIcon?.remove();
+			swipeIcon = null;
+			if (node instanceof HTMLElement) {
+				node.style.position = '';
+			}
+		};
+
 		const clearActive = () => {
-			if (activeNode) resetTransform(activeNode);
+			if (activeNode) {
+				resetTransform(activeNode);
+				removeSwipeIcon(activeNode);
+				if (pointerId !== null && activeNode.hasPointerCapture?.(pointerId)) {
+					activeNode.releasePointerCapture(pointerId);
+				}
+			}
 			activeNode = null;
+			pointerId = null;
+			axis = null;
 			swipeReplyReady = false;
-			swipeReplyHapticSent = false;
 			clearLongPress();
 		};
 
@@ -401,6 +347,10 @@ export const initMessageActions = () => {
 
 			const targetNode = activeNode;
 			const shouldReply = swipeReplyReady;
+			if (axis === 'x') {
+				// Mouse: lepas setelah menggeser jangan sampai membuka gambar/canvas di bawah kursor.
+				suppressClickUntil = Date.now() + 350;
+			}
 			clearActive();
 
 			if (shouldReply) {
@@ -410,78 +360,107 @@ export const initMessageActions = () => {
 
 		chatFeed.addEventListener('pointerdown', (event) => {
 			if (event.button !== 0) {
-				activeNode = null;
 				return;
 			}
+			clearActive();
 
 			const node = event.target instanceof HTMLElement
 				? event.target.closest('[data-message-id]')
 				: null;
 			if (!(node instanceof HTMLElement)) {
-				activeNode = null;
 				return;
 			}
 
 			if (event.target.closest('input, textarea, [data-voice-toggle], [data-voice-progress]')) {
-				activeNode = null;
 				return;
 			}
 
 			activeNode = node;
+			pointerId = event.pointerId;
+			axis = null;
 			swipeReplyReady = false;
-			swipeReplyHapticSent = false;
 			startX = event.clientX;
 			startY = event.clientY;
 			node.style.transition = '';
 			clearLongPress();
 			longPressTimer = window.setTimeout(() => {
-				if (activeNode) {
+				if (activeNode && axis === null) {
 					try { navigator.vibrate?.(15); } catch {}
-					showMessagePopup(activeNode);
-					resetTransform(activeNode);
-					activeNode = null;
+					const pressedNode = activeNode;
+					clearActive();
+					showMessagePopup(pressedNode);
 				}
 			}, LONG_PRESS_MS);
 		});
 
 		chatFeed.addEventListener('pointermove', (event) => {
-			if (!activeNode) return;
+			if (!activeNode || event.pointerId !== pointerId) return;
 
 			const deltaX = event.clientX - startX;
 			const deltaY = event.clientY - startY;
 
-			if (Math.abs(deltaY) > 18) {
-				clearActive();
-				return;
-			}
-
-			if (Math.abs(deltaX) > 18) {
-				clearLongPress();
-			}
-
-			// swipe RIGHT only (deltaX > 0)
-			if (deltaX > 6) {
-				const dragX = Math.min(90, deltaX);
-				activeNode.style.transform = `translateX(${dragX}px)`;
-				const passesThreshold = deltaX > SWIPE_THRESHOLD && deltaX > Math.abs(deltaY) + 8;
-				swipeReplyReady = passesThreshold;
-				if (passesThreshold && !swipeReplyHapticSent) {
-					try { navigator.vibrate?.(10); } catch {}
-					swipeReplyHapticSent = true;
+			if (axis === null) {
+				if (Math.abs(deltaX) < AXIS_LOCK_PX && Math.abs(deltaY) < AXIS_LOCK_PX) {
+					return;
 				}
-				if (event.cancelable) event.preventDefault();
-			} else if (deltaX < -6) {
-				// block left swipe — just cancel
-				clearActive();
-				return;
-			} else {
-				swipeReplyReady = false;
+				clearLongPress();
+				// Geser ke kanan yang lebih dominan = balas; selain itu biarkan feed menggulir.
+				if (deltaX > 0 && Math.abs(deltaX) > Math.abs(deltaY)) {
+					axis = 'x';
+					try { activeNode.setPointerCapture(pointerId); } catch {}
+					showSwipeIcon(activeNode);
+				} else {
+					clearActive();
+					return;
+				}
 			}
+
+			const dragX = Math.max(0, Math.min(SWIPE_MAX, deltaX));
+			activeNode.style.transform = `translateX(${dragX}px)`;
+			const progress = Math.min(1, dragX / SWIPE_THRESHOLD);
+			if (swipeIcon) {
+				swipeIcon.style.opacity = String(progress);
+				swipeIcon.style.transform = `translateY(-50%) scale(${0.6 + 0.4 * progress})`;
+			}
+
+			const passesThreshold = dragX >= SWIPE_THRESHOLD;
+			if (passesThreshold && !swipeReplyReady) {
+				try { navigator.vibrate?.(10); } catch {}
+			}
+			swipeReplyReady = passesThreshold;
+			swipeIcon?.classList.toggle('is-ready', passesThreshold);
+			if (event.cancelable) event.preventDefault();
 		}, { passive: false });
 
 		chatFeed.addEventListener('pointerup', commitGestureOnRelease);
 		chatFeed.addEventListener('pointercancel', clearActive);
-		chatFeed.addEventListener('pointerleave', clearActive);
+		chatFeed.addEventListener('pointerleave', () => {
+			// Setelah arah terkunci, pointer capture menjaga gestur walau kursor keluar feed.
+			if (axis !== 'x') {
+				clearActive();
+			}
+		});
+		chatFeed.addEventListener('lostpointercapture', (event) => {
+			// Sentuhan sudah ter-capture ke elemen anak; perpindahan capture ke node memicu event ini
+			// dari anak itu, jadi hanya capture milik node sendiri yang membatalkan gestur.
+			if (event.pointerId === pointerId && event.target === activeNode) {
+				clearActive();
+			}
+		});
+
+		// Tanpa ini, menggeser gambar/tautan dengan mouse memulai drag bawaan browser dan swipe batal.
+		chatFeed.addEventListener('dragstart', (event) => {
+			if (event.target instanceof Element && event.target.closest('[data-message-id]')) {
+				event.preventDefault();
+			}
+		});
+
+		chatFeed.addEventListener('click', (event) => {
+			if (Date.now() < suppressClickUntil) {
+				event.preventDefault();
+				event.stopPropagation();
+			}
+		}, true);
 
 		chatFeed.addEventListener('contextmenu', (event) => {
 			const node = event.target instanceof HTMLElement

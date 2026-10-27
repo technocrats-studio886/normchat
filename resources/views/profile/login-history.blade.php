@@ -12,11 +12,11 @@
 
         {{-- Stats cards --}}
         <div class="mt-4 grid grid-cols-2 gap-3">
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-4 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-4 py-3 shadow-sm">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Jumlah Masuk</p>
                 <p class="mt-1 font-display text-2xl font-extrabold text-slate-900">{{ number_format($totalAllTime) }}</p>
             </div>
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-4 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-4 py-3 shadow-sm">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Terakhir Masuk</p>
                 @if($lastLogin)
                     <p class="mt-1 text-sm font-bold text-slate-900">{{ $lastLogin->created_at?->timezone(config('app.display_timezone', config('app.timezone')))->format('d M Y') }}</p>
@@ -30,14 +30,14 @@
         {{-- Filters --}}
         <form method="GET" action="{{ route('profile.login-history') }}" class="mt-5 flex flex-wrap items-center gap-2">
             <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tampilkan</label>
-            <select name="range" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
+            <select name="range" data-auto-submit="1" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
                 <option value="week" {{ $loginRange === 'week' ? 'selected' : '' }}>1 Minggu</option>
                 <option value="month" {{ $loginRange === 'month' ? 'selected' : '' }}>1 Bulan</option>
                 <option value="3month" {{ $loginRange === '3month' ? 'selected' : '' }}>3 Bulan</option>
                 <option value="all" {{ $loginRange === 'all' ? 'selected' : '' }}>Semua</option>
             </select>
 
-            <select name="sort" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
+            <select name="sort" data-auto-submit="1" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
                 <option value="desc" {{ $sortDir === 'desc' ? 'selected' : '' }}>Terbaru</option>
                 <option value="asc" {{ $sortDir === 'asc' ? 'selected' : '' }}>Terlama</option>
             </select>
@@ -107,7 +107,7 @@
                 </div>
             @empty
                 <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-8 w-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
                     <p class="mt-2 text-sm font-semibold text-slate-600">Belum ada riwayat</p>
                     <p class="mt-1 text-xs text-slate-400">Aktivitas masuk dan keluar akan muncul di sini.</p>
                 </div>

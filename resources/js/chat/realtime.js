@@ -1,5 +1,6 @@
 // Event realtime (Reverb/Echo): pesan baru, edit, hapus, polling, mengetik, mention.
 
+import { refreshModelLocks } from './composer/ai-options.js';
 import { authUserId, chatFeed, groupId, pendingMessagesByLocalId } from './context.js';
 import { ensureMentionToastStack, highlightMessageInFeed } from './highlight.js';
 import { renderMermaidInNode } from './markdown.js';
@@ -158,6 +159,9 @@ export const initRealtime = () => {
 			}
 
 			rememberLatestMessageId(payload.message.id);
+			if (payload.message.group_credits_remaining !== undefined) {
+				refreshModelLocks(payload.message.group_credits_remaining);
+			}
 
 			const distFromBottomBefore = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
 			const senderId = Number(payload.message.sender_id || 0);

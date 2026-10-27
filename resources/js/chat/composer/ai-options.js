@@ -42,9 +42,12 @@ const markChecked = (container, attribute, value) => {
 	});
 };
 
+// Kategori yang dikunci saldo grup (App\Services\Credits\ModelAccess) tidak bisa dipilih.
+const isLocked = (option) => option?.getAttribute('data-ai-model-locked') === '1';
+
 const selectModel = (modelId, persist = true) => {
 	const option = modelMenu?.querySelector(`[data-ai-model-option="${CSS.escape(modelId)}"]`);
-	if (!(modelInput instanceof HTMLInputElement) || !option) {
+	if (!(modelInput instanceof HTMLInputElement) || !option || isLocked(option)) {
 		return false;
 	}
 
@@ -112,11 +115,54 @@ const setMode = (option) => {
 
 const closeModelMenu = () => modelMenu?.classList.add('hidden');
 
+/** Model bawaan grup, atau model pertama yang tidak terkunci. */
+const selectFallbackModel = () => {
+	if (modelInput instanceof HTMLInputElement && selectModel(modelInput.dataset.defaultModel || '', false)) {
+		return;
+	}
+	const unlocked = modelMenu?.querySelector('[data-ai-model-option]:not([data-ai-model-locked="1"])');
+	selectModel(unlocked?.getAttribute('data-ai-model-option') || '', false);
+};
+
+const setLocked = (option, locked) => {
+	option.setAttribute('data-ai-model-locked', locked ? '1' : '0');
+	option.setAttribute('aria-disabled', locked ? 'true' : 'false');
+	const modelId = option.getAttribute('data-ai-model-option') || '';
+	modelMenu?.querySelector(`[data-ai-model-lock-note="${CSS.escape(modelId)}"]`)?.classList.toggle('hidden', !locked);
+};
+
+/**
+ * Perbarui kunci kategori dari saldo grup terbaru (dibawa tiap pesan realtime). Polanya sama
+ * dengan server: terbuka saat saldo ≥ ambang buka, terkunci saat saldo < ambang tutup,
+ * di antaranya tetap seperti sebelumnya.
+ */
+export const refreshModelLocks = (credits) => {
+	const balance = Number(credits);
+	if (!modelMenu || !Number.isFinite(balance)) {
+		return;
+	}
+
+	modelMenu.querySelectorAll('[data-ai-model-locked]').forEach((option) => {
+		if (balance >= Number(option.getAttribute('data-ai-model-open-at') || 0)) {
+			setLocked(option, false);
+		} else if (balance < Number(option.getAttribute('data-ai-model-floor') || 0)) {
+			setLocked(option, true);
+		}
+	});
+
+	const current = modelInput instanceof HTMLInputElement
+		? modelMenu.querySelector(`[data-ai-model-option="${CSS.escape(modelInput.value)}"]`)
+		: null;
+	if (isLocked(current)) {
+		selectFallbackModel();
+	}
+};
+
 export const initAiOptions = () => {
 	if (modelInput instanceof HTMLInputElement) {
 		const stored = readStoredModel();
 		if (!stored || !selectModel(stored, false)) {
-			selectModel(modelInput.dataset.defaultModel || modelInput.value, false);
+			selectFallbackModel();
 		}
 	}
 
@@ -128,7 +174,7 @@ export const initAiOptions = () => {
 
 	modelMenu?.addEventListener('click', (event) => {
 		const option = event.target.closest('[data-ai-model-option]');
-		if (!option) {
+		if (!option || isLocked(option)) {
 			return;
 		}
 

@@ -46,10 +46,7 @@
             <div class="mt-4 rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm text-coral-700">
                 <p>{{ $error }}</p>
                 @if(str_contains($error, 'login'))
-                    <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('mailbox-logout-form').submit();" class="mt-2 inline-block text-xs font-bold text-navy-600 hover:text-navy-800">
-                        Login Ulang
-                    </a>
-                    <form id="mailbox-logout-form" action="{{ route('logout') }}" method="POST" class="hidden">@csrf</form>
+                    <form action="{{ route('logout') }}" method="POST">@csrf<button type="submit" class="mt-2 inline-block text-xs font-bold text-navy-600 hover:text-navy-800">Login Ulang</button></form>
                 @endif
             </div>
         @endif
@@ -101,9 +98,15 @@
         </div>
     </section>
 
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         (function () {
-            const rtf = new Intl.RelativeTimeFormat(navigator.language || 'id', { numeric: 'auto' });
+            // Bahasa browser yang tidak dikenali Intl (mis. "en-US@posix") jatuh ke bahasa Indonesia.
+            let rtf;
+            try {
+                rtf = new Intl.RelativeTimeFormat(navigator.language || 'id', { numeric: 'auto' });
+            } catch (e) {
+                rtf = new Intl.RelativeTimeFormat('id', { numeric: 'auto' });
+            }
             const units = [
                 ['year', 31536000], ['month', 2592000], ['week', 604800],
                 ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1],

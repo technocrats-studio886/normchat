@@ -21,6 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'interdotz.enabled' => \App\Http\Middleware\EnsureInterdotzEnabled::class,
         ]);
 
+        // Sesi habis setelah 5 hari tanpa aksi user.
+        $middleware->web(append: [
+            \App\Http\Middleware\EndIdleSession::class,
+            \App\Http\Middleware\AddContentSecurityPolicy::class,
+        ]);
+
         // Trust Nginx reverse proxy
         $middleware->trustProxies(at: '*');
     })

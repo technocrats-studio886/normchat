@@ -1,6 +1,7 @@
 // Canvas: kartu di feed dan panel Code/Preview yang terbuka saat tombol Open diklik.
-// Preview web berjalan di iframe sandbox tanpa allow-same-origin, jadi skrip canvas
-// tidak bisa menyentuh sesi atau halaman normi.chat.
+// Preview web dimuat dari route canvas (ChatController::canvas) di iframe sandbox tanpa
+// allow-same-origin, jadi skrip canvas tidak bisa menyentuh sesi atau halaman normi.chat.
+// Bukan srcdoc: dokumen srcdoc mewarisi CSP normi.chat sehingga skrip canvas terblokir.
 
 import { chatShell } from './context.js';
 import { renderMarkdown, renderMermaidInNode } from './markdown.js';
@@ -123,7 +124,7 @@ const renderContent = () => {
 		iframe.className = 'h-full w-full border-0 bg-white';
 		iframe.title = current.title;
 		iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads');
-		iframe.srcdoc = current.content;
+		iframe.src = current.url.replace(/\/attachment$/, '/canvas');
 		preview.appendChild(iframe);
 		return;
 	}

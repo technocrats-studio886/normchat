@@ -12,7 +12,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
             </a>
-            <h1 class="font-display text-xl font-extrabold text-[#121C29]">Normi AI</h1>
+            <h1 class="font-display text-xl font-extrabold text-[var(--nc-text)]">Normi AI</h1>
         </div>
 
         @if(! $canManageAiPersona)
@@ -22,7 +22,7 @@
             </div>
         @endif
 
-        <p class="mb-4 text-sm text-[#64748B]">Atur cara Normi AI menjawab di grup ini.</p>
+        <p class="mb-4 text-sm text-slate-500">Atur cara Normi AI menjawab di grup ini.</p>
 
         @if(session('success'))
             <div class="mb-4 rounded-xl bg-navy-50 px-4 py-3 text-sm font-semibold text-navy-700">
@@ -32,10 +32,10 @@
 
         <form method="POST" action="{{ route('settings.ai.model.save', $group) }}" class="panel-card mb-3 p-4">
             @csrf
-            <p class="text-sm font-bold text-[#121C29]">Model bawaan grup</p>
+            <p class="text-sm font-bold text-[var(--nc-text)]">Model bawaan grup</p>
             <div class="mt-3 space-y-2">
                 @forelse($aiModels as $aiModel)
-                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-navy-500 has-[:checked]:bg-navy-50 @if(! $canManageAiPersona) cursor-not-allowed opacity-70 @endif">
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-slate-200 px-3 py-2.5 transition has-[:checked]:border-navy-500 has-[:checked]:bg-navy-50 @if(! $canManageAiPersona) cursor-not-allowed @endif">
                         <input type="radio" name="ai_model" value="{{ $aiModel->model_id }}" class="mt-0.5 accent-navy-600"
                                {{ $currentAiModel?->is($aiModel) ? 'checked' : '' }} @if(! $canManageAiPersona) disabled @endif>
                         <span class="min-w-0">
@@ -61,15 +61,15 @@
             @csrf
             <div class="panel-card p-4">
                 <div class="mb-3 flex items-center justify-between">
-                    <p class="text-sm font-bold text-[#121C29]">Kepribadian</p>
+                    <p class="text-sm font-bold text-[var(--nc-text)]">Kepribadian</p>
                 </div>
 
-                    <label for="ai_persona_style" class="mb-1 block text-xs font-semibold text-[#64748B]">Gaya bicara</label>
+                    <label for="ai_persona_style" class="mb-1 block text-xs font-semibold text-slate-500">Gaya bicara</label>
                     <textarea id="ai_persona_style" name="ai_persona_style" rows="3"
                               class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100 @if(! $canManageAiPersona) cursor-not-allowed text-slate-500 @endif"
                               placeholder="Contoh: singkat, santai, langsung ke inti." @if(! $canManageAiPersona) readonly @endif>{{ old('ai_persona_style', $group->ai_persona_style) }}</textarea>
 
-                    <label for="ai_persona_guardrails" class="mb-1 mt-3 block text-xs font-semibold text-[#64748B]">Batasan</label>
+                    <label for="ai_persona_guardrails" class="mb-1 mt-3 block text-xs font-semibold text-slate-500">Batasan</label>
                     <textarea id="ai_persona_guardrails" name="ai_persona_guardrails" rows="2"
                               class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100 @if(! $canManageAiPersona) cursor-not-allowed text-slate-500 @endif"
                               placeholder="Contoh: jangan bahas di luar topik grup." @if(! $canManageAiPersona) readonly @endif>{{ old('ai_persona_guardrails', $group->ai_persona_guardrails) }}</textarea>

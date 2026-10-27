@@ -67,6 +67,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/groups/{group}/messages/{message}', [ChatController::class, 'update'])->middleware('group.permission')->name('chat.update');
     Route::delete('/groups/{group}/messages/{message}', [ChatController::class, 'destroy'])->middleware('group.permission')->name('chat.destroy');
     Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
+    Route::get('/groups/{group}/messages/{message}/canvas', [ChatController::class, 'canvas'])->middleware('group.permission')->name('chat.canvas');
 
     // Settings (view for active members, write actions restricted by permission)
     Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->name('settings.show');
@@ -91,7 +92,9 @@ Route::middleware('auth')->group(function () {
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/profile/account', [ProfileController::class, 'account'])->name('profile.account');
+    Route::get('/avatars/{filename}', [ProfileController::class, 'avatar'])->where('filename', '[A-Za-z0-9]{20,64}\.(jpg|jpeg|png|webp)')->name('avatars.show');
     Route::post('/profile/account', [ProfileController::class, 'updateAccount'])->name('profile.account.update');
+    Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme.update');
     // URL lama, dipertahankan untuk bookmark.
     Route::redirect('/profile/activity', '/profile/login-history')->name('profile.activity');
     Route::get('/profile/storage', [ProfileController::class, 'storage'])->name('profile.storage');

@@ -23,6 +23,8 @@ class AiModel extends Model
         'sort_order',
         'image_model',
         'image_model_precise',
+        'unlock_multiple',
+        'lock_multiple',
     ];
 
     protected $casts = [
@@ -33,11 +35,19 @@ class AiModel extends Model
         'is_active' => 'boolean',
         'is_default' => 'boolean',
         'sort_order' => 'integer',
+        'unlock_multiple' => 'float',
+        'lock_multiple' => 'float',
     ];
 
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** Kategori ini hanya bisa dipakai bila saldo grup cukup (App\Services\Credits\ModelAccess). */
+    public function isGated(): bool
+    {
+        return (float) $this->unlock_multiple > 0;
     }
 
     /** Mesin gambar internal kategori ini; versi presisi bila diminta dan tersedia. */

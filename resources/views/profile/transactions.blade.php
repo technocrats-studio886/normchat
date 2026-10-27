@@ -12,11 +12,11 @@
 
         {{-- Summary stats --}}
         <div class="mt-4 grid grid-cols-2 gap-2">
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Total Dibayar</p>
                 <p class="mt-1 text-sm font-bold text-slate-900">Rp{{ number_format($totalSpentIdr, 0, ',', '.') }}</p>
             </div>
-            <div class="rounded-2xl border border-[#E4E9F0] bg-white px-3 py-3 shadow-sm">
+            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
                 <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Normkredit</p>
                 <p class="mt-1 text-sm font-bold text-navy-700">+{{ number_format($totalCreditsEarned, 2, ',', '.') }}</p>
             </div>
@@ -25,21 +25,21 @@
         {{-- Filters --}}
         <form method="GET" action="{{ route('profile.transactions') }}" class="mt-5 flex flex-wrap items-center gap-2">
             <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tampilkan</label>
-            <select name="range" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
+            <select name="range" data-auto-submit="1" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
                 <option value="all" {{ $range === 'all' ? 'selected' : '' }}>Semua</option>
                 <option value="week" {{ $range === 'week' ? 'selected' : '' }}>1 Minggu</option>
                 <option value="month" {{ $range === 'month' ? 'selected' : '' }}>1 Bulan</option>
                 <option value="3month" {{ $range === '3month' ? 'selected' : '' }}>3 Bulan</option>
             </select>
 
-            <select name="source" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
+            <select name="source" data-auto-submit="1" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
                 <option value="all" {{ $source === 'all' ? 'selected' : '' }}>Semua</option>
                 <option value="group_creation" {{ $source === 'group_creation' ? 'selected' : '' }}>Buat grup</option>
                 <option value="patungan" {{ $source === 'patungan' ? 'selected' : '' }}>Gabung grup</option>
                 <option value="topup" {{ $source === 'topup' ? 'selected' : '' }}>Isi Normkredit</option>
             </select>
 
-            <select name="sort" onchange="this.form.submit()" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
+            <select name="sort" data-auto-submit="1" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-100">
                 <option value="desc" {{ $sortDir === 'desc' ? 'selected' : '' }}>Terbaru</option>
                 <option value="asc" {{ $sortDir === 'asc' ? 'selected' : '' }}>Terlama</option>
             </select>
@@ -106,7 +106,7 @@
                 </div>
             @empty
                 <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-8 w-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
                     <p class="mt-2 text-sm font-semibold text-slate-600">Belum ada pembayaran</p>
                     <p class="mt-1 text-xs text-slate-400">Pembayaranmu akan muncul di sini.</p>
                 </div>
