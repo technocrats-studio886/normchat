@@ -25,7 +25,7 @@ self.addEventListener('fetch', (event) => {
   const isAttachmentRoute = /\/groups\/\d+\/messages\/\d+\/attachment$/i.test(requestUrl.pathname);
   const isRealtimeOrAuthRoute = requestUrl.pathname.startsWith('/broadcasting/') || requestUrl.pathname.startsWith('/up');
 
-  // Always fetch fresh for cross-origin, build assets, navigations, attachment downloads, and JSON/API calls.
+  // Selalu ambil dari jaringan untuk lintas domain, aset build, navigasi, lampiran, dan panggilan JSON/API.
   if (!isSameOrigin || isBuildAsset || isHtml || isJsonLike || isAttachmentRoute || isRealtimeOrAuthRoute) {
     event.respondWith(
       fetch(event.request).catch(() => caches.match(event.request))

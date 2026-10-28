@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountUnavailableException;
 use App\Services\Auth\SocialLogin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,14 +44,18 @@ class GoogleAuthController extends Controller
             return $this->failed('Email Google kamu belum terverifikasi.');
         }
 
-        $user = $login->findOrCreate(
-            'google',
-            (string) $googleUser->getId(),
-            $email,
-            (string) ($googleUser->getName() ?: $email),
-            $googleUser->getAvatar(),
-            strtolower(substr((string) preg_replace('/[^A-Za-z0-9._-]/', '', strstr($email, '@', true) ?: ''), 0, 40))
-        );
+        try {
+            $user = $login->findOrCreate(
+                'google',
+                (string) $googleUser->getId(),
+                $email,
+                (string) ($googleUser->getName() ?: $email),
+                $googleUser->getAvatar(),
+                strtolower(substr((string) preg_replace('/[^A-Za-z0-9._-]/', '', strstr($email, '@', true) ?: ''), 0, 40))
+            );
+        } catch (AccountUnavailableException $e) {
+            return redirect()->route('login')->with('info', $e->getMessage());
+        }
 
         $login->signIn($user, $request, 'google');
 

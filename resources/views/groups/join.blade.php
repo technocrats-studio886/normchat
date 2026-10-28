@@ -11,7 +11,7 @@
             @endif
 
             @if($alreadyMember)
-                <div class="mt-6 rounded-xl border border-navy-200 bg-navy-50 px-4 py-3 text-sm text-navy-700">
+                <div class="mt-6 rounded-xl border border-primary-line bg-primary-soft px-4 py-3 text-sm text-primary-ink">
                     Kamu sudah bergabung di grup ini.
                 </div>
                 <a href="{{ route('chat.show', $group) }}" class="btn-cta mt-4 block text-center">
@@ -20,11 +20,11 @@
             @else
                 {{-- payment errors shown by layout --}}
 
-                <div class="mt-5 rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3">
-                    <p class="text-sm font-semibold text-coral-800">Gabung dengan ikut patungan</p>
-                    <p class="mt-1 text-xs text-coral-700">Saldo grup: <strong>{{ number_format((float) ($group->groupToken?->credits ?? 0), 2, ',', '.') }} Normkredit</strong>. Patunganmu menambah saldo ini dan dipakai bersama.</p>
+                <div class="mt-5 rounded-2xl border border-primary-line bg-primary-soft px-4 py-3">
+                    <p class="text-sm font-semibold text-primary-ink">Gabung dengan ikut patungan</p>
+                    <p class="mt-1 text-xs text-primary-ink">Saldo grup: <strong>{{ number_format((float) ($group->groupToken?->credits ?? 0), 2, ',', '.') }} Normkredit</strong>. Patunganmu menambah saldo ini dan dipakai bersama.</p>
                     @if($group->member_daily_credit_limit)
-                        <p class="mt-1 text-xs text-coral-700">Batas pemakaian: {{ number_format($group->member_daily_credit_limit, 2, ',', '.') }} Normkredit per anggota per hari.</p>
+                        <p class="mt-1 text-xs text-primary-ink">Batas pemakaian: {{ number_format($group->member_daily_credit_limit, 2, ',', '.') }} Normkredit per anggota per hari.</p>
                     @endif
                 </div>
 
@@ -53,7 +53,7 @@
                         </div>
                     </div>
                     @if($errors->has('password'))
-                        <p class="text-xs text-coral-600">{{ $errors->first('password') }}</p>
+                        <p class="text-xs text-danger-ink">{{ $errors->first('password') }}</p>
                     @endif
 
                     @include('partials.package-picker', [
@@ -61,7 +61,7 @@
                         'submitLabel' => 'Gabung',
                     ])
                     @error('payment')
-                        <p class="text-xs text-coral-600">{{ $message }}</p>
+                        <p class="text-xs text-danger-ink">{{ $message }}</p>
                     @enderror
                 </form>
             @endif

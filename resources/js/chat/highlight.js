@@ -41,7 +41,7 @@ const getMessageHighlightTargets = (messageNode, includeSender = false) => {
 		targets.push(...Array.from(messageNode.querySelectorAll('.ai-markdown p, .ai-markdown li, .ai-markdown td, .ai-markdown h1, .ai-markdown h2, .ai-markdown h3, .ai-markdown h4')));
 	}
 	if (includeSender) {
-		const senderTarget = messageNode.querySelector('.nc-chat-sender');
+		const senderTarget = messageNode.querySelector('.nc-msg-name');
 		if (senderTarget instanceof HTMLElement) {
 			targets.push(senderTarget);
 		}
@@ -146,10 +146,7 @@ const animateJumpFocus = (target) => {
 		return;
 	}
 
-	const visualTarget = target.matches('[data-message-body="1"]')
-		? target
-		: (target.querySelector('[data-message-body="1"], .bubble-mine, .bubble-ai, .bubble-other, .nc-media-caption-card, [data-poll-card]')
-		|| target);
+	const visualTarget = target.matches('[data-message-bubble]') ? target : (target.querySelector('[data-message-bubble]') || target);
 
 	if (activeJumpFocusNode instanceof HTMLElement && activeJumpFocusNode !== visualTarget) {
 		activeJumpFocusNode.classList.remove('nc-jump-focus');

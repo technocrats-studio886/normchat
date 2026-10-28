@@ -52,11 +52,11 @@
 
         {{-- Messages --}}
         <div
-            class="nc-scroll mt-3 flex-1 space-y-4 overflow-y-auto px-4 py-3 pb-56 lg:px-[max(1.5rem,calc((100%_-_var(--nc-room-max))/2))]"
+            class="nc-scroll mt-3 flex-1 overflow-y-auto px-4 py-3 pb-56 lg:px-[max(1.5rem,calc((100%_-_var(--nc-room-max))/2))]"
             data-chat-group-id="{{ $group->id }}"
             data-auth-user-id="{{ auth()->id() }}"
             data-chat-feed="1"
-            data-message-count="{{ $messages->count() }}"
+            data-message-count="{{ count($messages) }}"
             data-last-read-message-id="{{ $lastReadMessageId ?? 0 }}"
             data-latest-message-id="{{ $latestMessageId ?? 0 }}"
             data-unread-count="{{ $unreadCount ?? 0 }}"
@@ -65,303 +65,30 @@
             data-poll-stats-url="{{ route('chat.polls.stats', $group) }}"
             data-poll-vote-url-template="{{ route('chat.polls.vote', ['group' => $group, 'message' => '__MESSAGE__']) }}"
             data-viewer-is-moderator="{{ $viewerIsModerator ? '1' : '0' }}"
+            data-messages-url="{{ route('chat.store', $group) }}"
+            data-group-frozen="{{ $group->isFrozen() ? '1' : '0' }}"
         >
-            @forelse ($messages as $message)
-                @php
-                    $isMine = $message->sender_type === 'user' && $message->sender_id === auth()->id();
-                    $isAi = $message->sender_type === 'ai';
-                    $senderName = $isAi ? ($message->sender_name ?? 'Normi AI') : ($isMine ? 'Kamu' : ($message->sender->name ?? 'User'));
-                    $attachmentUrl = $message->attachment_path ? route('chat.attachment', ['group' => $group->id, 'message' => $message->id]) : null;
-                    $attachmentMime = strtolower((string) $message->attachment_mime);
-                    $isImage = $message->message_type === 'image' && $attachmentUrl;
-                    $isVoice = $attachmentUrl && (
-                        $message->message_type === 'voice'
-                        || str_starts_with($attachmentMime, 'audio/')
-                        || $attachmentMime === 'video/webm'
-                    );
-                    $isVideo = $attachmentUrl && ! $isVoice && (
-                        $message->message_type === 'video'
-                        || str_starts_with($attachmentMime, 'video/')
-                    );
-                    $isCanvas = $attachmentUrl && $message->message_type === 'canvas';
-                    $isFileAttachment = $attachmentUrl && ! $isImage && ! $isVoice && ! $isVideo && ! $isCanvas;
-                    $attachmentName = (string) ($message->attachment_original_name ?: ($message->attachment_path ? basename($message->attachment_path) : 'Lampiran'));
-                    $attachmentBytes = (int) ($message->attachment_size ?? 0);
-                    if ($attachmentBytes > 0 && $attachmentBytes >= 1024 * 1024 * 1024) {
-                        $attachmentSizeLabel = number_format($attachmentBytes / (1024 * 1024 * 1024), 1) . ' GB';
-                    } elseif ($attachmentBytes > 0 && $attachmentBytes >= 1024 * 1024) {
-                        $attachmentSizeLabel = number_format($attachmentBytes / (1024 * 1024), 1) . ' MB';
-                    } elseif ($attachmentBytes > 0 && $attachmentBytes >= 1024) {
-                        $attachmentSizeLabel = number_format($attachmentBytes / 1024, 1) . ' KB';
-                    } elseif ($attachmentBytes > 0) {
-                        $attachmentSizeLabel = $attachmentBytes . ' B';
-                    } else {
-                        $attachmentSizeLabel = 'Dokumen';
-                    }
-                    $previewContent = $message->content
-                        ? (string) $message->content
-                        : ($isImage ? '[Gambar]' : ($isVideo ? '[Video]' : ($isVoice ? '[Voice note]' : ($isCanvas ? '[Canvas]' : ($isFileAttachment ? '[File]' : '[Lampiran]')))));
-                    $replyTarget = $message->replyToMessage;
-                    $replyQuote = trim((string) ($message->reply_quote_text ?? ''));
-                    $replySender = $replyTarget
-                        ? ($replyTarget->sender_type === 'ai' ? 'Normi AI' : ($replyTarget->sender->name ?? 'User'))
-                        : null;
-                    $replyPreview = $replyTarget
-                        ? ($replyQuote !== ''
-                            ? \Illuminate\Support\Str::limit($replyQuote, 100)
-                            : ($replyTarget->content
-                            ? \Illuminate\Support\Str::limit((string) $replyTarget->content, 100)
-                            : (($replyTarget->message_type === 'image') ? '[Gambar]' : (($replyTarget->message_type === 'voice') ? '[Voice note]' : '[Lampiran]'))))
-                        : null;
-                    $audioSourceMime = $attachmentMime === 'video/webm' ? 'audio/webm' : ($message->attachment_mime ?? 'audio/webm');
-                    $isEdited = ((int) ($message->versions_count ?? 0)) > 0;
-                        $editedAtIso = $isEdited ? optional($message->updated_at)->toIso8601String() : '';
-                        $editedTitle = $isEdited && $message->updated_at
-                            ? 'Diedit ' . $message->updated_at->timezone(config('app.display_timezone', config('app.timezone')))->format('d M H:i')
-                            : 'Pesan telah diedit';
-                @endphp
-
-                @if($isMine)
-                    {{-- User's own message - right aligned, blue --}}
-                    <div id="message-{{ $message->id }}" class="flex justify-end" data-message-id="{{ $message->id }}" data-message-sender-id="{{ (int) ($message->sender_id ?? 0) }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}" data-message-attachment-mime="{{ $message->attachment_mime }}" data-message-attachment-name="{{ $message->attachment_original_name }}">
-                        <div class="max-w-[75%]">
-                            @if($replyTarget)
-                                <button type="button" data-reply-jump="{{ $replyTarget->id }}" data-reply-quote="{{ $replyQuote }}" class="nc-reply-chip nc-reply-chip--mine mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">
-                                    <p class="nc-reply-chip-sender font-semibold">Membalas {{ $replySender }}</p>
-                                    <p class="truncate">{{ $replyPreview }}</p>
-                                </button>
-                            @endif
-                            @if($message->content && $isImage)
-                                <div class="nc-media-caption-card nc-media-caption-card--mine mb-2" data-message-body="1">
-                                    <a href="{{ $attachmentUrl }}" class="block overflow-hidden rounded-t-[20px]" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="{{ $attachmentName }}" data-attachment-frame="1">
-                                        <img src="{{ $attachmentUrl }}" alt="Gambar" class="h-auto max-h-72 w-full object-cover" />
-                                    </a>
-                                    <div class="px-3 pb-2 pt-2 text-sm text-white/95">
-                                        <span class="whitespace-pre-wrap">{{ $message->content }}</span><span class="nc-inline-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="mine">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--mine" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</span>
-                                    </div>
-                                </div>
-                            @elseif($isImage)
-                                <a href="{{ $attachmentUrl }}" class="mb-2 block overflow-hidden rounded-2xl border border-navy-200 bg-navy-50" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="{{ $attachmentName }}">
-                                    <img src="{{ $attachmentUrl }}" alt="Gambar" class="h-auto max-h-64 w-full object-cover" />
-                                </a>
-                            @elseif($isVoice)
-                                <div class="mb-2 inline-block w-55 max-w-full rounded-2xl border border-white/15 px-3 py-2 text-white transition" style="background: var(--nc-mine);" data-voice-player="1">
-                                    <audio preload="metadata" class="hidden" data-voice-audio>
-                                        <source src="{{ $attachmentUrl }}" type="{{ $audioSourceMime }}">
-                                    </audio>
-                                    <div class="flex items-center gap-2">
-                                        <button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white" data-voice-toggle aria-label="Putar" aria-pressed="false">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4.75a.75.75 0 0 1 1.165-.623l7 4.75a.75.75 0 0 1 0 1.246l-7 4.75A.75.75 0 0 1 6.5 14.25v-9.5Z" /></svg>
-                                        </button>
-                                        <div class="min-w-0 flex-1">
-                                            <div class="mb-1 flex h-4 items-end gap-0.5" data-voice-wave>
-                                                @foreach (['h-2','h-3','h-2','h-4','h-2','h-3','h-4','h-2','h-3','h-2','h-4','h-2'] as $barHeight)
-                                                    <span class="{{ $barHeight }} w-0.5 rounded-full bg-white/70 opacity-45" data-voice-bar></span>
-                                                @endforeach
-                                            </div>
-                                            <input type="range" min="0" max="1000" value="0" class="h-1 w-full cursor-pointer" style="accent-color: rgba(255,255,255,0.85);" data-voice-progress>
-                                            <div class="mt-1 flex items-center justify-between text-[11px] text-white/80">
-                                                <span data-voice-current>0:00</span>
-                                                <span data-voice-duration>0:00</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <p class="mt-1 hidden text-[11px] text-white/80" data-voice-fallback-note>Putar lewat pemutar di bawah.</p>
-                                </div>
-                            @elseif($message->content && $isVideo)
-                                <div class="nc-media-caption-card nc-media-caption-card--mine mb-2" data-message-body="1">
-                                    <button type="button" class="block w-full overflow-hidden rounded-t-[20px] bg-black" data-message-body="1" data-attachment-open="1" data-attachment-kind="video" data-attachment-url="{{ $attachmentUrl }}" data-attachment-name="{{ $attachmentName }}" data-attachment-frame="1">
-                                        <div class="relative">
-                                            <video src="{{ $attachmentUrl }}" class="h-auto max-h-72 w-full bg-black object-cover" muted playsinline preload="metadata"></video>
-                                            <span class="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm font-bold text-white">▶</span>
-                                        </div>
-                                    </button>
-                                    <div class="px-3 pb-2 pt-2 text-sm text-white/95">
-                                        <span class="whitespace-pre-wrap">{{ $message->content }}</span><span class="nc-inline-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="mine">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--mine" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</span>
-                                    </div>
-                                </div>
-                            @elseif($isVideo)
-                                <button type="button" class="mb-2 block w-full overflow-hidden rounded-2xl border border-navy-200 bg-navy-50" data-message-body="1" data-attachment-open="1" data-attachment-kind="video" data-attachment-url="{{ $attachmentUrl }}" data-attachment-name="{{ $attachmentName }}">
-                                    <div class="relative">
-                                        <video src="{{ $attachmentUrl }}" class="h-auto max-h-72 w-full bg-black object-cover" muted playsinline preload="metadata"></video>
-                                        <span class="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm font-bold text-white">▶</span>
-                                    </div>
-                                    <p class="px-3 py-2 text-left text-xs font-medium text-slate-700">{{ $attachmentName }}</p>
-                                </button>
-                            @elseif($isFileAttachment)
-                                <button type="button" class="mb-2 block w-full rounded-2xl border border-navy-200 bg-navy-50 p-3 text-left text-navy-800" data-message-body="1" data-attachment-download="1" data-attachment-url="{{ $attachmentUrl }}" data-attachment-name="{{ $attachmentName }}">
-                                    <div class="flex items-center gap-3">
-                                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/10 text-base">📄</span>
-                                        <div class="min-w-0 flex-1">
-                                            <p class="truncate text-sm font-semibold">{{ $attachmentName }}</p>
-                                            <p class="text-[11px] opacity-75">{{ $attachmentSizeLabel }}</p>
-                                        </div>
-                                        <span class="text-[11px] font-semibold opacity-80">Buka</span>
-                                    </div>
-                                </button>
-                            @endif
-                            @if($message->content && ($isImage || $isVideo))
-                            @elseif($message->content)
-                                <div class="bubble-mine">
-                                    <span class="whitespace-pre-wrap">{{ $message->content }}</span><span class="nc-inline-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="mine">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--mine" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</span>
-                                </div>
-                            @else
-                                <p class="mt-1 text-right meta-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="mine">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--mine" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
-                            @endif
-                        </div>
-                    </div>
-                @elseif($isAi)
-                    {{-- AI message - left aligned, green tinted --}}
-                    @php $hasRich = str_contains($message->content ?? '', '|') || str_contains($message->content ?? '', '```mermaid'); @endphp
-                    <div id="message-{{ $message->id }}" class="{{ $hasRich ? 'max-w-[95%]' : 'max-w-[80%]' }}" data-message-id="{{ $message->id }}" data-message-sender-id="{{ (int) ($message->sender_id ?? 0) }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}" data-message-attachment-mime="{{ $message->attachment_mime }}" data-message-attachment-name="{{ $message->attachment_original_name }}">
-                        @if($replyTarget)
-                            <button type="button" data-reply-jump="{{ $replyTarget->id }}" data-reply-quote="{{ $replyQuote }}" class="nc-reply-chip nc-reply-chip--ai mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">
-                                <p class="nc-reply-chip-sender font-semibold">Membalas {{ $replySender }}</p>
-                                <p class="truncate">{{ $replyPreview }}</p>
-                            </button>
-                        @endif
-                        @if($isImage)
-                            <a href="{{ $attachmentUrl }}" class="mb-2 block overflow-hidden rounded-2xl border border-coral-100 bg-coral-50" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="{{ $attachmentName }}">
-                                <img src="{{ $attachmentUrl }}" alt="Gambar AI" class="h-auto max-h-64 w-full object-cover" />
-                            </a>
-                        @elseif($isVoice)
-                            <div class="mb-2 inline-block w-55 max-w-full rounded-2xl border border-coral-200 bg-coral-50 px-3 py-2 text-coral-900 transition" data-voice-player="1">
-                                <audio preload="metadata" class="hidden" data-voice-audio>
-                                    <source src="{{ $attachmentUrl }}" type="{{ $audioSourceMime }}">
-                                </audio>
-                                <div class="flex items-center gap-2">
-                                    <button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-coral-500 text-white" data-voice-toggle aria-label="Putar" aria-pressed="false">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4.75a.75.75 0 0 1 1.165-.623l7 4.75a.75.75 0 0 1 0 1.246l-7 4.75A.75.75 0 0 1 6.5 14.25v-9.5Z" /></svg>
-                                    </button>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="mb-1 flex h-4 items-end gap-0.5" data-voice-wave>
-                                            @foreach (['h-2','h-3','h-2','h-4','h-2','h-3','h-4','h-2','h-3','h-2','h-4','h-2'] as $barHeight)
-                                                <span class="{{ $barHeight }} w-0.5 rounded-full bg-coral-500/70 opacity-45" data-voice-bar></span>
-                                            @endforeach
-                                        </div>
-                                        <input type="range" min="0" max="1000" value="0" class="h-1 w-full cursor-pointer accent-coral-500" data-voice-progress>
-                                        <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                                            <span data-voice-current>0:00</span>
-                                            <span data-voice-duration>0:00</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <p class="mt-1 hidden text-[11px] text-slate-500" data-voice-fallback-note>Putar lewat pemutar di bawah.</p>
-                            </div>
-                        @elseif($isVideo)
-                            <button type="button" class="mb-2 block w-full overflow-hidden rounded-2xl border border-coral-200 bg-coral-50" data-message-body="1" data-attachment-open="1" data-attachment-kind="video" data-attachment-url="{{ $attachmentUrl }}" data-attachment-name="{{ $attachmentName }}">
-                                <div class="relative">
-                                    <video src="{{ $attachmentUrl }}" class="h-auto max-h-72 w-full bg-black object-cover" muted playsinline preload="metadata"></video>
-                                    <span class="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm font-bold text-white">▶</span>
-                                </div>
-                                <p class="px-3 py-2 text-left text-xs font-medium text-slate-700">{{ $attachmentName }}</p>
-                            </button>
-                        @elseif($isCanvas)
-                            @include('chat._canvas-card', ['message' => $message, 'url' => $attachmentUrl])
-                        @elseif($isFileAttachment)
-                            <button type="button" class="mb-2 block w-full rounded-2xl border border-coral-200 bg-coral-50 p-3 text-left text-coral-800" data-message-body="1" data-attachment-download="1" data-attachment-url="{{ $attachmentUrl }}" data-attachment-name="{{ $attachmentName }}">
-                                <div class="flex items-center gap-3">
-                                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/10 text-base">📄</span>
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-semibold">{{ $attachmentName }}</p>
-                                        <p class="text-[11px] opacity-75">{{ $attachmentSizeLabel }}</p>
-                                    </div>
-                                    <span class="text-[11px] font-semibold opacity-80">Buka</span>
-                                </div>
-                            </button>
-                        @endif
-                        <p class="nc-chat-sender nc-chat-sender--ai mb-1 text-[11px] font-semibold">{{ $senderName }}</p>
-                        @if($message->content)
-                            <div class="bubble-ai ai-markdown overflow-hidden" data-ai-raw>{{ $message->content }}</div>
-                            <p class="nc-chat-meta nc-chat-meta--ai mt-1 text-right text-[11px] font-medium" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="ai">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--ai" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
-                        @else
-                            <p class="nc-chat-meta nc-chat-meta--ai mt-1 text-right text-[11px] font-medium" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="ai">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--ai" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
-                        @endif
-                    </div>
-                @else
-                    {{-- Other user message - left aligned, white --}}
-                    <div id="message-{{ $message->id }}" class="max-w-[75%]" data-message-id="{{ $message->id }}" data-message-sender-id="{{ (int) ($message->sender_id ?? 0) }}" style="touch-action: pan-y; user-select: none; -webkit-user-select: none;" data-message-sender-name="{{ $senderName }}" data-message-content="{{ $previewContent }}" data-message-type="{{ $message->message_type }}" data-message-attachment-mime="{{ $message->attachment_mime }}" data-message-attachment-name="{{ $message->attachment_original_name }}">
-                        <p class="nc-chat-sender mb-1 text-[11px]">{{ $senderName }}</p>
-                        @if($replyTarget)
-                            <button type="button" data-reply-jump="{{ $replyTarget->id }}" data-reply-quote="{{ $replyQuote }}" class="nc-reply-chip nc-reply-chip--other mb-1 block w-full rounded-xl px-3 py-1.5 text-left text-xs">
-                                <p class="nc-reply-chip-sender font-semibold">Membalas {{ $replySender }}</p>
-                                <p class="truncate">{{ $replyPreview }}</p>
-                            </button>
-                        @endif
-                        @if($isImage)
-                            <a href="{{ $attachmentUrl }}" class="mb-2 block overflow-hidden rounded-2xl border border-slate-200 bg-white" data-message-body="1" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="{{ $attachmentName }}">
-                                <img src="{{ $attachmentUrl }}" alt="Gambar" class="h-auto max-h-64 w-full object-cover" />
-                            </a>
-                        @elseif($isVoice)
-                            <div class="mb-2 inline-block w-55 max-w-full rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-slate-800 transition" data-voice-player="1">
-                                <audio preload="metadata" class="hidden" data-voice-audio>
-                                    <source src="{{ $attachmentUrl }}" type="{{ $audioSourceMime }}">
-                                </audio>
-                                <div class="flex items-center gap-2">
-                                    <button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-500 text-white" data-voice-toggle aria-label="Putar" aria-pressed="false">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4.75a.75.75 0 0 1 1.165-.623l7 4.75a.75.75 0 0 1 0 1.246l-7 4.75A.75.75 0 0 1 6.5 14.25v-9.5Z" /></svg>
-                                    </button>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="mb-1 flex h-4 items-end gap-0.5" data-voice-wave>
-                                            @foreach (['h-2','h-3','h-2','h-4','h-2','h-3','h-4','h-2','h-3','h-2','h-4','h-2'] as $barHeight)
-                                                <span class="{{ $barHeight }} w-0.5 rounded-full bg-navy-500/70 opacity-45" data-voice-bar></span>
-                                            @endforeach
-                                        </div>
-                                        <input type="range" min="0" max="1000" value="0" class="h-1 w-full cursor-pointer accent-navy-500" data-voice-progress>
-                                        <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                                            <span data-voice-current>0:00</span>
-                                            <span data-voice-duration>0:00</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <p class="mt-1 hidden text-[11px] text-slate-500" data-voice-fallback-note>Putar lewat pemutar di bawah.</p>
-                            </div>
-                        @elseif($isVideo)
-                            <button type="button" class="mb-2 block w-full overflow-hidden rounded-2xl border border-slate-200 bg-white" data-message-body="1" data-attachment-open="1" data-attachment-kind="video" data-attachment-url="{{ $attachmentUrl }}" data-attachment-name="{{ $attachmentName }}">
-                                <div class="relative">
-                                    <video src="{{ $attachmentUrl }}" class="h-auto max-h-72 w-full bg-black object-cover" muted playsinline preload="metadata"></video>
-                                    <span class="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm font-bold text-white">▶</span>
-                                </div>
-                                <p class="px-3 py-2 text-left text-xs font-medium text-slate-700">{{ $attachmentName }}</p>
-                            </button>
-                        @elseif($isFileAttachment)
-                            <button type="button" class="mb-2 block w-full rounded-2xl border border-slate-200 bg-white p-3 text-left text-slate-700" data-message-body="1" data-attachment-download="1" data-attachment-url="{{ $attachmentUrl }}" data-attachment-name="{{ $attachmentName }}">
-                                <div class="flex items-center gap-3">
-                                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-base">📄</span>
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-semibold">{{ $attachmentName }}</p>
-                                        <p class="text-[11px] text-slate-500">{{ $attachmentSizeLabel }}</p>
-                                    </div>
-                                    <span class="text-[11px] font-semibold text-slate-500">Buka</span>
-                                </div>
-                            </button>
-                        @endif
-                        @if($message->content)
-                            <div class="bubble-other">
-                                <span class="whitespace-pre-wrap">{{ $message->content }}</span><span class="nc-inline-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="other">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--other" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</span>
-                            </div>
-                        @else
-                            <p class="mt-1 meta-time" data-message-time="{{ optional($message->created_at)->toIso8601String() }}" data-time-label="" data-time-edited="{{ $isEdited ? '1' : '0' }}" data-time-edited-at="{{ $editedAtIso }}" data-time-tone="other">{{ $message->created_at?->format('H:i') }}@if($isEdited) <span class="nc-edited-mark nc-edited-mark--other" title="{{ $editedTitle }}" aria-label="{{ $editedTitle }}">diedit</span>@endif</p>
-                        @endif
-                    </div>
-                @endif
-            @empty
-                <div class="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500" data-feed-empty="1">
-                    Belum ada pesan.
-                </div>
-            @endforelse
+            @if(empty($messages))
+                <p class="nc-feed-empty" data-feed-empty="1">Belum ada pesan. Sapa anggotamu, atau panggil <b>@normi</b> untuk bertanya.</p>
+            @endif
             <div class="hidden pb-2 text-[11px] text-slate-400" data-typing-indicator="1"></div>
         </div>
+        {{-- Pesan awal; dirender oleh resources/js/chat/feed.js dengan templat yang sama seperti pesan realtime. --}}
+        <script type="application/json" data-forward-targets nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">@json($forwardTargets, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)</script>
+        <script type="application/json" data-initial-messages nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">@json($messages, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)</script>
 
         {{-- Input bar --}}
         <div class="composer-shell">
+            @if($group->isFrozen())
+                <p class="nc-frozen-note" role="status">Grup ini dibekukan oleh admin Normi Chat. Pesan baru tidak bisa dikirim, riwayat tetap bisa dibaca.</p>
+            @else
             <form method="POST" action="{{ route('chat.store', $group) }}" class="relative" enctype="multipart/form-data" data-chat-form="1">
                 @csrf
                 <input type="file" name="attachment" accept="{{ \App\Support\AttachmentRules::acceptAttribute() }}" class="hidden" data-chat-attachment="1" />
                 <input type="hidden" name="reply_to_message_id" value="" data-reply-to-input="1" />
                 <input type="hidden" name="reply_quote_text" value="" data-reply-quote-input="1" />
 
-                <div class="hidden items-center justify-between gap-2 border-b border-navy-100 bg-navy-50/70 px-4 py-2" data-reply-preview="1">
+                <div class="hidden items-center justify-between gap-2 border-b border-primary-line bg-primary-soft px-4 py-2" data-reply-preview="1">
                     {{-- Ketuk untuk membuka pesan penuh dan memilih bagian yang dibalas (resources/js/chat/composer/quote-picker.js). --}}
                     <div class="flex min-w-0 flex-1 cursor-pointer items-center gap-2" role="button" tabindex="0" title="Pilih bagian yang dibalas" data-reply-preview-open="1">
                         <div class="h-8 w-1 shrink-0 rounded-full" style="background: var(--nc-primary);"></div>
@@ -369,9 +96,9 @@
                             <p class="text-[11px] font-bold text-slate-700" data-reply-preview-sender="1">Balas pesan</p>
                             <p class="truncate text-xs text-slate-600" data-reply-preview-content="1"></p>
                         </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h10M4 17h12"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h10M4 17h12"/></svg>
                     </div>
-                    <button type="button" class="rounded-md p-1 text-slate-400 hover:bg-navy-100" data-reply-clear="1" aria-label="Batalkan balasan">
+                    <button type="button" class="rounded-md p-1 text-slate-500 hover:bg-primary-soft" data-reply-clear="1" aria-label="Batalkan balasan">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
                     </button>
                 </div>
@@ -418,7 +145,9 @@
                         </button>
 
                         <button type="submit" class="composer-send hidden" data-chat-send="1" aria-label="Kirim">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12 20 4l-4 16-4.5-6.5L4.5 12Z"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="nc-send-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12 20 4l-4 16-4.5-6.5L4.5 12Z"/></svg>
+                            {{-- Mode edit (resources/js/chat/composer/edit-mode.js): tombol kirim jadi centang. --}}
+                            <svg xmlns="http://www.w3.org/2000/svg" class="nc-save-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
                         </button>
                     </div>
 
@@ -447,29 +176,44 @@
 
                     {{-- Pemilih model per pesan --}}
                     @if($aiModels->isNotEmpty())
-                        <div class="composer-popover right-0 w-64 hidden" data-model-menu="1" role="menu">
+                        <div class="composer-popover right-0 w-64 hidden" data-model-menu="1" data-group-credits="{{ $groupCredits }}" role="menu">
                             @foreach($aiModels as $aiModel)
                                 @php($gate = $modelGates[$aiModel->model_id] ?? null)
                                 <button type="button" class="composer-menu-item" data-ai-model-option="{{ $aiModel->model_id }}" data-ai-model-name="{{ $aiModel->label }}" role="menuitemradio" aria-checked="false"
-                                    @if($gate) data-ai-model-locked="{{ $gate['locked'] ? '1' : '0' }}" data-ai-model-open-at="{{ $gate['open_at'] }}" data-ai-model-floor="{{ $gate['floor'] }}" aria-disabled="{{ $gate['locked'] ? 'true' : 'false' }}" @endif>
+                                    @if($gate) data-ai-model-locked="{{ $gate['locked'] ? '1' : '0' }}" data-ai-model-open-at="{{ $gate['open_at'] }}" data-ai-model-floor="{{ $gate['floor'] }}" @endif>
                                     <span class="inline-flex h-5 w-5 items-center justify-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="hidden h-4 w-4" viewBox="0 0 20 20" fill="currentColor" data-ai-check="1"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
+                                        @if($gate)
+                                            {{-- Heroicons solid lock-closed (20) --}}
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 {{ $gate['locked'] ? '' : 'hidden' }}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-ai-lock-icon="1"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd"/></svg>
+                                        @endif
                                     </span>
                                     <span class="min-w-0 flex-1">
                                         <span class="block font-semibold">{{ $aiModel->label }}</span>
                                         @if($aiModel->description)
-                                            <span class="block text-[11px] opacity-60">{{ $aiModel->description }}</span>
+                                            <span class="block text-[11px] text-ink-soft {{ $gate && $gate['locked'] ? 'hidden' : '' }}" data-ai-model-description="1">{{ $aiModel->description }}</span>
+                                        @endif
+                                        @if($gate)
+                                            {{-- Kategori dikunci saldo grup (App\Services\Credits\ModelAccess); ketuk untuk penjelasan. --}}
+                                            <span class="block text-[11px] text-ink-soft {{ $gate['locked'] ? '' : 'hidden' }}" data-ai-lock-hint="1">Butuh saldo grup {{ $gate['open_at_label'] }} NK</span>
                                         @endif
                                     </span>
                                 </button>
-                                @if($gate)
-                                    {{-- Kategori dikunci saldo grup (App\Services\Credits\ModelAccess). --}}
-                                    <a href="{{ route('subscription.tokens.buy', ['group' => $group->id]) }}" class="composer-menu-note {{ $gate['locked'] ? '' : 'hidden' }}" data-ai-model-lock-note="{{ $aiModel->model_id }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path stroke-linecap="round" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-                                        <span>Terbuka saat saldo grup ≥ {{ $gate['open_at_label'] }} NK · <span class="font-semibold underline">Isi Normkredit</span></span>
-                                    </a>
-                                @endif
                             @endforeach
+                        </div>
+                    @endif
+
+                    @if($modelGates->isNotEmpty())
+                        <div class="nc-popup-overlay hidden" data-model-lock-sheet="1" role="dialog" aria-modal="true" aria-labelledby="nc-model-lock-title">
+                            <div class="nc-popup-card nc-lock-sheet">
+                                <h2 id="nc-model-lock-title" class="text-base font-bold" data-lock-title></h2>
+                                <p class="mt-1.5 text-sm text-ink-soft" data-lock-text></p>
+                                <div class="nc-meter mt-3" aria-hidden="true"><span data-lock-meter></span></div>
+                                <div class="mt-4 flex justify-end gap-2">
+                                    <button type="button" class="btn-secondary px-4 py-2" data-lock-close="1">Tutup</button>
+                                    <a href="{{ route('subscription.tokens.buy', ['group' => $group->id]) }}" class="btn-primary px-4 py-2">Isi Normkredit</a>
+                                </div>
+                            </div>
                         </div>
                     @endif
 
@@ -485,10 +229,10 @@
                     <span class="min-w-14 text-lg font-semibold tabular-nums" data-voice-timer="1">0:00</span>
                     <div class="flex min-w-0 flex-1 items-center gap-1 text-navy-100" aria-hidden="true">
                         @for ($i = 0; $i < 16; $i++)
-                            <span class="h-6 w-1 rounded-full bg-navy-100/80 {{ $i % 2 === 0 ? 'animate-pulse' : '' }}" style="animation-delay: {{ $i * 0.08 }}s;"></span>
+                            <span class="h-6 w-1 rounded-full bg-white/70 {{ $i % 2 === 0 ? 'animate-pulse' : '' }}" style="animation-delay: {{ $i * 0.08 }}s;"></span>
                         @endfor
                     </div>
-                    <button type="button" class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#526884] text-[#121C29]" data-voice-stop-send="1" aria-label="Kirim rekaman" title="Kirim rekaman">
+                    <button type="button" class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy-50 text-navy-950" data-voice-stop-send="1" aria-label="Kirim rekaman" title="Kirim rekaman">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M3.105 3.105a.75.75 0 0 1 .818-.164l12 5.25a.75.75 0 0 1 0 1.374l-12 5.25A.75.75 0 0 1 2.9 14.18l1.2-4.18a.75.75 0 0 0 0-.4l-1.2-4.18a.75.75 0 0 1 .205-.815Z" />
                         </svg>
@@ -497,6 +241,7 @@
 
                 <span class="mt-2 hidden rounded bg-slate-800 px-2 py-0.5 text-[10px] text-white" data-recording-indicator="1">Merekam suara...</span>
             </form>
+            @endif
         </div>
 
         {{-- Scroll to bottom button --}}
@@ -541,7 +286,7 @@
             </a>
             @if($viewerIsOwner)
                 <div class="my-1 border-t border-white/15"></div>
-                <button type="button" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-coral-200 hover:bg-coral-500/30" data-open-delete-group-menu="1" role="menuitem">
+                <button type="button" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#FECCC5] hover:bg-[#FB6856]/30" data-open-delete-group-menu="1" role="menuitem">
                     <span class="inline-flex h-5 w-5 items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6m4 4v6m4-6v6"/></svg>
                     </span>
@@ -561,7 +306,7 @@
                         <form method="POST" action="{{ route('groups.destroy', $group) }}">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="rounded-xl bg-coral-500 px-3 py-2 text-xs font-bold text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-50" data-delete-group-menu-submit="1" disabled>Hapus permanen</button>
+                            <button type="submit" class="rounded-xl bg-danger px-3 py-2 text-xs font-bold text-white hover:bg-danger-hover disabled:cursor-not-allowed disabled:opacity-50" data-delete-group-menu-submit="1" disabled>Hapus permanen</button>
                         </form>
                     </div>
                 </div>

@@ -1,65 +1,12 @@
-@extends('layouts.app', ['title' => 'Superadmin - Normi Chat'])
+@extends('layouts.app', ['title' => 'Pengaturan - Admin Normi Chat'])
 
 @section('content')
     @php
         $fmtNk = fn ($value) => number_format((float) $value, 2, ',', '.');
         $fmtIdr = fn ($value) => 'Rp' . number_format((float) $value, 0, ',', '.');
-        $usageRevenue = (float) $usage->charged * $rupiahPerCredit;
-        $usageMargin = $usageRevenue > 0 ? (1 - (float) $usage->cost_idr / $usageRevenue) * 100 : null;
     @endphp
-    <section class="page-shell pt-5">
-        <a href="{{ route('profile.show') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700">
-            <span aria-hidden="true">&larr;</span> Profil
-        </a>
-        <h1 class="mt-3 font-display text-xl font-extrabold text-slate-900">Superadmin</h1>
-
-        @if(session('success'))
-            <div class="mt-3 rounded-xl bg-navy-50 px-4 py-3 text-sm font-semibold text-navy-700">{{ session('success') }}</div>
-        @endif
-
-        {{-- Ringkasan 30 hari --}}
-        <h2 class="section-title mt-6">30 hari terakhir</h2>
-        <div class="grid grid-cols-2 gap-2">
-            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
-                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Penjualan NK</p>
-                <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtIdr($sales->revenue) }}</p>
-                <p class="text-[11px] text-slate-500">{{ $fmtNk($sales->credits) }} NK · {{ (int) $sales->payments }} bayar</p>
-            </div>
-            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
-                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Pemakaian AI</p>
-                <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtNk($usage->charged) }} NK</p>
-                <p class="text-[11px] text-slate-500">{{ (int) $usage->requests }} request · {{ $fmtIdr($usageRevenue) }}</p>
-            </div>
-            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
-                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Biaya OpenAI</p>
-                <p class="mt-1 text-sm font-bold text-slate-900">{{ $fmtIdr($usage->cost_idr) }}</p>
-            </div>
-            <div class="rounded-2xl border border-[var(--nc-line)] bg-white px-3 py-3 shadow-sm">
-                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Margin atas pemakaian</p>
-                <p class="mt-1 text-sm font-bold {{ $usageMargin !== null && $usageMargin < 25 ? 'text-coral-600' : 'text-navy-700' }}">
-                    {{ $usageMargin === null ? '–' : number_format($usageMargin, 1, ',', '.') . '%' }}
-                </p>
-            </div>
-        </div>
-        @if($usageByModel->isNotEmpty())
-            <div class="mt-2 overflow-x-auto rounded-2xl border border-[var(--nc-line)] bg-white shadow-sm">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
-                        <tr><th class="px-3 py-2">Model</th><th class="px-3 py-2 text-right">Req</th><th class="px-3 py-2 text-right">NK</th><th class="px-3 py-2 text-right">Biaya</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach($usageByModel as $row)
-                            <tr class="border-t border-slate-100">
-                                <td class="px-3 py-2 font-mono">{{ $row->model }}</td>
-                                <td class="px-3 py-2 text-right">{{ (int) $row->requests }}</td>
-                                <td class="px-3 py-2 text-right">{{ $fmtNk($row->charged) }}</td>
-                                <td class="px-3 py-2 text-right">{{ $fmtIdr($row->cost_idr) }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
+    <section class="page-shell">
+        @include('superadmin._nav')
 
         {{-- Katalog model --}}
         <h2 class="section-title mt-6">Model AI</h2>
@@ -71,7 +18,7 @@
                         <div class="min-w-0">
                             <p class="text-sm font-bold text-slate-900">
                                 {{ $aiModel->label }}
-                                @if($aiModel->is_default)<span class="ml-1 rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-semibold text-navy-700">default</span>@endif
+                                @if($aiModel->is_default)<span class="ml-1 rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-semibold text-primary-ink">default</span>@endif
                                 @unless($aiModel->is_active)<span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">nonaktif</span>@endunless
                             </p>
                             <p class="truncate font-mono text-[11px] text-slate-500">{{ $aiModel->model_id }}</p>
@@ -86,7 +33,7 @@
                             </p>
                         </div>
                         <div class="shrink-0 text-right">
-                            <p class="text-sm font-extrabold text-navy-600">{{ $fmtNk($sampleCredits[$aiModel->id] ?? 0) }} NK</p>
+                            <p class="text-sm font-extrabold text-primary-ink">{{ $fmtNk($sampleCredits[$aiModel->id] ?? 0) }} NK</p>
                             <p class="text-[10px] text-slate-400">contoh</p>
                         </div>
                     </div>
@@ -128,7 +75,7 @@
                         <label for="{{ $key }}" class="text-[11px] font-bold uppercase tracking-wider text-slate-500">{{ $label }}</label>
                         <input id="{{ $key }}" name="{{ $key }}" type="number" step="{{ $step }}" min="0" required value="{{ old($key, $settings[$key]) }}" class="input-field mt-1.5" />
                         @error($key)
-                            <p class="mt-1 text-xs text-coral-500">{{ $message }}</p>
+                            <p class="mt-1 text-xs text-danger-ink">{{ $message }}</p>
                         @enderror
                     </div>
                 @endforeach

@@ -29,103 +29,37 @@
             @endif
         </div>
 
-        {{-- Gabung Grup (paling atas) --}}
-        <div class="mt-5">
-            <div class="card-soft">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-coral-50 text-coral-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 8h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h2m8-4H8l-1 4h10l-1-4Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 12v4m-2-2h4"/></svg>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-slate-900">Gabung Grup</p>
-                        <p class="text-[11px] text-slate-500">Masukkan kode grup dari temanmu</p>
-                    </div>
-                </div>
-                <form method="GET" action="" class="mt-3 flex items-center gap-2" data-join-by-id-form="{{ url('/join') }}">
-                    <input
-                        type="text"
-                        name="share_id"
-                        placeholder="Kode grup"
-                        required
-                        autocomplete="off"
-                        class="input-field flex-1"
-                        data-join-by-id-input="1"
-                    />
-                    <button type="submit" class="btn-primary">Gabung</button>
-                </form>
-            </div>
+        <div class="mt-6 flex items-center justify-between gap-3">
+            <h2 class="nc-section-title">Grup</h2>
+            <a href="{{ route('groups.create') }}" class="btn-primary px-4 py-2">Buat grup</a>
         </div>
 
-        {{-- Section title --}}
-        <div class="mt-6 flex items-center justify-between">
-            <h2 class="section-title">Grup</h2>
-            <a href="{{ route('groups.create') }}" class="text-[11px] font-bold text-coral-600 hover:text-coral-700">+ Buat grup</a>
-        </div>
+        <form method="GET" action="" class="mt-3 flex items-center gap-2" data-join-by-id-form="{{ url('/join') }}">
+            <input type="text" name="share_id" placeholder="Punya kode grup? Masukkan di sini" required autocomplete="off" class="nc-input min-w-0 flex-1" aria-label="Kode grup" data-join-by-id-input="1">
+            <button type="submit" class="btn-secondary shrink-0 px-4 py-2">Gabung</button>
+        </form>
 
-        {{-- Group search --}}
-        @if(count($groups) > 0)
-            <div class="mt-2 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
-                <input type="text" placeholder="Cari grup" class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" data-group-search-input="1" autocomplete="off" />
-            </div>
+        @if(count($groups) > 3)
+            <input type="search" placeholder="Cari grup" class="nc-input mt-3 w-full" aria-label="Cari grup" data-group-search-input="1" autocomplete="off">
         @endif
 
-        {{-- Group list --}}
-        <div class="mt-2 space-y-2.5">
+        <div class="nc-list">
             @forelse ($groups as $group)
                 @php
                     $activeMembers = $group->members->where('status', 'active');
-                    $ownerInMembers = $activeMembers->contains('user_id', $group->owner_id);
-                    $memberCount = $activeMembers->count() + ($ownerInMembers ? 0 : 1);
-                    $initial = strtoupper(substr($group->name, 0, 1));
+                    $memberCount = $activeMembers->count() + ($activeMembers->contains('user_id', $group->owner_id) ? 0 : 1);
                 @endphp
-                <div class="card-soft overflow-hidden p-0" data-group-card="1" data-group-search="{{ $group->name }} {{ $group->share_id }}">
-                    <a href="{{ route('chat.show', $group) }}" class="flex items-center gap-3 px-4 py-3 transition active:bg-slate-50">
-                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style="background: var(--nc-primary);">
-                            {{ $initial }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-2">
-                                <h3 class="truncate text-sm font-bold text-slate-900">{{ $group->name }}</h3>
-                            </div>
-                            <p class="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="3.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 20c1.2-3.2 4-5 8-5s6.8 1.8 8 5"/></svg>
-                                {{ $memberCount }} anggota
-                            </p>
-                        </div>
-                    </a>
-                    <div class="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
-                        <span class="truncate">Kode: <span class="font-mono font-semibold text-slate-600">{{ $group->share_id }}</span></span>
-                        <div class="flex items-center gap-3">
-                            <button type="button" class="font-semibold text-coral-600 hover:text-coral-700" data-copy-share-id="{{ $group->share_id }}">Salin</button>
-                            <button
-                                type="button"
-                                class="font-semibold text-navy-600 hover:text-navy-700"
-                                data-share-group-url="{{ route('groups.join', $group->share_id) }}"
-                                data-share-group-name="{{ $group->name }}"
-                            >
-                                Bagikan
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <a href="{{ route('chat.show', $group) }}" class="nc-list-row hover:bg-surface-2" data-group-card="1" data-group-search="{{ $group->name }} {{ $group->share_id }}">
+                    <span class="nc-sidebar-avatar h-11 w-11 text-sm">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($group->name, 0, 1)) }}</span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-semibold">{{ $group->name }}</span>
+                        <span class="block text-xs text-ink-soft">{{ $memberCount }} anggota{{ $group->isFrozen() ? ' · Dibekukan' : '' }}</span>
+                    </span>
+                </a>
             @empty
-                <div class="card-soft p-6 text-center">
-                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-coral-50 text-coral-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h7m-7 4h5M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6l-4 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>
-                    </div>
-                    <p class="text-sm font-semibold text-slate-700">Belum ada grup</p>
-                    <p class="mt-1 text-xs text-slate-500">Buat grup atau gabung dengan kode grup.</p>
-                </div>
+                <p class="nc-list-empty">Belum ada grup. Buat grup baru, atau gabung dengan kode dari temanmu.</p>
             @endforelse
-            <div class="hidden rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-500" data-group-search-empty="1">
-                Grup tidak ditemukan.
-            </div>
+            <p class="nc-list-empty hidden" data-group-search-empty="1">Grup tidak ditemukan.</p>
         </div>
-
-        {{-- Create CTA --}}
-        <a href="{{ route('groups.create') }}" class="btn-cta mt-6">
-            + Buat Grup
-        </a>
     </section>
 @endsection

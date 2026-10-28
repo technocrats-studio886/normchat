@@ -62,7 +62,7 @@ final class DocumentResponder implements AiResponder
 
         $task->recordChat('document', $model, $completion);
 
-        return AiReply::attachment('document', '📄 Dokumen siap: ' . $document['original_name'], [
+        return AiReply::attachment('document', 'Dokumen siap: ' . $document['original_name'], [
             'message_type' => $document['message_type'] ?? 'file',
             'path' => $document['path'],
             'mime' => $document['mime'],

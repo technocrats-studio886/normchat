@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Crypt;
@@ -26,16 +27,17 @@ use Illuminate\Support\Facades\Crypt;
     'refresh_token_encrypted',
     'token_expires_at',
     'api_key_encrypted',
-    'theme',
+    'theme_mode',
+    'theme_accent',
 ])]
 #[Hidden(['password', 'remember_token', 'access_token_encrypted', 'refresh_token_encrypted', 'api_key_encrypted'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
-     * Get the attributes that should be cast.
+     * Konversi tipe atribut.
      *
      * @return array<string, string>
      */
@@ -130,8 +132,10 @@ class User extends Authenticatable
             return (string) $this->username;
         }
 
+        // ID penyedia yang berupa kode acak (UUID, ULID, deret angka) tidak layak jadi username.
         $providerId = (string) ($this->provider_user_id ?? $this->interdotz_id ?? '');
-        if ($providerId !== '') {
+        $opaque = preg_match('/^([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}|[0-9A-HJKMNP-TV-Z]{26}|\d{8,})$/i', $providerId) === 1;
+        if ($providerId !== '' && ! $opaque) {
             return $clean($providerId);
         }
 

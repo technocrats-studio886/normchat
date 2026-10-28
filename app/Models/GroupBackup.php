@@ -15,6 +15,10 @@ class GroupBackup extends Model
         'storage_path',
         'created_by',
         'created_at',
+        'status',
+        'message_count',
+        'attachment_count',
+        'last_message_id',
     ];
 
     protected $casts = [

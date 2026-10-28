@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schedule;
 use Symfony\Component\Console\Command\Command;
 
 Artisan::command('inspire', function () {
@@ -78,3 +79,7 @@ Artisan::command('interdotz:sync-client-profile {--token=} {--dry-run} {--logo-u
 
     return Command::SUCCESS;
 })->purpose('Sync Normi Chat client profile and image metadata to Interdotz backend');
+
+// Dijalankan service "scheduler" di docker-compose.yml.
+Schedule::command('normchat:backup-groups')->dailyAt('03:00')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();
+Schedule::command('normchat:prune-exports')->dailyAt('03:30')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();

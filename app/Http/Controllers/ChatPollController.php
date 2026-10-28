@@ -40,6 +40,7 @@ class ChatPollController extends Controller
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_if($group->isFrozen(), 423, 'Grup ini dibekukan oleh admin Normi Chat.');
 
         $optionNumber = (int) $request->validate(['option_number' => ['required', 'integer', 'min:1', 'max:20']])['option_number'];
 

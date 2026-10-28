@@ -6,13 +6,10 @@ use App\Enums\PaymentPurpose;
 use App\Exceptions\CheckoutFailedException;
 use App\Http\Requests\TopupCreditsRequest;
 use App\Models\Group;
-use App\Services\Credits\Funding;
-use App\Services\NormkreditLedger;
 use App\Services\NormkreditPricing;
 use App\Services\Payments\NormkreditCheckout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -44,7 +41,7 @@ class TopupController extends Controller
         return view('subscription.buy-tokens', ['contextGroup' => $group]);
     }
 
-    public function store(TopupCreditsRequest $request, NormkreditLedger $ledger, NormkreditCheckout $checkout): RedirectResponse
+    public function store(TopupCreditsRequest $request, NormkreditCheckout $checkout): RedirectResponse
     {
         $lockedGroupId = (int) session(self::SESSION_GROUP_KEY, 0);
         if ($lockedGroupId <= 0) {
@@ -62,18 +59,6 @@ class TopupController extends Controller
         abort_unless($group->isOwnedBy($user) || $group->hasActiveMember($user), 403);
 
         $quote = $this->pricing->quotePackages($request->packages());
-
-        if ($user->isSuperadmin()) {
-            $ledger->credit($group, $user, Funding::bypass($quote->credits, 'SA-TOPUP-' . strtoupper(Str::random(8))), 'topup');
-
-            return redirect()->route('subscription.tokens.buy.success')->with('token_purchase', [
-                'normkredits' => $quote->credits,
-                'paid_amount' => 0,
-                'payment_method' => 'bypass',
-                'payment_unit' => 'IDR',
-                'group_name' => $group->name,
-            ]);
-        }
 
         try {
             return redirect()->away($checkout->start($user, $group, PaymentPurpose::Topup, $quote));

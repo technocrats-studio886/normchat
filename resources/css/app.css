@@ -37,53 +37,119 @@
     --color-coral-950: #481410;
 }
 
+/* Warna semantik: utilitas bg-primary, text-primary-ink, bg-danger, dst. Nilainya dari token tema di
+   bawah dan dibaca di elemen pemakainya, jadi ikut mode/aksen terdekat (termasuk pratinjau di Profil). */
+@theme inline {
+    --color-primary: var(--nc-primary);
+    --color-primary-hover: var(--nc-primary-hover);
+    --color-primary-ink: var(--nc-primary-text);
+    --color-primary-soft: var(--nc-primary-light);
+    --color-primary-line: var(--nc-primary-line);
+    --color-danger: var(--nc-danger);
+    --color-danger-hover: var(--nc-danger-hover);
+    --color-danger-ink: var(--nc-danger-text);
+    --color-danger-soft: var(--nc-danger-soft);
+    --color-danger-line: var(--nc-danger-line);
+    --color-ink: var(--nc-text);
+    --color-ink-soft: var(--nc-text-soft);
+    --color-surface: var(--nc-surface);
+    --color-surface-2: var(--nc-surface-2);
+    --color-line: var(--nc-line);
+}
+
 @layer base {
-    :root {
-        --nc-bg: var(--color-navy-50);
+    /* ── Tema: data-mode (light|dark) + data-accent di <html>, dipilih di Profil (App\Support\Themes).
+       Setiap elemen ber-data-mode mendefinisikan ulang SEMUA token, sehingga pratinjau di panel tema
+       bisa memakai mode/aksen lain tanpa mengubah halaman. ── */
+    :root,
+    [data-accent="navy"] { --accent: #1e2e43; --accent-dark: #3b5677; }
+    [data-accent="toska"] { --accent: #0f6f68; --accent-dark: #197a72; }
+    [data-accent="biru"] { --accent: #1d5aa0; --accent-dark: #3a74b8; }
+    [data-accent="hijau"] { --accent: #2f6a3e; --accent-dark: #3f8452; }
+    [data-accent="bata"] { --accent: #a8432f; --accent-dark: #b04f3a; }
+
+    :root,
+    [data-mode] {
+        color-scheme: light;
+        --nc-bg: #F3F5F8;
         --nc-surface: #ffffff;
-        --nc-surface-2: var(--color-navy-100);
-        --nc-text: var(--color-navy-950);
-        --nc-text-soft: var(--color-navy-600);
-        --nc-muted: var(--color-navy-400);
-        --nc-line: var(--color-navy-100);
-        --nc-line-strong: var(--color-navy-200);
-        /* Bawaan Tailwind (#90A1B9) hanya 2,6:1 di atas putih; dipakai untuk label & teks samar. */
+        --nc-surface-2: #E4E9F0;
+        --nc-text: #121C29;
+        --nc-text-soft: #40536C;
+        --nc-muted: #7186A3;
+        --nc-line: #E4E9F0;
+        --nc-line-strong: #C9D2DF;
+
+        /* Warna utama = aksen pilihan user (aksi, pesan sendiri, sorotan). */
+        --nc-primary: var(--accent);
+        --nc-primary-hover: color-mix(in srgb, var(--accent) 82%, #000000);
+        --nc-primary-text: var(--accent);
+        --nc-primary-light: color-mix(in srgb, var(--accent) 9%, #ffffff);
+        --nc-primary-line: color-mix(in srgb, var(--accent) 30%, #ffffff);
+        --nc-mine: var(--accent);
+
+        /* Bahaya & galat (hapus, keluar, pesan error). */
+        --nc-danger: #C43D2E;
+        --nc-danger-hover: #A1342A;
+        --nc-danger-text: #A1342A;
+        --nc-danger-soft: #FFF3F1;
+        --nc-danger-line: #FECCC5;
+
+        /* Coral hanya untuk Normi AI. */
+        --nc-ai: #FB6856;
+        --nc-ai-name: #A1342A;
+        --nc-chat-bg: #F3F5F8;
+        --nc-chat-header-bg: rgba(255, 255, 255, 0.95);
+        --nc-chat-header-border: #E4E9F0;
+        --nc-chat-header-title: #121C29;
+        --nc-chat-header-subtitle: #40536C;
+        --nc-chat-other-bg: #ffffff;
+        --nc-chat-other-text: #121C29;
+        --nc-chat-other-border: #E4E9F0;
+        --nc-chat-ai-bg: #FFF3F1;
+        --nc-chat-ai-text: #852F27;
+        --nc-chat-ai-border: #FECCC5;
+        --nc-chat-composer-input-bg: #ffffff;
+        --nc-chat-composer-text: #121C29;
+        --nc-chat-composer-soft: #40536C;
+        --nc-chat-composer-line: #E4E9F0;
+
+        /* Warna nama & avatar anggota di chat (attachments.js personColor); semua ≥ 4,5:1 di bubble. */
+        --nc-person-0: #1d7a5c;
+        --nc-person-1: #9a4b8c;
+        --nc-person-2: #2f62b0;
+        --nc-person-3: #b4471f;
+        --nc-person-4: #6655b0;
+        --nc-person-5: #0e6f8a;
+        --nc-person-6: #85650a;
+        --nc-person-7: #a3365a;
+
+        --nc-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+        --nc-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+
+        /* Skala slate & coral bawaan (dibalik di mode gelap). slate-400 bawaan Tailwind hanya 2,6:1. */
+        --color-slate-50: #f8fafc;
+        --color-slate-100: #f1f5f9;
+        --color-slate-200: #e2e8f0;
+        --color-slate-300: #cad5e2;
         --color-slate-400: #7C8A9E;
-        /* Warna teks untuk utilitas navy/coral yang dipetakan ke warna utama (lihat remap di bawah). */
-        --nc-primary-text: var(--nc-primary);
-        --nc-primary-text-strong: var(--nc-primary-hover);
-        /* Warna dasar campuran tint navy/coral (lihat remap utilitas di bawah): putih di tema terang. */
-        --nc-tint-base: #ffffff;
-        --nc-chat-bg: var(--color-navy-50);
-        --nc-warn-text: var(--color-coral-800);
-
-        /* Navy = warna utama (aksi, pesan sendiri); coral = aksen (Normi AI, badge, sorotan). */
-        --nc-primary: var(--color-navy-900);
-        --nc-primary-light: var(--color-navy-50);
-        --nc-primary-hover: var(--color-navy-950);
-        --nc-accent: var(--color-coral-500);
-        --nc-accent-soft: var(--color-coral-50);
-
-        --nc-mine: var(--color-navy-900);
-        --nc-ai: var(--color-coral-500);
-        --nc-ai-soft: var(--color-coral-50);
-        --nc-warn: var(--color-coral-600);
-        --nc-danger: var(--color-coral-700);
-
-        --nc-radius-lg: 20px;
-        --nc-radius-md: 14px;
-        --nc-radius-sm: 10px;
-
-        --nc-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06),
-            0 1px 2px rgba(0, 0, 0, 0.04);
-        --nc-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08),
-            0 2px 4px -1px rgba(0, 0, 0, 0.04);
+        --color-slate-500: #62748e;
+        --color-slate-600: #45556c;
+        --color-slate-700: #314158;
+        --color-slate-800: #1d293d;
+        --color-slate-900: #0f172b;
+        --color-slate-950: #020618;
+        --color-coral-50: #FFF3F1;
+        --color-coral-100: #FFE4E0;
+        --color-coral-200: #FECCC5;
+        --color-coral-300: #FDA99E;
+        --color-coral-700: #C43D2E;
+        --color-coral-800: #A1342A;
+        --color-coral-900: #852F27;
     }
 
-    /* ── Tema (data-theme di <html>, dipilih di Profil; App\Support\Themes) ── */
-    [data-theme="navy"] {
+    [data-mode="dark"] {
         color-scheme: dark;
-        /* Nilai ditulis langsung: skala navy/coral di bawah ikut diganti dalam blok yang sama. */
         --nc-bg: #121C29;
         --nc-surface: #1A2738;
         --nc-surface-2: #233247;
@@ -92,24 +158,50 @@
         --nc-muted: #8C9BB1;
         --nc-line: rgba(161, 176, 197, 0.22);
         --nc-line-strong: rgba(161, 176, 197, 0.36);
-        /* Coral yang cukup gelap untuk teks putih (4,6:1) dan teks putih/80 (3,4:1); coral-500 hanya 2,9:1. */
-        --nc-primary: #D04436;
-        --nc-primary-light: rgba(208, 68, 54, 0.16);
-        --nc-primary-hover: #B23A2D;
-        /* Teks berwarna utama di atas latar gelap butuh coral terang. */
-        --nc-primary-text: #FC8474;
-        --nc-primary-text-strong: #FDA99E;
-        --nc-accent: #FB6856;
-        --nc-accent-soft: rgba(251, 104, 86, 0.14);
-        --nc-mine: #40536C;
-        --nc-ai-soft: rgba(251, 104, 86, 0.14);
-        --nc-tint-base: #1A2738;
+
+        --nc-primary: var(--accent-dark);
+        --nc-primary-hover: color-mix(in srgb, var(--accent-dark) 85%, #000000);
+        --nc-primary-text: color-mix(in srgb, var(--accent-dark) 40%, #ffffff);
+        --nc-primary-light: color-mix(in srgb, var(--accent-dark) 26%, #1A2738);
+        --nc-primary-line: color-mix(in srgb, var(--accent-dark) 60%, #1A2738);
+        --nc-mine: var(--accent-dark);
+
+        --nc-danger: #C43D2E;
+        --nc-danger-hover: #A1342A;
+        --nc-danger-text: #FDA99E;
+        --nc-danger-soft: rgba(251, 104, 86, 0.14);
+        --nc-danger-line: rgba(251, 104, 86, 0.38);
+
+        --nc-ai-name: #FECCC5;
         --nc-chat-bg: #121C29;
-        --nc-warn-text: #FDA99E;
+        --nc-chat-header-bg: rgba(26, 39, 56, 0.94);
+        --nc-chat-header-border: rgba(161, 176, 197, 0.25);
+        --nc-chat-header-title: #F3F5F8;
+        --nc-chat-header-subtitle: #A1B0C5;
+        --nc-chat-other-bg: #1E2E43;
+        --nc-chat-other-text: #F3F5F8;
+        --nc-chat-other-border: rgba(161, 176, 197, 0.25);
+        --nc-chat-ai-bg: #2E2228;
+        --nc-chat-ai-text: #FFE4E0;
+        --nc-chat-ai-border: rgba(251, 104, 86, 0.4);
+        --nc-chat-composer-input-bg: #1E2E43;
+        --nc-chat-composer-text: #F3F5F8;
+        --nc-chat-composer-soft: #A1B0C5;
+        --nc-chat-composer-line: rgba(161, 176, 197, 0.25);
+
+        --nc-person-0: #5cc8a0;
+        --nc-person-1: #d995c9;
+        --nc-person-2: #86aef2;
+        --nc-person-3: #f0976f;
+        --nc-person-4: #ae9ff2;
+        --nc-person-5: #5cc4de;
+        --nc-person-6: #dbb64e;
+        --nc-person-7: #f08db0;
+
         --nc-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.35);
         --nc-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
 
-        /* Skala slate dibalik: teks gelap jadi terang, latar terang jadi gelap. */
+        /* Teks gelap jadi terang, latar terang jadi gelap. */
         --color-slate-50: #1A2738;
         --color-slate-100: #233247;
         --color-slate-200: #2E3F56;
@@ -121,14 +213,6 @@
         --color-slate-800: #DCE2EA;
         --color-slate-900: #EEF1F5;
         --color-slate-950: #F7F9FB;
-
-        /* Tint terang navy/coral (latar & garis, termasuk varian /opasitas) jadi tint gelap;
-           teks coral gelap yang dipakai di atas tint itu jadi terang. Navy 400–950 tetap,
-           karena dipakai sebagai latar gelap (tombol, overlay, panel rekaman). */
-        --color-navy-50: #1C2A3C;
-        --color-navy-100: #26364B;
-        --color-navy-200: #34465E;
-        --color-navy-300: #4A5D77;
         --color-coral-50: #33232A;
         --color-coral-100: #43292D;
         --color-coral-200: #633836;
@@ -136,68 +220,11 @@
         --color-coral-700: #FDA99E;
         --color-coral-800: #FECCC5;
         --color-coral-900: #FFE4E0;
-
-        --nc-chat-meta: #A1B0C5;
-        --nc-chat-meta-strong: #F3F5F8;
-        --nc-chat-header-bg: rgba(30, 46, 67, 0.92);
-        --nc-chat-header-border: rgba(161, 176, 197, 0.25);
-        --nc-chat-header-title: #F3F5F8;
-        --nc-chat-header-subtitle: #A1B0C5;
-        --nc-chat-reply-mine-bg: rgba(18, 28, 41, 0.45);
-        --nc-chat-reply-mine-border: #FB6856;
-        --nc-chat-reply-mine-text: #F3F5F8;
-        --nc-chat-reply-ai-bg: rgba(251, 104, 86, 0.14);
-        --nc-chat-reply-ai-border: rgba(251, 104, 86, 0.4);
-        --nc-chat-reply-ai-text: #FFE4E0;
-        --nc-chat-reply-other-bg: rgba(18, 28, 41, 0.45);
-        --nc-chat-reply-other-border: rgba(161, 176, 197, 0.25);
-        --nc-chat-reply-other-text: #F3F5F8;
-        --nc-chat-other-bg: #1E2E43;
-        --nc-chat-other-text: #F3F5F8;
-        --nc-chat-other-border: rgba(161, 176, 197, 0.25);
-        --nc-chat-ai-bg: rgba(251, 104, 86, 0.16);
-        --nc-chat-ai-text: #FFE4E0;
-        --nc-chat-ai-border: rgba(251, 104, 86, 0.4);
-        --nc-chat-composer-bg: #121C29;
-        --nc-chat-composer-input-bg: #1E2E43;
-        --nc-chat-composer-text: #F3F5F8;
-        --nc-chat-composer-soft: #A1B0C5;
-        --nc-chat-composer-line: rgba(161, 176, 197, 0.25);
     }
 
-    [data-theme="coral"] {
-        --nc-bg: var(--color-coral-50);
-        --nc-surface-2: var(--color-coral-100);
-        --nc-line: var(--color-coral-200);
-        --nc-line-strong: var(--color-coral-300);
-        --nc-chat-bg: var(--color-coral-50);
-
-        --nc-chat-meta: var(--color-coral-700);
-        --nc-chat-meta-strong: var(--color-navy-950);
-        --nc-chat-header-bg: rgba(255, 255, 255, 0.95);
-        --nc-chat-header-border: var(--color-coral-200);
-        --nc-chat-header-title: var(--color-navy-950);
-        --nc-chat-header-subtitle: var(--color-coral-700);
-        --nc-chat-reply-mine-bg: rgba(255, 255, 255, 0.16);
-        --nc-chat-reply-mine-border: var(--color-navy-900);
-        --nc-chat-reply-mine-text: var(--color-navy-950);
-        --nc-chat-reply-ai-bg: var(--color-coral-50);
-        --nc-chat-reply-ai-border: var(--color-coral-300);
-        --nc-chat-reply-ai-text: var(--color-coral-900);
-        --nc-chat-reply-other-bg: var(--color-coral-50);
-        --nc-chat-reply-other-border: var(--color-coral-200);
-        --nc-chat-reply-other-text: var(--color-navy-950);
-        --nc-chat-other-bg: #ffffff;
-        --nc-chat-other-text: var(--color-navy-950);
-        --nc-chat-other-border: var(--color-coral-200);
-        --nc-chat-ai-bg: var(--color-coral-100);
-        --nc-chat-ai-text: var(--color-coral-900);
-        --nc-chat-ai-border: var(--color-coral-300);
-        --nc-chat-composer-bg: var(--color-coral-50);
-        --nc-chat-composer-input-bg: #ffffff;
-        --nc-chat-composer-text: var(--color-navy-950);
-        --nc-chat-composer-soft: var(--color-coral-700);
-        --nc-chat-composer-line: var(--color-coral-200);
+    /* Elemen di dalam pratinjau mewarisi warna teks & latar dari token, bukan dari halaman. */
+    [data-mode] {
+        color: var(--nc-text);
     }
 
     /* Preflight Tailwind memberi placeholder 50% warna teks: terlalu pucat di kedua tema. */
@@ -218,19 +245,8 @@
 }
 
 @layer components {
-    /* ── Brand ───────────────────────────────────── */
-    .brand-lockup { @apply inline-flex items-center gap-2; }
 
-    .brand-mark {
-        @apply inline-flex h-9 w-9 items-center justify-center rounded-2xl text-white;
-        background: var(--nc-primary);
-    }
 
-    .brand-title {
-        @apply text-xl font-extrabold tracking-tight;
-        font-family: 'Sora', 'Poppins', sans-serif;
-        color: var(--nc-text);
-    }
 
     .normchat-bg {
         background: var(--nc-bg);
@@ -279,11 +295,6 @@
         background: var(--nc-primary-hover);
     }
 
-    .btn-cta-warm {
-        @apply block w-full rounded-2xl py-3.5 text-center text-sm font-extrabold tracking-wide text-white transition active:scale-[0.98];
-        background: #C43D2E;
-    }
-    .btn-cta-warm:hover { background: #A1342A; }
 
     .google-btn {
         @apply inline-flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-3 font-bold text-white transition active:scale-[0.98];
@@ -327,17 +338,6 @@
         background: var(--nc-primary);
     }
 
-    /* legacy aliases */
-    .nav-pill,
-    .nav-pill-chat {
-        @apply inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[11px] font-bold tracking-wide transition;
-        color: var(--nc-muted);
-    }
-    .nav-pill-active-outline,
-    .nav-pill-chat-active {
-        @apply inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[11px] font-bold tracking-wide text-white transition;
-        background: var(--nc-primary);
-    }
 
     /* ── Page shells ─────────────────────────────── */
     .page-shell { @apply min-h-screen px-4 pb-32 pt-5; }
@@ -348,20 +348,11 @@
         border: 1px solid var(--nc-line);
         box-shadow: var(--nc-shadow-soft);
     }
-    .panel-card-muted {
-        @apply rounded-2xl;
-        background: var(--nc-surface-2);
-        border: 1px solid var(--nc-line);
-    }
     .card-soft {
         @apply rounded-2xl p-4;
         background: var(--nc-surface);
         border: 1px solid var(--nc-line);
         box-shadow: var(--nc-shadow-soft);
-    }
-    .card-glow {
-        @apply rounded-2xl p-4 text-white;
-        background: var(--nc-primary);
     }
 
     .section-title {
@@ -369,14 +360,6 @@
         color: var(--nc-muted);
     }
 
-    .page-title {
-        @apply font-display text-[26px] font-extrabold leading-tight;
-        color: var(--nc-text);
-    }
-    .page-subtitle {
-        @apply mt-1 text-sm leading-relaxed;
-        color: var(--nc-text-soft);
-    }
 
     .nc-chat-header-card {
         background: var(--nc-chat-header-bg, rgba(255, 255, 255, 0.95));
@@ -398,201 +381,800 @@
         background: rgba(161, 176, 197, 0.16);
     }
 
-    .nc-chat-sender {
-        color: var(--nc-chat-meta, #64748b);
+    /* ── Pesan chat (resources/js/chat/messages.js) ──
+       .nc-msg = satu baris: avatar + tumpukan bubble. Pesan beruntun dari orang yang sama
+       (is-run-start … is-run-end) dirapatkan: nama di pesan pertama, avatar di pesan terakhir. */
+    .nc-feed-empty {
+        @apply py-10 text-center text-sm;
+        color: var(--nc-text-soft);
     }
-    .nc-chat-sender--ai {
-        color: var(--nc-chat-ai-text, var(--color-coral-700));
+    .nc-msg {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        margin-top: 2px;
     }
-    .nc-chat-meta {
-        color: var(--nc-chat-meta, #A1B0C5);
+    .nc-msg.is-run-start { margin-top: 12px; }
+    .nc-msg--mine { justify-content: flex-end; }
+    .nc-msg-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        min-width: 0;
+        max-width: min(80%, 36rem);
     }
-    .nc-chat-meta--ai {
-        color: var(--nc-chat-ai-text, var(--color-coral-700));
-        opacity: 0.86;
-    }
-
-    .nc-reply-chip {
-        border-left-width: 3px;
-        transition: background-color 120ms ease;
-        box-shadow: 0 1px 2px rgba(18, 28, 41, 0.12);
-    }
-    .nc-reply-chip--mine {
-        background: var(--nc-chat-reply-mine-bg, #F3F5F8);
-        border-left-color: var(--nc-chat-reply-mine-border, #7186A3);
-        color: var(--nc-chat-reply-mine-text, #1E2E43);
-    }
-    .nc-reply-chip--mine:hover {
-        filter: brightness(1.06);
-    }
-    .nc-reply-chip--ai {
-        background: var(--nc-chat-reply-ai-bg, var(--color-coral-50));
-        border-left-color: var(--nc-chat-reply-ai-border, var(--color-coral-400));
-        color: var(--nc-chat-reply-ai-text, var(--color-coral-900));
-    }
-    .nc-reply-chip--ai:hover {
-        filter: brightness(1.06);
-    }
-    .nc-reply-chip--other {
-        background: var(--nc-chat-reply-other-bg, #F3F5F8);
-        border-left-color: var(--nc-chat-reply-other-border, #64748b);
-        color: var(--nc-chat-reply-other-text, #344458);
-    }
-    .nc-reply-chip--other:hover {
-        filter: brightness(1.06);
-    }
-    .nc-reply-chip-sender {
-        color: var(--nc-chat-meta-strong, var(--nc-chat-header-title, #1E2E43));
+    .nc-msg--mine .nc-msg-stack { align-items: flex-end; }
+    .nc-msg-stack.is-wide { max-width: calc(100% - 36px); }
+    .nc-msg-pending {
+        @apply mt-0.5 px-1 text-[11px];
+        color: var(--nc-text-soft);
     }
 
-    /* ── Chat bubbles: sendiri = navy, anggota lain = putih, Normi AI = coral ── */
+    .nc-avatar {
+        width: 28px;
+        height: 28px;
+        flex: none;
+        border-radius: 9999px;
+        overflow: hidden;
+        visibility: hidden;
+    }
+    .nc-msg.is-run-end .nc-avatar { visibility: visible; }
+    .nc-avatar-img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .nc-avatar--ai { background: #ffffff; box-shadow: inset 0 0 0 1px var(--nc-line); }
+    .nc-avatar-fallback {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        background: var(--person);
+        color: #ffffff;
+    }
+    .nc-avatar-fallback svg { width: 72%; height: 72%; }
+    [data-mode="dark"] .nc-avatar-fallback {
+        background: color-mix(in srgb, var(--person) 28%, var(--nc-surface));
+        color: var(--person);
+    }
+
+    /* Bubble: sendiri = warna utama, anggota lain = permukaan, Normi AI = coral muda. */
+    .bubble-mine,
+    .bubble-other,
+    .bubble-ai {
+        @apply rounded-[18px] px-3 py-1.5 text-sm;
+        line-height: 1.45;
+    }
     .bubble-mine {
-        @apply rounded-3xl px-4 py-2.5 text-sm text-white;
         background: var(--nc-mine);
-        border-bottom-right-radius: 6px;
+        color: #ffffff;
     }
     .bubble-other {
-        @apply rounded-3xl px-4 py-2.5 text-sm;
-        color: var(--nc-chat-other-text, var(--nc-text));
         background: var(--nc-chat-other-bg, #ffffff);
+        color: var(--nc-chat-other-text, var(--nc-text));
         border: 1px solid var(--nc-chat-other-border, var(--nc-line));
-        border-bottom-left-radius: 6px;
     }
     .bubble-ai {
-        @apply rounded-3xl px-4 py-2.5 text-sm;
-        color: var(--nc-chat-ai-text, var(--color-coral-900));
         background: var(--nc-chat-ai-bg, var(--color-coral-50));
+        color: var(--nc-chat-ai-text, var(--color-coral-900));
         border: 1px solid var(--nc-chat-ai-border, var(--color-coral-200));
-        border-bottom-left-radius: 6px;
     }
+    .nc-bubble {
+        position: relative;
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+    .nc-msg-stack.is-wide .nc-bubble { width: 100%; }
+    /* Sudut bubble yang menghadap avatar dirapatkan di dalam rangkaian. */
+    .nc-msg--mine:not(.is-run-start) .nc-bubble { border-top-right-radius: 6px; }
+    .nc-msg--mine .nc-bubble { border-bottom-right-radius: 6px; }
+    .nc-msg:not(.nc-msg--mine):not(.is-run-start) .nc-bubble { border-top-left-radius: 6px; }
+    .nc-msg:not(.nc-msg--mine) .nc-bubble { border-bottom-left-radius: 6px; }
 
-    .nc-media-caption-card {
-        @apply overflow-hidden rounded-3xl;
+    .nc-msg-name {
+        display: none;
+        margin-bottom: 1px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--person);
     }
-    .nc-media-caption-card--mine {
-        background: var(--nc-mine);
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        border-bottom-right-radius: 6px;
-    }
-    .nc-media-caption-card--mine [data-attachment-frame="1"] {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    }
+    .nc-msg.is-run-start .nc-msg-name { display: block; }
 
-    /* ── Inline time inside bubble (Telegram-style) ──── */
-    .bubble-mine, .bubble-other, .bubble-ai { position: relative; }
+    /* Jam (dan "diedit") mengapung di kanan bawah, teks mengalir di sebelahnya. */
     .nc-inline-time {
         float: right;
-        margin-left: 0.5rem;
-        margin-top: 0.35rem;
-        font-size: 10px;
-        line-height: 1;
+        position: relative;
+        top: 5px;
+        margin-left: 10px;
+        font-size: 11px;
+        line-height: 1.2;
         white-space: nowrap;
-        opacity: 0.85;
+        opacity: 0.8;
     }
-    .bubble-mine .nc-inline-time { color: rgba(255,255,255,0.85); }
-    .bubble-other .nc-inline-time { color: var(--nc-chat-other-text, var(--nc-text-soft)); opacity: 0.85; }
-    .bubble-ai .nc-inline-time { color: var(--nc-chat-ai-text, var(--color-coral-700)); opacity: 0.85; }
-    .nc-media-caption-card--mine .nc-inline-time { color: rgba(255,255,255,0.85); }
+    .nc-edited-mark { margin-right: 4px; }
+
+    /* Kutipan pesan yang dibalas; --q = warna orang yang dikutip. */
+    .nc-quote {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        margin: 3px 0 5px;
+        padding: 4px 8px;
+        border-left: 3px solid var(--q);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--q) 12%, transparent);
+        text-align: left;
+        font-size: 13px;
+        line-height: 1.35;
+        transition: background-color 120ms ease;
+    }
+    .nc-quote:hover { background: color-mix(in srgb, var(--q) 20%, transparent); }
+    .nc-quote-name {
+        display: block;
+        font-weight: 600;
+        color: var(--q);
+    }
+    .nc-quote-text {
+        display: block;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        max-width: 18rem;
+    }
+    /* Di bubble sendiri (latar warna utama) kutipan selalu putih; --q dari inline style diabaikan. */
+    .bubble-mine .nc-quote {
+        border-left-color: #ffffff;
+        background: rgba(255, 255, 255, 0.14);
+    }
+    .bubble-mine .nc-quote:hover { background: rgba(255, 255, 255, 0.22); }
+    .bubble-mine .nc-quote-name { color: #ffffff; }
+
+    /* Gambar & video tampil utuh selebar bubble, setinggi maksimal 60% layar. */
+    .nc-bubble-media {
+        position: relative;
+        display: block;
+        margin: 4px -9px 6px;
+        overflow: hidden;
+        border-radius: 13px;
+    }
+    .nc-media-image {
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        max-height: 60vh;
+    }
+    .nc-bubble.is-media-only { padding: 3px; }
+    .nc-bubble.is-media-only .nc-msg-name { padding: 2px 8px 0; }
+    .nc-bubble.is-media-only .nc-quote { width: auto; margin: 3px 3px 4px; }
+    .nc-bubble.is-media-only .nc-bubble-media { margin: 0; border-radius: 15px; }
+    .nc-bubble.is-media-only .nc-inline-time {
+        position: absolute;
+        top: auto;
+        right: 10px;
+        bottom: 10px;
+        margin: 0;
+        padding: 2px 7px;
+        border-radius: 9999px;
+        background: rgba(18, 28, 41, 0.6);
+        color: #ffffff;
+        opacity: 1;
+    }
+    .nc-video-play {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        margin: auto;
+        border-radius: 9999px;
+        background: rgba(18, 28, 41, 0.6);
+        color: #ffffff;
+    }
+    .nc-video-play svg { width: 22px; height: 22px; }
+
+    /* File, voice, dan canvas: blok di dalam bubble, warnanya turunan warna teks bubble. */
+    .nc-file,
+    .nc-canvas-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-width: 13rem;
+        margin: 4px -5px 4px;
+        padding: 7px;
+        border-radius: 12px;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        text-align: left;
+    }
+    .nc-file:hover { background: color-mix(in srgb, currentColor 13%, transparent); }
+    .nc-file-icon,
+    .nc-canvas-card-icon {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        flex: none;
+        border-radius: 10px;
+        background: color-mix(in srgb, currentColor 14%, transparent);
+    }
+    .nc-canvas-open {
+        @apply shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition active:scale-[0.97];
+        background: var(--nc-primary);
+        color: #ffffff;
+    }
+    .nc-canvas-open:hover { background: var(--nc-primary-hover); }
+
+    .nc-voice {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 13rem;
+        margin: 4px 0 2px;
+        border-radius: 12px;
+    }
+    .nc-voice-toggle {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        flex: none;
+        border-radius: 9999px;
+        background: color-mix(in srgb, currentColor 16%, transparent);
+    }
+    .nc-voice-wave {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        height: 18px;
+    }
+    .nc-voice-wave span {
+        width: 3px;
+        border-radius: 2px;
+        background: currentColor;
+        opacity: 0.45;
+    }
+    .nc-voice-progress {
+        display: block;
+        width: 100%;
+        height: 4px;
+        margin-top: 4px;
+        accent-color: currentColor;
+    }
+    .nc-voice-times {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2px;
+        font-size: 11px;
+        opacity: 0.8;
+    }
+
+    /* Polling: batang hasil = --ratio, diisi dari polls.js setelah suara dihitung. */
+    .nc-poll { min-width: 14rem; }
+    .nc-poll-label {
+        margin-top: 2px;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.8;
+    }
+    .nc-poll-question {
+        margin: 1px 0 6px;
+        font-weight: 600;
+    }
+    .nc-poll-options {
+        display: grid;
+        gap: 5px;
+    }
+    .nc-poll-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 7px 10px;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+        background: linear-gradient(to right, color-mix(in srgb, currentColor 14%, transparent) var(--ratio, 0%), transparent var(--ratio, 0%));
+        text-align: left;
+        font-size: 13px;
+    }
+    button.nc-poll-option:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); }
+    .nc-poll-option.is-chosen { border-color: currentColor; }
+    .nc-poll-summary {
+        margin-top: 6px;
+        font-size: 11px;
+        opacity: 0.8;
+    }
 
     .ai-markdown p { margin-bottom: 0.25rem; }
     .ai-markdown p:last-child { margin-bottom: 0; }
     .ai-markdown br + br { display: none; }
     .ai-markdown .overflow-x-auto { margin: 0.375rem -0.5rem; }
-    .ai-markdown table { margin: 0; width: 100%; font-size: 0.7rem; }
+    .ai-markdown table { margin: 0; width: 100%; font-size: 0.75rem; }
     .ai-markdown table th, .ai-markdown table td { padding: 0.25rem 0.5rem; white-space: nowrap; }
     .ai-markdown pre.mermaid { background: #fff; border-radius: 0.75rem; padding: 0.5rem; margin: 0.375rem 0; overflow-x: auto; text-align: center; }
     .ai-markdown pre.mermaid svg { max-width: 100%; height: auto; }
     .ai-markdown hr { margin: 0.375rem 0; border-color: var(--color-coral-200); }
     .ai-markdown ol, .ai-markdown ul { margin: 0.25rem 0; }
-    .ai-markdown code { font-size: 0.7rem; }
-
-    .meta-time { @apply text-[10px] font-medium; color: var(--nc-muted); }
-    .nc-edited-mark {
-        @apply ml-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold;
-        border-color: var(--nc-line-strong);
-        color: var(--color-slate-500);
-        background: var(--nc-bg);
+    .ai-markdown code { font-size: 0.75rem; }
+    .ai-markdown .nc-code {
+        margin: 0.375rem 0;
+        padding: 0.5rem 0.625rem;
+        overflow-x: auto;
+        border-radius: 0.625rem;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        white-space: pre;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+        line-height: 1.5;
     }
-    .nc-edited-mark--mine {
-        border-color: rgba(255, 255, 255, 0.4);
-        color: #ffffff;
-        background: rgba(255, 255, 255, 0.18);
-    }
-    .nc-edited-mark--ai {
-        border-color: var(--color-coral-300);
-        color: var(--color-coral-800);
-        background: var(--color-coral-100);
-    }
-    .nc-edited-mark--other {
-        border-color: var(--nc-line-strong);
-        color: var(--color-slate-500);
-        background: var(--nc-bg);
+    .ai-markdown .nc-md-quote {
+        margin: 0.25rem 0;
+        padding-left: 0.625rem;
+        border-left: 3px solid color-mix(in srgb, currentColor 35%, transparent);
+        opacity: 0.9;
     }
 
-    .nc-message-edited-flash {
-        border-radius: inherit;
-        --nc-edited-flash-fill: rgba(113, 134, 163, 0.16);
-        --nc-edited-flash-ring: rgba(113, 134, 163, 0.28);
-        animation: ncEditedFlash 900ms ease;
-    }
-    .nc-message-edited-flash--mine {
-        --nc-edited-flash-fill: rgba(113, 134, 163, 0.18);
-        --nc-edited-flash-ring: rgba(113, 134, 163, 0.32);
-    }
-    .nc-message-edited-flash--ai {
-        --nc-edited-flash-fill: rgba(82, 104, 132, 0.16);
-        --nc-edited-flash-ring: rgba(52, 68, 88, 0.28);
-    }
-    .nc-message-edited-flash--other {
-        --nc-edited-flash-fill: rgba(100, 116, 139, 0.14);
-        --nc-edited-flash-ring: rgba(100, 116, 139, 0.24);
-    }
+    .nc-edited-flash { animation: ncEditedFlash 900ms ease; }
     @keyframes ncEditedFlash {
-        0% { box-shadow: inset 0 0 0 999px var(--nc-edited-flash-fill), 0 0 0 1px var(--nc-edited-flash-ring); }
-        100% { box-shadow: inset 0 0 0 999px rgba(113, 134, 163, 0), 0 0 0 1px rgba(113, 134, 163, 0); }
+        0% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--nc-primary) 35%, transparent); }
+        100% { box-shadow: 0 0 0 3px transparent; }
     }
-
-    @media (max-width: 640px) {
-        .nc-message-edited-flash {
-            animation-duration: 720ms;
-        }
-        .nc-message-edited-flash--mine {
-            --nc-edited-flash-fill: color-mix(in srgb, var(--nc-primary) 13%, transparent);
-            --nc-edited-flash-ring: color-mix(in srgb, var(--nc-primary) 22%, transparent);
-        }
-        .nc-message-edited-flash--ai {
-            --nc-edited-flash-fill: rgba(82, 104, 132, 0.12);
-            --nc-edited-flash-ring: rgba(52, 68, 88, 0.2);
-        }
-        .nc-message-edited-flash--other {
-            --nc-edited-flash-fill: rgba(100, 116, 139, 0.1);
-            --nc-edited-flash-ring: rgba(100, 116, 139, 0.18);
-        }
-    }
-
     @media (prefers-reduced-motion: reduce) {
-        .nc-message-edited-flash {
-            animation-duration: 120ms;
-        }
+        .nc-edited-flash { animation-duration: 120ms; }
     }
 
-    /* ── Chips & badges ──────────────────────────── */
-    .chip,
-    .chip-indigo,
-    .chip-emerald,
-    .chip-amber,
-    .chip-rose,
-    .chip-slate {
-        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold;
+    /* ── Aksi pesan (resources/js/chat/actions/) ── */
+    .nc-bubble:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
+    .nc-msg-stack { position: relative; }
+    .nc-msg-actions {
+        position: absolute;
+        top: calc(100% + 2px);
+        z-index: 6;
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border: 1px solid var(--nc-line);
+        border-radius: 12px;
+        background: var(--nc-surface);
+        color: var(--nc-text-soft);
+        box-shadow: var(--nc-shadow-md);
     }
-    .chip-indigo {
-        background: color-mix(in srgb, var(--nc-primary) 10%, var(--nc-tint-base));
-        color: var(--nc-primary-text-strong);
+    .nc-msg--mine .nc-msg-actions { right: 0; }
+    .nc-msg:not(.nc-msg--mine) .nc-msg-actions { left: 0; }
+    .nc-msg-actions.is-side { top: auto; bottom: 0; }
+    .nc-msg--mine .nc-msg-actions.is-side { right: calc(100% + 6px); }
+    .nc-msg:not(.nc-msg--mine) .nc-msg-actions.is-side { left: calc(100% + 6px); }
+    .nc-msg-action {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
     }
-    .chip-emerald { background: var(--nc-bg); color: var(--nc-text); }
-    .chip-amber { background: color-mix(in srgb, var(--color-coral-500) 8%, var(--nc-tint-base)); color: var(--nc-warn-text); }
-    .chip-rose { background: color-mix(in srgb, var(--color-coral-500) 8%, var(--nc-tint-base)); color: var(--nc-warn-text); }
-    .chip-slate { background: var(--nc-bg); color: var(--color-slate-600); }
+    .nc-msg-action:hover,
+    .nc-msg-action:focus-visible,
+    .nc-msg-action[aria-expanded="true"] { background: var(--nc-surface-2); color: var(--nc-text); }
+    .nc-msg-action.is-danger:hover { color: var(--nc-danger-text); }
+    .nc-msg-more {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        min-width: 180px;
+        padding: 4px;
+        border: 1px solid var(--nc-line);
+        border-radius: 12px;
+        background: var(--nc-surface);
+        box-shadow: var(--nc-shadow-md);
+    }
+    .nc-msg-more button,
+    .nc-press-menu button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        text-align: left;
+        font-size: 14px;
+        color: var(--nc-text);
+    }
+    .nc-msg-more button:hover,
+    .nc-msg-more button:focus-visible,
+    .nc-press-menu button:focus-visible { background: var(--nc-surface-2); }
+
+    /* HP: tahan lama, bubble ditonjolkan di atas latar redup dengan menu di bawahnya. */
+    .nc-press-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 90;
+        background: rgba(10, 15, 22, 0.45);
+        animation: ncFadeIn 120ms ease;
+    }
+    .nc-press-stack {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        max-width: calc(100% - 24px);
+    }
+    .nc-press-stack.is-mine { align-items: flex-end; }
+    .nc-press-bubble { overflow: hidden; border-radius: 18px; pointer-events: none; }
+    .nc-msg.is-pressed [data-message-bubble] { visibility: hidden; }
+    .nc-press-menu:focus { outline: none; }
+    .nc-press-menu {
+        min-width: 200px;
+        padding: 4px;
+        border-radius: 14px;
+        background: var(--nc-surface);
+        box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5);
+    }
+    .nc-press-menu hr { margin: 4px 6px; border-color: var(--nc-line); }
+    .nc-press-menu button.is-danger,
+    .nc-msg-more button.is-danger { color: var(--nc-danger-text); }
+
+    /* Pesan terhapus, terusan, dan pemberitahuan Normi. */
+    .nc-msg-deleted { font-style: italic; opacity: 0.85; }
+    .nc-forwarded { margin-bottom: 2px; font-size: 12px; opacity: 0.8; }
+    .nc-notice-label { margin-bottom: 2px; font-size: 11px; font-weight: 600; opacity: 0.8; }
+    .nc-msg.is-notice .bubble-ai { border-style: dashed; }
+    .nc-edited-mark { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+
+    /* Mode pilih pesan. */
+    .nc-select-bar,
+    .nc-edit-header {
+        position: absolute;
+        inset: 0.75rem 0.75rem auto;
+        z-index: 35;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 58px;
+        padding: 8px 10px;
+        border: 1px solid var(--nc-chat-header-border);
+        border-radius: 24px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        box-shadow: var(--nc-shadow-soft);
+    }
+    @media (min-width: 1024px) {
+        .nc-select-bar,
+        .nc-edit-header { left: max(1rem, calc((100% - var(--nc-room-max)) / 2)); right: max(1rem, calc((100% - var(--nc-room-max)) / 2)); }
+    }
+    .nc-msg.is-selected { background: color-mix(in srgb, var(--nc-primary) 14%, transparent); border-radius: 12px; }
+    :root.nc-selecting .nc-msg { cursor: pointer; }
+    :root.nc-selecting .nc-msg * { pointer-events: none; }
+
+    /* Mode edit: pesan lain diredupkan, tombol kirim jadi centang, tombol lampiran/voice/model disembunyikan. */
+    :root.nc-editing .nc-msg:not(.is-edit-target) { opacity: 0.32; }
+    :root.nc-editing [data-open-attach-menu],
+    :root.nc-editing [data-open-model-menu],
+    :root.nc-editing [data-composer-voice-btn],
+    :root.nc-editing [data-ai-mode-chip-row] { display: none !important; }
+    .nc-save-icon,
+    :root.nc-editing .nc-send-icon { display: none; }
+    :root.nc-editing .nc-save-icon { display: block; }
+    .nc-edit-strip {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 6px;
+        padding: 8px 12px;
+        border-radius: 14px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        color: var(--nc-text-soft);
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    .nc-edit-strip svg { color: var(--nc-ai-name); }
+    .nc-edit-choice {
+        position: absolute;
+        right: 6px;
+        bottom: calc(100% + 8px);
+        z-index: 45;
+        display: grid;
+        gap: 4px;
+        width: 250px;
+        padding: 6px;
+        border: 1px solid var(--nc-line);
+        border-radius: 14px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        box-shadow: var(--nc-shadow-md);
+    }
+    .nc-edit-choice button {
+        padding: 9px 10px;
+        border-radius: 10px;
+        text-align: left;
+        font-size: 14px;
+    }
+    .nc-edit-choice button:hover:not(:disabled),
+    .nc-edit-choice button:focus-visible { background: var(--nc-surface-2); }
+    .nc-edit-choice button.is-main { background: var(--nc-primary); color: #ffffff; font-weight: 600; }
+    .nc-edit-choice button.is-main:hover:not(:disabled) { background: var(--nc-primary-hover); }
+    .nc-edit-choice button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .nc-edit-choice small { display: block; font-size: 11.5px; font-weight: 400; opacity: 0.85; }
+
+    /* Dialog aplikasi (resources/js/ui/dialog.js), lembar Bagikan, dan popup Version. */
+    .nc-dialog-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 95;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 1rem 1rem calc(env(safe-area-inset-bottom) + 1rem);
+        background: rgba(10, 15, 22, 0.45);
+        animation: ncFadeIn 120ms ease;
+    }
+    @media (min-width: 640px) { .nc-dialog-overlay { align-items: center; } }
+    .nc-dialog {
+        display: grid;
+        gap: 12px;
+        width: 100%;
+        max-width: 360px;
+        padding: 18px;
+        border-radius: 20px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.4);
+        animation: ncSlideUp 160ms ease;
+    }
+    .nc-dialog-title { font-size: 16px; font-weight: 700; }
+    .nc-dialog-message { margin-top: -6px; font-size: 14px; line-height: 1.5; color: var(--nc-text-soft); }
+    .nc-dialog-choices { display: grid; gap: 6px; }
+    .nc-dialog-choice {
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        background: var(--nc-surface-2);
+        color: var(--nc-text);
+    }
+    .nc-dialog-choice.is-danger { background: var(--nc-danger); color: #ffffff; }
+    .nc-dialog-choice.is-danger:hover { background: var(--nc-danger-hover); }
+    .nc-dialog-choice.is-primary { background: var(--nc-primary); color: #ffffff; }
+    .nc-dialog-choice.is-plain:hover { background: var(--nc-line-strong); }
+    .nc-icon-button {
+        display: inline-grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        flex: none;
+        border-radius: 12px;
+        color: var(--nc-text-soft);
+    }
+    .nc-icon-button:hover:not(:disabled) { background: var(--nc-surface-2); color: var(--nc-text); }
+    .nc-icon-button:disabled { opacity: 0.35; }
+    .nc-icon-button.is-danger { color: var(--nc-danger-text); }
+
+    .nc-forward { max-width: 400px; }
+    .nc-forward-preview {
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--nc-surface-2);
+        color: var(--nc-text-soft);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+    }
+    .nc-forward-search {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid var(--nc-line-strong);
+        border-radius: 12px;
+        background: var(--nc-surface);
+        font-size: 14px;
+    }
+    .nc-forward-list { display: grid; max-height: 45vh; overflow-y: auto; }
+    .nc-forward-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 6px;
+        border-radius: 10px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+    .nc-forward-item:hover { background: var(--nc-surface-2); }
+    .nc-forward-item input { width: 18px; height: 18px; accent-color: var(--nc-primary); }
+    .nc-forward-initial {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        flex: none;
+        border-radius: 12px;
+        background: var(--nc-primary);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+    }
+    .nc-forward-empty { padding: 12px 0; text-align: center; font-size: 14px; color: var(--nc-text-soft); }
+
+    .nc-versions { max-width: 460px; }
+    .nc-versions-body {
+        display: grid;
+        gap: 8px;
+        max-height: 60vh;
+        overflow-y: auto;
+        padding: 10px;
+        border-radius: 14px;
+        background: var(--nc-chat-bg);
+    }
+    .nc-version-time { text-align: center; font-size: 12px; color: var(--nc-text-soft); }
+    .nc-version-row { display: grid; justify-items: start; max-width: 88%; }
+    .nc-version-row.is-mine { justify-self: end; justify-items: end; }
+    .nc-version-name { margin: 0 0 2px 4px; font-size: 12.5px; font-weight: 600; }
+    .nc-version-file { margin-top: 4px; font-size: 12px; opacity: 0.85; }
+    .nc-versions-nav {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .nc-frozen-note {
+        padding: 12px 16px;
+        border: 1px solid var(--nc-line-strong);
+        border-radius: 20px;
+        background: var(--nc-surface);
+        color: var(--nc-text-soft);
+        font-size: 13px;
+        text-align: center;
+    }
+
+    /* ── Halaman pengaturan: kepala, bagian, daftar, dan kontrol formulir ── */
+    .nc-page-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; color: var(--nc-text); }
+    .nc-section { margin-bottom: 24px; }
+    .nc-section-title { font-size: 15px; font-weight: 700; color: var(--nc-text); }
+    .nc-section-note { margin-top: 2px; font-size: 13px; line-height: 1.45; color: var(--nc-text-soft); }
+    .nc-list {
+        margin-top: 10px;
+        border: 1px solid var(--nc-line);
+        border-radius: 16px;
+        background: var(--nc-surface);
+        overflow: hidden;
+    }
+    .nc-list-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; color: var(--nc-text); }
+    .nc-list-row + .nc-list-row { border-top: 1px solid var(--nc-line); }
+    .nc-list-empty { padding: 14px; font-size: 13px; color: var(--nc-text-soft); }
+    .nc-spinner {
+        width: 16px;
+        height: 16px;
+        flex: none;
+        border: 2px solid var(--nc-line-strong);
+        border-top-color: var(--nc-primary);
+        border-radius: 9999px;
+        animation: ncSpin 0.8s linear infinite;
+    }
+    @keyframes ncSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .nc-spinner { animation-duration: 2.4s; } }
+
+    .nc-export-sheet { max-width: 420px; max-height: calc(100vh - 2rem); overflow-y: auto; }
+    .nc-export-sheet fieldset { display: grid; gap: 6px; }
+    .nc-field-label { font-size: 12px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-segment--2 { grid-template-columns: repeat(2, 1fr); }
+    .nc-segment label,
+    .nc-chips label { position: relative; cursor: pointer; }
+    .nc-segment input,
+    .nc-chips input { position: absolute; opacity: 0; pointer-events: none; }
+    .nc-segment label span {
+        display: block;
+        padding: 8px 4px;
+        border-radius: 10px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--nc-text-soft);
+    }
+    .nc-segment input:checked + span { background: var(--nc-surface); color: var(--nc-text); box-shadow: var(--nc-shadow-soft); }
+    .nc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .nc-chips label span {
+        display: inline-block;
+        padding: 6px 12px;
+        border: 1px solid var(--nc-line-strong);
+        border-radius: 9999px;
+        font-size: 13px;
+        color: var(--nc-text);
+    }
+    .nc-chips input:checked + span { border-color: var(--nc-primary); background: var(--nc-primary); color: #ffffff; }
+    .nc-segment input:focus-visible + span,
+    .nc-chips input:focus-visible + span { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
+    .nc-date { display: grid; gap: 4px; font-size: 12px; color: var(--nc-text-soft); }
+    .nc-date input {
+        padding: 8px 10px;
+        border: 1px solid var(--nc-line-strong);
+        border-radius: 10px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        font-size: 14px;
+    }
+    .nc-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--nc-text); cursor: pointer; }
+    .nc-switch input {
+        appearance: none;
+        position: relative;
+        width: 38px;
+        height: 22px;
+        flex: none;
+        border-radius: 9999px;
+        background: var(--nc-line-strong);
+        transition: background-color 150ms ease;
+    }
+    .nc-switch input::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 9999px;
+        background: #ffffff;
+        transition: transform 150ms ease;
+    }
+    .nc-switch input:checked { background: var(--nc-primary); }
+    .nc-switch input:checked::after { transform: translateX(16px); }
+    .nc-switch input:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
+
+    /* ── Superadmin (resources/views/superadmin) ── */
+    .nc-admin-tabs { display: flex; gap: 4px; margin-top: 10px; overflow-x: auto; border-bottom: 1px solid var(--nc-line); }
+    .nc-admin-tabs a {
+        flex: none;
+        padding: 8px 12px;
+        border-bottom: 2px solid transparent;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--nc-text-soft);
+    }
+    .nc-admin-tabs a:hover { color: var(--nc-text); }
+    .nc-admin-tabs a.is-active { border-color: var(--nc-primary); color: var(--nc-primary-text); }
+    .nc-flash { margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--nc-primary-light); color: var(--nc-primary-text); font-size: 14px; font-weight: 600; }
+    .nc-flash.is-error { background: var(--nc-danger-soft); color: var(--nc-danger-text); }
+    .nc-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+    .nc-stat { padding: 12px 14px; border: 1px solid var(--nc-line); border-radius: 16px; background: var(--nc-surface); }
+    .nc-stat p { font-size: 12px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-stat b { display: block; margin-top: 4px; font-size: 18px; color: var(--nc-text); }
+    .nc-stat span { display: block; margin-top: 2px; font-size: 12px; color: var(--nc-text-soft); }
+    .nc-filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .nc-filter-bar input[type="search"],
+    .nc-filter-bar select,
+    .nc-input {
+        min-width: 0;
+        padding: 9px 12px;
+        border: 1px solid var(--nc-line-strong);
+        border-radius: 12px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        font-size: 14px;
+    }
+    .nc-filter-bar input[type="search"] { flex: 1 1 16rem; }
+    .nc-badge {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 7px;
+        border-radius: 9999px;
+        background: var(--nc-surface-2);
+        color: var(--nc-text-soft);
+        font-size: 11px;
+        font-weight: 600;
+        vertical-align: 1px;
+    }
+    .nc-button-danger { border-radius: 12px; background: var(--nc-danger); color: #ffffff; font-size: 14px; font-weight: 600; }
+    .nc-button-danger:hover { background: var(--nc-danger-hover); }
+    .nc-table-wrap { margin-top: 10px; overflow-x: auto; border: 1px solid var(--nc-line); border-radius: 16px; background: var(--nc-surface); }
+    .nc-table { width: 100%; font-size: 13px; color: var(--nc-text); }
+    .nc-table th, .nc-table td { padding: 9px 12px; text-align: right; white-space: nowrap; }
+    .nc-table th:first-child, .nc-table td:first-child { text-align: left; }
+    .nc-table thead th { font-size: 12px; color: var(--nc-text-soft); border-bottom: 1px solid var(--nc-line); }
+    .nc-table tbody tr + tr td { border-top: 1px solid var(--nc-line); }
+    .nc-table tfoot th { border-top: 1px solid var(--nc-line-strong); }
 
     /* ── Composer ────────────────────────────────── */
     /* Textbar ala Gemini: satu pill — [+] [teks] [model ▾] [mic/kirim], chip mode di atasnya. */
@@ -643,11 +1225,22 @@
     .composer-menu-item.is-selected {
         background: rgba(161, 176, 197, 0.16);
     }
-    .composer-menu-item[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
-    .composer-menu-item[aria-disabled="true"]:hover { background: transparent; }
-    .composer-menu-note {
-        @apply -mt-1 mb-1 flex items-start gap-1.5 px-3 pb-1.5 pl-11 text-[11px] leading-snug;
-        color: var(--nc-text-soft);
+    /* Saran @mention yang terpilih (keyboard ↑/↓ atau kursor). */
+    .nc-mention-option.is-active { background: var(--nc-surface-2); }
+    .composer-menu-item[data-ai-model-locked="1"] [data-ai-lock-icon] { color: var(--nc-text-soft); }
+    /* Lembar penjelasan model terkunci: progres saldo grup menuju ambang buka. */
+    .nc-lock-sheet { max-width: 360px; padding: 18px; }
+    .nc-meter {
+        height: 6px;
+        overflow: hidden;
+        border-radius: 9999px;
+        background: var(--nc-surface-2);
+    }
+    .nc-meter span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--nc-primary);
     }
     .composer-input::placeholder {
         color: var(--nc-chat-composer-soft, var(--color-navy-400));
@@ -727,7 +1320,7 @@
     .nc-sidebar-badge,
     .nc-sidebar-dot {
         @apply inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white;
-        background: var(--nc-accent);
+        background: var(--nc-primary);
     }
     .nc-sidebar-dot {
         @apply absolute -right-1 -top-1 hidden ring-2 ring-white;
@@ -767,24 +1360,7 @@
         .composer-shell { max-width: var(--nc-room-max); }
     }
 
-    /* ── Canvas (kartu di feed + panel Code/Preview) ── */
-    .nc-canvas-card {
-        @apply w-full min-w-60 rounded-2xl border p-3;
-        background: var(--nc-surface);
-        border-color: var(--nc-line);
-        color: var(--nc-text);
-        box-shadow: var(--nc-shadow-soft);
-    }
-    .nc-canvas-card-icon {
-        @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl;
-        background: color-mix(in srgb, var(--nc-primary) 12%, transparent);
-        color: var(--nc-primary);
-    }
-    .nc-canvas-open {
-        @apply rounded-full px-5 py-1.5 text-xs font-bold text-white transition active:scale-[0.97];
-        background: var(--nc-primary);
-    }
-    .nc-canvas-open:hover { background: var(--nc-primary-hover); }
+    /* ── Canvas: panel Code/Preview ── */
     .nc-canvas-overlay {
         @apply fixed inset-0 z-[95] flex items-stretch justify-center sm:items-center sm:p-6;
         background: rgba(18, 28, 41, 0.55);
@@ -852,36 +1428,8 @@
         box-shadow: 0 8px 18px -14px color-mix(in srgb, var(--nc-primary) 65%, transparent);
     }
 
-    /* ── Floating action button ──────────────────── */
-    .fab {
-        @apply fixed z-30 inline-flex h-14 w-14 items-center justify-center rounded-full text-white;
-        right: max(env(safe-area-inset-right), 20px);
-        bottom: calc(env(safe-area-inset-bottom) + 100px);
-        background: var(--nc-primary);
-        box-shadow: var(--nc-shadow-md);
-    }
-    .fab:active { transform: scale(0.96); }
 
-    /* ── Sheet (bottom modal) ────────────────────── */
-    .sheet-overlay {
-        @apply fixed inset-0 z-[60] opacity-0 transition;
-        background: rgba(0, 0, 0, 0.4);
-        pointer-events: none;
-    }
-    .sheet-overlay.is-open { opacity: 1; pointer-events: auto; }
 
-    .sheet-panel {
-        @apply fixed inset-x-0 z-[61] mx-auto w-full max-w-md rounded-t-3xl p-5 transition;
-        background: var(--nc-surface);
-        bottom: 0;
-        transform: translateY(100%);
-        box-shadow: 0 -8px 30px -10px rgba(0, 0, 0, 0.15);
-        padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
-    }
-    .sheet-panel.is-open { transform: translateY(0); }
-    .sheet-handle {
-        @apply mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200;
-    }
 
     /* ── Message popup (long-press) ─────────────── */
     .nc-popup-overlay {
@@ -900,38 +1448,6 @@
         overflow: hidden;
         animation: ncSlideUp 180ms ease;
     }
-    .nc-popup-preview {
-        padding: 12px 16px;
-        font-size: 13px; line-height: 1.5;
-        color: var(--nc-text-soft);
-        border-bottom: 1px solid var(--nc-line);
-        max-height: 80px; overflow: hidden;
-        word-break: break-word;
-    }
-    .nc-popup-menu {
-        padding: 6px 0;
-    }
-    .nc-popup-menu-item {
-        display: flex; align-items: center; gap: 12px;
-        width: 100%; padding: 11px 16px;
-        text-align: left;
-        font-size: 14px; font-weight: 500;
-        color: var(--nc-text);
-        background: none; border: none; cursor: pointer;
-        transition: background 100ms;
-    }
-    .nc-popup-menu-item:hover { background: var(--nc-surface-2); }
-    .nc-popup-menu-item:active { background: var(--nc-line); }
-    .nc-popup-menu-item svg { color: var(--nc-text-soft); flex-shrink: 0; }
-    .nc-popup-menu-danger { color: var(--nc-danger); }
-    .nc-popup-menu-danger svg { color: var(--nc-danger); }
-
-    .nc-message-selected {
-        box-shadow: inset 0 0 0 2px rgba(113, 134, 163, 0.35);
-        border-radius: 14px;
-        background-color: rgba(113, 134, 163, 0.06);
-    }
-
     /* Swipe ke kanan untuk membalas (resources/js/chat/composer/message-actions.js) */
     .nc-swipe-reply-icon {
         position: absolute; top: 50%; z-index: 1;
@@ -948,15 +1464,43 @@
     .nc-popup-card--wide { max-width: 440px; }
     .nc-popup-card--wide .nc-quote-picker { max-height: 45vh; white-space: normal; line-height: 1.6; }
 
-    /* Pemilih tema di Profil (resources/views/profile/show.blade.php) */
-    .nc-theme-option[aria-checked="true"] {
-        border-color: var(--nc-primary);
-        box-shadow: 0 0 0 2px var(--nc-primary);
-    }
-    .nc-theme-sample {
-        background: var(--nc-chat-bg);
+    /* Pemilih tema di Profil: pratinjau memakai data-mode/data-accent sendiri. */
+    .nc-theme-preview {
+        display: grid;
+        padding: 4px 12px 12px;
         border: 1px solid var(--nc-line);
+        border-radius: 18px;
+        background: var(--nc-chat-bg);
     }
+    .nc-segment {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+        padding: 4px;
+        border-radius: 14px;
+        background: var(--nc-surface-2);
+    }
+    .nc-segment button {
+        padding: 8px 4px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--nc-text-soft);
+    }
+    .nc-segment button[aria-checked="true"] {
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        box-shadow: var(--nc-shadow-soft);
+    }
+    .nc-accent-option {
+        width: 40px;
+        height: 40px;
+        border-radius: 9999px;
+        background: var(--swatch);
+        border: 3px solid var(--nc-surface);
+        box-shadow: 0 0 0 1px var(--nc-line-strong);
+    }
+    .nc-accent-option[aria-checked="true"] { box-shadow: 0 0 0 2px var(--nc-text); }
 
     /* Select-text sub-popup keeps old style */
     .nc-popup-header {
@@ -998,21 +1542,6 @@
         line-height: 1.8;
         white-space: pre-wrap;
         cursor: text;
-    }
-    .nc-quote-word {
-        border: none;
-        border-radius: 6px;
-        padding: 0 2px;
-        margin-right: 3px;
-        background: transparent;
-        color: var(--nc-text);
-        font-size: 13px;
-        line-height: 1.7;
-        cursor: pointer;
-    }
-    .nc-quote-word--selected {
-        background: color-mix(in srgb, var(--nc-primary) 22%, transparent);
-        color: inherit;
     }
     .nc-quote-result {
         margin: 10px 0 0;
@@ -1100,145 +1629,14 @@
         }
     }
 
-    /* Keep existing blue/indigo utility usage aligned with the logo palette. */
-    .text-navy-500,
-    .text-navy-600,
-    .text-navy-600,
-    .text-navy-700 {
-        color: var(--nc-primary-text) !important;
-    }
-    .text-navy-800,
-    .text-navy-900,
-    .text-navy-700 {
-        color: var(--nc-primary-text-strong) !important;
-    }
-    .bg-navy-50,
-    .bg-navy-50,
-    .bg-navy-100 {
-        background-color: color-mix(in srgb, var(--nc-primary) 10%, var(--nc-tint-base)) !important;
-    }
-    .bg-navy-500,
-    .bg-navy-600,
-    .bg-navy-600 {
-        background-color: var(--nc-primary) !important;
-    }
-    .bg-navy-400\/45 {
-        background-color: color-mix(in srgb, var(--nc-primary) 45%, transparent) !important;
-    }
-    .bg-navy-300\/55 {
-        background-color: color-mix(in srgb, var(--nc-primary) 55%, transparent) !important;
-    }
-    .bg-navy-200 {
-        background-color: color-mix(in srgb, var(--nc-primary) 22%, var(--nc-tint-base)) !important;
-    }
-    .border-navy-100,
-    .border-navy-200,
-    .border-navy-200,
-    .border-navy-300 {
-        border-color: color-mix(in srgb, var(--nc-primary) 32%, var(--nc-tint-base)) !important;
-    }
-    .border-navy-400,
-    .border-navy-400 {
-        border-color: color-mix(in srgb, var(--nc-primary) 48%, var(--nc-tint-base)) !important;
-    }
-    .border-navy-300\/70 {
-        border-color: color-mix(in srgb, var(--nc-primary) 70%, var(--nc-tint-base)) !important;
-    }
-    .border-navy-500,
-    .border-navy-500 {
-        border-color: var(--nc-primary) !important;
-    }
-    .focus\:border-navy-400:focus,
-    .focus\:border-navy-500:focus {
-        border-color: color-mix(in srgb, var(--nc-primary) 56%, var(--nc-tint-base)) !important;
-    }
-    .focus\:ring-navy-100:focus,
-    .focus\:ring-navy-500:focus {
-        --tw-ring-color: color-mix(in srgb, var(--nc-primary) 24%, var(--nc-tint-base)) !important;
-    }
-    .accent-navy-600 {
-        accent-color: var(--nc-primary) !important;
-    }
-    .hover\:text-navy-700:hover,
-    .hover\:text-navy-700:hover {
-        color: var(--nc-primary-text-strong) !important;
-    }
-    .text-navy-50 {
-        color: color-mix(in srgb, var(--nc-primary) 8%, #ffffff) !important;
-    }
-    .text-navy-100\/90 {
-        color: color-mix(in srgb, var(--nc-primary) 18%, #ffffff) !important;
-    }
-    .hover\:bg-navy-100:hover,
-    .hover\:bg-navy-50:hover {
-        background-color: color-mix(in srgb, var(--nc-primary) 14%, var(--nc-tint-base)) !important;
-    }
-    .hover\:bg-navy-300\/55:hover {
-        background-color: color-mix(in srgb, var(--nc-primary-hover) 55%, transparent) !important;
-    }
-    .hover\:bg-navy-700:hover {
-        background-color: var(--nc-primary-hover) !important;
-    }
-
-    /* Remap rose utility classes to the collaboration palette. */
-    .text-coral-400,
-    .text-coral-500,
-    .text-coral-600 {
-        color: var(--nc-primary-text) !important;
-    }
-    .text-coral-700 {
-        color: var(--nc-primary-text-strong) !important;
-    }
-    .bg-coral-50,
-    .bg-coral-100 {
-        background-color: color-mix(in srgb, var(--nc-primary) 10%, var(--nc-tint-base)) !important;
-    }
-    .bg-coral-500 {
-        background-color: var(--nc-primary) !important;
-    }
-    .bg-coral-600 {
-        background-color: var(--nc-primary-hover) !important;
-    }
-    .border-coral-100,
-    .border-coral-200,
-    .border-coral-300 {
-        border-color: color-mix(in srgb, var(--nc-primary) 28%, var(--nc-tint-base)) !important;
-    }
-    .hover\:bg-coral-50:hover,
-    .hover\:bg-coral-100:hover {
-        background-color: color-mix(in srgb, var(--nc-primary) 14%, var(--nc-tint-base)) !important;
-    }
-    .hover\:bg-coral-500:hover {
-        background-color: color-mix(in srgb, var(--nc-primary) 88%, #344458) !important;
-    }
-    .hover\:bg-coral-600:hover {
-        background-color: var(--nc-primary-hover) !important;
-    }
-    .hover\:text-coral-700:hover {
-        color: var(--nc-primary-text-strong) !important;
-    }
-    .shadow-coral-900\/15,
-    .shadow-coral-900\/20,
-    .shadow-coral-900\/35 {
-        --tw-shadow-color: color-mix(in srgb, var(--nc-primary) 34%, transparent) !important;
-    }
     @keyframes ncFadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes ncSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-    /* ── Misc ────────────────────────────────────── */
-    .divider-soft { height: 1px; background: var(--nc-line); }
 }
 
-/* Tema gelap: bg-white solid jadi permukaan gelap. :where menjaga spesifisitas setara utilitas,
+/* Mode gelap: bg-white solid jadi permukaan gelap. :where menjaga spesifisitas setara utilitas,
    jadi hover:bg-* tetap menang. bg-white/xx (lapisan putih di atas warna) sengaja tidak diubah. */
 @layer utilities {
-    :where([data-theme="navy"]) .bg-white { background-color: var(--nc-surface); }
-    :where([data-theme="navy"]) .text-navy-950 { color: var(--nc-text); }
-    :where([data-theme="navy"]) .ring-white { --tw-ring-color: var(--nc-surface); }
-    :where([data-theme="navy"]) .text-navy-100 { color: #E4E9F0; }
-    :where([data-theme="navy"]) .text-navy-200 { color: #C9D2DF; }
-    :where([data-theme="navy"]) .text-navy-300 { color: #A1B0C5; }
-    :where([data-theme="navy"]) .text-coral-100 { color: #FFE4E0; }
-    :where([data-theme="navy"]) .text-coral-200 { color: #FECCC5; }
-    :where([data-theme="navy"]) .text-coral-300 { color: #FDA99E; }
+    :where([data-mode="dark"]) .bg-white { background-color: var(--nc-surface); }
+    :where([data-mode="dark"]) .ring-white { --tw-ring-color: var(--nc-surface); }
 }

@@ -1,11 +1,27 @@
-// Hidrasi pesan yang sudah dirender server (waktu lokal, voice, polling, markdown AI).
+// Feed chat: render pesan awal dari data halaman, jaga penanda rangkaian pesan, dan ganti foto
+// profil yang gagal dimuat dengan avatar siluet.
 
 import { chatFeed } from './context.js';
-import { renderMarkdown, renderMermaidInNode } from './markdown.js';
-import { localizeExistingMessageTimes } from './messages.js';
-import { hydrateExistingPollMessages, refreshPollCardsFromFeed } from './polls.js';
-import { escapeHtml } from './utils.js';
+import { renderMermaidInNode } from './markdown.js';
+import { applyMessageRuns, avatarFallbackHtml, buildMessageNode } from './messages.js';
+import { refreshPollCardsFromFeed } from './polls.js';
 import { initVoicePlayers } from './voice-player.js';
+
+const readInitialMessages = () => {
+	const source = document.querySelector('[data-initial-messages]');
+	if (!source) {
+		return [];
+	}
+
+	try {
+		const messages = JSON.parse(source.textContent || '[]');
+		return Array.isArray(messages) ? messages : [];
+	} catch {
+		return [];
+	} finally {
+		source.remove();
+	}
+};
 
 /** Hapus keterangan "Belum ada pesan" begitu pesan pertama masuk (terkirim, pending, atau realtime). */
 const removeEmptyStateOnFirstMessage = () => {
@@ -15,7 +31,7 @@ const removeEmptyStateOnFirstMessage = () => {
 	}
 
 	const observer = new MutationObserver(() => {
-		if (chatFeed.querySelector('[data-message-id], [data-local-message-id]')) {
+		if (chatFeed.querySelector('.nc-msg')) {
 			emptyState.remove();
 			observer.disconnect();
 		}
@@ -23,30 +39,45 @@ const removeEmptyStateOnFirstMessage = () => {
 	observer.observe(chatFeed, { childList: true });
 };
 
+/** Rangkaian dihitung ulang setiap kali pesan ditambah, diganti, dihapus, atau disembunyikan. */
+const keepMessageRunsUpdated = () => {
+	let scheduled = false;
+	const schedule = () => {
+		if (scheduled) {
+			return;
+		}
+		scheduled = true;
+		window.requestAnimationFrame(() => {
+			scheduled = false;
+			applyMessageRuns(chatFeed);
+		});
+	};
+
+	new MutationObserver(schedule).observe(chatFeed, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+};
+
 export const initRenderedFeed = () => {
+	if (!(chatFeed instanceof HTMLElement)) {
+		return;
+	}
+
+	const typingIndicator = chatFeed.querySelector('[data-typing-indicator]');
+	const fragment = document.createDocumentFragment();
+	readInitialMessages().forEach((message) => fragment.appendChild(buildMessageNode(message)));
+	chatFeed.insertBefore(fragment, typingIndicator);
+
+	applyMessageRuns(chatFeed);
+	keepMessageRunsUpdated();
 	removeEmptyStateOnFirstMessage();
-	localizeExistingMessageTimes();
-
-	initVoicePlayers(document);
-
-	hydrateExistingPollMessages();
-
+	initVoicePlayers(chatFeed);
+	renderMermaidInNode(chatFeed);
 	refreshPollCardsFromFeed();
 
-	// Render markdown in server-rendered AI bubbles
-	document.querySelectorAll('[data-ai-raw]').forEach((el) => {
-		const raw = el.textContent.trim();
-		if (!raw) return;
-		el.innerHTML = renderMarkdown(escapeHtml(raw));
-		renderMermaidInNode(el);
-
-		// Expand parent wrapper for rich content
-		if (el.innerHTML.includes('<table') || el.innerHTML.includes('mermaid')) {
-			const wrapper = el.closest('[data-message-id]');
-			if (wrapper) {
-				wrapper.classList.remove('max-w-[80%]');
-				wrapper.classList.add('max-w-[95%]');
-			}
+	// Foto profil gagal dimuat (link kedaluwarsa, diblokir): pakai avatar siluet.
+	chatFeed.addEventListener('error', (event) => {
+		const image = event.target;
+		if (image instanceof HTMLImageElement && image.hasAttribute('data-avatar-photo')) {
+			image.outerHTML = avatarFallbackHtml();
 		}
-	});
+	}, true);
 };

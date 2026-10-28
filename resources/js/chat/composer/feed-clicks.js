@@ -1,5 +1,6 @@
-// Klik di feed: lompat ke pesan yang dibalas, buka/unduh lampiran, dan vote polling.
+// Klik di feed: lompat ke pesan yang dibalas, buka/unduh lampiran, vote polling, dan buka versi pesan.
 
+import { openVersions } from '../actions/versions.js';
 import { chatFeed } from '../context.js';
 import { highlightMessageInFeed } from '../highlight.js';
 import { buildPollVoteUrl, mergePollStatsIntoCache, refreshPollCardsFromFeed } from '../polls.js';
@@ -192,6 +193,13 @@ export const initFeedClicks = () => {
 
 	if (chatFeed instanceof HTMLElement) {
 		chatFeed.addEventListener('click', async (event) => {
+			const versionsTrigger = event.target.closest('[data-open-versions]');
+			if (versionsTrigger instanceof HTMLElement) {
+				event.preventDefault();
+				openVersions(Number(versionsTrigger.getAttribute('data-open-versions') || 0));
+				return;
+			}
+
 			const replyJumpTrigger = event.target.closest('[data-reply-jump], a[href^="#message-"]');
 			if (replyJumpTrigger instanceof HTMLElement) {
 				event.preventDefault();

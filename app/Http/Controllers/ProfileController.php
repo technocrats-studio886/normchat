@@ -30,7 +30,7 @@ class ProfileController extends Controller
             'username' => $user->displayUsername(),
             'loginCount' => AuditLog::where('actor_id', $user->id)->whereIn('action', ProfileHistoryController::LOGIN_ACTIONS)->count(),
             'transactionCount' => GroupTokenContribution::where('user_id', $user->id)->count(),
-            'theme' => Themes::resolve($user->theme),
+            'theme' => Themes::for($user),
         ]);
     }
 
@@ -61,13 +61,29 @@ class ProfileController extends Controller
         return redirect()->route('profile.account')->with('success', 'Profil disimpan.');
     }
 
-    /** Simpan tema tampilan; default disimpan sebagai kosong. */
+    /** Simpan mode & aksen tema; nilai bawaan (ikuti sistem, navy) disimpan sebagai kosong. */
     public function updateTheme(Request $request): JsonResponse
     {
-        $theme = $request->validate(['theme' => ['required', 'string', 'in:' . implode(',', Themes::ids())]])['theme'];
-        $request->user()->update(['theme' => $theme === Themes::DEFAULT ? null : $theme]);
+        $validated = $request->validate([
+            'mode' => ['required', 'string', 'in:' . implode(',', array_keys(Themes::MODES))],
+            'accent' => ['required', 'string', 'in:' . implode(',', array_keys(Themes::ACCENTS))],
+        ]);
 
-        return response()->json(['ok' => true, 'theme' => $theme]);
+        $request->user()->update([
+            'theme_mode' => $validated['mode'] === Themes::DEFAULT_MODE ? null : $validated['mode'],
+            'theme_accent' => $validated['accent'] === Themes::DEFAULT_ACCENT ? null : $validated['accent'],
+        ]);
+
+        return response()->json(['ok' => true, 'mode' => $validated['mode'], 'accent' => $validated['accent']]);
+    }
+
+    /** Zona waktu dari browser, untuk jam yang ditulis server (App\Support\UserTime). */
+    public function updateTimezone(Request $request): JsonResponse
+    {
+        $timezone = $request->validate(['timezone' => ['required', 'string', 'timezone:all']])['timezone'];
+        $request->user()->forceFill(['timezone' => $timezone])->save();
+
+        return response()->json(['ok' => true]);
     }
 
     public function storage(Request $request, StorageUsage $storage): View

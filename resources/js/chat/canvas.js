@@ -15,29 +15,21 @@ const titleFromFilename = (filename) => {
 	return base ? base.replace(/\b\w/g, (char) => char.toUpperCase()) : 'Canvas';
 };
 
-/** Kartu Canvas untuk pesan realtime; padanan resources/views/chat/_canvas-card.blade.php. */
+/** Kartu Canvas di dalam bubble Normi: judul, jenis, dan tombol Buka. */
 export const renderCanvasCard = (message) => {
 	const isWeb = String(message?.attachment_mime || '').toLowerCase() === 'text/html';
 	const title = titleFromFilename(message?.attachment_original_name);
-	const createdAt = message?.created_at ? new Date(message.created_at) : null;
-	const dateText = createdAt && !Number.isNaN(createdAt.valueOf())
-		? createdAt.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-		: '';
 
 	return `
-		<div class="nc-canvas-card mb-2" data-message-body="1">
-			<div class="flex items-start gap-3">
-				<span class="nc-canvas-card-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${isWeb ? WEB_ICON : DOC_ICON}</svg>
-				</span>
-				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-semibold">${escapeHtml(title)}</p>
-					<p class="text-[11px] opacity-70">${isWeb ? 'Halaman web' : 'Dokumen'}${dateText ? ` · ${escapeHtml(dateText)}` : ''}</p>
-				</div>
-			</div>
-			<div class="mt-3 flex justify-end">
-				<button type="button" class="nc-canvas-open" data-canvas-open="1" data-canvas-url="${escapeAttr(message?.attachment_url || '')}" data-canvas-kind="${isWeb ? 'web' : 'document'}" data-canvas-title="${escapeAttr(title)}" data-canvas-filename="${escapeAttr(message?.attachment_original_name || 'canvas')}">Buka</button>
-			</div>
+		<div class="nc-canvas-card">
+			<span class="nc-canvas-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${isWeb ? WEB_ICON : DOC_ICON}</svg>
+			</span>
+			<span class="min-w-0 flex-1">
+				<span class="block truncate text-sm font-semibold">${escapeHtml(title)}</span>
+				<span class="block text-[11px] opacity-75">${isWeb ? 'Halaman web' : 'Dokumen'}</span>
+			</span>
+			<button type="button" class="nc-canvas-open" data-canvas-open="1" data-canvas-url="${escapeAttr(message?.attachment_url || '')}" data-canvas-kind="${isWeb ? 'web' : 'document'}" data-canvas-title="${escapeAttr(title)}" data-canvas-filename="${escapeAttr(message?.attachment_original_name || 'canvas')}">Buka</button>
 		</div>
 	`;
 };

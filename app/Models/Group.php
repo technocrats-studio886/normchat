@@ -88,9 +88,17 @@ class Group extends Model
     }
 
     /** Grup aktif yang dimiliki atau diikuti (sebagai member aktif) oleh user. */
+    /** Dibekukan superadmin: anggota masih bisa membaca, tetapi tidak bisa mengirim pesan atau memanggil Normi. */
+    public const STATUS_FROZEN = 'frozen';
+
+    public function isFrozen(): bool
+    {
+        return $this->status === self::STATUS_FROZEN;
+    }
+
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        return $query->where('status', 'active')
+        return $query->whereIn('status', ['active', self::STATUS_FROZEN])
             ->where(fn (Builder $q) => $q
                 ->where('owner_id', $user->id)
                 ->orWhereHas('members', fn (Builder $m) => $m->active()->where('user_id', $user->id)));

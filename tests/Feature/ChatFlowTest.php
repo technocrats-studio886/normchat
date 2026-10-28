@@ -148,12 +148,12 @@ class ChatFlowTest extends TestCase
         Event::assertDispatched(UserMentioned::class, fn (UserMentioned $event) => $event->userId === $this->owner->id);
     }
 
-    public function test_only_moderators_delete_messages(): void
+    public function test_member_cannot_delete_others_messages_but_moderator_can(): void
     {
-        $message = $this->messageFrom($this->member, 'hapus aku');
+        $message = $this->messageFrom($this->owner, 'punya pemilik');
 
         $this->actingAs($this->member)->deleteJson($this->url("messages/{$message->id}"))->assertForbidden();
-        $this->actingAs($this->owner)->deleteJson($this->url("messages/{$message->id}"))->assertOk()->assertJsonPath('message_id', $message->id);
+        $this->actingAs($this->owner)->deleteJson($this->url("messages/{$message->id}"))->assertOk()->assertJsonPath('message.id', $message->id);
 
         $this->assertSoftDeleted($message);
         Event::assertDispatched(MessageDeleted::class);

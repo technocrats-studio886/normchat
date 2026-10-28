@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 @php
     // Tema tampilan user (App\Support\Themes); dipasang server-side agar tidak berkedip.
-    $uiTheme = \App\Support\Themes::resolve(auth()->user()?->theme);
+    $uiTheme = \App\Support\Themes::for(auth()->user());
+    $uiMode = $uiTheme['mode'] === 'dark' ? 'dark' : 'light';
 @endphp
-<html lang="id" data-theme="{{ $uiTheme }}">
+<html lang="id" data-theme-mode="{{ $uiTheme['mode'] }}" data-mode="{{ $uiMode }}" data-accent="{{ $uiTheme['accent'] }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,8 +12,9 @@
     @auth
         <meta name="auth-user-id" content="{{ auth()->id() }}">
         <meta name="auth-user-name" content="{{ auth()->user()->name }}">
+        <meta name="auth-user-timezone" content="{{ auth()->user()->timezone }}" data-timezone-url="{{ route('profile.timezone.update') }}">
     @endauth
-    <meta name="theme-color" content="{{ \App\Support\Themes::OPTIONS[$uiTheme]['browser'] }}">
+    <meta name="theme-color" content="{{ \App\Support\Themes::BROWSER[$uiMode] }}">
     @include('partials.brand-head')
     <link rel="manifest" href="{{ route('pwa.manifest') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,9 +23,9 @@
     <title>{{ $title ?? 'Normi Chat' }}</title>
     {{-- Status sidebar desktop dipasang sebelum render agar tidak berkedip (resources/js/ui/sidebar.js). --}}
     {{-- Semua <script> butuh nonce dari Content-Security-Policy (App\Http\Middleware\AddContentSecurityPolicy). --}}
+    {{-- Mode "Ikuti sistem": pilih terang/gelap dari setelan perangkat sebelum render, dan ikuti perubahannya. --}}
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">(() => { const html = document.documentElement; const query = matchMedia('(prefers-color-scheme: dark)'); const apply = () => { if (html.dataset.themeMode !== 'system') return; html.dataset.mode = query.matches ? 'dark' : 'light'; document.querySelector('meta[name="theme-color"]')?.setAttribute('content', query.matches ? '{{ \App\Support\Themes::BROWSER['dark'] }}' : '{{ \App\Support\Themes::BROWSER['light'] }}'); }; apply(); query.addEventListener('change', apply); })();</script>
     <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">try { if (localStorage.getItem('nc-sidebar') === 'collapsed') document.documentElement.classList.add('nc-sidebar-collapsed'); } catch (e) {}</script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}"></script>
-    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">mermaid.initialize({startOnLoad:false,theme:'neutral',securityLevel:'strict'});</script>
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @php
             $viteEntries = ['resources/css/app.css'];
@@ -70,7 +72,7 @@
         <main class="{{ auth()->check() ? 'pb-32 lg:pb-8' : 'pb-0' }}">
             @if (session('success'))
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-navy-200 bg-navy-50 px-4 py-3 text-sm font-medium text-navy-700 shadow-sm">
+                    <div class="rounded-2xl border border-primary-line bg-primary-soft px-4 py-3 text-sm font-medium text-primary-ink shadow-sm">
                         {{ session('success') }}
                     </div>
                 </div>
@@ -78,7 +80,7 @@
 
             @if (session('info'))
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm font-medium text-coral-700 shadow-sm">
+                    <div class="rounded-2xl border border-danger-line bg-danger-soft px-4 py-3 text-sm font-medium text-danger-ink shadow-sm">
                         {{ session('info') }}
                     </div>
                 </div>
@@ -86,7 +88,7 @@
 
             @if ($errors->any())
                 <div class="mx-4 pt-4">
-                    <div class="rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm text-coral-700 shadow-sm">
+                    <div class="rounded-2xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-ink shadow-sm">
                         <ul class="space-y-1">
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -102,7 +104,6 @@
         @auth
             @php
                 $isHome = request()->routeIs('groups.index');
-                $isCreate = request()->routeIs('groups.create');
                 $isProfile = request()->routeIs('profile.*');
                 $hideBottomNav = request()->routeIs('chat.*')
                     || request()->routeIs('groups.create')
@@ -112,16 +113,19 @@
             @unless($hideBottomNav)
                 <nav class="nc-bottom-nav lg:hidden">
                     <div class="nc-bottom-nav-inner">
-                        <a href="{{ route('groups.index') }}" class="{{ $isHome ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Beranda">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
-                            Beranda
-                        </a>
-                        <a href="{{ route('groups.create') }}" class="{{ $isCreate ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Buat Grup">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
-                            Buat
-                        </a>
-                        <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nc-nav-item-active' : 'nc-nav-item' }}" aria-label="Pengaturan">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
+                        @if(auth()->user()->isSuperadmin())
+                            <a href="{{ route('superadmin.index') }}" class="{{ request()->routeIs('superadmin.*') ? 'nc-nav-item-active' : 'nc-nav-item' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h12a2.25 2.25 0 0 0 2.25-2.25V3M3.75 3h16.5M8.25 21l3.75-4.5L15.75 21"/></svg>
+                                Admin
+                            </a>
+                        @else
+                            <a href="{{ route('groups.index') }}" class="{{ $isHome ? 'nc-nav-item-active' : 'nc-nav-item' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
+                                Beranda
+                            </a>
+                        @endif
+                        <a href="{{ route('profile.show') }}" class="{{ $isProfile ? 'nc-nav-item-active' : 'nc-nav-item' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
                             Akun
                         </a>
                     </div>
@@ -130,7 +134,6 @@
         @endauth
     </div>
     </div>
-</body>
 <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -140,17 +143,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-window.onerror = function(message) {
-    if (typeof message === 'string' && message.indexOf('removeChild') !== -1) {
-        return true;
-    }
-};
-
-window.addEventListener('unhandledrejection', function(event) {
-    var reason = event.reason;
-    if (reason && typeof reason.message === 'string' && reason.message.indexOf('removeChild') !== -1) {
-        event.preventDefault();
-    }
-});
 </script>
+</body>
 </html>

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\MessageDeleted;
 use App\Events\MessageSent;
 use App\Events\MessageUpdated;
 use App\Http\Requests\SendMessageRequest;
@@ -14,11 +13,11 @@ use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\Message;
-use App\Models\MessageVersion;
-use App\Models\PollVote;
+use App\Models\MessageHide;
 use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Chat\AttachmentStorage;
 use App\Services\Chat\MentionNotifier;
+use App\Services\Chat\MessageActions;
 use App\Services\Chat\MessagePresenter;
 use App\Services\Credits\ModelAccess;
 use App\Services\Files\StoredFiles;
@@ -30,6 +29,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -60,15 +60,20 @@ class ChatController extends Controller
 
         $group->load(['owner', 'members.user', 'members.role', 'groupToken']);
 
-        $messages = Message::query()
+        $viewer = $request->user();
+        $messages = Message::withTrashed()
             ->where('group_id', $group->id)
-            ->with(['sender:id,name', 'replyToMessage.sender:id,name'])
+            ->visibleTo($viewer)
+            ->whereNotIn('id', MessageHide::where('user_id', $viewer->id)->select('message_id'))
+            ->with(['sender:id,name,avatar_url', 'replyToMessage.sender:id,name'])
             ->withCount('versions')
             ->orderByDesc('id')
             ->take(self::VISIBLE_MESSAGES)
             ->get()
             ->reverse()
             ->values();
+        // Pertanyaan yang masih menunggu jawaban Normi tidak bisa diedit dulu.
+        $awaitingAi = ChatMessageQueue::whereIn('message_id', $messages->pluck('id'))->whereIn('status', ['queued', 'processing'])->pluck('message_id')->flip();
 
         $lastReadMessageId = (int) ($this->membership($group, $request)?->last_read_message_id ?? 0);
         $latestMessageId = (int) Message::where('group_id', $group->id)->max('id');
@@ -77,7 +82,11 @@ class ChatController extends Controller
 
         return view('chat.show', [
             'group' => $group,
-            'messages' => $messages,
+            // Dirender di browser oleh resources/js/chat/messages.js, sama dengan pesan realtime.
+            'messages' => $messages->map(fn (Message $message) => $this->presenter->present($message, null, ['awaiting_ai' => $awaitingAi->has($message->id)]))->all(),
+            // Tujuan "Bagikan": grup lain tempat user bisa mengirim pesan.
+            'forwardTargets' => Group::query()->visibleTo($viewer)->where('status', 'active')->whereKeyNot($group->id)->orderBy('name')->get(['id', 'name'])
+                ->map(fn (Group $target) => ['id' => $target->id, 'name' => $target->name])->all(),
             'mentionSuggestions' => $this->mentions->suggestionsFor($group, $request->user()),
             'lastReadMessageId' => $lastReadMessageId,
             'latestMessageId' => $latestMessageId,
@@ -90,6 +99,7 @@ class ChatController extends Controller
                 'open_at_label' => $access->format($access->openAt($aiModel)),
                 'floor' => $access->floor($aiModel),
             ]]),
+            'groupCredits' => (float) ($token?->credits ?? 0),
             'defaultAiModel' => $group->resolvedAiModel()?->model_id,
         ]);
     }
@@ -124,6 +134,7 @@ class ChatController extends Controller
     public function store(SendMessageRequest $request, Group $group, AttachmentStorage $attachments): RedirectResponse|JsonResponse
     {
         $this->authorize('chat', $group);
+        $this->ensureNotFrozen($group);
         $user = $request->user();
         $content = $request->content();
 
@@ -163,7 +174,10 @@ class ChatController extends Controller
             ProcessGroupChatQueueJob::dispatch($group->id);
         }
 
-        $payload = $this->presenter->present($message, $user->name, ['group_credits_remaining' => $group->groupToken?->credits ?? 0]);
+        $payload = $this->presenter->present($message, $user->name, [
+            'group_credits_remaining' => $group->groupToken?->credits ?? 0,
+            'awaiting_ai' => $message->isAddressedToAi(),
+        ]);
         event(new MessageSent($group->id, $payload));
 
         if ($content !== '') {
@@ -175,71 +189,90 @@ class ChatController extends Controller
             : redirect()->route('chat.show', $group);
     }
 
-    public function update(Request $request, Group $group, Message $message): JsonResponse
+    /** Edit pesan sendiri. regenerate=1: pertanyaan untuk Normi dijawab ulang (memakai Normkredit). */
+    public function update(Request $request, Group $group, Message $message, MessageActions $actions): JsonResponse
     {
         $this->authorize('chat', $group);
+        $this->ensureNotFrozen($group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless($actions->canEdit($request->user(), $message), 403);
 
-        $user = $request->user();
-        abort_unless($message->sender_type === 'user' && (int) $message->sender_id === (int) $user->id, 403);
-
-        $nextContent = trim((string) $request->validate(['content' => ['required', 'string', 'max:3000']])['content']);
-        if ($nextContent === '') {
-            return response()->json(['ok' => false, 'message' => 'content_required'], 422);
+        $validated = $request->validate([
+            'content' => ['required', 'string', 'max:3000'],
+            'regenerate' => ['sometimes', 'boolean'],
+            'ai_model' => ['nullable', 'string', 'max:80'],
+        ]);
+        $content = trim($validated['content']);
+        if ($content === '') {
+            return response()->json(['ok' => false, 'message' => 'Pesan tidak boleh kosong.'], 422);
         }
 
-        $previousContent = (string) ($message->content ?? '');
-        if ($previousContent !== $nextContent) {
-            MessageVersion::create([
-                'message_id' => $message->id,
-                'version_number' => max(((int) $message->versions()->max('version_number')) + 1, 1),
-                'content_snapshot' => $previousContent,
-                'edited_by' => $user->id,
-                'edited_at' => now(),
-            ]);
-            $message->update(['content' => $nextContent]);
-
-            // Hanya mention yang baru ditambahkan yang diberi notifikasi.
-            $newHandles = array_values(array_diff($this->mentions->handlesIn($nextContent), $this->mentions->handlesIn($previousContent)));
-            $this->mentions->notify($group, $message, $user, $nextContent, $newHandles);
-
-            if ($message->isAddressedToAi()) {
-                ChatMessageQueue::enqueue($message);
-                ProcessGroupChatQueueJob::dispatch($group->id);
-            }
-
-            AuditLog::record('chat.edit_message', $user->id, $message, [
-                'old_length' => mb_strlen($previousContent),
-                'new_length' => mb_strlen($nextContent),
-            ], $group->id);
+        try {
+            $message = $actions->edit($request->user(), $group, $message, $content, (bool) ($validated['regenerate'] ?? false), $validated['ai_model'] ?? null);
+        } catch (RuntimeException $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 409);
         }
 
-        $message->loadCount('versions');
-        $payload = $this->presenter->present($message, $user->name, ['group_credits_remaining' => $group->groupToken?->credits ?? 0]);
+        $payload = $this->presenter->present($message, $request->user()->name, [
+            'group_credits_remaining' => $group->groupToken?->credits ?? 0,
+            'awaiting_ai' => $actions->isAwaitingAi($message),
+        ]);
         event(new MessageUpdated((int) $group->id, $payload));
 
         return response()->json(['ok' => true, 'message' => $payload]);
     }
 
-    public function destroy(Request $request, Group $group, Message $message): JsonResponse
+    /** Semua versi pesan beserta jawaban Normi di tiap versi (popup "Version"). */
+    public function versions(Group $group, Message $message, MessageActions $actions): JsonResponse
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
 
-        $user = $request->user();
-        abort_unless($group->isModerator($user), 403);
+        return response()->json(['ok' => true, 'versions' => $actions->versions($message)]);
+    }
 
-        PollVote::where('poll_message_id', $message->id)->delete();
-        $message->delete();
+    /** Hapus untuk semua: diganti jejak "Pesan ini dihapus"; isinya tetap tersimpan untuk ekspor. */
+    public function destroy(Request $request, Group $group, Message $message, MessageActions $actions): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless($actions->canDeleteForAll($request->user(), $group, $message), 403);
+        $this->ensureNotFrozen($group);
 
-        event(new MessageDeleted((int) $group->id, (int) $message->id, (int) $user->id, (string) $user->name));
-        AuditLog::record('chat.delete_message', $user->id, $message, [
-            'sender_type' => $message->sender_type,
-            'sender_id' => $message->sender_id,
-            'message_type' => $message->message_type,
-        ], $group->id);
+        $actions->deleteForAll($request->user(), $group, $message);
 
-        return response()->json(['ok' => true, 'message_id' => (int) $message->id]);
+        return response()->json(['ok' => true, 'message' => $this->presenter->present($message)]);
+    }
+
+    /** Hapus untuk saya: pesan disembunyikan dari tampilan user ini saja, di semua perangkatnya. all=1: semua pesan. */
+    public function hide(Request $request, Group $group, MessageActions $actions): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        $validated = $request->validate([
+            'all' => ['sometimes', 'boolean'],
+            'message_ids' => ['required_without:all', 'array', 'max:200'],
+            'message_ids.*' => ['integer'],
+        ]);
+        $ids = ($validated['all'] ?? false) ? null : array_map('intval', $validated['message_ids']);
+
+        return response()->json(['ok' => true, 'hidden' => $actions->hideFor($request->user(), $group, $ids)]);
+    }
+
+    /** Teruskan pesan ke grup lain milik user. */
+    public function forward(Request $request, Group $group, Message $message, MessageActions $actions): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_if($message->isNotice(), 403);
+
+        $ids = $request->validate([
+            'group_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'group_ids.*' => ['integer'],
+        ])['group_ids'];
+        $targets = Group::query()->visibleTo($request->user())->where('status', 'active')->whereKey($ids)->whereKeyNot($group->id)->get();
+        abort_if($targets->isEmpty(), 422);
+
+        return response()->json(['ok' => true, 'forwarded' => $actions->forward($request->user(), $message, $targets)]);
     }
 
     /**
@@ -313,6 +346,11 @@ class ChatController extends Controller
     private function membership(Group $group, Request $request): ?GroupMember
     {
         return GroupMember::query()->active()->where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
+    }
+
+    private function ensureNotFrozen(Group $group): void
+    {
+        abort_if($group->isFrozen(), 423, 'Grup ini dibekukan oleh admin Normi Chat.');
     }
 
     private function unreadCount(Group $group, int $lastReadMessageId): int

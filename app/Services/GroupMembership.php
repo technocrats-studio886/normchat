@@ -12,8 +12,7 @@ use App\Models\User;
 use App\Services\Credits\Funding;
 
 /**
- * Mengaktifkan grup baru dan member baru setelah dana Normkredit-nya diterima
- * (lewat pembayaran, atau gratis untuk superadmin dengan Funding::bypass()).
+ * Mengaktifkan grup baru dan member baru setelah pembayaran Normkredit-nya diterima.
  */
 class GroupMembership
 {
@@ -36,8 +35,7 @@ class GroupMembership
             'included_seats' => 2,
         ]);
 
-        $source = $funding->isBypass() ? 'group_creation' : PaymentPurpose::GroupCreate->contributionSource();
-        $this->ledger->credit($group, $owner, $funding, $source);
+        $this->ledger->credit($group, $owner, $funding, PaymentPurpose::GroupCreate->contributionSource());
 
         AuditLog::record('group.create', $owner->id, $group, $this->auditMetadata($funding));
     }
@@ -48,8 +46,7 @@ class GroupMembership
 
         $group->subscription?->increment('included_seats');
 
-        $source = $funding->isBypass() ? 'patungan' : PaymentPurpose::GroupJoin->contributionSource();
-        $this->ledger->credit($group, $member, $funding, $source);
+        $this->ledger->credit($group, $member, $funding, PaymentPurpose::GroupJoin->contributionSource());
 
         AuditLog::record('group.member_joined', $member->id, $group, $this->auditMetadata($funding) + ['patungan' => true]);
     }

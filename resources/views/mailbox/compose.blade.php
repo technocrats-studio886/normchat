@@ -10,7 +10,7 @@
         <p class="mt-1 text-sm text-slate-500">Kirim pesan baru melalui Interdotz Mailbox.</p>
 
         @if(session('error'))
-            <div class="mt-3 rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+            <div class="mt-3 rounded-2xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                 {{ session('error') }}
             </div>
         @endif
@@ -35,7 +35,7 @@
                     class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                 />
                 @error('to')
-                    <p class="mt-1 text-xs text-coral-500">{{ $message }}</p>
+                    <p class="mt-1 text-xs text-danger-ink">{{ $message }}</p>
                 @enderror
             </div>
 
@@ -52,7 +52,7 @@
                     class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                 />
                 @error('subject')
-                    <p class="mt-1 text-xs text-coral-500">{{ $message }}</p>
+                    <p class="mt-1 text-xs text-danger-ink">{{ $message }}</p>
                 @enderror
             </div>
 
@@ -61,7 +61,7 @@
                 <div id="quill-editor">{!! \App\Support\SafeHtml::clean(old('body', '')) !!}</div>
                 <input type="hidden" name="body" id="bodyInput" />
                 @error('body')
-                    <p class="px-4 pb-2 text-xs text-coral-500">{{ $message }}</p>
+                    <p class="px-4 pb-2 text-xs text-danger-ink">{{ $message }}</p>
                 @enderror
             </div>
 

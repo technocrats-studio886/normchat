@@ -40,6 +40,27 @@ class CreditWallet
         });
     }
 
+    /**
+     * Penyesuaian saldo oleh superadmin (positif menambah, negatif mengurangi). Saldo yang sedang
+     * ditahan untuk permintaan AI yang berjalan tidak bisa ditarik.
+     *
+     * @throws \RuntimeException pesan aman ditampilkan ke admin
+     */
+    public function adjust(Group $group, float $credits): void
+    {
+        DB::transaction(function () use ($group, $credits) {
+            $token = $this->lockToken($group);
+            if ($token->remaining_credits + $credits < 0) {
+                throw new \RuntimeException('Saldo grup tidak cukup untuk dikurangi sebanyak itu.');
+            }
+            $token->update([
+                'total_credits' => $token->total_credits + $credits,
+                'remaining_credits' => $token->remaining_credits + $credits,
+            ]);
+            $this->access->sync($token);
+        });
+    }
+
     public function balanceFor(Group $group, User $user): CreditBalance
     {
         $token = GroupToken::forGroup((int) $group->id);

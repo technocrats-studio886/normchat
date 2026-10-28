@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountUnavailableException;
 use App\Services\Auth\SocialLogin;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -57,14 +58,18 @@ class InterdotzAuthController extends Controller
             (string) ($claims['username'] ?? $claims['preferred_username'] ?? $interdotzId)
         ), 0, 40));
 
-        $user = $login->findOrCreate(
-            'interdotz',
-            $interdotzId,
-            (string) ($claims['email'] ?? '') ?: $interdotzId . '@interdotz.user',
-            (string) ($profile['name'] ?? $claims['name'] ?? $claims['username'] ?? $claims['preferred_username'] ?? $interdotzId),
-            (string) ($profile['avatar_url'] ?? $claims['picture'] ?? $claims['avatar'] ?? '') ?: null,
-            $username
-        );
+        try {
+            $user = $login->findOrCreate(
+                'interdotz',
+                $interdotzId,
+                (string) ($claims['email'] ?? '') ?: $interdotzId . '@interdotz.user',
+                (string) ($profile['name'] ?? $claims['name'] ?? $claims['username'] ?? $claims['preferred_username'] ?? $interdotzId),
+                (string) ($profile['avatar_url'] ?? $claims['picture'] ?? $claims['avatar'] ?? '') ?: null,
+                $username
+            );
+        } catch (AccountUnavailableException $e) {
+            return redirect()->route('login')->with('info', $e->getMessage());
+        }
 
         $user->storeOAuthTokens(
             $accessToken,

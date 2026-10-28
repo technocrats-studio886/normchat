@@ -63,7 +63,8 @@ class ProcessGroupChatQueueJob implements ShouldQueue
         try {
             $message = Message::find($queueItem->message_id);
             if ($message) {
-                app(GroupAiAssistant::class)->handle($message);
+                $replace = $queueItem->replace_message_id ? Message::find($queueItem->replace_message_id) : null;
+                app(GroupAiAssistant::class)->handle($message, $replace);
             }
 
             $queueItem->update(['status' => 'processed', 'processed_at' => now(), 'error_message' => null]);

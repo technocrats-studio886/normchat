@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Enums\AiMode;
 use App\Events\MessageSent;
+use App\Events\MessageUpdated;
 use App\Events\TypingStatus;
 use App\Exceptions\InsufficientBudgetException;
 use App\Models\AiModel;
@@ -11,6 +12,7 @@ use App\Models\AiUsageLog;
 use App\Models\Group;
 use App\Models\GroupToken;
 use App\Models\Message;
+use App\Models\MessageVersion;
 use App\Models\User;
 use App\Services\AiDocumentGenerator;
 use App\Services\Ai\Responders\AiResponder;
@@ -43,7 +45,8 @@ class GroupAiAssistant
     ) {
     }
 
-    public function handle(Message $message): void
+    /** $replace: jawaban lama yang diganti (jawab ulang setelah pertanyaan diedit). */
+    public function handle(Message $message, ?Message $replace = null): void
     {
         $message->loadMissing('replyToMessage.sender:id,name');
         if (! $message->isAddressedToAi()) {
@@ -51,6 +54,9 @@ class GroupAiAssistant
         }
 
         $group = Group::with('groupToken')->find($message->group_id);
+        if ($group?->isFrozen()) {
+            return;
+        }
         $owner = $group ? User::find($group->owner_id) : null;
         $requester = $message->sender_id ? User::find($message->sender_id) : null;
         if (! $group || ! $owner || ! $requester) {
@@ -59,7 +65,7 @@ class GroupAiAssistant
 
         $task = $this->prepareTask($group, $owner, $requester, $message);
         if (is_string($task)) {
-            $this->postSystemMessage($group, $task);
+            $this->postNotice($message, $task);
 
             return;
         }
@@ -68,7 +74,7 @@ class GroupAiAssistant
         try {
             $reply = $this->responderFor($message)->respond($task);
         } catch (InsufficientBudgetException $e) {
-            $this->postSystemMessage($group, $e->getMessage());
+            $this->postNotice($message, $e->getMessage());
 
             return;
         } catch (Throwable $e) {
@@ -79,14 +85,15 @@ class GroupAiAssistant
         }
 
         [$reply, $creditsDue, $charged] = $this->bill($task, $reply);
-        $aiMessage = $this->postReply($message, $reply);
+        $replaced = $replace !== null && ! $replace->trashed() && ! $replace->replies()->exists();
+        $aiMessage = $replaced ? $this->replaceReply($replace, $message, $reply) : $this->postReply($message, $reply);
 
         $groupToken = $group->groupToken()->firstOrFail();
         if ($reply->billable) {
             $this->logUsage($task, $reply, $aiMessage, $creditsDue, $charged, $groupToken->credits);
         }
 
-        $this->broadcast($aiMessage, $reply->billable ? $charged : null, $groupToken->credits);
+        $this->broadcast($aiMessage, $reply->billable ? $charged : null, $groupToken->credits, $replaced);
     }
 
     /** @return AiTask|string task siap jalan, atau pesan penolakan untuk grup */
@@ -118,8 +125,10 @@ class GroupAiAssistant
             return 'Normi AI belum bisa dipakai. Coba lagi nanti.';
         }
 
+        // Pemberitahuan Normi untuk satu anggota bukan bagian percakapan.
         $recentMessages = Message::query()
             ->where('group_id', $group->id)
+            ->whereNull('visible_to_user_id')
             ->orderByDesc('id')
             ->take(self::CONTEXT_MESSAGES)
             ->get()
@@ -183,27 +192,46 @@ class GroupAiAssistant
     private function postReply(Message $request, AiReply $reply): Message
     {
         $quote = trim((string) ($request->reply_quote_text ?? ''));
-        $attributes = [
+
+        return Message::create([
             'group_id' => $request->group_id,
             'sender_type' => 'ai',
             'sender_id' => null,
             'reply_to_message_id' => $request->id,
             'reply_quote_text' => $quote !== '' ? $quote : null,
+            ...$this->replyContent($reply),
+        ]);
+    }
+
+    /** Jawab ulang: jawaban lama diganti di tempatnya; isi lamanya disimpan sebagai versi. */
+    private function replaceReply(Message $answer, Message $request, AiReply $reply): Message
+    {
+        MessageVersion::create([
+            'message_id' => $answer->id,
+            'version_number' => ((int) $answer->versions()->max('version_number')) + 1,
+            'content_snapshot' => (string) ($answer->content ?? ''),
+            'edited_by' => $request->sender_id,
+            'edited_at' => now(),
+        ]);
+        $answer->update($this->replyContent($reply));
+
+        return $answer->refresh()->loadCount('versions');
+    }
+
+    /** @return array<string, mixed> isi dan lampiran jawaban */
+    private function replyContent(AiReply $reply): array
+    {
+        $attachment = $reply->attachment;
+
+        return [
             'content' => self::withoutReplyMarkers($reply->text),
+            'message_type' => $attachment['message_type'] ?? 'text',
+            'attachment_disk' => $attachment ? 'normchat_attachments' : null,
+            'attachment_path' => $attachment['path'] ?? null,
+            'attachment_mime' => $attachment['mime'] ?? null,
+            'attachment_original_name' => $attachment['original_name'] ?? null,
+            'attachment_size' => $attachment['size'] ?? null,
         ];
-
-        if ($reply->attachment) {
-            $attributes += [
-                'message_type' => $reply->attachment['message_type'],
-                'attachment_disk' => 'normchat_attachments',
-                'attachment_path' => $reply->attachment['path'],
-                'attachment_mime' => $reply->attachment['mime'],
-                'attachment_original_name' => $reply->attachment['original_name'],
-                'attachment_size' => $reply->attachment['size'],
-            ];
-        }
-
-        return Message::create($attributes);
     }
 
     /**
@@ -246,24 +274,29 @@ class GroupAiAssistant
         ]);
     }
 
-    private function broadcast(Message $aiMessage, ?float $chargedCredits, float $groupCredits): void
+    private function broadcast(Message $aiMessage, ?float $chargedCredits, float $groupCredits, bool $replaced): void
     {
-        event(new MessageSent($aiMessage->group_id, $this->presenter->present($aiMessage, 'Normi AI', [
+        $payload = $this->presenter->present($aiMessage, 'Normi AI', [
             'ai_charged_credits' => $chargedCredits,
             'group_credits_remaining' => $groupCredits,
-        ])));
+        ]);
+
+        event($replaced ? new MessageUpdated($aiMessage->group_id, $payload) : new MessageSent($aiMessage->group_id, $payload));
     }
 
-    private function postSystemMessage(Group $group, string $text): void
+    /** Pemberitahuan (saldo habis, model terkunci, dll.) hanya untuk penanya, membalas pertanyaannya. */
+    private function postNotice(Message $request, string $text): void
     {
-        $message = Message::create([
-            'group_id' => $group->id,
+        $notice = Message::create([
+            'group_id' => $request->group_id,
             'sender_type' => 'ai',
             'sender_id' => null,
+            'reply_to_message_id' => $request->id,
+            'visible_to_user_id' => $request->sender_id,
             'content' => $text,
         ]);
 
-        event(new MessageSent($group->id, $this->presenter->present($message, 'Normi AI')));
+        event(new MessageSent($request->group_id, $this->presenter->present($notice, 'Normi AI'), (int) $request->sender_id));
     }
 
     private function spentToday(Group $group): float

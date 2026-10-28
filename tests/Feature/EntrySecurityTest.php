@@ -114,9 +114,13 @@ class EntrySecurityTest extends TestCase
 
     public function test_mermaid_diagrams_run_in_strict_mode(): void
     {
-        $this->actingAs($this->user)->get(route('groups.index'))
-            ->assertOk()
-            ->assertSee("securityLevel:'strict'", false)
-            ->assertDontSee("securityLevel:'loose'", false);
+        // Dimuat belakangan oleh resources/js/chat/markdown.js, hanya bila ada diagram.
+        $loader = (string) file_get_contents(resource_path('js/chat/markdown.js'));
+        $this->assertStringContainsString("securityLevel: 'strict'", $loader);
+        $this->assertStringNotContainsString("'loose'", $loader);
+        $this->assertMatchesRegularExpression('#mermaid@\d+\.\d+\.\d+/#', $loader, 'versi pasti');
+        $this->assertStringContainsString("script.integrity = MERMAID_SRI", $loader);
+
+        $this->actingAs($this->user)->get(route('groups.index'))->assertOk()->assertDontSee('mermaid.min.js', false);
     }
 }

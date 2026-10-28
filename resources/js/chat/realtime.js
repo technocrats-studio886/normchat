@@ -1,12 +1,13 @@
 // Event realtime (Reverb/Echo): pesan baru, edit, hapus, polling, mengetik, mention.
 
 import { refreshModelLocks } from './composer/ai-options.js';
+import { cancelEditModeFor } from './composer/edit-mode.js';
 import { authUserId, chatFeed, groupId, pendingMessagesByLocalId } from './context.js';
 import { ensureMentionToastStack, highlightMessageInFeed } from './highlight.js';
 import { renderMermaidInNode } from './markdown.js';
-import { buildMessageNode, flashEditedMessage, removeRenderedMessageById, replaceRenderedMessageByPayload, resolveEditedFlashTone } from './messages.js';
+import { buildMessageNode, flashEditedMessage, replaceRenderedMessageByPayload } from './messages.js';
 import { mergePollStatsIntoCache, refreshPollCardsFromFeed } from './polls.js';
-import { markGroupRead, markGroupVisited, noteUnseenIncomingMessage, refreshScrollBottomButton, rememberLatestMessageId, resetLatestMessageIdFromDom, syncScrollBottomCount } from './read-state.js';
+import { markGroupRead, markGroupVisited, noteUnseenIncomingMessage, refreshScrollBottomButton, rememberLatestMessageId, syncScrollBottomCount } from './read-state.js';
 import { escapeHtml, scrollChatToBottom } from './utils.js';
 import { initVoicePlayers } from './voice-player.js';
 
@@ -22,9 +23,9 @@ const showMentionToast = (payload) => {
 
 	const toast = document.createElement('button');
 	toast.type = 'button';
-	toast.className = 'pointer-events-auto rounded-2xl border border-coral-200 bg-white px-3 py-2 text-left shadow-lg shadow-slate-900/10 transition hover:bg-coral-50';
+	toast.className = 'pointer-events-auto rounded-2xl border border-primary-line bg-white px-3 py-2 text-left shadow-lg shadow-slate-900/10 transition hover:bg-primary-soft';
 	toast.innerHTML = `
-		<p class="text-[11px] font-semibold uppercase tracking-wide text-coral-700">Kamu disebut</p>
+		<p class="text-[11px] font-semibold uppercase tracking-wide text-primary-ink">Kamu disebut</p>
 		<p class="mt-0.5 text-sm font-semibold text-slate-800">${senderName} menyebutmu di ${groupName}</p>
 		<p class="mt-0.5 text-xs text-slate-500">${previewText}</p>
 	`;
@@ -55,7 +56,7 @@ const showMentionToast = (payload) => {
 				body: `${payload?.sender_name || 'Seseorang'} menyebutmu di ${payload?.group_name || 'grup'}`,
 			});
 		} catch {
-			// Ignore notification API failures in restricted browsers.
+			// Notifikasi bisa diblokir browser; abaikan.
 		}
 	}
 };
@@ -64,9 +65,103 @@ const seenMentionKeys = new Set();
 export let groupChannel = null;
 export const typingIndicator = document.querySelector('[data-typing-indicator]');
 
+/** Pesan sementara (dikirim dari perangkat ini) diganti pesan aslinya dari server. */
+const replacePending = (localId, pending, message) => {
+	const finalNode = buildMessageNode(message);
+	pending.node.replaceWith(finalNode);
+	initVoicePlayers(finalNode);
+	renderMermaidInNode(finalNode);
+	if (typeof pending.blobUrl === 'string') {
+		URL.revokeObjectURL(pending.blobUrl);
+	}
+	pendingMessagesByLocalId.delete(localId);
+	markGroupVisited();
+	scrollChatToBottom('auto');
+	markGroupRead(Number(message.id || 0));
+	refreshPollCardsFromFeed();
+};
+
+/** Pesan sendiri yang cocok dengan salah satu pesan sementara (isi, jenis, nama lampiran); bila tidak ada, yang tertua. */
+const findPendingFor = (message) => {
+	const entries = Array.from(pendingMessagesByLocalId.entries()).filter(([localId, pending]) => {
+		if (!pending?.node?.isConnected) {
+			pendingMessagesByLocalId.delete(localId);
+			return false;
+		}
+		return true;
+	});
+	return entries.find(([, pending]) => pending.messageType === String(message.message_type || '').toLowerCase()
+		&& String(pending.content || '').trim() === String(message.content || '').trim()
+		&& String(pending.attachmentOriginalName || '') === String(message.attachment_original_name || ''))
+		|| entries[0]
+		|| null;
+};
+
+/** Jawaban Normi datang: pertanyaannya boleh diedit lagi. */
+const markAnswered = (message) => {
+	const questionId = Number(message?.reply_to?.id || 0);
+	if (message?.sender_type === 'ai' && questionId > 0) {
+		chatFeed?.querySelector(`[data-message-id="${questionId}"]`)?.removeAttribute('data-message-awaiting-ai');
+	}
+};
+
+/** Pesan baru dari kanal grup, atau pemberitahuan Normi dari kanal pribadi user. */
+const onMessageSent = (payload) => {
+	const message = payload?.message;
+	if (!chatFeed || !message || Number(payload.group_id || 0) !== Number(groupId || 0)) {
+		return;
+	}
+
+	rememberLatestMessageId(message.id);
+	markAnswered(message);
+	if (message.group_credits_remaining !== undefined) {
+		refreshModelLocks(message.group_credits_remaining);
+	}
+
+	const distFromBottomBefore = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
+	const isMine = message.sender_type === 'user' && Number(message.sender_id || 0) === authUserId;
+
+	if (isMine && pendingMessagesByLocalId.size > 0) {
+		const match = findPendingFor(message);
+		if (match) {
+			replacePending(match[0], match[1], message);
+			return;
+		}
+	}
+
+	if (chatFeed.querySelector(`[data-message-id="${message.id}"]`)) {
+		return;
+	}
+
+	const node = buildMessageNode(message);
+	if (typingIndicator && typingIndicator.parentNode === chatFeed) {
+		chatFeed.insertBefore(node, typingIndicator);
+	} else {
+		chatFeed.appendChild(node);
+	}
+	initVoicePlayers(node);
+	renderMermaidInNode(node);
+
+	if (isMine || distFromBottomBefore < 170) {
+		if (isMine) {
+			markGroupVisited();
+		}
+		scrollChatToBottom(isMine ? 'auto' : 'smooth');
+		markGroupRead(Number(message.id || 0));
+	} else {
+		noteUnseenIncomingMessage();
+		syncScrollBottomCount();
+		refreshScrollBottomButton();
+	}
+	refreshPollCardsFromFeed();
+};
+
 export const initRealtime = () => {
 	if (window.Echo && authUserId > 0) {
-		window.Echo.private(`App.Models.User.${authUserId}`).listen('.mention.tagged', (payload) => {
+		const userChannel = window.Echo.private(`App.Models.User.${authUserId}`);
+		// Pemberitahuan Normi yang hanya untuk user ini (saldo habis, model terkunci, dll.).
+		userChannel.listen('.message.sent', onMessageSent);
+		userChannel.listen('.mention.tagged', (payload) => {
 			if (!payload) {
 				return;
 			}
@@ -153,127 +248,7 @@ export const initRealtime = () => {
 			updateTypingState('ai', String(payload?.sender_name || 'Normi AI'), Boolean(payload?.is_typing));
 		});
 
-		groupChannel.listen('.message.sent', (payload) => {
-			if (!chatFeed || !payload?.message) {
-				return;
-			}
-
-			rememberLatestMessageId(payload.message.id);
-			if (payload.message.group_credits_remaining !== undefined) {
-				refreshModelLocks(payload.message.group_credits_remaining);
-			}
-
-			const distFromBottomBefore = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
-			const senderId = Number(payload.message.sender_id || 0);
-			const isMine = payload.message.sender_type === 'user' && senderId === authUserId;
-
-			if (
-				payload.message.sender_type === 'user'
-				&& Number(payload.message.sender_id || 0) === authUserId
-				&& pendingMessagesByLocalId.size > 0
-			) {
-				const normalizedContent = String(payload.message.content || '').trim();
-				const normalizedAttachmentName = String(payload.message.attachment_original_name || '');
-				for (const [localId, pending] of pendingMessagesByLocalId.entries()) {
-					if (!pending?.node?.isConnected) {
-						pendingMessagesByLocalId.delete(localId);
-						continue;
-					}
-
-					if (pending.messageType !== String(payload.message.message_type || '').toLowerCase()) {
-						continue;
-					}
-
-					if (String(pending.content || '').trim() !== normalizedContent) {
-						continue;
-					}
-
-					if (String(pending.attachmentOriginalName || '') !== normalizedAttachmentName) {
-						continue;
-					}
-
-					try {
-						const finalNode = buildMessageNode(payload.message);
-						finalNode.setAttribute('data-message-id', String(payload.message.id));
-						finalNode.id = `message-${payload.message.id}`;
-						pending.node.replaceWith(finalNode);
-						initVoicePlayers(finalNode);
-						renderMermaidInNode(finalNode);
-					} catch {}
-
-					if (typeof pending.blobUrl === 'string') {
-						URL.revokeObjectURL(pending.blobUrl);
-					}
-
-					pendingMessagesByLocalId.delete(localId);
-					markGroupVisited();
-					scrollChatToBottom('auto');
-					markGroupRead(Number(payload.message.id || 0));
-					refreshPollCardsFromFeed();
-					return;
-				}
-			}
-
-			if (
-				payload.message.sender_type === 'user'
-				&& Number(payload.message.sender_id || 0) === authUserId
-				&& pendingMessagesByLocalId.size > 0
-			) {
-				const [fallbackLocalId, fallbackPending] = pendingMessagesByLocalId.entries().next().value || [];
-				if (fallbackLocalId && fallbackPending?.node?.isConnected) {
-					try {
-						const finalNode = buildMessageNode(payload.message);
-						finalNode.setAttribute('data-message-id', String(payload.message.id));
-						finalNode.id = `message-${payload.message.id}`;
-						fallbackPending.node.replaceWith(finalNode);
-						initVoicePlayers(finalNode);
-						renderMermaidInNode(finalNode);
-					} catch {}
-
-					if (typeof fallbackPending.blobUrl === 'string') {
-						URL.revokeObjectURL(fallbackPending.blobUrl);
-					}
-
-					pendingMessagesByLocalId.delete(fallbackLocalId);
-					markGroupVisited();
-					scrollChatToBottom('auto');
-					markGroupRead(Number(payload.message.id || 0));
-					refreshPollCardsFromFeed();
-					return;
-				}
-			}
-
-			const duplicate = chatFeed.querySelector(`[data-message-id="${payload.message.id}"]`);
-			if (duplicate) {
-				return;
-			}
-
-			const node = buildMessageNode(payload.message);
-			node.setAttribute('data-message-id', String(payload.message.id));
-			node.id = `message-${payload.message.id}`;
-			if (typingIndicator && typingIndicator.parentNode === chatFeed) {
-				chatFeed.insertBefore(node, typingIndicator);
-			} else {
-				chatFeed.appendChild(node);
-			}
-			initVoicePlayers(node);
-			renderMermaidInNode(node);
-
-			if (isMine || distFromBottomBefore < 170) {
-				if (isMine) {
-					markGroupVisited();
-				}
-				scrollChatToBottom(isMine ? 'auto' : 'smooth');
-				markGroupRead(Number(payload.message.id || 0));
-			} else {
-				if (!isMine) {
-					noteUnseenIncomingMessage();
-					syncScrollBottomCount();
-				}
-				refreshScrollBottomButton();
-			}
-			refreshPollCardsFromFeed();
-		});
+		groupChannel.listen('.message.sent', onMessageSent);
 
 		groupChannel.listen('.message.updated', (payload) => {
 			if (!chatFeed || !payload?.message) {
@@ -285,28 +260,24 @@ export const initRealtime = () => {
 				return;
 			}
 
+			markAnswered(payload.message);
 			const updatedNode = replaceRenderedMessageByPayload(payload.message);
 			if (payload.message.is_edited) {
-				const flashTone = resolveEditedFlashTone(payload.message);
-				flashEditedMessage(updatedNode, flashTone);
+				flashEditedMessage(updatedNode);
 			}
 			rememberLatestMessageId(messageId);
 			refreshScrollBottomButton();
 			refreshPollCardsFromFeed();
 		});
 
+		// Hapus untuk semua: pesan diganti jejak "Pesan ini dihapus".
 		groupChannel.listen('.message.deleted', (payload) => {
-			if (!chatFeed) {
+			if (!chatFeed || !payload?.message?.id) {
 				return;
 			}
 
-			const messageId = Number(payload?.message_id || 0);
-			if (!Number.isFinite(messageId) || messageId <= 0) {
-				return;
-			}
-
-			removeRenderedMessageById(messageId);
-			resetLatestMessageIdFromDom();
+			replaceRenderedMessageByPayload(payload.message);
+			cancelEditModeFor(payload.message.id);
 			refreshScrollBottomButton();
 			refreshPollCardsFromFeed();
 		});

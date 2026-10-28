@@ -2,6 +2,7 @@
 
 namespace App\Services\Auth;
 
+use App\Exceptions\AccountUnavailableException;
 use App\Http\Middleware\EndIdleSession;
 use App\Models\AuditLog;
 use App\Models\User;
@@ -10,7 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Login lewat penyedia identitas (Google, Interdotz): cari user berdasarkan ID
- * di penyedia, lalu email; buat bila belum ada; lalu buka sesi.
+ * di penyedia, lalu email; buat bila belum ada; lalu buka sesi. Akun yang dihapus atau diblokir
+ * superadmin ditolak (AccountUnavailableException).
  */
 class SocialLogin
 {
@@ -22,11 +24,18 @@ class SocialLogin
         ?string $avatarUrl = null,
         ?string $username = null
     ): User {
-        $user = User::query()
+        $user = User::withTrashed()
             ->where('auth_provider', $provider)
             ->where('provider_user_id', $providerUserId)
             ->first()
-            ?? User::query()->where('email', $email)->first();
+            ?? User::withTrashed()->where('email', $email)->first();
+
+        if ($user?->trashed()) {
+            throw new AccountUnavailableException('Akun ini sudah dihapus. Hubungi admin Normi Chat bila ingin memulihkannya.');
+        }
+        if ($user?->blocked_at !== null) {
+            throw new AccountUnavailableException('Akun ini diblokir. Hubungi admin Normi Chat bila menurutmu ini keliru.');
+        }
 
         $attributes = [
             'name' => $name,

@@ -15,8 +15,8 @@ class AiDocumentGenerator
     public const FORMAT_TXT = 'txt';
 
     /**
-     * Detect a document-generation request from a user prompt. Returns a normalized
-     * format key (pdf|docx|md|txt) or null when the user is not asking for a doc.
+     * Kenali permintaan membuat dokumen dari pesan user. Mengembalikan format (pdf|docx|md|txt),
+     * atau null bila user tidak meminta dokumen.
      */
     public function detectRequestedFormat(string $content): ?string
     {
@@ -49,7 +49,7 @@ class AiDocumentGenerator
 
         // Generic "buatkan dokumen / buat file" → default to PDF
         if (preg_match('/\b(dokumen|file|laporan|report|surat|catatan|notulen|ringkasan\s+file)\b/u', $normalized) === 1) {
-            // Avoid colliding with image generation phrasing already handled separately.
+            // Jangan bentrok dengan permintaan gambar, yang ditangani terpisah.
             if (preg_match('/\b(gambar|foto|image|picture|illustration)\b/u', $normalized) === 1) {
                 return null;
             }
@@ -60,7 +60,7 @@ class AiDocumentGenerator
     }
 
     /**
-     * Persist generated content to the attachments disk and return descriptor.
+     * Simpan isi dokumen ke disk lampiran dan kembalikan datanya.
      *
      * @return array{path: string, mime: string, original_name: string, message_type: string}|null
      */

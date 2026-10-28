@@ -43,7 +43,7 @@ const ensureFileAttachmentPreviewEl = () => {
 	el.setAttribute('data-attachment-preview-file', '1');
 	el.className = 'mb-2 hidden items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5';
 	el.innerHTML = `
-	<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-base">📄</span>
+	<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg></span>
 	<div class="min-w-0 flex-1">
 		<p class="truncate text-sm font-semibold text-slate-700" data-attachment-preview-file-name>Dokumen</p>
 		<p class="text-[11px] text-slate-500" data-attachment-preview-file-size>Siap dikirim</p>
@@ -150,7 +150,7 @@ export const refreshAttachmentLabel = () => {
 	refreshSendVoiceToggle();
 };
 
-/** Tombol kirim tampil bila ada teks atau lampiran; selain itu tombol rekam suara. */
+/** Tombol kirim tampil bila ada teks, lampiran, atau sedang mengedit; selain itu tombol rekam suara. */
 export const refreshSendVoiceToggle = () => {
 	if (!(mentionInput instanceof HTMLTextAreaElement)) {
 		return;
@@ -158,7 +158,7 @@ export const refreshSendVoiceToggle = () => {
 
 	const hasText = mentionInput.value.trim().length > 0;
 	const hasAttachment = attachmentInput instanceof HTMLInputElement && (attachmentInput.files?.length || 0) > 0;
-	const canSend = hasText || hasAttachment;
+	const canSend = hasText || hasAttachment || document.documentElement.classList.contains('nc-editing');
 	if (sendButton instanceof HTMLElement) {
 		sendButton.classList.toggle('hidden', !canSend);
 	}

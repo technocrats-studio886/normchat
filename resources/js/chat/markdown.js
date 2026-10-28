@@ -1,11 +1,11 @@
-// Render markdown balasan AI (tabel, list, kode, mermaid).
+// Render markdown balasan AI (tabel, list, blok kode, kutipan, mermaid).
 
 export const renderMarkdown = (escaped) => {
 	const lines = escaped.split('\n');
 	const out = [];
 	let inTable = false;
-	let inMermaid = false;
-	let mermaidLines = [];
+	let fenceLang = null;
+	let fenceLines = [];
 	let inList = false;
 	let listType = '';
 
@@ -19,29 +19,34 @@ export const renderMarkdown = (escaped) => {
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 
-		// Mermaid code blocks
-		if (line.trim() === '```mermaid') {
+		// Blok kode berpagar (```bahasa ... ```); ```mermaid menjadi diagram.
+		const fence = line.trim().match(/^```(\w*)$/);
+		if (fence && fenceLang === null) {
 			closeList();
-			inMermaid = true;
-			mermaidLines = [];
+			fenceLang = fence[1].toLowerCase();
+			fenceLines = [];
 			continue;
 		}
-		if (inMermaid) {
+		if (fenceLang !== null) {
 			if (line.trim() === '```') {
-				inMermaid = false;
-				const id = 'mermaid-' + Math.random().toString(36).slice(2, 10);
-				out.push(`<pre class="mermaid" id="${id}">${mermaidLines.join('\n')}</pre>`);
-				mermaidLines = [];
+				if (fenceLang === 'mermaid') {
+					const id = 'mermaid-' + Math.random().toString(36).slice(2, 10);
+					out.push(`<pre class="mermaid" id="${id}">${fenceLines.join('\n')}</pre>`);
+				} else {
+					out.push(`<pre class="nc-code"><code>${fenceLines.join('\n')}</code></pre>`);
+				}
+				fenceLang = null;
 			} else {
-				mermaidLines.push(line);
+				fenceLines.push(line);
 			}
 			continue;
 		}
 
-		// Code blocks (generic)
-		if (line.trim().startsWith('```')) {
+		// Kutipan (teks sudah di-escape, jadi ">" menjadi "&gt;")
+		const quoteMatch = line.match(/^&gt;\s?(.*)/);
+		if (quoteMatch) {
 			closeList();
-			out.push(line.trim() === '```' ? '' : `<code class="text-xs">${line.replace(/```\w*/, '')}</code>`);
+			out.push(`<blockquote class="nc-md-quote">${inlineFormat(quoteMatch[1])}</blockquote>`);
 			continue;
 		}
 
@@ -122,6 +127,8 @@ export const renderMarkdown = (escaped) => {
 
 	closeList();
 	if (inTable) out.push('</tbody></table></div>');
+	// Blok kode yang tidak ditutup tetap ditampilkan sebagai kode.
+	if (fenceLang !== null) out.push(`<pre class="nc-code"><code>${fenceLines.join('\n')}</code></pre>`);
 
 	return out.join('\n');
 };
@@ -135,9 +142,45 @@ const inlineFormat = (text) => {
 		.replace(/`([^`]+)`/g, '<code class="rounded bg-slate-200 px-1 py-0.5 text-xs">$1</code>');
 };
 
-export const renderMermaidInNode = (node) => {
-	if (typeof mermaid === 'undefined') return;
-	const blocks = node.querySelectorAll('pre.mermaid');
+// Mermaid (±2,5 MB) hanya dimuat bila ada diagram, dengan versi pasti dan hash integritas.
+const MERMAID_SRC = 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js';
+const MERMAID_SRI = 'sha384-rbtjAdnIQE/aQJGEgXrVUlMibdfTSa4PQju4HDhN3sR2PmaKFzhEafuePsl9H/9I';
+let mermaidReady = null;
+
+const loadMermaid = () => {
+	mermaidReady ??= new Promise((resolve, reject) => {
+		const script = document.createElement('script');
+		script.src = MERMAID_SRC;
+		script.integrity = MERMAID_SRI;
+		script.crossOrigin = 'anonymous';
+		// Content-Security-Policy hanya mengizinkan skrip bernonce (lihat AddContentSecurityPolicy).
+		script.nonce = document.querySelector('script[nonce]')?.nonce || '';
+		script.onload = () => {
+			window.mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
+			resolve(window.mermaid);
+		};
+		script.onerror = () => {
+			mermaidReady = null;
+			reject(new Error('mermaid_unavailable'));
+		};
+		document.head.appendChild(script);
+	});
+
+	return mermaidReady;
+};
+
+export const renderMermaidInNode = async (node) => {
+	const blocks = Array.from(node.querySelectorAll('pre.mermaid:not([data-processed])'));
+	if (blocks.length === 0) {
+		return;
+	}
+
+	let mermaid;
+	try {
+		mermaid = await loadMermaid();
+	} catch {
+		return;
+	}
 	blocks.forEach(async (block) => {
 		if (block.dataset.processed) return;
 		block.dataset.processed = '1';
@@ -146,7 +189,7 @@ export const renderMermaidInNode = (node) => {
 			const { svg } = await mermaid.render(id + '-svg', block.textContent);
 			block.innerHTML = svg;
 		} catch {
-			block.classList.add('text-xs', 'text-coral-400');
+			block.classList.add('text-xs', 'text-danger-ink');
 		}
 	});
 };

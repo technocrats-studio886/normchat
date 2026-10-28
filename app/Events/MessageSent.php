@@ -13,9 +13,11 @@ class MessageSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    /** $onlyUserId: pemberitahuan Normi untuk satu anggota dikirim ke kanal pribadinya saja. */
     public function __construct(
         public int $groupId,
         public array $message,
+        public ?int $onlyUserId = null,
     ) {}
 
     public function broadcastAs(): string
@@ -32,14 +34,16 @@ class MessageSent implements ShouldBroadcastNow
     }
 
     /**
-     * Get the channels the event should broadcast on.
+     * Kanal penerima event.
      *
      * @return array<int, Channel>
      */
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('group.'.$this->groupId),
+            $this->onlyUserId !== null
+                ? new PrivateChannel('App.Models.User.'.$this->onlyUserId)
+                : new PrivateChannel('group.'.$this->groupId),
         ];
     }
 }

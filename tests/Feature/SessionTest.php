@@ -70,6 +70,8 @@ class SessionTest extends TestCase
 
     public function test_activity_on_day_four_restarts_the_five_days(): void
     {
+        // Jam dibekukan: tanpa ini, permintaan yang melewati pergantian detik membuat test gagal acak.
+        $this->freezeSecond();
         $fourDaysAgo = now()->subDays(4)->getTimestamp();
 
         $this->actingAs($this->user)

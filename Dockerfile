@@ -6,8 +6,13 @@ RUN apt-get update \
         unzip \
         libpq-dev \
         libzip-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libwebp-dev \
+        libfreetype6-dev \
         supervisor \
-    && docker-php-ext-install pdo_pgsql pcntl bcmath zip opcache \
+    && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
+    && docker-php-ext-install pdo_pgsql pcntl bcmath zip opcache gd \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && rm -rf /var/lib/apt/lists/*

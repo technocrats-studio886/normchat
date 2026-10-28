@@ -1,10 +1,8 @@
-// Kolom ketik composer: tinggi otomatis, batal edit dengan Escape, dan sinyal mengetik.
+// Kolom ketik composer: tinggi otomatis dan sinyal mengetik.
 
 import { scrollChatToBottom } from '../utils.js';
 import { refreshAttachmentLabel, refreshSendVoiceToggle } from './attachment.js';
 import { attachmentInput, chatForm, emojiPanel, mentionInput, recordingIndicator } from './elements.js';
-import { clearEditingState, getEditingMessageId } from './reply.js';
-import { showActionToast } from './toast.js';
 import { noteTyping, stopTyping } from './typing.js';
 
 export const initComposerInput = () => {
@@ -19,16 +17,6 @@ export const initComposerInput = () => {
 		mentionInput.addEventListener('focus', () => {
 			window.setTimeout(() => scrollChatToBottom('auto'), 70);
 			window.setTimeout(() => scrollChatToBottom('auto'), 220);
-		});
-
-		mentionInput.addEventListener('keydown', (event) => {
-			if (event.key !== 'Escape' || getEditingMessageId() <= 0) {
-				return;
-			}
-
-			event.preventDefault();
-			clearEditingState(true);
-			showActionToast('Batal mengedit');
 		});
 
 		mentionInput.addEventListener('input', resizeComposerInput);

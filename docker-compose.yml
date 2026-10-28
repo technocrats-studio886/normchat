@@ -153,6 +153,25 @@ services:
         exec setpriv --reuid=www-data --regid=www-data --init-groups php artisan queue:work redis --queue=default --tries=3 --sleep=1 --timeout=600 --max-time=3600
       "
 
+  # Tugas terjadwal (routes/console.php): cadangan chat otomatis pukul 03.00, hapus cadangan
+  # lebih dari 30 hari dan unduhan riwayat lebih dari 7 hari. Konfigurasi dibaca dari .env.
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: normchat-scheduler
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - normchat_storage:/opt/normchat/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: setpriv --reuid=www-data --regid=www-data --init-groups php artisan schedule:work
+
   reverb:
     build:
       context: .

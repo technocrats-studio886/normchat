@@ -5,7 +5,7 @@ import { chatFeed } from '../context.js';
 import { renderMarkdown, renderMermaidInNode } from '../markdown.js';
 import { escapeHtml } from '../utils.js';
 import { replyClearButton, replyPreview, replyQuoteInput, replyToInput } from './elements.js';
-import { normalizeReplyQuote, setReplyTargetWithText } from './reply.js';
+import { normalizeReplyQuote, setReplyTarget } from './reply.js';
 import { showActionToast } from './toast.js';
 
 const HINT = 'Blok teks yang mau dibalas.';
@@ -27,7 +27,7 @@ export const openQuotePicker = (messageNode, { currentQuote = '', onPick }) => {
 
 	const sender = String(messageNode.dataset.messageSenderName || 'User');
 	const content = String(messageNode.dataset.messageContent || '').trim();
-	const isAi = messageNode.querySelector('.bubble-ai') !== null;
+	const isAi = messageNode.dataset.senderKey === 'ai';
 	const bodyHtml = isAi
 		? `<div class="ai-markdown">${renderMarkdown(escapeHtml(content))}</div>`
 		: `<p class="whitespace-pre-wrap">${escapeHtml(content)}</p>`;
@@ -148,7 +148,7 @@ export const initReplyPreviewPicker = () => {
 
 		openQuotePicker(messageNode, {
 			currentQuote: replyQuoteInput instanceof HTMLInputElement ? replyQuoteInput.value : '',
-			onPick: (quote) => setReplyTargetWithText(messageNode, quote),
+			onPick: (quote) => setReplyTarget(messageNode, quote),
 		});
 	};
 

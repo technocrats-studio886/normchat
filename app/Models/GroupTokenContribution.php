@@ -14,6 +14,7 @@ class GroupTokenContribution extends Model
         'credit_amount',
         'price_paid',
         'payment_reference',
+        'note',
     ];
 
     protected $casts = [

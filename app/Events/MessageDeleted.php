@@ -13,11 +13,10 @@ class MessageDeleted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    /** @param array $message pesan yang dihapus (MessagePresenter), berisi penanda tanpa isinya */
     public function __construct(
         public int $groupId,
-        public int $messageId,
-        public int $deletedBy,
-        public string $deletedByName,
+        public array $message,
     ) {}
 
     public function broadcastAs(): string
@@ -29,9 +28,7 @@ class MessageDeleted implements ShouldBroadcastNow
     {
         return [
             'group_id' => $this->groupId,
-            'message_id' => $this->messageId,
-            'deleted_by' => $this->deletedBy,
-            'deleted_by_name' => $this->deletedByName,
+            'message' => $this->message,
         ];
     }
 

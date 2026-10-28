@@ -100,7 +100,7 @@ export const markGroupRead = async (targetMessageId = 0) => {
 			serverLastReadMessageId = Math.max(serverLastReadMessageId, nextReadId);
 		}
 	} catch {
-		// Ignore read-state sync failures to keep chat usable in flaky networks.
+		// Gagal sinkron status baca tidak boleh mengganggu chat di jaringan yang putus-sambung.
 	} finally {
 		markReadInFlight = false;
 		if (markReadQueued) {

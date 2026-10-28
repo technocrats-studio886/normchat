@@ -148,20 +148,22 @@ class ModelAccessTest extends TestCase
         $this->assertStringContainsString('Advanced terkunci', (string) Message::where('sender_type', 'ai')->value('content'));
     }
 
-    public function test_chat_page_shows_advanced_locked_with_top_up_link_until_unlocked(): void
+    public function test_chat_page_shows_advanced_locked_with_explanation_until_unlocked(): void
     {
         $this->actingAs($this->owner)->get(route('chat.show', $this->group))
             ->assertOk()
+            ->assertSee('data-group-credits="250"', false)
             ->assertSee('data-ai-model-option="gpt-6-astra" data-ai-model-name="Advanced" role="menuitemradio" aria-checked="false"', false)
-            ->assertSee('data-ai-model-locked="1" data-ai-model-open-at="500" data-ai-model-floor="250" aria-disabled="true"', false)
-            ->assertSee('Terbuka saat saldo grup ≥ 500 NK')
+            ->assertSee('data-ai-model-locked="1" data-ai-model-open-at="500" data-ai-model-floor="250"', false)
+            ->assertSee('Butuh saldo grup 500 NK')
+            ->assertSee('data-model-lock-sheet="1"', false)
             ->assertSee(route('subscription.tokens.buy', ['group' => $this->group->id]), false);
 
         $this->wallet->deposit($this->group, 250);
 
         $this->actingAs($this->owner)->get(route('chat.show', $this->group))
             ->assertSee('data-ai-model-locked="0"', false)
-            ->assertSee('composer-menu-note hidden', false);
+            ->assertSee('text-[11px] text-ink-soft hidden" data-ai-lock-hint="1"', false);
     }
 
     public function test_superadmin_sets_and_validates_unlock_thresholds(): void
@@ -183,7 +185,7 @@ class ModelAccessTest extends TestCase
             ->assertSessionHasErrors('lock_multiple');
 
         $this->actingAs($boss)->put("/superadmin/models/{$sol->id}", $form + ['unlock_multiple' => 1.5, 'lock_multiple' => 0.5])
-            ->assertRedirect('/superadmin');
+            ->assertRedirect('/superadmin/pengaturan');
         $this->assertSame([1.5, 0.5], [$sol->fresh()->unlock_multiple, $sol->fresh()->lock_multiple]);
 
         $this->actingAs($boss)->put("/superadmin/models/{$sol->id}", $form + ['unlock_multiple' => '', 'lock_multiple' => 1]);

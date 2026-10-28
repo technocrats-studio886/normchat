@@ -11,11 +11,13 @@ class MessageVersion extends Model
         'message_id',
         'version_number',
         'content_snapshot',
+        'answer_snapshot',
         'edited_by',
         'edited_at',
     ];
 
     protected $casts = [
+        'answer_snapshot' => 'array',
         'edited_at' => 'datetime',
     ];
 

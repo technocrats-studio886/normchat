@@ -155,10 +155,8 @@ class GroupCreditsTest extends TestCase
 
     public function test_purchases_go_fully_into_group_credits(): void
     {
-        $boss = User::factory()->create(['email' => 'boss@normchat.test']);
-
-        $this->actingAs($boss)->post('/groups', ['name' => 'A', 'password' => '1234']);
-        $group = Group::where('name', 'A')->firstOrFail();
+        $group = Group::create(['name' => 'A', 'owner_id' => $this->owner->id, 'password_hash' => Hash::make('1234'), 'status' => 'pending_payment']);
+        app(\App\Services\GroupMembership::class)->activateGroup($group, $this->owner, new \App\Services\Credits\Funding(250, 125000, 'INV-A'));
 
         $contribution = GroupTokenContribution::latest('id')->firstOrFail();
         $this->assertSame((float) $group->groupToken->remaining_credits, (float) $contribution->credit_amount);
@@ -219,10 +217,10 @@ class GroupCreditsTest extends TestCase
             ->assertOk()->assertSee('Dipakai semua anggota untuk Normi AI.')->assertDontSee('share_percent');
 
         $this->actingAs($this->owner)->get("/groups/{$this->group->id}/settings")
-            ->assertOk()->assertSee('Normkredit')->assertSee('250,00 Normkredit')->assertSee('Batas harian per anggota');
+            ->assertOk()->assertSee('Normkredit')->assertSee('250,00 NK')->assertSee('Batas pemakaian harian per anggota');
 
         $this->actingAs($this->member)->get("/groups/{$this->group->id}/settings")
-            ->assertOk()->assertSee('10,00 Normkredit per anggota per hari')->assertDontSee('Batas harian per anggota</label>', false);
+            ->assertOk()->assertSee('Batas pemakaian 10,00 NK per anggota per hari')->assertDontSee('name="member_daily_credit_limit"', false);
 
         $this->actingAs(User::factory()->create())->get("/join/{$this->group->share_id}")
             ->assertOk()->assertSee('Saldo grup')->assertDontSee('share_percent');

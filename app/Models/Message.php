@@ -28,6 +28,10 @@ class Message extends Model
         'attachment_size',
         'ai_model',
         'ai_mode',
+        'deleted_by',
+        'visible_to_user_id',
+        'forwarded_from_name',
+        'forwarded_from_message_id',
     ];
 
     protected $casts = [
@@ -50,6 +54,18 @@ class Message extends Model
         }
 
         return $replyTarget?->sender_type === 'ai';
+    }
+
+    /** Pemberitahuan Normi untuk satu anggota (mis. saldo habis), bukan jawaban untuk grup. */
+    public function isNotice(): bool
+    {
+        return $this->visible_to_user_id !== null;
+    }
+
+    /** Pesan yang boleh dilihat user: semua kecuali pemberitahuan untuk anggota lain. */
+    public function scopeVisibleTo($query, User $user)
+    {
+        return $query->where(fn ($q) => $q->whereNull('visible_to_user_id')->orWhere('visible_to_user_id', $user->id));
     }
 
     public function isAddressedToAi(): bool
@@ -87,9 +103,16 @@ class Message extends Model
         return $this->belongsTo(User::class, 'sender_id');
     }
 
+    /** Yang menghapus pesan untuk semua. */
+    public function deleter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    /** Termasuk pesan yang sudah dihapus, agar kutipannya bisa tampil "Pesan ini dihapus". */
     public function replyToMessage(): BelongsTo
     {
-        return $this->belongsTo(self::class, 'reply_to_message_id');
+        return $this->belongsTo(self::class, 'reply_to_message_id')->withTrashed();
     }
 
     public function replies(): HasMany

@@ -58,67 +58,31 @@ export const parsePollContent = (rawContent) => {
 	};
 };
 
-export const renderPollCard = ({ poll, tone = 'other', messageId = 0, inlineTimeHtml = '' }) => {
+/** Polling sebagai bubble pesan (warna mengikuti pengirim lewat bubble-{tone}). */
+export const renderPollCard = ({ poll, tone = 'other', messageId = 0, headerHtml = '', inlineTimeHtml = '' }) => {
 	if (!poll || !Array.isArray(poll.options) || poll.options.length < 2) {
 		return '';
 	}
 
-	const colorMap = {
-		mine: {
-			card: 'bg-navy-500 text-white border-navy-400',
-			question: 'text-navy-50',
-			meta: 'text-navy-100/90',
-			option: 'bg-navy-400/45 border-navy-300/70 text-white hover:bg-navy-300/55',
-		},
-		ai: {
-			card: 'bg-navy-50 text-navy-900 border-navy-200',
-			question: 'text-navy-900',
-			meta: 'text-navy-700',
-			option: 'bg-white border-navy-200 text-navy-900 hover:bg-navy-100',
-		},
-		other: {
-			card: 'bg-white text-slate-800 border-slate-200',
-			question: 'text-slate-900',
-			meta: 'text-slate-500',
-			option: 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100',
-		},
-	};
-
-	const palette = colorMap[tone] || colorMap.other;
-	const safeQuestion = escapeHtml(poll.question);
 	const numericMessageId = Number(messageId || 0);
 	const canVote = Number.isFinite(numericMessageId) && numericMessageId > 0;
 	const optionsHtml = poll.options
 		.map((option) => {
-			const safeLabel = escapeHtml(option.label);
 			const safeNumber = Number(option.number || 0);
-			if (!canVote) {
-				return `<div class="rounded-xl border px-2.5 py-2 text-xs font-medium ${palette.option}" data-poll-option-row="1" data-poll-option-number="${safeNumber}"><div class="flex items-center gap-2"><span class="font-bold">${safeNumber}.</span><span class="min-w-0 flex-1 truncate">${safeLabel}</span><span class="text-[10px] font-semibold opacity-80" data-poll-option-count>0</span></div></div>`;
-			}
-
-			return `
-				<button
-					type="button"
-					class="w-full rounded-xl border px-2.5 py-2 text-left text-xs font-medium transition ${palette.option}"
-					data-poll-vote="1"
-					data-poll-id="${numericMessageId}"
-					data-poll-option="${safeNumber}"
-					data-poll-label="${escapeAttr(option.label)}"
-					data-poll-option-row="1"
-					data-poll-option-number="${safeNumber}"
-				>
-					<span class="flex items-center gap-2"><span class="font-bold">${safeNumber}.</span><span class="min-w-0 flex-1 truncate">${safeLabel}</span><span class="text-[10px] font-semibold opacity-80" data-poll-option-count>0</span></span>
-				</button>
-			`;
+			const inner = `<span class="font-semibold">${safeNumber}.</span><span class="min-w-0 flex-1 truncate">${escapeHtml(option.label)}</span><span class="text-[11px] font-semibold opacity-80" data-poll-option-count>0</span>`;
+			return canVote
+				? `<button type="button" class="nc-poll-option" data-poll-vote="1" data-poll-id="${numericMessageId}" data-poll-option="${safeNumber}" data-poll-label="${escapeAttr(option.label)}" data-poll-option-row="1" data-poll-option-number="${safeNumber}">${inner}</button>`
+				: `<div class="nc-poll-option" data-poll-option-row="1" data-poll-option-number="${safeNumber}">${inner}</div>`;
 		})
 		.join('');
 
 	return `
-		<div class="rounded-2xl border px-3 py-2.5 ${palette.card}" data-message-body="1" data-poll-card="1" data-poll-id="${numericMessageId}" data-poll-tone="${escapeAttr(tone)}">
-			<p class="text-[11px] font-semibold uppercase tracking-wide ${palette.meta}">Polling</p>
-			<p class="mt-1 text-sm font-semibold ${palette.question}">${safeQuestion}</p>
-			<div class="mt-2 space-y-1.5">${optionsHtml}</div>
-			<p class="mt-2 text-[11px] ${palette.meta}" data-poll-summary>Belum ada yang memilih</p>
+		<div class="nc-bubble bubble-${escapeAttr(tone)} nc-poll" data-message-body="1" data-message-bubble data-poll-card="1" data-poll-id="${numericMessageId}" data-poll-tone="${escapeAttr(tone)}">
+			${headerHtml}
+			<p class="nc-poll-label">Polling</p>
+			<p class="nc-poll-question">${escapeHtml(poll.question)}</p>
+			<div class="nc-poll-options">${optionsHtml}</div>
+			<p class="nc-poll-summary" data-poll-summary>Belum ada yang memilih</p>
 			${inlineTimeHtml}
 		</div>
 	`;
@@ -232,7 +196,7 @@ const requestPollStatsForVisibleCards = async () => {
 			refreshPollCardsFromFeed();
 		}
 	} catch {
-		// Ignore polling stat fetch errors and keep feed-based fallback active.
+		// Gagal mengambil hasil polling: tetap pakai hitungan dari feed.
 	} finally {
 		pollStatsRequestInFlight = false;
 	}
@@ -334,14 +298,8 @@ export const refreshPollCardsFromFeed = () => {
 			}
 
 			const ratio = totalVotes > 0 ? Math.max(0, Math.min(100, Math.round((count / totalVotes) * 100))) : 0;
-			row.style.backgroundImage = ratio > 0
-				? `linear-gradient(90deg, rgba(113, 134, 163, 0.16) ${ratio}%, rgba(0,0,0,0) ${ratio}%)`
-				: '';
-
-			const isMine = optionNumber > 0 && optionNumber === myVoteOption;
-			row.classList.toggle('ring-2', isMine);
-			row.classList.toggle('ring-navy-400', isMine);
-			row.classList.toggle('ring-offset-1', isMine);
+			row.style.setProperty('--ratio', `${ratio}%`);
+			row.classList.toggle('is-chosen', optionNumber > 0 && optionNumber === myVoteOption);
 		});
 
 		const summary = card.querySelector('[data-poll-summary]');
@@ -354,45 +312,5 @@ export const refreshPollCardsFromFeed = () => {
 				summary.textContent = `${totalVotes} suara`;
 			}
 		}
-	});
-};
-
-export const hydrateExistingPollMessages = () => {
-	if (!(chatFeed instanceof HTMLElement)) {
-		return;
-	}
-
-	chatFeed.querySelectorAll('[data-message-id]').forEach((messageNode) => {
-		if (!(messageNode instanceof HTMLElement)) {
-			return;
-		}
-
-		if (messageNode.querySelector('[data-poll-card]')) {
-			return;
-		}
-
-		const pollData = parsePollContent(messageNode.dataset.messageContent || '');
-		if (!pollData) {
-			return;
-		}
-
-		const bubble = messageNode.querySelector('.bubble-mine, .bubble-ai, .bubble-other');
-		if (!(bubble instanceof HTMLElement)) {
-			return;
-		}
-
-		const inlineTimeEl = bubble.querySelector('.nc-inline-time');
-		const inlineTimeHtml = inlineTimeEl instanceof HTMLElement ? inlineTimeEl.outerHTML : '';
-		const messageId = Number(messageNode.getAttribute('data-message-id') || 0);
-		const tone = messageNode.classList.contains('justify-end')
-			? 'mine'
-			: (bubble.classList.contains('bubble-ai') ? 'ai' : 'other');
-
-		bubble.outerHTML = renderPollCard({
-			poll: pollData,
-			tone,
-			messageId,
-			inlineTimeHtml,
-		});
 	});
 };

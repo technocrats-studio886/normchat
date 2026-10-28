@@ -6,6 +6,6 @@ interface ChatExporter
 {
     public function extension(): string;
 
-    /** @param list<ExportEntry> $entries */
-    public function render(string $groupName, array $entries): string;
+    /** @return string isi berkas */
+    public function render(ExportDocument $document): string;
 }

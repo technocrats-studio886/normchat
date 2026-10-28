@@ -5,124 +5,144 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\Group;
 use App\Models\GroupBackup;
-use App\Models\GroupMember;
 use App\Models\Message;
 use App\Models\RecoveryLog;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\Files\StoredFiles;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
-/** Snapshot JSON pesan & anggota grup, dan pemulihannya. */
+/**
+ * Cadangan chat grup = titik pulih. Cadangan menyimpan seluruh kolom pesan yang ada saat itu;
+ * memulihkan hanya mengembalikan pesan yang sejak itu terhapus, di posisi dan jam aslinya.
+ * Pesan yang dikirim sesudahnya dan keanggotaan grup tidak diubah.
+ */
 class GroupBackups
 {
     private const DISK = 'normchat_backups';
 
-    public function snapshot(Group $group, int $actorId): GroupBackup
+    /** Cadangan otomatis disimpan sekian hari. */
+    public const KEEP_DAYS = 30;
+
+    public function __construct(private readonly StoredFiles $files)
     {
-        $group->loadMissing(['members', 'messages']);
+    }
 
-        $filename = sprintf('group-%d-backup-%s.json', $group->id, now()->format('YmdHis'));
-        Storage::disk(self::DISK)->put($filename, json_encode([
-            'group' => $group->only(['id', 'name', 'description', 'owner_id', 'approval_enabled']),
-            'members' => $group->members->map->only(['user_id', 'role_id', 'status', 'joined_at'])->values()->all(),
-            'messages' => $group->messages->map->only(['sender_type', 'sender_id', 'content', 'created_at'])->values()->all(),
-            'generated_at' => now()->toIso8601String(),
-        ], JSON_PRETTY_PRINT));
-
+    /** Catat cadangan baru sebagai "sedang dibuat"; isinya ditulis oleh CreateBackupSnapshotJob. */
+    public function start(Group $group, ?int $actorId, string $type = 'manual'): GroupBackup
+    {
         return GroupBackup::create([
             'group_id' => $group->id,
-            'backup_type' => 'snapshot',
-            'storage_path' => $filename,
+            'backup_type' => $type,
+            'storage_path' => '',
             'created_by' => $actorId,
             'created_at' => now(),
+            'status' => 'pending',
         ]);
     }
 
+    public function fill(GroupBackup $backup): void
+    {
+        $rows = Message::where('group_id', $backup->group_id)->orderBy('id')->get()
+            ->map(fn (Message $message) => $message->getAttributes())
+            ->all();
+
+        $path = sprintf('group-%d/backup-%d-%s.json', $backup->group_id, $backup->id, now()->format('YmdHis'));
+        Storage::disk(self::DISK)->put($path, json_encode(['version' => 2, 'messages' => $rows], JSON_UNESCAPED_UNICODE));
+
+        $backup->update([
+            'storage_path' => $path,
+            'status' => 'ready',
+            'message_count' => count($rows),
+            'attachment_count' => count(array_filter($rows, fn (array $row) => ! empty($row['attachment_path']))),
+            'last_message_id' => $rows === [] ? null : (int) end($rows)['id'],
+        ]);
+    }
+
+    /** Jumlah pesan yang akan kembali bila cadangan ini dipulihkan. */
+    public function restorableCount(GroupBackup $backup): int
+    {
+        $rows = $this->rowsOf($backup);
+
+        return count($this->missingRows($backup, $rows)) + $this->trashedQuery($backup, $rows)->count();
+    }
+
     /**
-     * Ganti seluruh pesan dan anggota grup dengan isi snapshot. Owner selalu dipertahankan.
+     * Kembalikan pesan yang terhapus sejak cadangan dibuat.
      *
      * @throws RuntimeException pesan aman ditampilkan ke user
      */
-    public function restore(Group $group, GroupBackup $backup, User $actor, ?string $reason): void
+    public function restore(Group $group, GroupBackup $backup, User $actor): int
     {
-        $snapshot = $this->readSnapshot($backup);
+        $rows = $this->rowsOf($backup);
 
-        DB::transaction(function () use ($group, $backup, $actor, $reason, $snapshot) {
-            $this->restoreMessages($group, $snapshot['messages']);
-            $this->restoreMembers($group, $snapshot['members']);
+        $restored = DB::transaction(function () use ($group, $backup, $actor, $rows) {
+            $count = $this->trashedQuery($backup, $rows)->update(['deleted_at' => null, 'deleted_by' => null]);
+
+            // Baris yang sudah benar-benar hilang (dari pemulihan versi lama) ditulis ulang dengan id aslinya.
+            foreach ($this->missingRows($backup, $rows) as $row) {
+                DB::table('messages')->insert($row);
+                $count++;
+            }
 
             RecoveryLog::create([
                 'group_id' => $group->id,
                 'backup_id' => $backup->id,
                 'restored_by' => $actor->id,
                 'restored_at' => now(),
-                'reason' => $reason,
             ]);
-            AuditLog::record('settings.restore_backup', $actor->id, $backup, ['reason' => $reason], $group->id);
+            AuditLog::record('settings.restore_backup', $actor->id, $backup, ['restored' => $count], $group->id);
+
+            return $count;
         });
+
+        return $restored;
     }
 
-    private function readSnapshot(GroupBackup $backup): array
+    /** Hapus cadangan yang lebih lama dari KEEP_DAYS beserta berkasnya. */
+    public function prune(): int
     {
-        $content = app(StoredFiles::class)->get(self::DISK, (string) $backup->storage_path);
-        if ($content === null) {
-            throw new RuntimeException('Cadangan tidak ditemukan.');
-        }
-
-        $snapshot = json_decode($content, true);
-        if (! is_array($snapshot) || ! isset($snapshot['messages'], $snapshot['members'])) {
-            throw new RuntimeException('Cadangan rusak dan tidak bisa dipulihkan.');
-        }
-
-        return $snapshot;
-    }
-
-    private function restoreMessages(Group $group, array $messages): void
-    {
-        Message::where('group_id', $group->id)->forceDelete();
-
-        foreach ($messages as $row) {
-            Message::create([
-                'group_id' => $group->id,
-                'sender_type' => (string) ($row['sender_type'] ?? 'user'),
-                'sender_id' => isset($row['sender_id']) ? (int) $row['sender_id'] : null,
-                'content' => (string) ($row['content'] ?? ''),
-            ]);
-        }
-    }
-
-    private function restoreMembers(Group $group, array $members): void
-    {
-        $ownerId = (int) $group->owner_id;
-        GroupMember::updateOrCreate(
-            ['group_id' => $group->id, 'user_id' => $ownerId],
-            ['role_id' => Role::forKey(Role::OWNER)->id, 'status' => 'active', 'joined_at' => now()]
-        );
-
-        $snapshotUserIds = collect($members)->pluck('user_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
-        GroupMember::query()
-            ->where('group_id', $group->id)
-            ->where('user_id', '!=', $ownerId)
-            ->when($snapshotUserIds !== [], fn ($query) => $query->whereNotIn('user_id', $snapshotUserIds))
-            ->delete();
-
-        foreach ($members as $row) {
-            $userId = (int) ($row['user_id'] ?? 0);
-            if ($userId <= 0 || $userId === $ownerId || ! User::whereKey($userId)->exists()) {
-                continue;
+        $old = GroupBackup::where('created_at', '<', now()->subDays(self::KEEP_DAYS))->get();
+        foreach ($old as $backup) {
+            if ($backup->storage_path) {
+                Storage::disk(self::DISK)->delete($backup->storage_path);
             }
-
-            GroupMember::updateOrCreate(
-                ['group_id' => $group->id, 'user_id' => $userId],
-                [
-                    'role_id' => (Role::find((int) ($row['role_id'] ?? 0)) ?? Role::forKey(Role::MEMBER))->id,
-                    'status' => (string) ($row['status'] ?? 'active'),
-                    'joined_at' => now(),
-                ]
-            );
+            $backup->delete();
         }
+
+        return $old->count();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function rowsOf(GroupBackup $backup): array
+    {
+        if ($backup->status !== 'ready') {
+            throw new RuntimeException('Cadangan ini belum siap.');
+        }
+
+        $content = $this->files->get(self::DISK, (string) $backup->storage_path);
+        $snapshot = $content === null ? null : json_decode($content, true);
+        if (! is_array($snapshot) || ! is_array($snapshot['messages'] ?? null) || ($snapshot['version'] ?? 1) < 2) {
+            throw new RuntimeException('Cadangan ini tidak bisa dipulihkan.');
+        }
+
+        return $snapshot['messages'];
+    }
+
+    private function trashedQuery(GroupBackup $backup, array $rows)
+    {
+        return Message::onlyTrashed()
+            ->where('group_id', $backup->group_id)
+            ->whereIn('id', array_column($rows, 'id'))
+            ->where('deleted_at', '>=', $backup->created_at);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function missingRows(GroupBackup $backup, array $rows): array
+    {
+        $existing = Message::withTrashed()->where('group_id', $backup->group_id)->whereIn('id', array_column($rows, 'id'))->pluck('id')->flip();
+
+        return array_values(array_filter($rows, fn (array $row) => ! $existing->has($row['id'])));
     }
 }

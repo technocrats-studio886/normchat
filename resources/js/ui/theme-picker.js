@@ -1,78 +1,99 @@
-// Pemilih tema di halaman Profil. Tema dipasang langsung ke <html data-theme> sebagai pratinjau
-// seluruh halaman; Batal mengembalikan, Terapkan menyimpan ke akun (POST /profile/theme).
+// Pemilih tema di halaman Profil: mode (terang/gelap/ikuti sistem) + warna aksen. Pilihan hanya
+// mengubah pratinjau di dalam panel; halaman berubah setelah Terapkan (POST /profile/theme).
 
 import { showActionToast } from '../chat/composer/toast.js';
 import { chatApiRequest } from '../chat/utils.js';
 
 const root = document.documentElement;
-const browserColorMeta = document.querySelector('meta[name="theme-color"]');
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+const resolveMode = (mode) => (mode === 'system' ? (darkQuery.matches ? 'dark' : 'light') : mode);
+
+/** Pasang tema ke <html>; skrip di layouts/app.blade.php yang mengikuti perubahan setelan perangkat. */
+const applyToPage = ({ mode, accent }) => {
+	root.dataset.themeMode = mode;
+	root.dataset.mode = resolveMode(mode);
+	root.dataset.accent = accent;
+	document.querySelector('meta[name="theme-color"]')?.setAttribute('content', root.dataset.mode === 'dark' ? '#121C29' : '#ffffff');
+};
 
 export const initThemePicker = () => {
 	const panel = document.querySelector('[data-theme-panel]');
 	const openButton = document.querySelector('[data-theme-open]');
-	if (!(panel instanceof HTMLElement) || !(openButton instanceof HTMLElement)) {
+	const preview = panel?.querySelector('[data-theme-preview]');
+	if (!(panel instanceof HTMLElement) || !(openButton instanceof HTMLElement) || !(preview instanceof HTMLElement)) {
 		return;
 	}
 
-	const saveUrl = String(panel.getAttribute('data-theme-url') || '');
 	const applyButton = panel.querySelector('[data-theme-apply]');
-	const options = Array.from(panel.querySelectorAll('[data-theme-option]'));
-	const optionFor = (themeId) => options.find((option) => option.getAttribute('data-theme-option') === themeId);
-	let savedTheme = root.dataset.theme || 'default';
-	let selected = savedTheme;
+	const modeOptions = Array.from(panel.querySelectorAll('[data-theme-mode-option]'));
+	const accentOptions = Array.from(panel.querySelectorAll('[data-theme-accent-option]'));
+	let saved = { mode: panel.dataset.themeMode || 'system', accent: panel.dataset.themeAccent || 'navy' };
+	let selected = { ...saved };
 
-	const preview = (themeId) => {
-		const option = optionFor(themeId) ?? optionFor('default');
-		selected = option.getAttribute('data-theme-option');
-		root.dataset.theme = selected;
-		browserColorMeta?.setAttribute('content', option.getAttribute('data-theme-browser') || '#ffffff');
-		options.forEach((item) => item.setAttribute('aria-checked', item === option ? 'true' : 'false'));
-	};
-
-	const close = () => {
-		panel.classList.add('hidden');
-		document.removeEventListener('keydown', onEscape);
-		openButton.focus();
-	};
-
-	const cancel = () => {
-		preview(savedTheme);
-		close();
+	const render = () => {
+		preview.dataset.mode = resolveMode(selected.mode);
+		preview.dataset.accent = selected.accent;
+		modeOptions.forEach((option) => option.setAttribute('aria-checked', String(option.dataset.themeModeOption === selected.mode)));
+		accentOptions.forEach((option) => option.setAttribute('aria-checked', String(option.dataset.themeAccentOption === selected.accent)));
 	};
 
 	const onEscape = (event) => {
 		if (event.key === 'Escape') {
-			cancel();
+			close();
 		}
 	};
 
+	const close = () => {
+		panel.classList.add('hidden');
+		panel.classList.remove('flex');
+		document.removeEventListener('keydown', onEscape);
+		darkQuery.removeEventListener('change', render);
+		openButton.focus();
+	};
+
 	openButton.addEventListener('click', () => {
-		preview(savedTheme);
+		selected = { ...saved };
+		render();
 		panel.classList.remove('hidden');
+		panel.classList.add('flex');
 		document.addEventListener('keydown', onEscape);
-		optionFor(selected)?.focus();
+		darkQuery.addEventListener('change', render);
+		modeOptions.find((option) => option.getAttribute('aria-checked') === 'true')?.focus();
 	});
-	options.forEach((option) => {
-		option.addEventListener('click', () => preview(option.getAttribute('data-theme-option')));
+	panel.addEventListener('click', (event) => {
+		if (event.target === panel) {
+			close();
+		}
 	});
-	panel.querySelector('[data-theme-cancel]')?.addEventListener('click', cancel);
+	modeOptions.forEach((option) => option.addEventListener('click', () => {
+		selected.mode = option.dataset.themeModeOption;
+		render();
+	}));
+	accentOptions.forEach((option) => option.addEventListener('click', () => {
+		selected.accent = option.dataset.themeAccentOption;
+		render();
+	}));
+	panel.querySelector('[data-theme-cancel]')?.addEventListener('click', close);
 
 	applyButton?.addEventListener('click', async () => {
-		if (selected === savedTheme) {
+		if (selected.mode === saved.mode && selected.accent === saved.accent) {
 			close();
 			return;
 		}
 
 		applyButton.disabled = true;
 		try {
-			await chatApiRequest(saveUrl, { method: 'POST', body: { theme: selected } });
-			savedTheme = selected;
-			const option = optionFor(selected);
+			await chatApiRequest(String(panel.dataset.themeUrl || ''), { method: 'POST', body: selected });
+			saved = { ...selected };
+			applyToPage(saved);
+			const modeLabel = modeOptions.find((option) => option.dataset.themeModeOption === saved.mode)?.textContent.trim() || '';
+			const accentOption = accentOptions.find((option) => option.dataset.themeAccentOption === saved.accent);
 			document.querySelectorAll('[data-theme-current-label]').forEach((node) => {
-				node.textContent = option?.getAttribute('data-theme-label') || '';
+				node.textContent = `${modeLabel} · ${accentOption?.getAttribute('aria-label') || ''}`;
 			});
 			document.querySelectorAll('[data-theme-current-swatch]').forEach((node) => {
-				node.style.background = option?.getAttribute('data-theme-swatch') || '';
+				node.style.background = accentOption?.style.getPropertyValue('--swatch') || '';
 			});
 			close();
 			showActionToast('Tema diterapkan');

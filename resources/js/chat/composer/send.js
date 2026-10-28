@@ -2,15 +2,16 @@
 
 import { authUserId, chatFeed, pendingMessagesByLocalId } from '../context.js';
 import { renderMermaidInNode } from '../markdown.js';
-import { buildMessageNode, flashEditedMessage, replaceRenderedMessageByPayload, resolveEditedFlashTone } from '../messages.js';
+import { buildMessageNode } from '../messages.js';
 import { refreshPollCardsFromFeed } from '../polls.js';
 import { markGroupRead, markGroupVisited, rememberLatestMessageId } from '../read-state.js';
 import { typingIndicator } from '../realtime.js';
 import { chatApiRequest, scrollChatToBottom } from '../utils.js';
 import { initVoicePlayers } from '../voice-player.js';
 import { refreshAttachmentLabel } from './attachment.js';
-import { attachmentInput, buildMessageApiUrl, cameraInput, chatForm, detectAttachmentMessageType, emojiPanel, mentionInput, replyQuoteInput, replyToInput, sendButton } from './elements.js';
-import { clearEditingState, clearReplyTarget, getEditingMessageId, normalizeReplyQuote } from './reply.js';
+import { isEditing, submitEdit } from './edit-mode.js';
+import { attachmentInput, cameraInput, chatForm, detectAttachmentMessageType, emojiPanel, mentionInput, replyQuoteInput, replyToInput, sendButton } from './elements.js';
+import { clearReplyTarget, normalizeReplyQuote } from './reply.js';
 import { showActionToast } from './toast.js';
 import { whisperTyping } from './typing.js';
 
@@ -89,7 +90,7 @@ export const initSend = () => {
 		if (timeEl instanceof HTMLElement) {
 			timeEl.textContent = 'Gagal terkirim';
 			timeEl.classList.remove('text-slate-400');
-			timeEl.classList.add('text-coral-500');
+			timeEl.classList.add('text-danger-ink');
 		}
 
 		pendingMessagesByLocalId.delete(localId);
@@ -160,45 +161,16 @@ export const initSend = () => {
 			: '';
 		const selectedFile = attachmentInput.files?.[0] instanceof File ? attachmentInput.files?.[0] : null;
 
-		if (getEditingMessageId() > 0) {
-			if (!contentText) {
-				showActionToast('Pesan tidak boleh kosong');
-				return;
-			}
-
+		if (isEditing()) {
 			if (selectedFile) {
 				showActionToast('Lampiran tidak bisa ditambahkan saat mengedit');
-				return;
-			}
-
-			const updateUrl = buildMessageApiUrl(getEditingMessageId());
-			if (!updateUrl) {
-				showActionToast('Gagal mengubah pesan');
 				return;
 			}
 
 			setSendingUi(true);
 			chatSubmitInFlight = true;
 			try {
-				const result = await chatApiRequest(updateUrl, {
-					method: 'PATCH',
-					body: {
-						content: contentText,
-					},
-				});
-
-				if (result?.message) {
-					const updatedNode = replaceRenderedMessageByPayload(result.message);
-					if (result.message.is_edited) {
-						const flashTone = resolveEditedFlashTone(result.message);
-						flashEditedMessage(updatedNode, flashTone);
-					}
-				}
-
-				clearEditingState(true);
-				showActionToast('Pesan diubah');
-			} catch {
-				showActionToast('Gagal mengubah pesan');
+				await submitEdit(contentText);
 			} finally {
 				setSendingUi(false);
 				chatSubmitInFlight = false;

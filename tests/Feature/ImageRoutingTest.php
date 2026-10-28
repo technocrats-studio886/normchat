@@ -66,7 +66,7 @@ class ImageRoutingTest extends TestCase
 
         $reply = Message::where('sender_type', 'ai')->firstOrFail();
         $this->assertSame('image', $reply->message_type);
-        $this->assertSame('🎨 Kucing oranye cat air.', $reply->content);
+        $this->assertSame('Kucing oranye cat air.', $reply->content);
         Storage::disk('normchat_attachments')->assertExists($reply->attachment_path);
 
         // Penyusun (Luna): (500 × $0,10 + 100 × $0,50) / 1M = $0,0001

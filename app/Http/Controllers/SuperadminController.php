@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AiModel;
-use App\Models\AiUsageLog;
 use App\Models\AuditLog;
-use App\Models\GroupTokenContribution;
 use App\Services\NormkreditPricing;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,40 +15,18 @@ use Illuminate\View\View;
 
 class SuperadminController extends Controller
 {
+    /** Superadmin › Pengaturan: katalog model AI dan harga Normkredit. */
     public function index(NormkreditPricing $pricing): View
     {
-        $since = now()->subDays(30);
         $aiModels = AiModel::query()->orderBy('sort_order')->orderBy('id')->get();
 
-        $usage = AiUsageLog::query()
-            ->where('created_at', '>=', $since)
-            ->selectRaw('count(*) as requests, coalesce(sum(charged_credits), 0) as charged, coalesce(sum(provider_cost_idr), 0) as cost_idr')
-            ->first();
-
-        $usageByModel = AiUsageLog::query()
-            ->where('created_at', '>=', $since)
-            ->groupBy('model')
-            ->selectRaw('model, count(*) as requests, sum(charged_credits) as charged, sum(provider_cost_idr) as cost_idr')
-            ->orderByDesc('requests')
-            ->get();
-
-        $sales = GroupTokenContribution::query()
-            ->where('created_at', '>=', $since)
-            ->where('price_paid', '>', 0)
-            ->selectRaw('count(*) as payments, coalesce(sum(price_paid), 0) as revenue, coalesce(sum(credit_amount), 0) as credits')
-            ->first();
-
-        return view('superadmin.index', [
+        return view('superadmin.settings', [
             'settings' => $pricing->settings(),
             'usdToIdr' => $pricing->usdToIdr(),
             'aiModels' => $aiModels,
             'sampleCredits' => $aiModels->mapWithKeys(fn (AiModel $aiModel) => [
                 $aiModel->id => $pricing->creditsForCost($aiModel->costUsd(3000, 0, 500), $aiModel->multiplier),
             ]),
-            'usage' => $usage,
-            'usageByModel' => $usageByModel,
-            'sales' => $sales,
-            'rupiahPerCredit' => $pricing->rupiahPerCredit(),
         ]);
     }
 
@@ -70,7 +46,7 @@ class SuperadminController extends Controller
         ]);
 
         $pricing->update($validated);
-        $this->audit('superadmin.update_pricing', $validated);
+        $this->audit('admin.update_pricing', $validated);
 
         return back()->with('success', 'Pengaturan harga disimpan.');
     }
@@ -84,9 +60,9 @@ class SuperadminController extends Controller
             $this->syncDefault($aiModel);
         });
 
-        $this->audit('superadmin.create_ai_model', ['model_id' => $validated['model_id']]);
+        $this->audit('admin.create_ai_model', ['model_id' => $validated['model_id']]);
 
-        return redirect()->route('superadmin.index')->with('success', 'Model ' . $validated['label'] . ' ditambahkan.');
+        return redirect()->route('superadmin.settings')->with('success', 'Model ' . $validated['label'] . ' ditambahkan.');
     }
 
     public function editModel(AiModel $aiModel): View
@@ -103,9 +79,9 @@ class SuperadminController extends Controller
             $this->syncDefault($aiModel);
         });
 
-        $this->audit('superadmin.update_ai_model', ['model_id' => $aiModel->model_id] + $validated);
+        $this->audit('admin.update_ai_model', ['model_id' => $aiModel->model_id] + $validated);
 
-        return redirect()->route('superadmin.index')->with('success', 'Model ' . $aiModel->label . ' diperbarui.');
+        return redirect()->route('superadmin.settings')->with('success', 'Model ' . $aiModel->label . ' diperbarui.');
     }
 
     private function validateModel(Request $request, ?AiModel $aiModel = null): array

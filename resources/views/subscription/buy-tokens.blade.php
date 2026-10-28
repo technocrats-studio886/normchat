@@ -1,15 +1,11 @@
 @extends('layouts.app', ['title' => 'Isi Normkredit - Normi Chat'])
 
 @section('content')
-    <section class="page-shell pt-6">
-        <a href="{{ url()->previous() }}" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition hover:text-slate-700">
-            <span aria-hidden="true">&larr;</span> Kembali
-        </a>
-
-        <h1 class="mt-3 font-display text-2xl font-extrabold text-slate-900">Isi Normkredit</h1>
+    <section class="page-shell">
+        <x-page-header :back="url()->previous()" title="Isi Normkredit" />
 
         @if($errors->has('payment'))
-            <div class="mt-3 rounded-xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+            <div class="mt-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                 {{ $errors->first('payment') }}
             </div>
         @endif
@@ -20,7 +16,7 @@
             @php $ctxGt = $contextGroup->groupToken; @endphp
             <div class="panel-card rounded-2xl p-4">
                 <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Grup</label>
-                <div class="mt-2 flex items-center justify-between rounded-xl border border-navy-200 bg-navy-50 px-3 py-2.5">
+                <div class="mt-2 flex items-center justify-between rounded-xl border border-primary-line bg-primary-soft px-3 py-2.5">
                     <div class="min-w-0">
                         <p class="truncate text-sm font-bold text-slate-800">{{ $contextGroup->name }}</p>
                         <p class="text-[11px] text-slate-500">Saldo: {{ number_format($ctxGt?->credits ?? 0, 2, ',', '.') }} Normkredit</p>

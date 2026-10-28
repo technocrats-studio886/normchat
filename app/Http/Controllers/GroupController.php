@@ -11,14 +11,12 @@ use App\Models\AuditLog;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\Role;
-use App\Services\Credits\Funding;
 use App\Services\GroupMembership;
 use App\Services\NormkreditPricing;
 use App\Services\Payments\NormkreditCheckout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class GroupController extends Controller
@@ -51,7 +49,6 @@ class GroupController extends Controller
     {
         $user = $request->user();
         $quote = $this->pricing->quoteGroupCreation();
-        $isSuperadmin = $user->isSuperadmin();
 
         $group = Group::create([
             'name' => $request->validated('name'),
@@ -60,15 +57,8 @@ class GroupController extends Controller
             'password_hash' => Hash::make($request->validated('password')),
             'approval_enabled' => $request->boolean('approval_enabled'),
             'ai_provider' => 'openai',
-            'status' => $isSuperadmin ? 'active' : 'pending_payment',
+            'status' => 'pending_payment',
         ]);
-
-        if ($isSuperadmin) {
-            $this->membership->activateGroup($group, $user, Funding::bypass($quote->credits, $this->bypassReference('GROUP')));
-
-            return redirect()->route('chat.show', $group)
-                ->with('success', 'Grup "' . $group->name . '" berhasil dibuat.');
-        }
 
         try {
             return redirect()->away($this->checkout->start($user, $group, PaymentPurpose::GroupCreate, $quote));
@@ -114,13 +104,6 @@ class GroupController extends Controller
         }
 
         $quote = $this->pricing->quotePackages($request->packages());
-
-        if ($user->isSuperadmin()) {
-            $this->membership->activateJoin($group, $user, Funding::bypass($quote->credits, $this->bypassReference('JOIN')));
-
-            return redirect()->route('chat.show', $group)
-                ->with('success', 'Kamu bergabung ke grup "' . $group->name . '".');
-        }
 
         try {
             return redirect()->away($this->checkout->start($user, $group, PaymentPurpose::GroupJoin, $quote, [
@@ -184,10 +167,5 @@ class GroupController extends Controller
         $group->delete();
 
         return redirect()->route('groups.index')->with('success', 'Grup berhasil dihapus.');
-    }
-
-    private function bypassReference(string $kind): string
-    {
-        return 'SA-' . $kind . '-' . strtoupper(Str::random(8));
     }
 }

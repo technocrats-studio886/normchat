@@ -4,7 +4,8 @@ namespace App\View\Components;
 
 use App\Models\Group;
 use App\Models\Message;
-use Illuminate\Support\Collection;
+use App\Models\MessageHide;
+use App\Services\Chat\MessageSummary;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\Component;
@@ -20,16 +21,19 @@ class DesktopSidebar extends Component
     public function render(): View
     {
         $user = auth()->user();
+        // Pesan terakhir yang memang terlihat oleh user ini (termasuk jejak pesan terhapus).
         $groups = Group::query()
             ->visibleTo($user)
-            ->addSelect(['last_message_id' => Message::query()
+            ->addSelect(['last_message_id' => Message::withTrashed()
                 ->select('id')
                 ->whereColumn('group_id', 'groups.id')
+                ->visibleTo($user)
+                ->whereNotIn('id', MessageHide::where('user_id', $user->id)->select('message_id'))
                 ->latest('id')
                 ->limit(1)])
             ->get();
 
-        $lastMessages = Message::query()
+        $lastMessages = Message::withTrashed()
             ->with('sender:id,name')
             ->whereIn('id', $groups->pluck('last_message_id')->filter())
             ->get()
@@ -39,6 +43,8 @@ class DesktopSidebar extends Component
             ->join('group_members as gm', fn ($join) => $join->on('gm.group_id', '=', 'messages.group_id')->where('gm.user_id', $user->id))
             ->whereIn('messages.group_id', $groups->pluck('id'))
             ->whereNull('messages.deleted_at')
+            ->where(fn ($query) => $query->whereNull('messages.visible_to_user_id')->orWhere('messages.visible_to_user_id', $user->id))
+            ->whereNotIn('messages.id', MessageHide::where('user_id', $user->id)->select('message_id'))
             ->whereRaw('messages.id > coalesce(gm.last_read_message_id, 0)')
             ->where(fn ($query) => $query->whereNull('messages.sender_id')->orWhere('messages.sender_id', '!=', $user->id))
             ->groupBy('messages.group_id')
@@ -60,13 +66,13 @@ class DesktopSidebar extends Component
 
     private function row(Group $group, ?Message $last, int $unread, int $viewerId): array
     {
-        $time = $last?->created_at?->timezone(config('app.display_timezone', config('app.timezone')));
+        $time = $last?->created_at?->copy()->setTimezone(\App\Support\UserTime::zone());
 
         return [
             'group' => $group,
             'initial' => Str::upper(Str::substr($group->name, 0, 1)),
             'preview' => $last ? $this->preview($last, $viewerId) : 'Belum ada pesan',
-            'time' => $time ? ($time->isToday() ? $time->format('H:i') : $time->format('d/m/y')) : '',
+            'time' => $time ? ($time->isToday() ? $time->format('H.i') : $time->format('d/m/y')) : '',
             'unread' => $unread,
             'sort_key' => $last?->id ?? 0,
         ];
@@ -77,17 +83,9 @@ class DesktopSidebar extends Component
         $sender = match (true) {
             $message->sender_type === 'ai' => 'Normi AI',
             (int) $message->sender_id === $viewerId => 'Kamu',
-            default => Str::words((string) ($message->sender?->name ?? 'User'), 1, ''),
+            default => Str::words((string) ($message->sender?->name ?? 'Anggota'), 1, ''),
         };
 
-        $body = trim((string) $message->content) ?: match ($message->message_type) {
-            'image' => '🖼 Gambar',
-            'voice' => '🎤 Voice note',
-            'video' => '🎬 Video',
-            'canvas' => '🧩 Canvas',
-            default => '📎 Lampiran',
-        };
-
-        return $sender . ': ' . Str::limit(Str::squish($body), 60);
+        return $sender . ': ' . Str::limit(MessageSummary::of($message), 60);
     }
 }

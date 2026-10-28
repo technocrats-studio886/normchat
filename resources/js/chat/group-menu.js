@@ -1,13 +1,14 @@
 // Menu pengaturan cepat grup di halaman chat (polling, hapus grup).
 
 import { chatMessagesBaseUrl, setPollComposerOpener } from './composer.js';
-import { chatFeed, chatShell, hiddenMessagesStorageKey } from './context.js';
+import { chatFeed, chatShell } from './context.js';
 import { renderMermaidInNode } from './markdown.js';
 import { buildMessageNode } from './messages.js';
 import { refreshPollCardsFromFeed } from './polls.js';
 import { markGroupRead, rememberLatestMessageId } from './read-state.js';
 import { typingIndicator } from './realtime.js';
 import { chatApiRequest, scrollChatToBottom } from './utils.js';
+import { openDialog } from '../ui/dialog.js';
 import { initVoicePlayers } from './voice-player.js';
 
 const settingsMenu = document.querySelector('[data-settings-menu]');
@@ -62,7 +63,7 @@ export const initGroupMenu = () => {
 				</div>
 				<div class="mt-4 flex items-center justify-end gap-2">
 					<button type="button" data-poll-cancel class="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Batal</button>
-					<button type="button" data-poll-send class="rounded-xl bg-navy-600 px-3 py-2 text-xs font-bold text-white hover:bg-navy-700">Kirim</button>
+					<button type="button" data-poll-send class="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-hover">Kirim</button>
 				</div>
 			</div>
 		`;
@@ -202,7 +203,7 @@ export const initGroupMenu = () => {
 			}
 		});
 
-		settingsMenu.addEventListener('click', (event) => {
+		settingsMenu.addEventListener('click', async (event) => {
 			const target = event.target.closest('button,a');
 			if (!target) {
 				return;
@@ -210,24 +211,21 @@ export const initGroupMenu = () => {
 
 			if (target.matches('[data-menu-clear-history]')) {
 				event.preventDefault();
-				const confirmClear = window.confirm('Bersihkan chat di perangkat ini? Pesan tetap ada untuk anggota lain.');
-				if (confirmClear && chatFeed) {
-					const hiddenIds = [];
-					chatFeed.querySelectorAll('[data-message-id]').forEach((node) => {
-						const messageId = String(node.getAttribute('data-message-id') || '').trim();
-						if (messageId) {
-							hiddenIds.push(messageId);
-						}
-						node.classList.add('hidden');
-					});
-					try {
-						window.localStorage.setItem(hiddenMessagesStorageKey, JSON.stringify(Array.from(new Set(hiddenIds))));
-					} catch {
-						// Ignore storage write failures silently.
-					}
-					showMenuToast('History lokal dibersihkan');
-				}
 				closeMenu();
+				const choice = await openDialog({
+					title: 'Bersihkan chat?',
+					message: 'Semua pesan di grup ini dihapus dari tampilanmu, di semua perangkatmu. Anggota lain tetap melihatnya.',
+					choices: [{ label: 'Bersihkan', value: 'clear', tone: 'danger' }],
+				});
+				if (choice) {
+					try {
+						await chatApiRequest(`${chatMessagesBaseUrl}/hide`, { method: 'POST', body: { all: true } });
+						chatFeed?.querySelectorAll('.nc-msg').forEach((node) => node.remove());
+						showMenuToast('Chat dibersihkan');
+					} catch {
+						showMenuToast('Gagal membersihkan chat');
+					}
+				}
 				return;
 			}
 

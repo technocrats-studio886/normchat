@@ -126,9 +126,34 @@ const selectFallbackModel = () => {
 
 const setLocked = (option, locked) => {
 	option.setAttribute('data-ai-model-locked', locked ? '1' : '0');
-	option.setAttribute('aria-disabled', locked ? 'true' : 'false');
-	const modelId = option.getAttribute('data-ai-model-option') || '';
-	modelMenu?.querySelector(`[data-ai-model-lock-note="${CSS.escape(modelId)}"]`)?.classList.toggle('hidden', !locked);
+	option.querySelector('[data-ai-lock-icon]')?.classList.toggle('hidden', !locked);
+	option.querySelector('[data-ai-lock-hint]')?.classList.toggle('hidden', !locked);
+	option.querySelector('[data-ai-model-description]')?.classList.toggle('hidden', locked);
+};
+
+const lockSheet = document.querySelector('[data-model-lock-sheet]');
+const creditFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+
+const closeLockSheet = () => lockSheet?.classList.add('hidden');
+
+/** Penjelasan model terkunci: ambang buka, saldo grup sekarang, dan kekurangannya. */
+const openLockSheet = (option) => {
+	if (!(lockSheet instanceof HTMLElement)) {
+		return;
+	}
+
+	const label = option.getAttribute('data-ai-model-name') || '';
+	const openAt = Number(option.getAttribute('data-ai-model-open-at') || 0);
+	const balance = Math.max(0, Number(modelMenu?.dataset.groupCredits || 0));
+	const missing = Math.max(0, openAt - balance);
+
+	lockSheet.querySelector('[data-lock-title]').textContent = `${label} belum terbuka`;
+	lockSheet.querySelector('[data-lock-text]').textContent = `${label} terbuka saat saldo grup mencapai ${creditFormat.format(openAt)} NK. `
+		+ `Saldo sekarang ${creditFormat.format(balance)} NK, kurang ${creditFormat.format(missing)} NK.`;
+	lockSheet.querySelector('[data-lock-meter]').style.width = `${openAt > 0 ? Math.min(100, (balance / openAt) * 100) : 0}%`;
+	closeModelMenu();
+	lockSheet.classList.remove('hidden');
+	lockSheet.querySelector('[data-lock-close]')?.focus();
 };
 
 /**
@@ -141,6 +166,7 @@ export const refreshModelLocks = (credits) => {
 	if (!modelMenu || !Number.isFinite(balance)) {
 		return;
 	}
+	modelMenu.dataset.groupCredits = String(balance);
 
 	modelMenu.querySelectorAll('[data-ai-model-locked]').forEach((option) => {
 		if (balance >= Number(option.getAttribute('data-ai-model-open-at') || 0)) {
@@ -174,7 +200,11 @@ export const initAiOptions = () => {
 
 	modelMenu?.addEventListener('click', (event) => {
 		const option = event.target.closest('[data-ai-model-option]');
-		if (!option || isLocked(option)) {
+		if (!option) {
+			return;
+		}
+		if (isLocked(option)) {
+			openLockSheet(option);
 			return;
 		}
 
@@ -183,6 +213,17 @@ export const initAiOptions = () => {
 	});
 
 	attachMenuButton?.addEventListener('click', closeModelMenu);
+
+	lockSheet?.addEventListener('click', (event) => {
+		if (event.target === lockSheet || event.target.closest('[data-lock-close]')) {
+			closeLockSheet();
+		}
+	});
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') {
+			closeLockSheet();
+		}
+	});
 
 	attachMenu?.addEventListener('click', (event) => {
 		const option = event.target.closest('[data-ai-mode-option]');

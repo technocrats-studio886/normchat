@@ -12,7 +12,7 @@
                 <p class="mt-2 text-sm text-slate-500">Masuk untuk melanjutkan.</p>
 
                 @error('auth')
-                    <p class="mt-4 w-full rounded-xl bg-coral-50 px-3 py-2 text-xs font-semibold text-coral-700">{{ $message }}</p>
+                    <p class="mt-4 w-full rounded-xl bg-danger-soft px-3 py-2 text-xs font-semibold text-danger-ink">{{ $message }}</p>
                 @enderror
 
                 <div class="mt-7 w-full space-y-3">

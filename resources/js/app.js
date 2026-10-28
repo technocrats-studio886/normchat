@@ -10,6 +10,7 @@ import { initGroupMenu } from './chat/group-menu.js';
 import { initMessageSearch } from './chat/message-search.js';
 import { initArchiveTabs } from './settings/archive-tabs.js';
 import { initDeleteGroupDialog } from './settings/delete-group.js';
+import { initHistoryPage } from './settings/history.js';
 import { initMembershipWatch } from './settings/membership-watch.js';
 import { initAvatarPreview } from './ui/avatar-preview.js';
 import { initFormHelpers } from './ui/form-helpers.js';
@@ -20,16 +21,19 @@ import { initPasswordToggles } from './ui/password-toggle.js';
 import { initShareButtons } from './ui/share-buttons.js';
 import { initSidebar } from './ui/sidebar.js';
 import { initThemePicker } from './ui/theme-picker.js';
+import { initTimezoneSync } from './ui/timezone.js';
 
 // Dulu script inline di view (berjalan sebelum app.js), jadi tetap diinisialisasi paling awal.
 initChatShell();
 initFormHelpers();
+initTimezoneSync();
 initSidebar();
 initPasswordToggles();
 initAvatarPreview();
 initJoinById();
 initPackagePickers();
 initArchiveTabs();
+initHistoryPage();
 initDeleteGroupDialog();
 initMembershipWatch();
 initThemePicker();

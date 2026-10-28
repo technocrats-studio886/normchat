@@ -14,6 +14,7 @@ class ChatMessageQueue extends Model
         'queued_at',
         'processed_at',
         'error_message',
+        'replace_message_id',
     ];
 
     protected $casts = [
@@ -31,8 +32,11 @@ class ChatMessageQueue extends Model
         return $this->belongsTo(Message::class);
     }
 
-    /** Antrekan pesan untuk Normi AI, kecuali sudah ada antrean aktif untuknya. */
-    public static function enqueue(Message $message): void
+    /**
+     * Antrekan pesan untuk Normi AI, kecuali sudah ada antrean aktif untuknya.
+     * $replace: jawaban lama yang diganti oleh jawaban baru (jawab ulang setelah pertanyaan diedit).
+     */
+    public static function enqueue(Message $message, ?Message $replace = null): void
     {
         $alreadyActive = static::query()
             ->where('message_id', $message->id)
@@ -45,6 +49,7 @@ class ChatMessageQueue extends Model
                 'message_id' => $message->id,
                 'status' => 'queued',
                 'queued_at' => now(),
+                'replace_message_id' => $replace?->id,
             ]);
         }
     }

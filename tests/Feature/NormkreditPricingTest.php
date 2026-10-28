@@ -10,7 +10,6 @@ use App\Models\AiUsageLog;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
 use App\Models\GroupMember;
-use App\Models\GroupToken;
 use App\Services\Credits\CreditWallet;
 use App\Models\Message;
 use App\Models\PendingPayment;
@@ -105,24 +104,6 @@ class NormkreditPricingTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->post("/join/{$group->share_id}", ['password' => '1234', 'packages' => 0])
             ->assertSessionHasErrors('packages');
-    }
-
-    public function test_superadmin_creates_group_with_package_credits_without_payment(): void
-    {
-        $boss = User::factory()->create(['email' => 'boss@normchat.test']);
-
-        $this->actingAs($boss)
-            ->post('/groups', ['name' => 'Kelas BD', 'password' => '1234'])
-            ->assertRedirect();
-
-        $group = Group::firstOrFail();
-        $this->assertSame('active', $group->status);
-        $this->assertSame(250.0, $group->groupToken->credits);
-        $this->assertDatabaseHas('group_token_contributions', [
-            'group_id' => $group->id,
-            'source' => 'group_creation',
-            'price_paid' => 0,
-        ]);
     }
 
     public function test_midtrans_topup_adds_ordered_credits(): void
@@ -230,7 +211,7 @@ class NormkreditPricingTest extends TestCase
         $this->actingAs(User::factory()->create())->get('/superadmin')->assertForbidden();
 
         $boss = User::factory()->create(['email' => 'boss@normchat.test']);
-        $this->actingAs($boss)->get('/superadmin')->assertOk()->assertSee('gpt-6-luna');
+        $this->actingAs($boss)->get('/superadmin/pengaturan')->assertOk()->assertSee('gpt-6-luna');
 
         $this->actingAs($boss)->post('/superadmin/models', [
             'model_id' => 'gpt-5.4-nano',
@@ -241,7 +222,7 @@ class NormkreditPricingTest extends TestCase
             'image_model' => 'gpt-image-2.5-flare',
             'is_active' => 1,
             'is_default' => 1,
-        ])->assertRedirect('/superadmin');
+        ])->assertRedirect('/superadmin/pengaturan');
 
         $this->assertSame('gpt-5.4-nano', AiModel::defaultModel()->model_id);
         $this->actingAs($boss)->get('/superadmin/models/' . AiModel::defaultModel()->id . '/edit')

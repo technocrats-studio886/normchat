@@ -1,21 +1,6 @@
-// Target balasan (reply) dan mode edit pesan di composer.
+// Target balasan (reply) di composer. Mode edit ada di edit-mode.js.
 
 import { mentionInput, replyClearButton, replyPreview, replyPreviewContent, replyPreviewSender, replyQuoteInput, replyToInput } from './elements.js';
-
-let editingMessageId = 0;
-
-export const getEditingMessageId = () => editingMessageId;
-export const startEditing = (messageId) => {
-	editingMessageId = messageId;
-};
-
-export const clearEditingState = (clearInput = false) => {
-	editingMessageId = 0;
-	if (clearInput && (mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement)) {
-		mentionInput.value = '';
-		mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
-	}
-};
 
 export const clearReplyTarget = () => {
 	if (replyToInput instanceof HTMLInputElement) {
@@ -30,10 +15,6 @@ export const clearReplyTarget = () => {
 		replyPreview.classList.add('hidden');
 		replyPreview.classList.remove('flex');
 	}
-
-	if (editingMessageId > 0) {
-		clearEditingState();
-	}
 };
 
 export const normalizeReplyQuote = (value) => String(value || '')
@@ -41,31 +22,21 @@ export const normalizeReplyQuote = (value) => String(value || '')
 	.trim()
 	.slice(0, 500);
 
-const getSelectedReplyQuoteFromMessage = (messageNode) => {
-	if (!(messageNode instanceof HTMLElement)) {
-		return '';
-	}
-
+/** Teks yang sedang diblok di dalam pesan itu sendiri, bila ada. */
+const selectedTextIn = (messageNode) => {
 	const selection = window.getSelection();
-	if (!selection || selection.rangeCount === 0) {
+	if (!selection || selection.rangeCount === 0 || !messageNode.contains(selection.getRangeAt(0).commonAncestorContainer)) {
 		return '';
 	}
 
-	const selectedText = normalizeReplyQuote(selection.toString() || '');
-	if (selectedText === '') {
-		return '';
-	}
-
-	const selectionRange = selection.getRangeAt(0);
-	const commonNode = selectionRange.commonAncestorContainer;
-	if (!messageNode.contains(commonNode)) {
-		return '';
-	}
-
-	return selectedText;
+	return normalizeReplyQuote(selection.toString());
 };
 
-export const setReplyTarget = (messageNode) => {
+/**
+ * Jadikan pesan sebagai target balasan. $quote = bagian yang dikutip; tanpa $quote dipakai teks
+ * yang sedang diblok di pesan itu, atau seluruh pesan.
+ */
+export const setReplyTarget = (messageNode, quote = null) => {
 	if (!(messageNode instanceof HTMLElement) || !(replyToInput instanceof HTMLInputElement)) {
 		return;
 	}
@@ -75,65 +46,27 @@ export const setReplyTarget = (messageNode) => {
 		return;
 	}
 
-	const sender = String(messageNode.dataset.messageSenderName || 'User');
-	const rawContent = String(messageNode.dataset.messageContent || '').trim();
-	const type = String(messageNode.dataset.messageType || 'text').toLowerCase();
-	const fallback = type === 'image' ? '[Gambar]' : (type === 'voice' ? '[Voice note]' : '[Lampiran]');
-	const content = rawContent !== '' ? rawContent : fallback;
-	const selectedQuote = getSelectedReplyQuoteFromMessage(messageNode);
+	const fromSelection = quote === null;
+	const normalizedQuote = fromSelection ? selectedTextIn(messageNode) : normalizeReplyQuote(quote);
 
 	replyToInput.value = messageId;
 	if (replyQuoteInput instanceof HTMLInputElement) {
-		replyQuoteInput.value = selectedQuote;
+		replyQuoteInput.value = normalizedQuote;
 	}
-	clearEditingState();
 	if (replyPreviewSender instanceof HTMLElement) {
-		replyPreviewSender.textContent = `Membalas ${sender}`;
+		replyPreviewSender.textContent = `Membalas ${messageNode.dataset.messageSenderName || 'Anggota'}`;
 	}
 	if (replyPreviewContent instanceof HTMLElement) {
-		replyPreviewContent.textContent = selectedQuote || content;
+		replyPreviewContent.textContent = normalizedQuote || String(messageNode.dataset.messageContent || '').trim();
 	}
 	if (replyPreview instanceof HTMLElement) {
 		replyPreview.classList.remove('hidden');
 		replyPreview.classList.add('flex');
 	}
-
-	const selection = window.getSelection();
-	if (selection && selectedQuote !== '') {
-		selection.removeAllRanges();
+	if (fromSelection && normalizedQuote) {
+		window.getSelection()?.removeAllRanges();
 	}
 
-	mentionInput?.focus();
-};
-
-/* ── setReplyTarget with optional partial text ── */
-export const setReplyTargetWithText = (messageNode, selectedText) => {
-	if (!(messageNode instanceof HTMLElement) || !(replyToInput instanceof HTMLInputElement)) return;
-	const messageId = String(messageNode.getAttribute('data-message-id') || '').trim();
-	if (!messageId) return;
-
-	const sender = String(messageNode.dataset.messageSenderName || 'User');
-	const rawContent = String(messageNode.dataset.messageContent || '').trim();
-	const type = String(messageNode.dataset.messageType || 'text').toLowerCase();
-	const fallback = type === 'image' ? '[Gambar]' : (type === 'voice' ? '[Voice note]' : '[Lampiran]');
-	const normalizedSelectedText = normalizeReplyQuote(selectedText);
-	const content = normalizedSelectedText || (rawContent !== '' ? rawContent : fallback);
-
-	replyToInput.value = messageId;
-	if (replyQuoteInput instanceof HTMLInputElement) {
-		replyQuoteInput.value = normalizedSelectedText;
-	}
-	clearEditingState();
-	if (replyPreviewSender instanceof HTMLElement) {
-		replyPreviewSender.textContent = `Membalas ${sender}`;
-	}
-	if (replyPreviewContent instanceof HTMLElement) {
-		replyPreviewContent.textContent = content;
-	}
-	if (replyPreview instanceof HTMLElement) {
-		replyPreview.classList.remove('hidden');
-		replyPreview.classList.add('flex');
-	}
 	mentionInput?.focus();
 };
 

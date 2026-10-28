@@ -43,7 +43,7 @@ class RecoveryAndMemberManagementTest extends TestCase
             'included_seats' => 2,
         ]);
 
-        // Admin boleh restore (policy 15 April); member biasa tidak.
+        // Hanya moderator (pemilik/admin) yang boleh memulihkan cadangan.
         $memberRole = Role::query()->create(['key' => 'member', 'name' => 'Member']);
 
         GroupMember::query()->create([
@@ -82,76 +82,28 @@ class RecoveryAndMemberManagementTest extends TestCase
         ]);
 
         $this->actingAs($member)
-            ->post(route('settings.backup.restore', [$group, $backup]), ['reason' => 'test'])
+            ->postJson(route('settings.backup.restore', [$group, $backup]))
             ->assertForbidden();
     }
 
-    public function test_owner_can_restore_backup_and_recovery_log_is_created(): void
+    public function test_old_format_backup_is_refused_without_touching_messages(): void
     {
         Storage::fake('normchat_backups');
-
         $owner = User::factory()->create();
+        $group = Group::query()->create(['name' => 'Recovery Group', 'owner_id' => $owner->id, 'password_hash' => Hash::make('1234')]);
+        Message::query()->create(['group_id' => $group->id, 'sender_type' => 'user', 'sender_id' => $owner->id, 'content' => 'current message']);
 
-        $group = Group::query()->create([
-            'name' => 'Recovery Group',
-            'description' => 'Test',
-            'owner_id' => $owner->id,
-            'password_hash' => Hash::make('1234'),
-            'approval_enabled' => false,
-        ]);
-
-        Subscription::query()->create([
-            'group_id' => $group->id,
-            'plan_name' => 'normchat-pro',
-            'status' => 'active',
-            'billing_cycle' => 'monthly',
-            'main_price' => 15000,
-            'included_seats' => 2,
-        ]);
-
-        Message::query()->create([
-            'group_id' => $group->id,
-            'sender_type' => 'user',
-            'sender_id' => $owner->id,
-            'content' => 'current message',
-        ]);
-
-        $snapshot = [
-            'group' => ['id' => $group->id, 'name' => $group->name],
-            'members' => [],
-            'messages' => [
-                ['sender_type' => 'ai', 'sender_id' => null, 'content' => 'restored message'],
-            ],
-            'generated_at' => now()->toIso8601String(),
-        ];
-
-        $path = 'restore-owner.json';
-        Storage::disk('normchat_backups')->put($path, json_encode($snapshot));
-
-        $backup = GroupBackup::query()->create([
-            'group_id' => $group->id,
-            'backup_type' => 'snapshot',
-            'storage_path' => $path,
-            'created_by' => $owner->id,
-            'created_at' => now(),
-        ]);
+        // Cadangan versi lama (hanya teks) tidak bisa dipulihkan dengan aman: lampiran & waktunya hilang.
+        Storage::disk('normchat_backups')->put('lama.json', json_encode(['members' => [], 'messages' => [['sender_type' => 'ai', 'content' => 'restored message']]]));
+        $backup = GroupBackup::query()->create(['group_id' => $group->id, 'backup_type' => 'snapshot', 'storage_path' => 'lama.json', 'created_by' => $owner->id, 'created_at' => now()]);
 
         $this->actingAs($owner)
-            ->post(route('settings.backup.restore', [$group, $backup]), ['reason' => 'rollback'])
-            ->assertRedirect();
+            ->postJson(route('settings.backup.restore', [$group, $backup]))
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Cadangan ini tidak bisa dipulihkan.');
 
-        $this->assertDatabaseHas('messages', [
-            'group_id' => $group->id,
-            'content' => 'restored message',
-            'sender_type' => 'ai',
-        ]);
-
-        $this->assertDatabaseHas('recovery_logs', [
-            'group_id' => $group->id,
-            'backup_id' => $backup->id,
-            'restored_by' => $owner->id,
-            'reason' => 'rollback',
-        ]);
+        $this->assertSame(['current message'], Message::where('group_id', $group->id)->pluck('content')->all());
+        $this->assertDatabaseCount('recovery_logs', 0);
     }
 
     public function test_only_owner_can_remove_member(): void

@@ -25,7 +25,7 @@
         <button type="button" data-package-step="1" class="flex h-9 w-9 items-center justify-center rounded-lg text-lg font-bold text-slate-600 hover:bg-slate-100" aria-label="Tambah paket">+</button>
     </div>
     @error('packages')
-        <p class="mt-1 text-xs text-coral-500">{{ $message }}</p>
+        <p class="mt-1 text-xs text-danger-ink">{{ $message }}</p>
     @enderror
 </div>
 

@@ -8,6 +8,12 @@ use App\Models\User;
 
 class GroupPolicy
 {
+    /** Superadmin tidak pernah menjadi anggota grup: tidak bisa membaca chat, lampiran, atau pengaturan grup. */
+    public function before(User $user): ?bool
+    {
+        return $user->isSuperadmin() ? false : null;
+    }
+
     public function view(User $user, Group $group): bool
     {
         return $this->isOwner($user, $group) || $this->isActiveMember($user, $group);
@@ -51,18 +57,15 @@ class GroupPolicy
             || $this->hasPermission($user, $group, 'export_chat');
     }
 
+    /** Cadangan hanya untuk moderator (pemilik atau admin grup). */
     public function createBackup(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group)
-            || $this->hasRoleKey($user, $group, 'admin')
-            || $this->hasPermission($user, $group, 'recover_history');
+        return $group->isModerator($user);
     }
 
     public function restoreBackup(User $user, Group $group): bool
     {
-        return $this->isOwner($user, $group)
-            || $this->hasRoleKey($user, $group, 'admin')
-            || $this->hasPermission($user, $group, 'recover_history');
+        return $group->isModerator($user);
     }
 
     /**

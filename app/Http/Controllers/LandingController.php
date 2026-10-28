@@ -14,6 +14,8 @@ class LandingController extends Controller
             return redirect()->route('groups.index');
         }
 
-        return view('marketing.landing');
+        $lang = $request->route('lang', 'id');
+
+        return view("marketing.{$lang}.home", ['lang' => $lang]);
     }
 }

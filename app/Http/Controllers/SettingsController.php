@@ -18,30 +18,23 @@ class SettingsController extends Controller
 {
     private const ARCHIVE_LIMIT = 60;
 
-    private const AUDIT_LIMIT = 15;
-
     public function show(Request $request, Group $group, CreditWallet $wallet): View
     {
         $this->authorize('view', $group);
         $user = $request->user();
 
         $group->load(['groupToken', 'members.user', 'members.role']);
-        $canEditProfile = $user->can('editGroupProfile', $group);
 
         return view('settings.show', [
             'group' => $group,
             'members' => $group->members->where('status', 'active')->values(),
-            'auditLogs' => AuditLog::where('group_id', $group->id)->latest('created_at')->take(self::AUDIT_LIMIT)->get(),
             'mediaMessages' => $this->archive($group)->where('message_type', 'image')->get(),
             'fileMessages' => $this->archive($group)->whereNotIn('message_type', ['image', 'voice'])->get(),
             'linkMessages' => $this->linkMessages($group),
-            'canManageSettings' => $canEditProfile,
-            'canEditProfile' => $canEditProfile,
+            'canEditProfile' => $user->can('editGroupProfile', $group),
             'canManageBilling' => $user->can('manageBilling', $group),
             'canManageAiPersona' => $user->can('manageAiPersona', $group),
             'canManageMembers' => $user->can('manageMembers', $group),
-            'canExportChat' => $user->can('exportChat', $group),
-            'canCreateBackup' => $user->can('createBackup', $group),
             'creditBalance' => $wallet->balanceFor($group, $user),
         ]);
     }

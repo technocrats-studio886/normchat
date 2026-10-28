@@ -12,14 +12,4 @@ final class Funding
         public readonly string $paymentMethod = 'midtrans',
     ) {
     }
-
-    public static function bypass(float $credits, string $reference): self
-    {
-        return new self($credits, 0, $reference, 'bypass');
-    }
-
-    public function isBypass(): bool
-    {
-        return $this->paymentMethod === 'bypass';
-    }
 }

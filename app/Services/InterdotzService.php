@@ -91,7 +91,7 @@ class InterdotzService
     {
         try {
             $payload = [
-                // Keep both key styles for compatibility across Interdotz deployments.
+                // Kedua gaya nama kunci dikirim agar cocok dengan semua versi server Interdotz.
                 'client_id' => $this->clientId,
                 'client_secret' => $this->clientSecret,
                 'clientId' => $this->clientId,
@@ -117,7 +117,7 @@ class InterdotzService
 
             $response = $sendAuthRequest($headers, $payload, "{$this->apiBase}/api/client/auth");
 
-            // Some API deployments only accept form-encoded payloads for this endpoint.
+            // Sebagian server Interdotz hanya menerima form-encoded untuk endpoint ini.
             if (! $response->successful() && str_contains(strtolower((string) $response->body()), 'client_id is required')) {
                 $response = $sendAuthRequest($headers, $payload, "{$this->apiBase}/api/client/auth", true);
             }

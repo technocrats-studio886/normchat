@@ -1,7 +1,8 @@
 // Elemen DOM composer dan helper kecil yang dipakai bersama.
 
 export const chatForm = document.querySelector('[data-chat-form]');
-export const chatMessagesBaseUrl = String(chatForm?.getAttribute('action') || '');
+// Dari feed, agar aksi pesan tetap jalan di grup yang dibekukan (tanpa form composer).
+export const chatMessagesBaseUrl = String(document.querySelector('[data-chat-feed]')?.dataset.messagesUrl || chatForm?.getAttribute('action') || '');
 
 export const buildMessageApiUrl = (messageId) => {
 	if (!chatMessagesBaseUrl || !messageId) {

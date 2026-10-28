@@ -9,11 +9,11 @@ use Throwable;
 
 class AttachmentTextExtractor
 {
-    private const MAX_BYTES = 8 * 1024 * 1024; // 8 MB hard cap on file size we will read
+    private const MAX_BYTES = 8 * 1024 * 1024; // batas berkas yang dibaca: 8 MB
     private const MAX_OUTPUT_CHARS = 16000;    // truncate extracted text to keep prompt manageable
 
     /**
-     * Returns plain text extracted from a document attachment, or null when not applicable / failed.
+     * Teks polos dari lampiran dokumen, atau null bila bukan dokumen atau gagal dibaca.
      */
     public function extract(?Message $message): ?string
     {

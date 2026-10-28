@@ -114,6 +114,12 @@ class StoredFiles
         }
     }
 
+    /** Salin berkas di disk yang sama (mis. lampiran pesan yang diteruskan ke grup lain). */
+    public function copy(string $disk, string $from, string $to): void
+    {
+        Storage::disk($disk)->copy($from, $to);
+    }
+
     public function forget(string $disk, string $path): void
     {
         Cache::forget($this->key($disk, $path, 'size'));

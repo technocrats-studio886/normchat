@@ -71,7 +71,7 @@ final class ImageResponder implements AiResponder
 
         $caption = $plan['caption'] !== '' ? $plan['caption'] : (string) $result->revisedPrompt;
 
-        return AiReply::attachment('image', $caption !== '' ? "🎨 {$caption}" : null, [
+        return AiReply::attachment('image', $caption !== '' ? $caption : null, [
             'message_type' => 'image',
             'path' => $path,
             'mime' => 'image/png',

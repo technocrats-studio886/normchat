@@ -19,15 +19,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'interdotz.webhook' => \App\Http\Middleware\VerifyInterdotzWebhookRequest::class,
             'superadmin' => \App\Http\Middleware\EnsureSuperadmin::class,
             'interdotz.enabled' => \App\Http\Middleware\EnsureInterdotzEnabled::class,
+            'not.superadmin' => \App\Http\Middleware\KeepSuperadminOutOfGroups::class,
         ]);
 
         // Sesi habis setelah 5 hari tanpa aksi user.
         $middleware->web(append: [
             \App\Http\Middleware\EndIdleSession::class,
+            \App\Http\Middleware\EndBlockedSession::class,
             \App\Http\Middleware\AddContentSecurityPolicy::class,
         ]);
 
-        // Trust Nginx reverse proxy
+        // Percayai reverse proxy Nginx (alamat IP & HTTPS asli user).
         $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
