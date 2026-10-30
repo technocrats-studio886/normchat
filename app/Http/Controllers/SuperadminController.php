@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AiModel;
 use App\Models\AuditLog;
 use App\Services\NormkreditPricing;
+use App\Services\Pricing\PricingVersions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,10 @@ use Illuminate\View\View;
 
 class SuperadminController extends Controller
 {
+    public function __construct(private readonly PricingVersions $versions)
+    {
+    }
+
     /** Superadmin › Pengaturan: katalog model AI dan harga Normkredit. */
     public function index(NormkreditPricing $pricing): View
     {
@@ -42,10 +47,19 @@ class SuperadminController extends Controller
             'media_multiplier' => ['required', 'numeric', 'min:1', 'max:20'],
             'max_credits_per_request' => ['required', 'numeric', 'min:0'],
             'max_output_tokens' => ['required', 'integer', 'min:256', 'max:128000'],
+            'max_input_tokens' => ['required', 'integer', 'min:2000', 'max:400000'],
             'daily_group_credit_limit' => ['required', 'numeric', 'min:0'],
+            'card_margin_percent' => ['required', 'numeric', 'min:0', 'max:20'],
         ]);
 
+        $marginBefore = $pricing->cardMarginPercent();
         $pricing->update($validated);
+        // Selisih kartu ikut kurs yang dipakai menagih: hitung ulang dari kurs pasar terakhir sekarang juga.
+        $rate = $pricing->rate();
+        if ($rate !== null && abs($pricing->cardMarginPercent() - $marginBefore) > 0.00001) {
+            $pricing->setExchangeRate((float) $rate['market_rate'], Auth::id(), 'Selisih kartu diubah ke ' . rtrim(rtrim(number_format($pricing->cardMarginPercent(), 2, ',', '.'), '0'), ',') . '%');
+        }
+        $this->versions->record(Auth::id(), 'Pengaturan harga Normkredit diubah');
         $this->audit('admin.update_pricing', $validated);
 
         return back()->with('success', 'Pengaturan harga disimpan.');
@@ -59,6 +73,7 @@ class SuperadminController extends Controller
             $aiModel = AiModel::create($validated);
             $this->syncDefault($aiModel);
         });
+        $this->versions->record(Auth::id(), 'Model ' . $validated['label'] . ' ditambahkan');
 
         $this->audit('admin.create_ai_model', ['model_id' => $validated['model_id']]);
 
@@ -78,6 +93,7 @@ class SuperadminController extends Controller
             $aiModel->update($validated);
             $this->syncDefault($aiModel);
         });
+        $this->versions->record(Auth::id(), 'Model ' . $aiModel->label . ' diubah');
 
         $this->audit('admin.update_ai_model', ['model_id' => $aiModel->model_id] + $validated);
 

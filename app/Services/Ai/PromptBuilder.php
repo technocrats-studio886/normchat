@@ -2,21 +2,37 @@
 
 namespace App\Services\Ai;
 
+use App\Enums\AiMode;
 use App\Models\Group;
+use App\Models\GroupContextTopic;
 use App\Models\Message;
+use App\Services\Ai\Context\ContextBundle;
+use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\AttachmentTextExtractor;
+use App\Services\Chat\PollService;
 use App\Services\Files\StoredFiles;
 use App\Services\NormkreditPricing;
+use App\Support\UserTime;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Menyusun konteks percakapan grup untuk model AI: riwayat pesan, isi lampiran
+ * Menyusun prompt untuk model AI dari konteks ContextManager: riwayat pesan, isi lampiran
  * dokumen, gambar (vision), dan transkrip voice note. Transkripsi yang benar-benar
  * memanggil API dicatat ke UsageMeter.
+ *
+ * Urutan pesan tetap demi prompt cache OpenAI — bagian yang jarang berubah di depan:
+ * instruksi Normi → persona grup → ringkasan grup → jendela riwayat (dari jangkar tetap) →
+ * konteks tambahan untuk pertanyaan ini (topik, pesan lama, maksud) → pertanyaan.
  */
 class PromptBuilder
 {
     private const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+    /** Voice note riwayat yang boleh ditranskripsi per permintaan; sisanya hanya bila transkripnya sudah ada. */
+    private const MAX_HISTORY_TRANSCRIPTIONS = 5;
+
+    /** @var array<int, true>|null id voice note riwayat yang boleh ditranskripsi; ditetapkan sekali per permintaan */
+    private ?array $transcribable = null;
 
     public function __construct(
         private readonly OpenAiClient $client,
@@ -34,7 +50,13 @@ class PromptBuilder
             . "\n- Mermaid diagram dengan syntax ```mermaid untuk flowchart, sequence diagram, pie chart, dll"
             . "\n- Numbered list dan bullet list"
             . "\nGunakan format yang paling sesuai untuk menjawab pertanyaan user."
-            . "\nJika user membalas pesan (reply), prioritaskan konteks pada bagian kutipan reply bila tersedia.";
+            . "\nJika user membalas pesan (reply), prioritaskan konteks pada bagian kutipan reply bila tersedia."
+            . "\n\nKamu membaca percakapan grup: tiap pesan anggota diawali waktu dan nama pengirimnya. Anggota sering mengobrol"
+            . ' tanpa memanggilmu; saat dipanggil, pahami pembicaraan itu dari ringkasan, riwayat, dan konteks tambahan,'
+            . " termasuk rujukan seperti \"itu\", \"yang tadi\", atau \"yang kedua\"."
+            . "\nBedakan yang dinyatakan anggota dari dugaanmu. Bila konteks tidak cukup, katakan terus terang atau minta"
+            . ' klarifikasi singkat; jangan mengarang isi pembicaraan.'
+            . "\nJangan awali jawabanmu dengan nama atau waktu.";
 
         if ($group->ai_persona_style) {
             $prompt .= "\n\nPersona style: " . $group->ai_persona_style;
@@ -47,12 +69,10 @@ class PromptBuilder
     }
 
     /**
-     * Pesan chat lengkap: system prompt, riwayat grup, lalu permintaan terbaru beserta
-     * gambar pada pesan itu / pesan yang dibalasnya.
-     *
-     * @param  iterable<Message>  $recentMessages
+     * Pesan chat lengkap: system prompt, ringkasan grup, jendela riwayat, konteks tambahan, lalu
+     * permintaan terbaru beserta gambar pada pesan itu / pesan yang dibalasnya.
      */
-    public function conversation(string $systemPrompt, iterable $recentMessages, Message $request): array
+    public function conversation(string $systemPrompt, ContextBundle $context, Message $request): array
     {
         $latestParts = [['type' => 'text', 'text' => $this->latestPromptText($request)]];
         foreach ([$request, $request->replyToMessage] as $imageSource) {
@@ -64,25 +84,81 @@ class PromptBuilder
 
         return [
             ['role' => 'system', 'content' => $systemPrompt],
-            ...$this->history($recentMessages, $request),
+            ...$this->memory($context),
+            ...$this->history($context->window, $request),
+            ...$this->extraContext($context),
             ['role' => 'user', 'content' => $latestParts],
         ];
     }
 
-    /**
-     * Riwayat grup sebagai pesan chat (tanpa pesan permintaan itu sendiri).
-     *
-     * @param  iterable<Message>  $recentMessages
-     */
-    public function history(iterable $recentMessages, Message $request, bool $skipEmpty = false): array
+    /** Ringkasan grup (lapis pertama ingatan), sesudah instruksi dan sebelum riwayat. */
+    public function memory(ContextBundle $context): array
     {
+        if ($context->summary === null) {
+            return [];
+        }
+
+        return [['role' => 'system', 'content' => "Ringkasan percakapan grup sebelum riwayat di bawah (dibuat otomatis dan bisa kurang lengkap;"
+            . " bila bertentangan, pesan asli yang benar):\n" . $context->summary]];
+    }
+
+    /**
+     * Konteks khusus pertanyaan ini: ringkasan topik, potongan pesan lama, dan maksud pertanyaan.
+     * Diletakkan setelah riwayat karena isinya berbeda tiap pertanyaan.
+     */
+    public function extraContext(ContextBundle $context): array
+    {
+        if (! $context->hasExtra()) {
+            return [];
+        }
+
+        $parts = [];
+        if ($context->topics !== []) {
+            $parts[] = "Ringkasan topik yang berkaitan:\n" . implode("\n", array_map(
+                fn (GroupContextTopic $topic) => '- ' . $topic->title . ': ' . $topic->summary,
+                $context->topics
+            ));
+        }
+        if ($context->retrieved !== []) {
+            $parts[] = "Potongan riwayat lama yang mungkin relevan (urut waktu):\n" . implode("\n", array_map(
+                fn (Message $message) => $this->contextLine($message, withSender: true),
+                $context->retrieved
+            ));
+        }
+        if ($context->intent !== null) {
+            $parts[] = 'Maksud pertanyaan menurut konteks: ' . $context->intent;
+        }
+        if ($context->ambiguous) {
+            $parts[] = 'Rujukan pertanyaan ini belum jelas dan tidak ditemukan di riwayat. Minta klarifikasi singkat; jangan menebak.';
+        }
+
+        return [['role' => 'system', 'content' => "Konteks tambahan untuk pertanyaan berikut:\n\n" . implode("\n\n", $parts)]];
+    }
+
+    /**
+     * Riwayat grup sebagai pesan chat (tanpa pesan permintaan itu sendiri). Pesan anggota diawali
+     * waktu dan nama pengirim; jawaban Normi tanpa awalan.
+     *
+     * @param  iterable<Message>  $messages
+     */
+    public function history(iterable $messages, Message $request, bool $skipEmpty = false): array
+    {
+        // Dipilih sekali: compose() bisa menyusun ulang riwayat, tapi tidak boleh menambah transkripsi.
+        $this->transcribable ??= collect($messages)
+            ->filter(fn (Message $row) => $row->message_type === 'voice' && $row->attachment_path
+                && ! Cache::has('msg-audio-transcript:' . $row->id))
+            ->sortByDesc('id')
+            ->take(self::MAX_HISTORY_TRANSCRIPTIONS)
+            ->mapWithKeys(fn (Message $row) => [(int) $row->id => true])
+            ->all();
+
         $history = [];
-        foreach ($recentMessages as $row) {
+        foreach ($messages as $row) {
             if ((int) $row->id === (int) $request->id) {
                 continue;
             }
 
-            $line = $this->contextLine($row);
+            $line = $this->contextLine($row, withSender: $row->sender_type !== 'ai');
             if ($skipEmpty && trim($line) === '') {
                 continue;
             }
@@ -111,7 +187,8 @@ class PromptBuilder
 
     private function latestPromptText(Message $request): string
     {
-        $parts = [];
+        $asker = $request->sender?->name ?? 'Anggota';
+        $parts = ['Sekarang ' . UserTime::format(now(), 'l, j F Y H.i') . ". {$asker} bertanya ke Normi:"];
 
         $baseContent = trim((string) $request->content);
         if ($baseContent !== '') {
@@ -139,7 +216,7 @@ class PromptBuilder
             $parts = [...$parts, ...$this->replyContext($request, $replyTarget)];
         }
 
-        return $parts === [] ? 'Bantu user berdasarkan konteks percakapan terbaru.' : implode("\n\n", $parts);
+        return count($parts) === 1 ? $parts[0] . ' (tanpa teks) Bantu berdasarkan konteks percakapan terbaru.' : implode("\n\n", $parts);
     }
 
     private function replyContext(Message $request, Message $replyTarget): array
@@ -167,7 +244,8 @@ class PromptBuilder
             }
         } elseif ($replyTarget->hasImageAttachment()) {
             $parts[] = 'Ada gambar pada pesan yang direply. Perhatikan gambar tersebut dalam jawabanmu.';
-        } else {
+        } elseif (! ($request->ai_mode === AiMode::Canvas && $replyTarget->message_type === CanvasResponder::MESSAGE_TYPE)) {
+            // Revisi Canvas: isi Canvas lama sudah dikirim utuh oleh CanvasResponder, jangan dua kali.
             $documentText = $this->documentText($replyTarget);
             if ($documentText !== null) {
                 $parts[] = 'Isi dokumen yang direply ("' . ($replyTarget->attachment_original_name ?: 'lampiran') . "\"):\n\n" . $documentText;
@@ -177,16 +255,32 @@ class PromptBuilder
         return $parts;
     }
 
-    private function contextLine(Message $row): string
+    private function contextLine(Message $row, bool $withSender = false): string
     {
         // Jawaban Normi AI selalu tercatat sebagai balasan; penanda di riwayat asisten ditiru model
         // ke jawabannya ("... [reply]"), jadi penanda hanya untuk pesan user, di depan.
         $replyQuoteText = trim((string) ($row->reply_quote_text ?? ''));
+        $replyTarget = (int) ($row->reply_to_message_id ?? 0) > 0 ? $row->replyToMessage : null;
+        $replyName = $replyTarget ? ($replyTarget->sender_type === 'ai' ? 'Normi AI' : ($replyTarget->sender?->name ?? 'anggota')) : null;
         $replyPrefix = $row->sender_type !== 'ai' && (int) ($row->reply_to_message_id ?? 0) > 0
-            ? ($replyQuoteText !== '' ? "(membalas, mengutip \"{$replyQuoteText}\") " : '(membalas pesan sebelumnya) ')
+            ? ($replyQuoteText !== ''
+                ? '(membalas ' . ($replyName ?? 'pesan sebelumnya') . ", mengutip \"{$replyQuoteText}\") "
+                : '(membalas ' . ($replyName ?? 'pesan sebelumnya') . ') ')
             : '';
+        if ($row->forwarded_from_name) {
+            $replyPrefix .= '(diteruskan dari ' . $row->forwarded_from_name . ') ';
+        }
+        if ($withSender) {
+            $sender = $row->sender_type === 'ai' ? 'Normi AI' : ($row->sender?->name ?? 'Anggota');
+            $replyPrefix = '[' . UserTime::format($row->created_at, 'D j/n H.i') . '] ' . $sender . ': ' . $replyPrefix;
+        }
 
         $content = trim((string) $row->content);
+        $poll = $content !== '' ? app(PollService::class)->parse($content) : null;
+        if ($poll !== null) {
+            return $replyPrefix . 'Polling: ' . $poll['question'] . ' — pilihan: '
+                . implode(', ', array_map(fn (array $option) => $option['number'] . '. ' . $option['label'], $poll['options']));
+        }
         if ($content !== '') {
             return $replyPrefix . $content;
         }
@@ -206,7 +300,9 @@ class PromptBuilder
         }
 
         if ($messageType === 'voice') {
-            $transcript = $this->transcript($row);
+            $transcript = isset($this->transcribable[(int) $row->id])
+                ? $this->transcript($row)
+                : $this->cachedTranscript($row);
 
             return $transcript !== null
                 ? $replyPrefix . '[Transkrip audio] ' . $transcript
@@ -225,6 +321,14 @@ class PromptBuilder
 
         return Cache::remember('msg-doc-text:' . $message->id, now()->addHours(12),
             fn () => app(AttachmentTextExtractor::class)->extract($message));
+    }
+
+    /** Transkrip yang sudah pernah dibuat, tanpa memanggil API. */
+    private function cachedTranscript(Message $message): ?string
+    {
+        $text = Cache::get('msg-audio-transcript:' . $message->id);
+
+        return is_string($text) && $text !== '' ? $text : null;
     }
 
     /**

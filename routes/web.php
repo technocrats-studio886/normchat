@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AiSettingsController;
 use App\Http\Controllers\Admin\AdminGroupController;
+use App\Http\Controllers\Admin\AdminOpenAiController;
 use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\AuthController;
@@ -144,6 +145,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/keuangan', [AdminReportController::class, 'finance'])->name('finance');
         Route::get('/csv/{type}', [AdminReportController::class, 'csv'])->whereIn('type', ['grup', 'user', 'transaksi', 'ai'])->name('csv');
         Route::get('/audit', [AdminReportController::class, 'audit'])->name('audit');
+        Route::get('/biaya-openai', [AdminOpenAiController::class, 'index'])->name('openai');
+        Route::post('/biaya-openai/kurs', [AdminOpenAiController::class, 'updateRate'])->name('openai.rate');
+        Route::post('/biaya-openai/anggaran', [AdminOpenAiController::class, 'updateBudget'])->name('openai.budget');
+        Route::post('/biaya-openai/saldo', [AdminOpenAiController::class, 'updateBalance'])->name('openai.balance');
+        Route::post('/biaya-openai/email-uji', [AdminOpenAiController::class, 'testEmail'])->name('openai.test-email');
+        Route::post('/peringatan/{alert}/tutup', [AdminOpenAiController::class, 'resolveAlert'])->name('alerts.resolve');
         Route::get('/pengaturan', [SuperadminController::class, 'index'])->name('settings');
         Route::post('/settings', [SuperadminController::class, 'updateSettings'])->name('settings.update');
         Route::post('/models', [SuperadminController::class, 'storeModel'])->name('models.store');

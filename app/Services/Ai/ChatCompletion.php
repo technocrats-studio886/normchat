@@ -21,6 +21,8 @@ final class ChatCompletion
         /** @var list<array{url: string, title: string}> sumber dari web search */
         public readonly array $citations = [],
         public readonly int $webSearchCalls = 0,
+        /** Id respons OpenAI (chatcmpl-… / resp_…), disimpan di log untuk audit. */
+        public readonly ?string $requestId = null,
     ) {
     }
 
@@ -39,6 +41,7 @@ final class ChatCompletion
             ],
             $response->status(),
             $response->successful() ? '' : (string) $response->body(),
+            requestId: $response->json('id'),
         );
     }
 
@@ -86,6 +89,7 @@ final class ChatCompletion
             $response->successful() ? '' : (string) $response->body(),
             array_values($citations),
             $searchCalls,
+            $response->json('id'),
         );
     }
 

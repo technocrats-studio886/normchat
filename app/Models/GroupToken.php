@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Saldo Normkredit grup yang terlihat (1 NK = Rp120 secara default, desimal 0,01 NK).
+ * Saldo Normkredit grup (1 NK = Rp120 secara default), disimpan 4 desimal; tampil 2 desimal.
  *
  * remaining_credits = kredit grup yang belum ditahan; dipakai penuh oleh semua anggota.
  * Perubahan saldo hanya lewat App\Services\Credits\CreditWallet.
@@ -41,9 +41,10 @@ class GroupToken extends Model
         return $this->hasMany(GroupTokenContribution::class, 'group_id', 'group_id');
     }
 
+    /** Saldo untuk ditampilkan (2 desimal, dibulatkan ke bawah agar tidak tampil lebih dari yang ada). */
     public function getCreditsAttribute(): float
     {
-        return round((float) $this->remaining_credits, 2);
+        return floor(round((float) $this->remaining_credits * 100, 6)) / 100;
     }
 
     public static function forGroup(int $groupId): self

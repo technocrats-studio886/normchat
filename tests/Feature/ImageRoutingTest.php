@@ -71,9 +71,9 @@ class ImageRoutingTest extends TestCase
 
         // Penyusun (Luna): (500 × $0,10 + 100 × $0,50) / 1M = $0,0001
         // Flare: (20 × $5 + 1.056 × $30) / 1M = $0,03178
-        // ($0,0001 + $0,03178) × 1,5 × 17.950 ÷ 120 = 7,153 → 7,16 NK
+        // ($0,0001 + $0,03178) × 1,5 × 17.950 ÷ 120 = 7,15306 → 7,1531 NK
         $log = AiUsageLog::firstOrFail();
-        $this->assertSame(['image', 'gpt-6-luna', 7.16, 1.5], [$log->kind, $log->model, $log->charged_credits, $log->multiplier]);
+        $this->assertSame(['image', 'gpt-6-luna', 7.1531, 1.5], [$log->kind, $log->model, $log->charged_credits, $log->multiplier]);
         $this->assertSame(['image_planner', 'image'], array_column($log->breakdown_json['lines'], 'component'));
         $this->assertSame('gpt-image-2.5-flare', $log->breakdown_json['lines'][1]['model']);
     }
@@ -179,7 +179,10 @@ class ImageRoutingTest extends TestCase
 
         $this->ask('@normi buatkan gambar sepeda merah');
 
-        $this->assertSame(0, AiUsageLog::count());
+        // Grup tidak ditagih, tapi biaya perencana yang sudah keluar tetap tercatat (0 NC) untuk rekonsiliasi.
+        $log = AiUsageLog::sole();
+        $this->assertSame(0.0, $log->charged_credits);
+        $this->assertGreaterThan(0, $log->provider_cost_usd);
         $this->assertSame(500.0, $this->group->groupToken->fresh()->credits);
         $this->assertSame(0.0, (float) $this->group->groupToken->fresh()->reserved_credits);
         $this->assertSame('Gagal membuat gambar. Coba lagi nanti.', Message::where('sender_type', 'ai')->value('content'));

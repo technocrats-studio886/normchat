@@ -3,11 +3,15 @@
 namespace App\Services\Ai;
 
 use App\Exceptions\InsufficientBudgetException;
+use App\Exceptions\RequestTooLargeException;
+use App\Exceptions\SpendLimitReachedException;
 use App\Models\AiModel;
+use App\Models\AiSpendHold;
 use App\Models\CreditHold;
 use App\Models\Group;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\Ai\Context\ContextBundle;
 use App\Services\Credits\CreditWallet;
 use App\Services\Credits\ModelAccess;
 use App\Services\NormkreditPricing;
@@ -15,7 +19,9 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Satu permintaan AI dari seorang anggota: konteksnya, model kategori yang dipilih
- * grup, pencatat biaya, dan Normkredit yang ditahan untuknya.
+ * grup, pencatat biaya, dan dua tahanan biayanya — estimasi biaya OpenAI di SpendGuard
+ * (saldo akun OpenAI) dan Normkredit grup di CreditWallet. $pricing sudah dikunci kursnya,
+ * jadi hold, settle, dan log memakai kurs yang sama.
  */
 final class AiTask
 {
@@ -25,22 +31,71 @@ final class AiTask
 
     private ?CreditHold $hold = null;
 
+    private ?AiSpendHold $spendHold = null;
+
     private ?RequestBudget $budget = null;
 
-    /** @param list<Message> $recentMessages */
+    /** Id respons OpenAI dari panggilan model utama, untuk log. */
+    private ?string $requestId = null;
+
+    /** Id tahanan NK, tetap tersedia setelah settle/release untuk menautkan log ke ledger. */
+    private ?int $creditHoldId = null;
+
+    /** Biaya OpenAI permintaan ini sudah dicatat di SpendGuard (sekali saja). */
+    private bool $spendRecorded = false;
+
+    /** Konteks dari ContextManager; hanya diganti compose() bila melewati batas token input. */
+    public ContextBundle $context;
+
     public function __construct(
         public readonly Group $group,
         public readonly User $requester,
         public readonly Message $message,
-        public readonly array $recentMessages,
+        ContextBundle $context,
         public readonly AiModel $model,
         public readonly OpenAiClient $client,
         public readonly NormkreditPricing $pricing,
+        public readonly int $pricingVersionId,
         private readonly CreditWallet $wallet,
         private readonly ModelAccess $access,
+        private readonly SpendGuard $spend,
     ) {
+        $this->context = $context;
         $this->meter = new UsageMeter();
         $this->prompts = new PromptBuilder($client, $this->meter, $pricing);
+    }
+
+    /**
+     * Susun pesan untuk model dalam batas token input per permintaan (pengaturan harga max_input_tokens).
+     * Bila lewat, konteks riwayat diperkecil lalu pesan disusun ulang; konteks yang dipakai tersimpan di
+     * $this->context (untuk log). Dipanggil sebelum biaya apa pun ditahan.
+     *
+     * @param  \Closure(ContextBundle): array  $build
+     *
+     * @throws RequestTooLargeException pesan penanya sendiri sudah melewati batas
+     */
+    public function compose(\Closure $build): array
+    {
+        $limit = (int) $this->pricing->get('max_input_tokens');
+        $context = $this->context;
+
+        while (true) {
+            $messages = $build($context);
+            $over = $limit > 0 ? Tokens::messages($messages) - $limit : 0;
+            if ($over <= 0) {
+                $this->context = $context;
+
+                return $messages;
+            }
+
+            $context = $context->shrinkBy($over) ?? throw new RequestTooLargeException();
+        }
+    }
+
+    /** Pemisah cache prompt per grup (akuntansi cache OpenAI; bukan isolasi riwayat). */
+    public function cacheKey(): string
+    {
+        return 'normchat-group-' . $this->group->id;
     }
 
     /**
@@ -48,10 +103,12 @@ final class AiTask
      *
      * @param  int|null  $outputCeiling  plafon jawaban khusus mode; null = setelan superadmin
      * @param  int  $extraInputTokens  input yang belum ada di $messages (mis. hasil pencarian web)
+     * @param  float  $extraUsd  biaya alat di luar token (mis. panggilan web search)
      *
      * @throws InsufficientBudgetException
+     * @throws SpendLimitReachedException
      */
-    public function planChat(array $messages, ?int $outputCeiling = null, int $extraInputTokens = 0): RequestBudget
+    public function planChat(array $messages, ?int $outputCeiling = null, int $extraInputTokens = 0, float $extraUsd = 0.0): RequestBudget
     {
         $balance = $this->wallet->balanceFor($this->group, $this->requester);
         // Kategori yang dikunci saldo tidak boleh memakai modal grup.
@@ -65,15 +122,42 @@ final class AiTask
                 ? new InsufficientBudgetException($this->access->floorMessage($this->model, $balance->groupTotal))
                 : $e;
         }
-        $this->reserve($this->budget->holdCredits);
+        $this->reserve($this->budget->holdCredits, $this->budget->providerUsd + $extraUsd);
 
         return $this->budget;
     }
 
-    /** @throws InsufficientBudgetException */
-    public function reserve(float $credits): void
+    /**
+     * Tahan biaya OpenAI di SpendGuard lebih dulu, lalu Normkredit grup.
+     *
+     * @throws InsufficientBudgetException
+     * @throws SpendLimitReachedException
+     */
+    public function reserve(float $credits, float $providerUsd): void
     {
-        $this->hold = $this->wallet->hold($this->group, $this->requester, $credits, $this->model);
+        $this->spendHold = $this->spend->reserve('chat', $providerUsd, (int) $this->group->id);
+        try {
+            $this->hold = $this->wallet->hold($this->group, $this->requester, $credits, $this->model, [
+                'pricing_version_id' => $this->pricingVersionId,
+                'exchange_rate_id' => $this->pricing->exchangeRateId(),
+            ]);
+        } catch (InsufficientBudgetException $e) {
+            $this->spend->release($this->spendHold);
+            $this->spendHold = null;
+            throw $e;
+        }
+        $this->creditHoldId = (int) $this->hold->id;
+        $this->spendHold->update(['credit_hold_id' => $this->creditHoldId]);
+    }
+
+    public function creditHoldId(): ?int
+    {
+        return $this->creditHoldId;
+    }
+
+    public function requestId(): ?string
+    {
+        return $this->requestId;
     }
 
     /**
@@ -88,6 +172,7 @@ final class AiTask
         $payload = [
             'messages' => $messages,
             'max_completion_tokens' => $this->budget?->maxOutputTokens ?? (int) $this->pricing->get('max_output_tokens'),
+            'prompt_cache_key' => $this->cacheKey(),
             ...$options,
         ];
 
@@ -108,6 +193,7 @@ final class AiTask
         if (! $completion->successful) {
             Log::warning('OpenAI response failed.', ['status' => $completion->status, 'body' => mb_substr($completion->errorBody, 0, 500)]);
         }
+        $this->requestId ??= $completion->requestId;
 
         return [$completion, $model];
     }
@@ -122,7 +208,7 @@ final class AiTask
     {
         $model = $this->model;
         $maxOutput = $this->budget?->maxOutputTokens ?? (int) $this->pricing->get('max_output_tokens');
-        $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout);
+        $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout, $this->cacheKey());
 
         $fallback = AiModel::defaultModel();
         if ($completion->looksLikeModelIssue() && $fallback && $fallback->model_id !== $model->model_id) {
@@ -133,12 +219,13 @@ final class AiTask
             ]);
 
             $model = $fallback;
-            $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout);
+            $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout, $this->cacheKey());
         }
 
         if (! $completion->successful) {
             Log::warning('OpenAI research failed.', ['status' => $completion->status, 'body' => mb_substr($completion->errorBody, 0, 500)]);
         }
+        $this->requestId ??= $completion->requestId;
 
         return [$completion, $model];
     }
@@ -177,9 +264,14 @@ final class AiTask
         return (bool) $this->budget?->isCapped;
     }
 
-    /** @return float NK yang benar-benar terpotong */
+    /**
+     * Selesaikan kedua tahanan: Normkredit sesuai $credits, saldo OpenAI sesuai biaya nyata meter.
+     *
+     * @return float NK yang benar-benar terpotong
+     */
     public function settle(float $credits): float
     {
+        $this->settleSpend();
         if (! $this->hold) {
             return 0.0;
         }
@@ -190,35 +282,40 @@ final class AiTask
         return $charged;
     }
 
+    /**
+     * Balasan tidak ditagih ke grup: Normkredit dikembalikan penuh, tetapi biaya OpenAI yang sudah
+     * terjadi (mis. jawaban gagal setelah transkripsi) tetap tercatat di SpendGuard.
+     */
     public function releaseHold(): void
     {
+        $this->settleSpend();
         if ($this->hold) {
             $this->wallet->release($this->hold);
             $this->hold = null;
         }
     }
 
-    /** ≈4 karakter per token teks, ≈1.100 token per gambar. */
-    public static function estimateInputTokens(array $messages): int
+    private function settleSpend(): void
     {
-        $chars = 0;
-        $images = 0;
-        foreach ($messages as $message) {
-            $content = $message['content'] ?? '';
-            if (is_string($content)) {
-                $chars += mb_strlen($content);
-                continue;
-            }
+        if ($this->spendRecorded) {
+            return;
+        }
+        $this->spendRecorded = true;
 
-            foreach ((array) $content as $part) {
-                if (($part['type'] ?? '') === 'image_url') {
-                    $images++;
-                } else {
-                    $chars += mb_strlen((string) ($part['text'] ?? ''));
-                }
-            }
+        $cost = $this->meter->providerCostUsd();
+        if (! $this->spendHold) {
+            // Biaya sebelum tahanan dibuat (transkripsi saat menyusun konteks, lalu permintaan ditolak).
+            $this->spend->charge('chat', $cost, (int) $this->group->id);
+
+            return;
         }
 
-        return (int) ceil($chars / 4) + $images * 1_100;
+        $cost > 0 ? $this->spend->settle($this->spendHold, $cost) : $this->spend->release($this->spendHold);
+        $this->spendHold = null;
+    }
+
+    public static function estimateInputTokens(array $messages): int
+    {
+        return Tokens::messages($messages);
     }
 }

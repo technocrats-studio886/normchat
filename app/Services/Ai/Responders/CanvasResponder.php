@@ -5,6 +5,7 @@ namespace App\Services\Ai\Responders;
 use App\Models\Message;
 use App\Services\Ai\AiReply;
 use App\Services\Ai\AiTask;
+use App\Services\Ai\Context\ContextBundle;
 use App\Services\Ai\ModePrompts;
 use App\Services\Ai\PromptBuilder;
 use App\Services\Files\StoredFiles;
@@ -32,12 +33,13 @@ final class CanvasResponder implements AiResponder
 
     public function respond(AiTask $task): AiReply
     {
-        $messages = $task->prompts->conversation(
+        $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation(
             PromptBuilder::chatSystemPrompt($task->group) . "\n\n" . ModePrompts::CANVAS,
-            $task->recentMessages,
+            $context,
             $task->message
-        );
+        ));
 
+        // Isi Canvas yang direvisi tidak dihitung batas input (dibatasi MAX_PREVIOUS_CHARS dan NC per permintaan).
         $previous = $this->previousCanvas($task->message->replyToMessage);
         if ($previous !== null) {
             // Disisipkan tepat sebelum permintaan terbaru.

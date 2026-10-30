@@ -83,3 +83,8 @@ Artisan::command('interdotz:sync-client-profile {--token=} {--dry-run} {--logo-u
 // Dijalankan service "scheduler" di docker-compose.yml.
 Schedule::command('normchat:backup-groups')->dailyAt('03:00')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();
 Schedule::command('normchat:prune-exports')->dailyAt('03:30')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();
+// Biaya OpenAI & ingatan Normi (docs/rancangan-llm-rules.md).
+Schedule::command('normchat:release-stale-holds')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('normchat:check-exchange-rate')->hourly()->withoutOverlapping();
+Schedule::command('normchat:reconcile-openai-costs')->hourly()->between('07:00', '23:00')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();
+Schedule::command('normchat:embed-new-messages')->everyMinute()->withoutOverlapping();

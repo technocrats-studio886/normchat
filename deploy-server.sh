@@ -75,8 +75,11 @@ BACKUP_DIR="${PROJECT_DIR}/storage/app/deploy-backups"
 mkdir -p "$BACKUP_DIR"
 BACKUP_FILE="${BACKUP_DIR}/db-$(date '+%Y%m%d-%H%M%S').sql"
 
-if "${COMPOSE[@]}" ps postgres >/dev/null 2>&1; then
-  "${COMPOSE[@]}" up -d postgres >/dev/null
+if [[ -n "$("${COMPOSE[@]}" ps -a -q postgres 2>/dev/null)" ]]; then
+  # `start`, bukan `up`: container lama dijalankan apa adanya. `up` bisa build image baru dan
+  # me-recreate postgres sebelum backup selesai dibuat.
+  "${COMPOSE[@]}" start postgres >/dev/null
+  until "${COMPOSE[@]}" exec -T postgres pg_isready -U "${DB_USERNAME:-normchat}" >/dev/null 2>&1; do sleep 1; done
   "${COMPOSE[@]}" exec -T postgres pg_dump -U "${DB_USERNAME:-normchat}" -d "${DB_DATABASE:-normchat}" > "$BACKUP_FILE"
   log "Backup database tersimpan: ${BACKUP_FILE}"
 else

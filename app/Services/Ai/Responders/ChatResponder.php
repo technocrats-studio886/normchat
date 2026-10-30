@@ -4,6 +4,7 @@ namespace App\Services\Ai\Responders;
 
 use App\Services\Ai\AiReply;
 use App\Services\Ai\AiTask;
+use App\Services\Ai\Context\ContextBundle;
 use App\Services\Ai\PromptBuilder;
 
 /** Jawaban teks biasa; dengan $modeInstructions untuk mode seperti Guided Learning. */
@@ -22,7 +23,7 @@ final class ChatResponder implements AiResponder
             $systemPrompt .= "\n\n" . $this->modeInstructions;
         }
 
-        $messages = $task->prompts->conversation($systemPrompt, $task->recentMessages, $task->message);
+        $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation($systemPrompt, $context, $task->message));
 
         $task->planChat($messages);
         [$completion, $model] = $task->complete($messages);

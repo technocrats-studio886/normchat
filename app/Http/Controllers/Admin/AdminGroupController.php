@@ -53,7 +53,8 @@ class AdminGroupController extends Controller
             'messageCount' => Message::where('group_id', $group->id)->count(),
             'lastActivity' => Message::where('group_id', $group->id)->max('created_at'),
             'usage' => AiUsageLog::where('group_id', $group->id)->where('created_at', '>=', $since)
-                ->selectRaw('count(*) as requests, coalesce(sum(charged_credits), 0) as charged, coalesce(sum(provider_cost_idr), 0) as cost_idr')->first(),
+                ->selectRaw('count(*) filter (where kind not in (' . AdminReportController::placeholders(AiUsageLog::NOT_ANSWERS) . ')) as requests,'
+                    . ' coalesce(sum(charged_credits), 0) as charged, coalesce(sum(provider_cost_idr), 0) as cost_idr', AiUsageLog::NOT_ANSWERS)->first(),
             'transactions' => GroupTokenContribution::where('group_id', $group->id)->with('user:id,name')->latest('id')->limit(30)->get(),
             'audit' => AuditLog::where('group_id', $group->id)->where('action', 'like', 'admin.%')->with('actor:id,name')->latest('id')->limit(20)->get(),
         ]);
@@ -69,8 +70,7 @@ class AdminGroupController extends Controller
 
         try {
             DB::transaction(function () use ($request, $group, $wallet, $amount, $data) {
-                $wallet->adjust($group, $amount);
-                GroupTokenContribution::create([
+                $contribution = GroupTokenContribution::create([
                     'group_id' => $group->id,
                     'user_id' => $request->user()->id,
                     'source' => 'admin_adjustment',
@@ -79,6 +79,7 @@ class AdminGroupController extends Controller
                     'payment_reference' => 'ADM-' . now()->format('YmdHis'),
                     'note' => $data['reason'],
                 ]);
+                $wallet->adjust($group, $amount, ['user_id' => $request->user()->id, 'contribution_id' => $contribution->id]);
                 AuditLog::record('admin.adjust_credits', $request->user()->id, $group, ['amount' => $amount, 'reason' => $data['reason'], 'group' => $group->name]);
             });
         } catch (RuntimeException $e) {

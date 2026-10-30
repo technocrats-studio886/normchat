@@ -150,7 +150,7 @@ services:
         mkdir -p /opt/normchat/storage/attachments /opt/normchat/storage/exports /opt/normchat/storage/backups &&
         chown -R www-data:www-data /opt/normchat/storage &&
         chmod -R ug+rwX /opt/normchat/storage &&
-        exec setpriv --reuid=www-data --regid=www-data --init-groups php artisan queue:work redis --queue=default --tries=3 --sleep=1 --timeout=600 --max-time=3600
+        exec setpriv --reuid=www-data --regid=www-data --init-groups php artisan queue:work redis --queue=default,maintenance --tries=3 --sleep=1 --timeout=600 --max-time=3600
       "
 
   # Tugas terjadwal (routes/console.php): cadangan chat otomatis pukul 03.00, hapus cadangan
@@ -225,7 +225,10 @@ services:
       "
 
   postgres:
-    image: postgres:16-alpine
+    # postgres:16-alpine + pgvector (docker/postgres/Dockerfile); data volume tetap sama.
+    build:
+      context: ./docker/postgres
+    image: normchat-postgres:16-pgvector
     container_name: normchat-postgres
     environment:
       POSTGRES_DB: ${DB_DATABASE}

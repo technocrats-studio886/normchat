@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AppSetting;
+use App\Models\ExchangeRate;
 use App\Services\Payments\PaymentQuote;
 use Illuminate\Support\Facades\Cache;
 
@@ -10,11 +11,18 @@ use Illuminate\Support\Facades\Cache;
  * Sumber tunggal harga Normkredit.
  *
  * Default ada di config('normchat.pricing'); superadmin menimpanya lewat tabel
- * app_settings. Kurs USD sengaja hanya dari .env.
+ * app_settings (setiap perubahan juga menjadi versi harga, App\Services\Pricing\PricingVersions).
+ * Kurs USD→IDR diisi superadmin setiap hari (tabel exchange_rates); .env hanya cadangan
+ * sampai kurs pertama diisi.
  */
 class NormkreditPricing
 {
     private const CACHE_KEY = 'normchat:pricing-settings';
+
+    private const RATE_CACHE_KEY = 'normchat:exchange-rate';
+
+    /** Kurs yang dikunci untuk satu request AI (lihat locked()). */
+    private ?array $lockedRate = null;
 
     /** Kunci yang boleh diubah superadmin, beserta tipenya. */
     public const EDITABLE = [
@@ -26,7 +34,9 @@ class NormkreditPricing
         'media_multiplier' => 'float',
         'max_credits_per_request' => 'float',
         'max_output_tokens' => 'int',
+        'max_input_tokens' => 'int',
         'daily_group_credit_limit' => 'float',
+        'card_margin_percent' => 'float',
     ];
 
     public function settings(): array
@@ -121,14 +131,76 @@ class NormkreditPricing
         return max(0.0, (float) $this->get('media_multiplier'));
     }
 
+    // ── Kurs ─────────────────────────────────────────────────
+
+    /** Kurs yang dipakai menagih: dikunci untuk request ini, atau kurs harian terakhir, atau .env. */
     public function usdToIdr(): float
     {
-        return (float) config('normchat.usd_to_idr', 17950);
+        return (float) ($this->rate()['applied_rate'] ?? config('normchat.usd_to_idr', 17950));
+    }
+
+    /** Id kurs yang dipakai (null = kurs cadangan .env). */
+    public function exchangeRateId(): ?int
+    {
+        return $this->rate()['id'] ?? null;
+    }
+
+    /**
+     * Salinan dengan kurs saat ini dikunci, dipakai sepanjang satu request AI: hold, settle, dan log
+     * memakai kurs yang sama walau superadmin mengganti kurs di tengah jalan.
+     */
+    public function locked(): static
+    {
+        $copy = clone $this;
+        $copy->lockedRate = $this->rate() ?? [];
+
+        return $copy;
+    }
+
+    /** @return array{id: int, market_rate: float, card_margin_percent: float, applied_rate: float, created_at: string}|null */
+    public function rate(): ?array
+    {
+        if ($this->lockedRate !== null) {
+            return $this->lockedRate === [] ? null : $this->lockedRate;
+        }
+
+        return Cache::rememberForever(self::RATE_CACHE_KEY, function () {
+            $rate = ExchangeRate::query()->latest('id')->first();
+
+            return $rate ? [
+                'id' => $rate->id,
+                'market_rate' => $rate->market_rate,
+                'card_margin_percent' => $rate->card_margin_percent,
+                'applied_rate' => $rate->applied_rate,
+                'created_at' => $rate->created_at->toIso8601String(),
+            ] : null;
+        });
+    }
+
+    public function cardMarginPercent(): float
+    {
+        return max(0.0, (float) $this->get('card_margin_percent'));
+    }
+
+    /** Kurs pasar dari superadmin; yang dipakai menagih = kurs × (1 + selisih kartu). */
+    public function setExchangeRate(float $marketRate, ?int $userId, ?string $note = null): ExchangeRate
+    {
+        $margin = $this->cardMarginPercent();
+        $rate = ExchangeRate::create([
+            'market_rate' => round($marketRate, 2),
+            'card_margin_percent' => $margin,
+            'applied_rate' => round($marketRate * (1 + $margin / 100), 2),
+            'set_by' => $userId,
+            'note' => $note,
+        ]);
+        Cache::forget(self::RATE_CACHE_KEY);
+
+        return $rate;
     }
 
     /**
      * Konversi biaya provider (USD) × multiplier menjadi Normkredit yang ditagih.
-     * Dibulatkan ke atas ke 0,01 NK supaya request kecil tetap tercatat.
+     * Presisi 0,0001 NC (sama dengan kolom saldo), dibulatkan ke atas di digit keempat.
      */
     public function creditsForCost(float $costUsd, float $multiplier = 1.0): float
     {
@@ -138,6 +210,6 @@ class NormkreditPricing
 
         $rupiah = $costUsd * $multiplier * $this->usdToIdr();
 
-        return max(0.01, ceil(round($rupiah / $this->rupiahPerCredit() * 100, 6)) / 100);
+        return max(0.0001, ceil(round($rupiah / $this->rupiahPerCredit() * 10000, 6)) / 10000);
     }
 }

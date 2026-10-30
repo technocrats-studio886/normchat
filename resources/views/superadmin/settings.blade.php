@@ -66,7 +66,9 @@
                     'media_multiplier' => ['Multiplier gambar & voice ×', '0.01'],
                     'max_credits_per_request' => ['Maks. NK / request', '0.01'],
                     'max_output_tokens' => ['Maks. output token', '1'],
+                    'max_input_tokens' => ['Maks. input token', '1'],
                     'daily_group_credit_limit' => ['Limit harian grup (NK)', '0.01'],
+                    'card_margin_percent' => ['Selisih kurs kartu %', '0.01'],
                 ];
             @endphp
             <div class="grid grid-cols-2 gap-3">
@@ -81,7 +83,9 @@
                 @endforeach
             </div>
             <p class="text-[11px] text-slate-500">
-                Potongan = biaya OpenAI × kurs Rp{{ number_format($usdToIdr, 0, ',', '.') }}/USD (dari .env) × multiplier model ÷ Rupiah per NK.
+                Potongan = biaya OpenAI × kurs Rp{{ number_format($usdToIdr, 2, ',', '.') }}/USD × multiplier model ÷ Rupiah per NK.
+                Kurs diisi harian di <a href="{{ route('superadmin.openai') }}#kurs" class="underline">Biaya OpenAI</a> lalu ditambah selisih kurs kartu.
+                Setiap penyimpanan menjadi versi harga baru.
                 Harga beli = NK × Rupiah per NK, ditambah biaya layanan QRIS.
                 Isi 0 pada maks. NK / request atau limit harian untuk menonaktifkan.
             </p>

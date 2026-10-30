@@ -57,12 +57,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | AI Provider API Keys (server-side fallback)
+    | OpenAI
     |--------------------------------------------------------------------------
+    | api_key: satu-satunya key untuk memanggil model (semua grup).
+    | admin_key + project_id: hanya untuk membaca biaya nyata (Costs API) saat rekonsiliasi harian.
     */
 
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
+        'admin_key' => env('OPENAI_ADMIN_KEY'),
+        'project_id' => env('OPENAI_PROJECT_ID'),
     ],
 
 ];

@@ -4,6 +4,7 @@ namespace App\Services\Ai\Responders;
 
 use App\Services\Ai\AiReply;
 use App\Services\Ai\AiTask;
+use App\Services\Ai\Context\ContextBundle;
 use App\Services\Ai\ModePrompts;
 use App\Services\Ai\PromptBuilder;
 
@@ -18,15 +19,23 @@ final class ResearchResponder implements AiResponder
     /** Perkiraan isi hasil pencarian yang masuk sebagai input, untuk menahan NK di muka. */
     private const ESTIMATED_SEARCH_INPUT_TOKENS = 20_000;
 
+    /** Perkiraan jumlah panggilan web search, untuk menahan biaya OpenAI di muka. */
+    private const ESTIMATED_SEARCH_CALLS = 5;
+
     public function respond(AiTask $task): AiReply
     {
-        $messages = $task->prompts->conversation(
+        $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation(
             PromptBuilder::chatSystemPrompt($task->group) . "\n\n" . ModePrompts::DEEP_RESEARCH,
-            $task->recentMessages,
+            $context,
             $task->message
-        );
+        ));
 
-        $task->planChat($messages, self::MAX_OUTPUT_TOKENS, self::ESTIMATED_SEARCH_INPUT_TOKENS);
+        $task->planChat(
+            $messages,
+            self::MAX_OUTPUT_TOKENS,
+            self::ESTIMATED_SEARCH_INPUT_TOKENS,
+            self::ESTIMATED_SEARCH_CALLS * (float) config('normchat.web_search.usd_per_call', 0.01),
+        );
         [$completion, $model] = $task->research($messages);
 
         if (! $completion->hasText()) {

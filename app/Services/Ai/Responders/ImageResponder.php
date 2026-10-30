@@ -4,6 +4,7 @@ namespace App\Services\Ai\Responders;
 
 use App\Services\Ai\AiReply;
 use App\Services\Ai\AiTask;
+use App\Services\Ai\Context\ContextBundle;
 use App\Services\Ai\ImageResult;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -44,9 +45,10 @@ final class ImageResponder implements AiResponder
     public function respond(AiTask $task): AiReply
     {
         $reference = $task->prompts->referenceImage($task->message);
-        $messages = $task->prompts->conversation(self::PLANNER_PROMPT, $task->recentMessages, $task->message);
+        $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation(self::PLANNER_PROMPT, $context, $task->message));
 
-        $task->reserve($this->estimateCredits($task, $messages, $reference !== null));
+        [$credits, $providerUsd] = $this->estimate($task, $messages, $reference !== null);
+        $task->reserve($credits, $providerUsd);
 
         $plan = $this->plan($task, $messages, $reference !== null);
         $engine = $task->model->imageEngine($plan['precise']);
@@ -115,8 +117,12 @@ final class ImageResponder implements AiResponder
         ];
     }
 
-    /** NK yang ditahan: penyusun instruksi + mesin gambar termahal kategori ini. */
-    private function estimateCredits(AiTask $task, array $messages, bool $hasReference): float
+    /**
+     * Yang ditahan: penyusun instruksi + mesin gambar termahal kategori ini.
+     *
+     * @return array{0: float, 1: float} [NK, biaya OpenAI USD]
+     */
+    private function estimate(AiTask $task, array $messages, bool $hasReference): array
     {
         $model = $task->model;
         $plannerCost = $model->costUsd(AiTask::estimateInputTokens($messages), 0, self::PLANNER_MAX_OUTPUT_TOKENS);
@@ -132,7 +138,7 @@ final class ImageResponder implements AiResponder
             );
         }, array_unique([$model->imageEngine(false), $model->imageEngine(true)])));
 
-        return $task->pricing->creditsForCost($plannerCost + $engineCost, $model->multiplier);
+        return [$task->pricing->creditsForCost($plannerCost + $engineCost, $model->multiplier), $plannerCost + $engineCost];
     }
 
     /** Pakai usage dari API bila ada; bila tidak, perkiraan dari config mesin gambar. */

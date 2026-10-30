@@ -8,6 +8,7 @@ use App\Models\GroupBackup;
 use App\Models\Message;
 use App\Models\RecoveryLog;
 use App\Models\User;
+use App\Services\Ai\Context\MemoryMaintenance;
 use App\Services\Files\StoredFiles;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -96,6 +97,9 @@ class GroupBackups
 
             return $count;
         });
+        if ($restored > 0) {
+            app(MemoryMaintenance::class)->messagesRestored((int) $group->id);
+        }
 
         return $restored;
     }

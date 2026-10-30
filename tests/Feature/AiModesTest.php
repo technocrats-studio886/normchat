@@ -92,6 +92,9 @@ class AiModesTest extends TestCase
         $this->runAi(['content' => '@normi ajari aku turunan', 'ai_mode' => AiMode::GuidedLearning]);
 
         Http::assertSent(function (Request $request) {
+            if (! str_ends_with($request->url(), '/chat/completions')) {
+                return false;
+            }
             $system = (string) $request['messages'][0]['content'];
             $latest = json_encode(end($request->data()['messages']));
 
@@ -159,7 +162,8 @@ class AiModesTest extends TestCase
 
         $this->runAi(['content' => 'tambahkan jadwal mingguan', 'reply_to_message_id' => $previous->id, 'ai_mode' => AiMode::Canvas]);
 
-        Http::assertSent(fn (Request $request) => str_contains(json_encode($request['messages']), 'Rencana Belajar Lama'));
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/chat/completions')
+            && str_contains(json_encode($request['messages']), 'Rencana Belajar Lama'));
         $reply = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
         $this->assertSame('text/markdown', $reply->attachment_mime);
         $this->assertSame('# Rencana Belajar Baru', Storage::disk('normchat_attachments')->get($reply->attachment_path));
@@ -203,10 +207,10 @@ class AiModesTest extends TestCase
         $this->assertStringContainsString('[BPS](https://bps.go.id/inflasi)', (string) $reply->content);
 
         // Token Cepat: (2.000 × 0,10 + 1.000 × 0,50) / 1M × 1,5 = $0,00105; 2 pencarian × $0,01 × 2 (media) = $0,04
-        // → $0,04105 × 17.950 ÷ 120 = 6,1404 → 6,15 NK
+        // → $0,04105 × 17.950 ÷ 120 = 6,140375 → 6,1404 NK
         $log = AiUsageLog::firstOrFail();
         $this->assertSame('research', $log->kind);
-        $this->assertSame(6.15, $log->charged_credits);
+        $this->assertSame(6.1404, $log->charged_credits);
         $this->assertContains('web_search', array_column($log->breakdown_json['lines'], 'component'));
     }
 
@@ -286,6 +290,9 @@ class AiModesTest extends TestCase
         $this->runAi(['content' => '@normi maksudku Ronaldo', 'reply_to_message_id' => $answer->id, 'reply_quote_text' => 'pesepak bola Argentina']);
 
         Http::assertSent(function (Request $request) {
+            if (! str_ends_with($request->url(), '/chat/completions')) {
+                return false;
+            }
             $history = collect($request['messages'])->slice(1, -1);
             $assistant = $history->firstWhere('role', 'assistant');
 

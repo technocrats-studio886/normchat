@@ -48,10 +48,60 @@ return [
         'media_multiplier' => 2.0,
         'max_credits_per_request' => 150,
         'max_output_tokens' => 4000,
+        // Batas keras token input per permintaan (konteks + pesan penanya + lampirannya).
+        'max_input_tokens' => 16000,
         'daily_group_credit_limit' => 0,
+        // Selisih kurs kartu & biaya bank di atas kurs pasar yang diisi superadmin (%).
+        'card_margin_percent' => 2.0,
     ],
 
+    // Kurs cadangan, hanya dipakai bila superadmin belum pernah mengisi kurs (tabel exchange_rates).
     'usd_to_idr' => (float) env('NORMCHAT_USD_TO_IDR', 17950),
+
+    /*
+    | Anggaran akun OpenAI (App\Services\Ai\SpendGuard). Angka anggaran & saldo diisi superadmin;
+    | di sini hanya ambang peringatan dan batas berhenti (persen terpakai).
+    */
+    'spend' => [
+        'alert_percents' => [50, 70, 85],
+        'stop_percent' => 100,
+        // Tahanan yang belum diselesaikan setelah sekian menit dianggap macet dan dilepas.
+        'stale_hold_minutes' => 15,
+        // Kurs belum diperbarui superadmin selama sekian jam → peringatan.
+        'rate_stale_hours' => 24,
+        // Selisih biaya nyata OpenAI vs hitungan sistem di atas persen ini → peringatan.
+        'reconcile_alert_percent' => 5,
+    ],
+
+    /*
+    | Ingatan Normi (docs/rancangan-llm-rules.md bagian 5). Angka token adalah perkiraan.
+    */
+    'context' => [
+        'window_tokens' => 6000,
+        'summary_tokens' => 600,
+        'topic_tokens' => 800,
+        'max_topics' => 2,
+        'retrieval_tokens' => 2000,
+        'retrieval_messages' => 8,
+        // Pesan sejak jangkar jendela yang memicu pembaruan ringkasan.
+        'summary_every_messages' => 100,
+        // Jumlah pesan terakhir yang tetap utuh di jendela setelah ringkasan diperbarui.
+        'window_overlap_messages' => 30,
+        // Pesan per cicilan saat meringkas / meng-embed.
+        'chunk_tokens' => 6000,
+        'embed_batch' => 100,
+        // Grup dianggap memakai Normi bila men-tag dalam sekian hari terakhir.
+        'active_days' => 30,
+        'understanding_timeout' => 8,
+        'topic_similarity' => 0.45,
+    ],
+
+    // Embedding untuk pencarian semantik; biayanya dari saldo OpenAI, tidak memotong NC.
+    'embedding' => [
+        'model' => env('NORMCHAT_EMBEDDING_MODEL', 'text-embedding-3-small'),
+        'dimensions' => 1536,
+        'usd_per_mtok' => 0.02,
+    ],
 
     /*
     | Mesin gambar internal. Dipilih per kategori AI (kolom ai_models.image_model dan

@@ -56,10 +56,11 @@ class NormkreditPricingTest extends TestCase
         $cost = $sol->costUsd(3000, 0, 500);
         $this->assertEqualsWithDelta(0.011, $cost, 1e-9);
 
-        // $0,011 × 2,5 × 17.950 = Rp493,64 ÷ Rp120 = 4,1136 NK → dibulatkan ke atas 4,12
-        $this->assertSame(4.12, $pricing->creditsForCost($cost, $sol->multiplier));
+        // $0,011 × 2,5 × 17.950 = Rp493,625 ÷ Rp120 = 4,11354 NK → dibulatkan ke atas di digit keempat 4,1136
+        $this->assertSame(4.1136, $pricing->creditsForCost($cost, $sol->multiplier));
         $this->assertSame(0.0, $pricing->creditsForCost(0, 2));
-        $this->assertSame(0.01, $pricing->creditsForCost(0.0000001, 2));
+        // Biaya sangat kecil tetap tercatat, minimal 0,0001 NC.
+        $this->assertSame(0.0001, $pricing->creditsForCost(0.0000001, 2));
     }
 
     public function test_packages_cost_rp120_per_credit_plus_qris_fee(): void
@@ -155,8 +156,8 @@ class NormkreditPricingTest extends TestCase
             && ! isset($request['temperature']));
 
         $log = AiUsageLog::firstOrFail();
-        $this->assertSame(4.12, $log->charged_credits);
-        $this->assertSame(295.88, $log->balance_after);
+        $this->assertSame(4.1136, $log->charged_credits);
+        $this->assertSame(295.8864, $log->balance_after);
         $this->assertSame(2.5, $log->multiplier);
         $this->assertEqualsWithDelta(0.011 * 17950, $log->provider_cost_idr, 0.001);
         $this->assertSame(295.88, $group->groupToken->fresh()->credits);

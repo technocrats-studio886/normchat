@@ -5,6 +5,7 @@ namespace App\Services\Ai\Responders;
 use App\Services\AiDocumentGenerator;
 use App\Services\Ai\AiReply;
 use App\Services\Ai\AiTask;
+use App\Services\Ai\Context\ContextBundle;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -27,11 +28,13 @@ final class DocumentResponder implements AiResponder
     public function respond(AiTask $task): AiReply
     {
         $userPrompt = trim((string) $task->message->content) ?: 'Buatkan dokumen ringkas berdasarkan konteks percakapan grup.';
-        $messages = [
+        $messages = $task->compose(fn (ContextBundle $context) => [
             ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
-            ...$task->prompts->history($task->recentMessages, $task->message, skipEmpty: true),
+            ...$task->prompts->memory($context),
+            ...$task->prompts->history($context->window, $task->message, skipEmpty: true),
+            ...$task->prompts->extraContext($context),
             ['role' => 'user', 'content' => "Format yang diminta user: {$this->format}.\nPermintaan user: {$userPrompt}\n\nTulis seluruh isi dokumen sekarang."],
-        ];
+        ]);
 
         $task->planChat($messages);
 

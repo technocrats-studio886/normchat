@@ -203,8 +203,8 @@ class GroupCreditsTest extends TestCase
 
         (new ProcessGroupChatQueueJob($this->group->id))->handle();
 
-        $this->assertSame(4.12, AiUsageLog::firstOrFail()->charged_credits);
-        $this->assertSame(245.88, $this->wallet->balanceFor($this->group, $this->owner)->groupTotal);
+        $this->assertSame(4.1136, AiUsageLog::firstOrFail()->charged_credits);
+        $this->assertSame(245.8864, $this->wallet->balanceFor($this->group, $this->owner)->groupTotal);
         $this->assertSame(0.0, (float) $this->group->groupToken->fresh()->reserved_credits);
     }
 

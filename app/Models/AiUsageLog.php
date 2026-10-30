@@ -7,6 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AiUsageLog extends Model
 {
+    /** Pemeliharaan ingatan Normi: dibayar dari saldo OpenAI, tidak ditagih ke grup. */
+    public const MAINTENANCE_KINDS = ['context_summary', 'context_understanding', 'embedding'];
+
+    /** Biaya OpenAI dari permintaan yang ditolak setelah ada biaya (mis. transkripsi), tidak ditagih. */
+    public const REFUSED = 'refused';
+
+    /** Log yang bukan jawaban Normi ke grup (tidak dihitung sebagai permintaan/jawaban di laporan). */
+    public const NOT_ANSWERS = [...self::MAINTENANCE_KINDS, self::REFUSED];
+
     protected $fillable = [
         'group_id',
         'request_message_id',
@@ -24,6 +33,11 @@ class AiUsageLog extends Model
         'multiplier',
         'charged_credits',
         'balance_after',
+        'balance_before',
+        'provider_request_id',
+        'cache_hit_percent',
+        'pricing_version_id',
+        'exchange_rate_id',
     ];
 
     protected $casts = [
@@ -34,6 +48,8 @@ class AiUsageLog extends Model
         'multiplier' => 'float',
         'charged_credits' => 'float',
         'balance_after' => 'float',
+        'balance_before' => 'float',
+        'cache_hit_percent' => 'float',
     ];
 
     public function group(): BelongsTo

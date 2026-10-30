@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Ai\Context\MemoryMaintenance;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -41,6 +42,8 @@ class Group extends Model
                 $group->share_id = static::generateUniqueShareId();
             }
         });
+        // Ingatan Normi berisi isi chat: ikut dihapus bersama grup, dibangun ulang bila grup dipulihkan.
+        static::deleted(fn (Group $group) => app(MemoryMaintenance::class)->purge((int) $group->id));
     }
 
     public static function generateUniqueShareId(): string

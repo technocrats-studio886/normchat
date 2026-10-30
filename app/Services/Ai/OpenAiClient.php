@@ -2,8 +2,6 @@
 
 namespace App\Services\Ai;
 
-use App\Models\AiConnection;
-use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -18,23 +16,14 @@ class OpenAiClient
     }
 
     /**
-     * Kredensial: koneksi AI milik owner grup, lalu API key owner, lalu OPENAI_API_KEY server.
+     * Satu API key server (OPENAI_API_KEY) untuk semua grup. Konteks tiap grup tetap terpisah karena
+     * disusun backend per grup; key hanya mengautentikasi akun OpenAI Normi Chat.
      */
-    public static function forOwner(User $owner): ?self
+    public static function server(): ?self
     {
-        $connectionToken = AiConnection::query()
-            ->where('user_id', $owner->id)
-            ->where('provider', 'openai')
-            ->first()
-            ?->decryptedAccessToken();
+        $token = config('services.openai.api_key');
 
-        foreach ([$connectionToken, $owner->getApiKey(), config('services.openai.api_key')] as $token) {
-            if (is_string($token) && $token !== '') {
-                return new self($token);
-            }
-        }
-
-        return null;
+        return is_string($token) && $token !== '' ? new self($token) : null;
     }
 
     public function chat(array $payload, int $timeout = 60): ChatCompletion
@@ -54,7 +43,7 @@ class OpenAiClient
      * Responses API dengan alat web search. $messages memakai format chat completions
      * (system + riwayat + user) dan diubah ke format input Responses API di sini.
      */
-    public function research(string $model, array $messages, int $maxOutputTokens, int $timeout = 300): ChatCompletion
+    public function research(string $model, array $messages, int $maxOutputTokens, int $timeout = 300, ?string $cacheKey = null): ChatCompletion
     {
         $instructions = [];
         $input = [];
@@ -73,6 +62,7 @@ class OpenAiClient
                 'input' => $input,
                 'tools' => [['type' => 'web_search']],
                 'max_output_tokens' => $maxOutputTokens,
+                ...($cacheKey !== null ? ['prompt_cache_key' => $cacheKey] : []),
             ]));
         } catch (Throwable $e) {
             Log::error('OpenAI research request failed.', ['model' => $model, 'error' => $e->getMessage()]);
@@ -91,6 +81,43 @@ class OpenAiClient
         return array_map(fn (array $part) => ($part['type'] ?? '') === 'image_url'
             ? ['type' => 'input_image', 'image_url' => (string) data_get($part, 'image_url.url')]
             : ['type' => 'input_text', 'text' => (string) ($part['text'] ?? '')], $content);
+    }
+
+    /**
+     * Embedding untuk beberapa teks sekaligus (urutan hasil = urutan masukan).
+     *
+     * @param  list<string>  $inputs
+     * @return array{vectors: list<list<float>>, tokens: int}|null
+     */
+    public function embed(string $model, array $inputs, int $dimensions, int $timeout = 60): ?array
+    {
+        try {
+            $response = Http::withToken($this->token)->timeout($timeout)->post(self::BASE_URL . '/embeddings', [
+                'model' => $model,
+                'input' => array_values($inputs),
+                'dimensions' => $dimensions,
+            ]);
+        } catch (Throwable $e) {
+            Log::warning('OpenAI embedding request failed.', ['model' => $model, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if ($response->failed()) {
+            Log::warning('OpenAI embedding rejected.', ['model' => $model, 'status' => $response->status(), 'body' => mb_substr($response->body(), 0, 300)]);
+
+            return null;
+        }
+
+        $vectors = collect((array) $response->json('data', []))
+            ->sortBy('index')
+            ->map(fn (array $row) => array_map('floatval', (array) ($row['embedding'] ?? [])))
+            ->values()
+            ->all();
+
+        return count($vectors) === count($inputs)
+            ? ['vectors' => $vectors, 'tokens' => (int) $response->json('usage.prompt_tokens', 0)]
+            : null;
     }
 
     public function generateImage(string $model, string $prompt, string $size, string $quality): ImageResult

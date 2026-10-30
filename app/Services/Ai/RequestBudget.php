@@ -20,6 +20,8 @@ final class RequestBudget
         public readonly int $maxOutputTokens,
         public readonly float $holdCredits,
         public readonly bool $isCapped,
+        /** Estimasi biaya OpenAI (USD) dengan output maksimal, ditahan di SpendGuard. */
+        public readonly float $providerUsd,
     ) {
     }
 
@@ -49,13 +51,11 @@ final class RequestBudget
             throw new InsufficientBudgetException(self::refusal($model, $inputTokens, $usableCredits, $maxPerRequest, $pricing));
         }
 
-        $hold = min(
-            $affordable,
-            $pricing->creditsForCost($model->costUsd($inputTokens, 0, $maxOutput), $model->multiplier)
-        );
+        $providerUsd = $model->costUsd($inputTokens, 0, $maxOutput);
+        $hold = min($affordable, $pricing->creditsForCost($providerUsd, $model->multiplier));
 
-        // Dibulatkan ke bawah agar tahanan tidak pernah melebihi kredit yang boleh dipakai.
-        return new self($maxOutput, floor($hold * 100) / 100, $maxOutput < $configuredMax);
+        // Dibulatkan ke bawah (0,0001 NC) agar tahanan tidak pernah melebihi kredit yang boleh dipakai.
+        return new self($maxOutput, floor(round($hold * 10000, 6)) / 10000, $maxOutput < $configuredMax, $providerUsd);
     }
 
     private static function refusal(AiModel $model, int $inputTokens, float $usable, float $maxPerRequest, NormkreditPricing $pricing): string

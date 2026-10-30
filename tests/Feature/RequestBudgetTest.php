@@ -48,8 +48,8 @@ class RequestBudgetTest extends TestCase
 
         $this->assertSame(4000, $budget->maxOutputTokens);
         $this->assertFalse($budget->isCapped);
-        // (3.000 × $2 + 4.000 × $10) / 1M × 2,5 × 17.950 ÷ 120 = 17,202 → 17,21 NK
-        $this->assertSame(17.21, $budget->holdCredits);
+        // (3.000 × $2 + 4.000 × $10) / 1M × 2,5 × 17.950 ÷ 120 = 17,20208 → 17,2021 NK
+        $this->assertSame(17.2021, $budget->holdCredits);
     }
 
     public function test_small_credits_shorten_the_answer_instead_of_refusing(): void
@@ -100,9 +100,9 @@ class RequestBudgetTest extends TestCase
             && $request['max_completion_tokens'] < 4000
             && $request['max_completion_tokens'] > RequestBudget::MIN_OUTPUT_TOKENS);
 
-        // Biaya aktual 3.000/500 token Advanced = 24,69 NK, dipotong dari kredit grup.
-        $this->assertSame(24.69, AiUsageLog::firstOrFail()->charged_credits);
-        $this->assertSame(305.31, app(CreditWallet::class)->balanceFor($group, $member)->groupTotal);
+        // Biaya aktual 3.000/500 token Advanced = 24,6813 NK, dipotong dari kredit grup.
+        $this->assertSame(24.6813, AiUsageLog::firstOrFail()->charged_credits);
+        $this->assertSame(305.3187, app(CreditWallet::class)->balanceFor($group, $member)->groupTotal);
         $this->assertStringContainsString('Jawaban dipersingkat', (string) Message::where('sender_type', 'ai')->value('content'));
     }
 

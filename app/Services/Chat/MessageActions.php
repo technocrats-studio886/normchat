@@ -14,6 +14,7 @@ use App\Models\MessageHide;
 use App\Models\MessageVersion;
 use App\Models\PollVote;
 use App\Models\User;
+use App\Services\Ai\Context\MemoryMaintenance;
 use App\Services\Files\StoredFiles;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -32,6 +33,7 @@ class MessageActions
         private readonly MentionNotifier $mentions,
         private readonly StoredFiles $files,
         private readonly PollService $polls,
+        private readonly MemoryMaintenance $memory,
     ) {
     }
 
@@ -107,6 +109,7 @@ class MessageActions
             ]);
             $message->update(['content' => $content]);
         });
+        $this->memory->messageChanged($message, deleted: false);
 
         // Hanya mention yang baru ditambahkan yang diberi notifikasi.
         $newHandles = array_values(array_diff($this->mentions->handlesIn($content), $this->mentions->handlesIn($previous)));
@@ -169,6 +172,7 @@ class MessageActions
             $message->update(['deleted_by' => $user->id]);
             $message->delete();
         });
+        $this->memory->messageChanged($message, deleted: true);
 
         event(new MessageDeleted((int) $group->id, $this->presenter->present($message)));
         AuditLog::record('chat.delete_message', $user->id, $message, [

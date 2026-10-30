@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiRequestRefusal;
 use App\Models\AiUsageLog;
 use App\Models\AuditLog;
 use App\Models\Group;
@@ -22,8 +23,10 @@ class AdminReportController extends Controller
     {
         $today = CarbonImmutable::now(UserTime::zone())->startOfDay()->utc();
         $month = now()->subDays(30);
+        // Permintaan = jawaban Normi; biaya termasuk pemeliharaan ingatan.
         $usage = fn ($since) => AiUsageLog::where('created_at', '>=', $since)
-            ->selectRaw('count(*) as requests, coalesce(sum(charged_credits), 0) as charged, coalesce(sum(provider_cost_idr), 0) as cost_idr')->first();
+            ->selectRaw('count(*) filter (where kind not in (' . self::placeholders(AiUsageLog::NOT_ANSWERS) . ')) as requests,'
+                . ' coalesce(sum(charged_credits), 0) as charged, coalesce(sum(provider_cost_idr), 0) as cost_idr', AiUsageLog::NOT_ANSWERS)->first();
         $sales = fn ($since) => GroupTokenContribution::where('created_at', '>=', $since)->where('price_paid', '>', 0)
             ->selectRaw('count(*) as payments, coalesce(sum(price_paid), 0) as revenue')->first();
 
@@ -38,7 +41,13 @@ class AdminReportController extends Controller
         ]);
     }
 
-    public function finance(Request $request): View
+    /** "?, ?, ?" untuk whereIn mentah. */
+    public static function placeholders(array $values): string
+    {
+        return implode(', ', array_fill(0, count($values), '?'));
+    }
+
+    public function finance(Request $request, NormkreditPricing $pricing): View
     {
         [$from, $to, $fromInput, $toInput] = $this->range($request);
 
@@ -50,16 +59,49 @@ class AdminReportController extends Controller
             ->selectRaw("to_char(created_at at time zone 'UTC' at time zone ?, 'YYYY-MM-DD') as day, sum(price_paid) as revenue, sum(credit_amount) as credits, count(*) as payments", [UserTime::zone()])
             ->groupBy('day')->orderBy('day')->get();
 
-        $usageByModel = AiUsageLog::whereBetween('created_at', [$from, $to])
-            ->groupBy('model')->selectRaw('model, count(*) as requests, sum(charged_credits) as charged, sum(provider_cost_idr) as cost_idr')
+        // Jawaban yang ditagih ke grup; pemeliharaan ingatan (dari saldo OpenAI) dihitung terpisah.
+        $usageByModel = AiUsageLog::whereBetween('created_at', [$from, $to])->whereNotIn('kind', AiUsageLog::NOT_ANSWERS)
+            ->groupBy('model')->selectRaw('model, count(*) as requests, sum(charged_credits) as charged, sum(provider_cost_idr) as cost_idr,'
+                . ' avg(input_tokens) as avg_input, sum(cached_input_tokens) as cached, sum(input_tokens) as input')
             ->orderByDesc('cost_idr')->get();
+
+        $maintenance = AiUsageLog::whereBetween('created_at', [$from, $to])->whereIn('kind', AiUsageLog::NOT_ANSWERS)
+            ->groupBy('kind')->selectRaw('kind, count(*) as calls, sum(input_tokens) as input, sum(provider_cost_idr) as cost_idr')
+            ->get()->keyBy('kind');
+
+        // Log sebelum penanda "searched" ada: dianggap mencari bila ada pesan lama yang ikut.
+        $searched = "coalesce((breakdown_json->'context'->>'searched')::boolean, (breakdown_json->'context'->>'retrieved')::int > 0)";
+        $recallFailed = "coalesce((breakdown_json->'context'->>'recall_failed')::boolean, false)";
+        $answers = AiUsageLog::whereBetween('created_at', [$from, $to])->whereNotIn('kind', AiUsageLog::NOT_ANSWERS)
+            ->selectRaw("count(*) as total,"
+                . " count(*) filter (where {$searched}) as searched,"
+                . " count(*) filter (where (breakdown_json->'context'->>'understanding')::boolean) as understood,"
+                . " count(*) filter (where (breakdown_json->'context'->>'summary')::boolean) as with_summary,"
+                . " count(*) filter (where {$recallFailed}) as recall_failed")
+            ->first();
+
+        // Normi gagal mengingat per minggu (Senin–Minggu, zona waktu superadmin): diminta klarifikasi, atau
+        // riwayat lama dicari tapi tidak ada yang ketemu. Hanya angka dari log, tanpa isi chat.
+        $recallByWeek = AiUsageLog::whereBetween('created_at', [$from, $to])->whereNotIn('kind', AiUsageLog::NOT_ANSWERS)
+            ->selectRaw("to_char(date_trunc('week', created_at at time zone 'UTC' at time zone ?), 'YYYY-MM-DD') as week,"
+                . " count(*) as total, count(*) filter (where {$recallFailed}) as failed", [UserTime::zone()])
+            ->groupBy('week')->orderBy('week')->get();
+
+        $refusals = AiRequestRefusal::whereBetween('created_at', [$from, $to])
+            ->groupBy('reason')->selectRaw('reason, count(*) as total')->pluck('total', 'reason');
+
+        $rupiahPerCredit = $pricing->rupiahPerCredit();
 
         $usageByGroup = AiUsageLog::whereBetween('ai_usage_logs.created_at', [$from, $to])
             ->join('groups', 'groups.id', '=', 'ai_usage_logs.group_id')
-            ->groupBy('groups.id', 'groups.name')->selectRaw('groups.id, groups.name, count(*) as requests, sum(charged_credits) as charged, sum(provider_cost_idr) as cost_idr')
+            ->groupBy('groups.id', 'groups.name')
+            ->selectRaw('groups.id, groups.name, count(*) filter (where ai_usage_logs.kind not in (' . self::placeholders(AiUsageLog::NOT_ANSWERS) . ')) as requests,'
+                . ' sum(charged_credits) as charged, sum(provider_cost_idr) as cost_idr', AiUsageLog::NOT_ANSWERS)
             ->orderByDesc('cost_idr')->limit(20)->get();
 
-        return view('superadmin.finance', compact('transactions', 'revenueByDay', 'usageByModel', 'usageByGroup', 'fromInput', 'toInput'));
+        return view('superadmin.finance', compact(
+            'transactions', 'revenueByDay', 'usageByModel', 'usageByGroup', 'maintenance', 'answers', 'recallByWeek', 'refusals', 'rupiahPerCredit', 'fromInput', 'toInput'
+        ));
     }
 
     public function audit(): View
@@ -97,9 +139,13 @@ class AdminReportController extends Controller
                     ->map(fn ($row) => [$row->id, UserTime::format($row->created_at, 'Y-m-d H:i'), $row->group?->name, $row->user?->name, $row->source, $row->credit_amount, $row->price_paid, $row->payment_reference, $row->note]),
             ],
             'ai' => [
-                ['ID', 'Waktu', 'Grup', 'Model', 'Jenis', 'Token masuk', 'Token keluar', 'NK ditagih', 'Biaya (Rp)'],
+                ['ID', 'Waktu', 'Grup', 'Model', 'Jenis', 'Token masuk', 'Token masuk tercache', 'Token keluar', 'Biaya (USD)', 'Kurs', 'Biaya (Rp)', 'Multiplier', 'NK ditagih', 'Saldo sebelum', 'Saldo sesudah', 'Versi harga', 'Request OpenAI'],
                 AiUsageLog::whereBetween('created_at', [$from, $to])->with(['group' => fn ($query) => $query->withTrashed()])->orderBy('id')->lazy()
-                    ->map(fn ($row) => [$row->id, UserTime::format($row->created_at, 'Y-m-d H:i'), $row->group?->name, $row->model, $row->kind, $row->input_tokens, $row->output_tokens, $row->charged_credits, $row->provider_cost_idr]),
+                    ->map(fn ($row) => [
+                        $row->id, UserTime::format($row->created_at, 'Y-m-d H:i'), $row->group?->name, $row->model, $row->kind,
+                        $row->input_tokens, $row->cached_input_tokens, $row->output_tokens, $row->provider_cost_usd, $row->usd_to_idr, $row->provider_cost_idr,
+                        $row->multiplier, $row->charged_credits, $row->balance_before, $row->balance_after, $row->pricing_version_id, $row->provider_request_id,
+                    ]),
             ],
             default => abort(404),
         };
