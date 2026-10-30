@@ -118,13 +118,30 @@ final class AiTask
         try {
             $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling);
         } catch (InsufficientBudgetException $e) {
-            throw $floor > 0 && $usable < $balance->usable()
-                ? new InsufficientBudgetException($this->access->floorMessage($this->model, $balance->groupTotal))
-                : $e;
+            if ($floor > 0 && $usable < $balance->usable()) {
+                throw new InsufficientBudgetException($this->access->floorMessage($this->model, $balance->groupTotal));
+            }
+            if ($balance->dailyQuotaLeft !== null && $balance->dailyQuotaLeft < $balance->groupTotal) {
+                // Yang habis batas harian dari owner, bukan saldo grup: "Isi Normkredit" tidak menolong.
+                throw new InsufficientBudgetException($this->dailyLimitMessage($balance->dailyQuotaLeft, $inputTokens));
+            }
+            throw $e;
         }
         $this->reserve($this->budget->holdCredits, $this->budget->providerUsd + $extraUsd);
 
         return $this->budget;
+    }
+
+    private function dailyLimitMessage(float $left, int $inputTokens): string
+    {
+        $fmt = fn (float $value) => number_format($value, 2, ',', '.');
+        $minimum = $this->pricing->creditsForCost(
+            $this->model->costUsd($inputTokens, 0, RequestBudget::MIN_OUTPUT_TOKENS),
+            $this->model->multiplier
+        );
+
+        return 'Batas pemakaian harianmu di grup ini tinggal ' . $fmt($left) . ' Normkredit, belum cukup untuk pertanyaan ini'
+            . ' (butuh sekitar ' . $fmt($minimum) . '). Coba pertanyaan yang lebih singkat, pilih model yang lebih hemat, atau lanjutkan besok.';
     }
 
     /**

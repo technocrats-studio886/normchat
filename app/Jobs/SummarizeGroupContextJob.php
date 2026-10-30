@@ -195,11 +195,18 @@ class SummarizeGroupContextJob implements ShouldQueue, ShouldBeUniqueUntilProces
                 . "Aturan:\n"
                 . "- ringkasan_grup (maks. 150 kata): tujuan grup, keputusan penting lintas topik, fakta & batasan jangka panjang,"
                 . " siapa memegang tugas apa. Gabungkan ringkasan lama dengan pesan baru; buang yang sudah tidak berlaku.\n"
-                . "- topik: hanya pembahasan yang muncul di pesan baru. Pakai id topik lama bila pembahasannya sama, null bila baru."
+                . "- Pertahankan detail persis: angka, nominal, tanggal, jam, tempat, dan nama. Tulis \"parkir mobil di basement gedung C\","
+                . " bukan \"Sari mengatur parkir\".\n"
+                . "- topik: pembahasan dari pesan baru yang berisi keputusan, rencana, jadwal, pembagian tugas, anggaran, atau fakta yang"
+                . " mungkin ditanyakan lagi. Setiap keputusan dan fakta seperti itu wajib masuk salah satu topik beserta pesan_penting-nya."
+                . " Pakai id topik lama bila pembahasannya sama, null bila baru."
                 . " ringkasan topik (maks. 120 kata): konteks, keputusan yang disepakati, fakta & batasan dari anggota, pertanyaan yang belum selesai.\n"
+                . "- Obrolan ringan yang tidak berkaitan dengan tujuan grup (cuaca, jalan, makanan, kabar sehari-hari) bukan topik dan tidak"
+                . " perlu masuk ringkasan.\n"
                 . "- pesan_awal, pesan_akhir, pesan_penting: id dari daftar pesan baru (pesan_penting = sumber keputusan/fakta penting).\n"
-                . "- Tulis apa yang dinyatakan anggota apa adanya. Kesimpulanmu sendiri tandai \"(dugaan Normi)\".\n"
-                . "- Obrolan ringan tanpa isi penting tidak perlu jadi topik. Bahasa Indonesia, sebut nama anggota bila relevan."],
+                . "- Tulis apa yang dinyatakan anggota apa adanya, atas nama penulisnya (pesan \"diteruskan oleh\" milik penulis aslinya)."
+                . " Kesimpulanmu sendiri tandai \"(dugaan Normi)\".\n"
+                . "- Bahasa Indonesia, sebut nama anggota bila relevan."],
             ['role' => 'user', 'content' => "Ringkasan grup saat ini:\n" . (trim((string) $state->summary) ?: '(belum ada)')
                 . "\n\nTopik yang sudah ada:\n" . ($detailed !== '' ? $detailed : '(belum ada)')
                 . ($titles !== '' ? "\n\nJudul topik lain: " . $titles : '')
@@ -278,6 +285,10 @@ class SummarizeGroupContextJob implements ShouldQueue, ShouldBeUniqueUntilProces
     private function line(Message $message): string
     {
         $sender = $message->sender_type === 'ai' ? 'Normi AI' : ($message->sender?->name ?? 'Anggota');
+        if ($message->forwarded_from_name) {
+            // Pesan yang diteruskan milik penulis aslinya, bukan yang meneruskan.
+            $sender = $message->forwarded_from_name . ' (diteruskan oleh ' . $sender . ')';
+        }
         $content = trim((string) $message->content);
         if ($content === '' && $message->attachment_path) {
             $content = '[lampiran: ' . ($message->attachment_original_name ?: $message->message_type) . ']';

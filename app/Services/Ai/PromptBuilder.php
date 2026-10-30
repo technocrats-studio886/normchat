@@ -281,35 +281,41 @@ class PromptBuilder
             return $replyPrefix . 'Polling: ' . $poll['question'] . ' — pilihan: '
                 . implode(', ', array_map(fn (array $option) => $option['number'] . '. ' . $option['label'], $poll['options']));
         }
-        if ($content !== '') {
-            return $replyPrefix . $content;
+        $attachment = $this->attachmentLine($row);
+        if ($attachment === null) {
+            return $replyPrefix . ($content !== '' ? $content : '[Pesan sebelumnya berisi lampiran]');
+        }
+
+        // Keterangan tidak menggantikan lampirannya: isi dokumen/transkrip tetap terbaca Normi.
+        return $replyPrefix . $attachment . ($content !== '' ? "\nKeterangan: " . $content : '');
+    }
+
+    /** Lampiran pesan riwayat sebagai teks (gambar, isi dokumen, transkrip voice note); null bila tanpa lampiran. */
+    private function attachmentLine(Message $row): ?string
+    {
+        if (! $row->attachment_path) {
+            return null;
         }
 
         $messageType = strtolower((string) ($row->message_type ?? 'text'));
-        if ($messageType === 'image') {
-            return $replyPrefix . '[Pesan sebelumnya berisi gambar]';
+        if ($messageType === 'image' || $row->hasImageAttachment()) {
+            return '[Pesan sebelumnya berisi gambar]';
         }
 
-        if ($messageType === 'file' && $row->attachment_path) {
-            $label = $row->attachment_original_name ?? 'lampiran';
-            $documentText = $this->documentText($row);
-
-            return $documentText !== null
-                ? $replyPrefix . "[Dokumen \"{$label}\"]\n" . mb_substr($documentText, 0, 1500)
-                : $replyPrefix . "[Pesan sebelumnya berisi lampiran file: {$label}]";
-        }
-
-        if ($messageType === 'voice') {
+        if ($messageType === 'voice' || $row->hasAudioAttachment()) {
             $transcript = isset($this->transcribable[(int) $row->id])
                 ? $this->transcript($row)
                 : $this->cachedTranscript($row);
 
-            return $transcript !== null
-                ? $replyPrefix . '[Transkrip audio] ' . $transcript
-                : $replyPrefix . '[Pesan sebelumnya berisi audio]';
+            return $transcript !== null ? '[Transkrip audio] ' . $transcript : '[Pesan sebelumnya berisi audio]';
         }
 
-        return $replyPrefix . '[Pesan sebelumnya berisi lampiran]';
+        $label = $row->attachment_original_name ?? 'lampiran';
+        $documentText = $this->documentText($row);
+
+        return $documentText !== null
+            ? "[Dokumen \"{$label}\"]\n" . mb_substr($documentText, 0, 1500)
+            : "[Pesan sebelumnya berisi lampiran file: {$label}]";
     }
 
     private function documentText(Message $message): ?string

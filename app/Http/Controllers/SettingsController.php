@@ -46,14 +46,12 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:500'],
-            'approval_enabled' => ['nullable'],
             'password' => ['nullable', 'string', 'min:4', 'max:100'],
         ]);
 
         $updates = [
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
-            'approval_enabled' => $request->boolean('approval_enabled'),
         ];
         if (! empty($validated['password'])) {
             $updates['password_hash'] = Hash::make($validated['password']);

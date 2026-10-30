@@ -126,6 +126,9 @@ class EmbedGroupMessagesJob implements ShouldQueue, ShouldBeUniqueUntilProcessin
         }
 
         $sender = $message->sender_type === 'ai' ? 'Normi AI' : ($message->sender?->name ?? 'Anggota');
+        if ($message->forwarded_from_name) {
+            $sender = $message->forwarded_from_name . ' (diteruskan oleh ' . $sender . ')';
+        }
 
         return $sender . ': ' . Str::limit($content, self::MAX_CHARS, '');
     }

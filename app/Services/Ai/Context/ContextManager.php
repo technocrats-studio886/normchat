@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai\Context;
 
+use App\Models\AiUsageLog;
 use App\Models\Group;
 use App\Models\GroupContextSummary;
 use App\Models\GroupContextTopic;
@@ -59,9 +60,10 @@ class ContextManager
         }
 
         $picked = $this->pickTopics($topics, $understanding, $queryVector, $windowStart);
-        // Pesan sumber topik terpilih ikut, supaya detail persis (angka, tanggal, kalimat) dari pesan asli.
-        $sourceIds = collect($picked)
-            ->flatMap(fn (GroupContextTopic $topic) => array_slice(array_map('intval', (array) $topic->key_message_ids), -self::TOPIC_SOURCE_MESSAGES))
+        // Sumber jawaban Normi terakhir di jendela (supaya pertanyaan lanjutan tidak membantah jawaban itu),
+        // lalu pesan sumber topik terpilih: detail persis (angka, tanggal, kalimat) dari pesan asli.
+        $sourceIds = collect($this->previousAnswerSources($window))
+            ->merge(collect($picked)->flatMap(fn (GroupContextTopic $topic) => array_slice(array_map('intval', (array) $topic->key_message_ids), -self::TOPIC_SOURCE_MESSAGES)))
             ->filter(fn (int $id) => $id < $windowStart)
             ->unique()
             ->values()
@@ -120,6 +122,27 @@ class ContextManager
         }
 
         return array_reverse($kept);
+    }
+
+    /**
+     * Pesan lama yang dipakai jawaban Normi terakhir di jendela (dicatat di log pemakaiannya).
+     *
+     * @param  list<Message>  $window
+     * @return list<int>
+     */
+    private function previousAnswerSources(array $window): array
+    {
+        $answer = collect($window)->last(fn (Message $message) => $message->sender_type === 'ai');
+        if (! $answer) {
+            return [];
+        }
+
+        $context = AiUsageLog::query()
+            ->where('response_message_id', $answer->id)
+            ->latest('id')
+            ->value('breakdown_json')['context'] ?? [];
+
+        return array_values(array_map('intval', (array) ($context['sources'] ?? [])));
     }
 
     /**
@@ -185,13 +208,13 @@ class ContextManager
 
     public static function messageTokens(Message $message): int
     {
-        $text = (string) $message->content;
-        if ($text === '' && $message->attachment_path) {
-            // Lampiran tanpa teks: penanda singkat, atau isi dokumen yang dipotong 1.500 karakter.
-            return $message->message_type === 'file' ? Tokens::text(str_repeat('x', 1500)) : 20;
+        $tokens = Tokens::text((string) $message->content) + self::LINE_OVERHEAD_TOKENS;
+        if ($message->attachment_path) {
+            // Lampiran ikut dikirim di samping keterangannya: penanda singkat, atau isi dokumen (maks. 1.500 karakter).
+            $tokens += $message->message_type === 'file' ? Tokens::text(str_repeat('x', 1500)) : 20;
         }
 
-        return Tokens::text($text) + self::LINE_OVERHEAD_TOKENS;
+        return $tokens;
     }
 
     private static function limitTokens(string $text, int $tokens): string

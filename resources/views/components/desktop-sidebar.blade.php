@@ -65,6 +65,11 @@
                 <p class="font-semibold text-slate-700">Belum ada grup</p>
                 <p class="mt-1 text-xs">Buat grup atau gabung dengan kode grup.</p>
                 <a href="{{ route('groups.create') }}" class="btn-primary mt-4 inline-flex text-xs">+ Buat grup</a>
+                {{-- Kebanyakan orang baru datang karena diundang: kolom kode grup langsung terlihat. --}}
+                <form method="GET" action="" class="mt-4 flex items-center gap-2 text-left" data-join-by-id-form="{{ url('/join') }}">
+                    <input type="text" name="share_id" placeholder="Kode grup" required autocomplete="off" aria-label="Kode grup" class="input-field min-w-0 flex-1 py-2" data-join-by-id-input="1" />
+                    <button type="submit" class="btn-secondary shrink-0 px-3 py-2 text-xs">Gabung</button>
+                </form>
             </div>
         @endforelse
         <p class="hidden px-6 py-6 text-center text-xs text-slate-500" data-group-search-empty="1">Grup tidak ditemukan.</p>

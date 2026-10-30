@@ -40,15 +40,6 @@
                 </div>
             </div>
 
-            {{-- Persetujuan anggota baru --}}
-            <div class="panel-card px-4 py-3">
-                <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Persetujuan</label>
-                <label class="mt-2 flex items-center gap-2 text-xs text-slate-600">
-                    <input type="checkbox" name="approval_enabled" value="1" class="rounded border-slate-300" {{ old('approval_enabled') ? 'checked' : '' }}>
-                    Anggota baru perlu persetujuanmu
-                </label>
-            </div>
-
             <div class="panel-card px-4 py-3">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Normkredit Awal</p>
                 <p class="mt-1 text-sm text-slate-700"><strong>{{ number_format($quote->credits, 0, ',', '.') }} Normkredit</strong> · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</p>

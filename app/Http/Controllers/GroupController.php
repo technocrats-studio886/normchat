@@ -55,7 +55,6 @@ class GroupController extends Controller
             'description' => $request->validated('description'),
             'owner_id' => $user->id,
             'password_hash' => Hash::make($request->validated('password')),
-            'approval_enabled' => $request->boolean('approval_enabled'),
             'ai_provider' => 'openai',
             'status' => 'pending_payment',
         ]);
@@ -157,6 +156,25 @@ class GroupController extends Controller
         event(new GroupMembershipChanged((int) $group->id, (int) $member->user_id, 'removed', null));
 
         return back()->with('success', 'Anggota dikeluarkan dari grup.');
+    }
+
+    /** Anggota/admin keluar sendiri. Patungannya tetap jadi saldo grup; pesannya tetap ada. */
+    public function leave(Request $request, Group $group): RedirectResponse
+    {
+        $user = $request->user();
+        if ($group->isOwnedBy($user)) {
+            return back()->withErrors(['member' => 'Pemilik grup tidak bisa keluar. Hapus grup bila sudah tidak dipakai.']);
+        }
+
+        $member = GroupMember::query()->where('group_id', $group->id)->where('user_id', $user->id)->first();
+        abort_unless($member !== null, 404);
+
+        $member->delete();
+
+        AuditLog::record('group.member_left', $user->id, $member, [], $group->id);
+        event(new GroupMembershipChanged((int) $group->id, (int) $user->id, 'left', null));
+
+        return redirect()->route('groups.index')->with('success', 'Kamu keluar dari grup ' . $group->name . '.');
     }
 
     public function destroy(Request $request, Group $group): RedirectResponse

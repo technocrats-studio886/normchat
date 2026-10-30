@@ -14,7 +14,7 @@ export const initMembershipWatch = () => {
 			return;
 		}
 
-		if (String(payload?.action || '') === 'removed') {
+		if (['removed', 'left'].includes(String(payload?.action || ''))) {
 			window.location.href = root.getAttribute('data-groups-url') || '/groups';
 			return;
 		}

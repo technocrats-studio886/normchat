@@ -69,10 +69,6 @@
                             </button>
                         </div>
                     </div>
-                    <label class="nc-switch">
-                        <span>Anggota baru perlu persetujuan</span>
-                        <input type="checkbox" name="approval_enabled" value="1" role="switch" @checked(old('approval_enabled', $group->approval_enabled))>
-                    </label>
                     <button type="submit" class="btn-primary w-full py-2.5">Simpan</button>
                 </form>
             @else
@@ -217,6 +213,15 @@
                         </form>
                     </div>
                 </div>
+            </div>
+        @else
+            <div class="nc-section">
+                <h2 class="nc-section-title">Keluar grup</h2>
+                <p class="nc-section-note">Patunganmu tetap menjadi saldo grup dan pesanmu tetap ada. Untuk kembali, gabung lagi dengan kode grup.</p>
+                <form method="POST" action="{{ route('groups.leave', $group) }}" data-confirm="Keluar dari grup {{ $group->name }}?" data-confirm-label="Keluar">
+                    @csrf
+                    <button type="submit" class="nc-button-danger mt-3 w-full py-2.5">Keluar grup</button>
+                </form>
             </div>
         @endif
 

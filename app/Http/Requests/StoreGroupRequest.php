@@ -12,7 +12,6 @@ class StoreGroupRequest extends FormRequest
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:500'],
             'password' => ['required', 'string', 'min:4', 'max:100'],
-            'approval_enabled' => ['nullable'],
         ];
     }
 }

@@ -54,6 +54,8 @@ final class ContextBundle
             // tapi tidak ada pesan lama yang ketemu. Pertanyaan umum yang tidak ketemu tidak dihitung.
             'recall_failed' => $this->ambiguous || ($this->refersToPast && $this->searched && $this->found === 0),
             'trimmed' => $this->trimmed,
+            // Id pesan lama yang dipakai jawaban ini (bukan isinya); ikut lagi di pertanyaan lanjutan.
+            'sources' => array_values(array_map(fn (Message $message) => (int) $message->id, $this->retrieved)),
         ];
     }
 

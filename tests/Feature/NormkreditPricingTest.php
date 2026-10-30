@@ -267,7 +267,7 @@ class NormkreditPricingTest extends TestCase
 
         $this->actingAs($owner)->get('/groups/create')
             ->assertOk()->assertSee('250 Normkredit')->assertSee('Buat Grup · Rp30.000')->assertDontSee('Rp30.210')
-            ->assertDontSee('Biaya layanan QRIS')->assertDontSee('DU');
+            ->assertDontSee('Biaya layanan QRIS')->assertDontSee('Dots Units');
 
         $this->actingAs($owner)->get("/tokens/buy?group={$group->id}")
             ->assertOk()->assertSee('125 Normkredit')->assertSee('Rp15.000')->assertDontSee('Rp15.105')->assertSee('300,00 Normkredit');

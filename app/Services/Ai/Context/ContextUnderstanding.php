@@ -42,6 +42,10 @@ class ContextUnderstanding
         'lebih', 'paling', 'sangat', 'banget', 'the', 'and', 'what', 'how', 'why', 'which', 'this', 'that',
         'jelaskan', 'jawab', 'bantu', 'bikin', 'buatkan', 'sebelumnya', 'dulu', 'pernah', 'bahas', 'dibahas', 'gitu',
         'begitu', 'begini', 'kayak', 'seperti', 'yaitu', 'adalah', 'ya', 'yah', 'oke', 'ok',
+        // Kata percakapan umum: tidak menunjuk topik apa pun ("yang itu tadi jadinya gimana?").
+        'jadinya', 'akhirnya', 'gmn', 'gimana', 'kok', 'kan', 'nah', 'emang', 'memang', 'beneran', 'sebenarnya',
+        'pokoknya', 'intinya', 'hal', 'masalah', 'urusan', 'yg', 'udh', 'blm', 'aja', 'gitu', 'gt', 'tuh', 'dah',
+        'kayaknya', 'mungkin', 'harusnya', 'seharusnya', 'katanya', 'gimanain', 'bagaimanakah', 'apanya',
         // Kata penilaian umum: tidak menunjuk topik apa pun ("itu tadi sudah benar?").
         'benar', 'betul', 'salah', 'bagus', 'baik', 'jelek', 'buruk', 'cocok', 'tepat', 'sesuai', 'setuju',
         'bener', 'mantap', 'gak', 'nggak', 'tidak', 'bukan', 'perlu', 'cukup', 'kurang',

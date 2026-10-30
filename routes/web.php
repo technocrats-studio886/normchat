@@ -114,6 +114,7 @@ Route::middleware('auth')->group(function () {
     // Members
     Route::post('/groups/{group}/members/{member}/promote', [GroupController::class, 'promoteMember'])->middleware('group.permission')->name('groups.members.promote');
     Route::post('/groups/{group}/members/{member}/remove', [GroupController::class, 'removeMember'])->middleware('group.permission')->name('groups.members.remove');
+    Route::post('/groups/{group}/leave', [GroupController::class, 'leave'])->middleware('group.permission')->name('groups.leave');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');

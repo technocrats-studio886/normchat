@@ -303,7 +303,7 @@ export const initRealtime = () => {
 				return;
 			}
 
-			if (String(payload?.action || '') === 'removed') {
+			if (['removed', 'left'].includes(String(payload?.action || ''))) {
 				window.location.href = '/groups';
 			}
 		});

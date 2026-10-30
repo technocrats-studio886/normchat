@@ -379,6 +379,11 @@ Data volume tetap dipakai (major version sama). Deploy: backup DB → build imag
 per topik) sebagai potongan riwayat lama, berbagi anggaran 2.000 token dengan hasil pencarian. Diberikan juga bila
 topik dipilih tanpa pencarian. Hanya pesan sebelum jendela, tidak terhapus, bukan pemberitahuan pribadi.
 
+**Sumber jawaban sebelumnya (K23):** setiap jawaban Normi mencatat id pesan lama yang dipakainya
+(`ai_usage_logs.breakdown_json.context.sources`, hanya angka). Selama jawaban Normi terakhir masih di jendela, sumber itu
+ikut lagi di pertanyaan berikutnya (di atas pesan sumber topik, dalam anggaran 2.000 token), supaya pertanyaan lanjutan
+tidak membantah jawaban yang sudah benar.
+
 **Rentang waktu (K19, prioritas, bukan saringan):** kata waktu di pertanyaan diubah jadi rentang menurut zona waktu
 penanya: "hari ini", "tadi pagi/siang/sore", "tadi malam/semalam", "kemarin", "kemarin lusa", "N hari lalu",
 nama hari ("Senin" = Senin terakhir sebelum hari ini), "minggu lalu" (Senin–Minggu pekan sebelumnya),
@@ -496,6 +501,7 @@ saldo OpenAI saat ini + cadangan, Admin API key dan project ID OpenAI (rekonsili
 | K20 | Metrik gagal mengingat & biaya per pesan | Tanda otomatis per jawaban + biaya rata-rata per jawaban (7) |
 | K21 | Batas keras input per permintaan | 16.000 token, potong konteks dulu, tolak bila pesannya sendiri lewat (5.3); isi Canvas yang direvisi tidak dihitung |
 | K22 | Voice note di riwayat | Maks. 5 voice note terbaru tanpa transkrip ditranskripsi per pertanyaan; sisanya penanda pesan suara (10) |
+| K23 | Pertanyaan lanjutan membantah jawaban Normi sebelumnya (uji alur 30 Okt) | Sumber jawaban terakhir ikut lagi selama jawabannya di jendela (5.6) |
 
 ## 10. Hasil tinjauan kode (30 Okt 2026)
 
