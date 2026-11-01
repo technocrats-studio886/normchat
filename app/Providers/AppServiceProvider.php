@@ -31,20 +31,16 @@ class AppServiceProvider extends ServiceProvider
         Carbon::setLocale(app()->getLocale());
         Gate::policy(Group::class, GroupPolicy::class);
 
-        // URL yang dipakai bersama seluruh halaman marketing (layout + isi halaman).
+        // Halaman marketing: URL antar halaman, tautan masuk, dan harga terkini (termasuk timpaan superadmin).
         View::composer('marketing.*', function ($view) {
             $marketingBase = rtrim((string) config('app.marketing_url', config('app.url')), '/');
-            $marketingPath = '/'.trim((string) config('app.normchat_marketing_path', '/normchat'), '/');
             $appBase = rtrim((string) config('app.normchat_app_url', config('app.url')), '/');
 
-            $landingUrl = $marketingBase.$marketingPath;
-            $lang = $view->getData()['lang'] ?? 'id';
-
             $view->with([
-                'landingUrl' => $landingUrl,
-                'lang' => $lang,
-                'base' => $lang === 'en' ? $landingUrl.'/en' : $landingUrl,
-                'startUrl' => $appBase.'/login?next=groups.index',
+                'page' => fn (string $path) => $marketingBase.$path,
+                'loginUrl' => $appBase.'/login?next=groups.index',
+                'supportEmail' => config('normchat.support_email'),
+                'pricing' => app(NormkreditPricing::class)->settings(),
             ]);
         });
 

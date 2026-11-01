@@ -1,680 +1,321 @@
-# NORMCHAT
-## Copywriting Website Company Profile
+# Normi Chat: Copywriting Website
 
-**Halaman:** Home, About, Pricing, dan Contact.
+Halaman: Home, Tentang, Harga, Kontak, Masuk. Plus elemen global dan SEO.
 
-**Karakter brand:** Modern, minimalis, profesional, dan berorientasi pada pengguna.
-
-**Positioning produk:** Platform obrolan grup yang menghubungkan manusia dan AI dalam satu ruang percakapan.
-
-**Tagline utama:** Percakapan Lebih Baik, Bersama.
+Status: rancangan, menunggu persetujuan. Belum ada view Blade yang diubah.
 
 ---
 
-# 01. HALAMAN HOME
-
-## A. Hero Section
-
-**Teks pendukung:**
-
-OBROLAN GRUP, DENGAN KEMAMPUAN AI
-
-**Headline utama:**
-
-# Bukan Sekadar Mengobrol. Saatnya Berpikir dan Berkembang Bersama.
-
-**Deskripsi:**
-
-Normchat menyatukan manusia dan AI dalam satu ruang percakapan. Bertukar ide secara real-time, diskusikan berbagai hal bersama tim, dan panggil AI saat membutuhkan bantuan. Semua berlangsung dalam satu percakapan tanpa harus berpindah-pindah aplikasi.
-
-**Tombol utama:** Mulai Sekarang
-
-**Tombol sekunder:** Lihat Harga
-
-**Teks pendukung kecil:**
-
-Satu ruang untuk tim Anda, ide-ide Anda, dan percakapan bersama AI.
-
-### Alternatif headline
-
-**Satukan Tim. Libatkan AI. Kembangkan Ide.**
-
-Satu ruang percakapan untuk bertukar pikiran, berkolaborasi, dan mendapatkan bantuan AI saat dibutuhkan.
-
-Alternatif ini cocok apabila desain hero menggunakan visual antarmuka chat sebagai fokus utama.
-
-## B. Introduction Section
-
-**Teks pendukung:**
-
-MENGENAL NORMCHAT
-
-**Headline:**
-
-### Ide yang Lebih Besar Dimulai dari Percakapan yang Tepat.
-
-**Deskripsi:**
-
-Ide-ide hebat jarang lahir sendirian. Semuanya berkembang melalui pertanyaan, pertukaran sudut pandang, diskusi, dan bantuan yang hadir pada waktu yang tepat.
-
-Normchat menghadirkan semua itu dalam satu ruang percakapan. Anda bisa berdiskusi dengan tim, berbagi pemikiran, dan melibatkan AI ketika membutuhkan perspektif tambahan.
-
-Tidak perlu memisahkan diskusi dari bantuan AI. Tidak perlu mengganggu alur percakapan hanya untuk mencari jawaban.
-
-Cukup satu ruang untuk menjaga diskusi tetap berjalan dan ide terus berkembang.
-
-## C. Features Section
-
-**Headline:**
-
-### Semua yang Dibutuhkan untuk Percakapan yang Lebih Bermakna.
-
-**Deskripsi pembuka:**
-
-Mulai dari percakapan real-time hingga bantuan AI sesuai kebutuhan, Normchat menyediakan berbagai fitur untuk membantu grup berdiskusi, berkolaborasi, dan mengelola percakapan dengan lebih terarah.
-
-### Fitur 1 — AI Sesuai Kebutuhan
-
-**Judul:**
-
-AI yang Membantu, Bukan Mengganggu.
-
-**Deskripsi:**
-
-AI seharusnya memberikan bantuan, bukan mengambil alih percakapan. Di Normchat, AI merespons ketika Anda memanggilnya melalui mention.
-
-Ajukan pertanyaan, eksplorasi ide, atau minta bantuan tanpa khawatir AI menyela setiap pesan yang dikirimkan anggota grup.
-
-Anda menentukan kapan AI perlu terlibat dalam diskusi.
-
-### Fitur 2 — Percakapan Real-Time
-
-**Judul:**
-
-Semua Tetap Terhubung dalam Satu Percakapan.
-
-**Deskripsi:**
-
-Kirim pesan dan ikuti perkembangan diskusi secara real-time. Pertanyaan, tanggapan, dan jawaban AI tetap berada dalam ruang percakapan yang sama sehingga konteks diskusi lebih mudah diikuti.
-
-Tidak perlu memecah percakapan ke berbagai tempat.
-
-### Fitur 3 — Kontrol Grup yang Fleksibel
-
-**Judul:**
-
-Grup Anda, Aturan Anda.
-
-**Deskripsi:**
-
-Buat grup, undang anggota, dan kelola akses sesuai kebutuhan. Dengan pengaturan akses grup dan hak pengguna, Anda memiliki kendali untuk mengatur siapa yang dapat berpartisipasi dalam percakapan.
-
-Ruang kolaborasi yang baik dimulai dari pengelolaan yang jelas.
-
-### Fitur 4 — Riwayat Percakapan yang Dapat Dikelola
-
-**Judul:**
-
-Percakapan Penting Layak Disimpan.
-
-**Deskripsi:**
-
-Simpan dan kelola riwayat percakapan melalui fitur pencadangan dan pemulihan. Ketika membutuhkan dokumentasi, ekspor percakapan ke dalam format PDF atau DOCX agar lebih mudah dibaca dan dijadikan referensi.
-
-Karena informasi penting tidak seharusnya berhenti berguna ketika percakapan selesai.
-
-### Fitur 5 — Dirancang untuk Penggunaan Mobile
-
-**Judul:**
-
-Percakapan Anda, di Mana Saja.
-
-**Deskripsi:**
-
-Normchat dirancang dengan pendekatan mobile-first agar nyaman digunakan melalui browser ponsel. Navigasi yang ringkas dan interaksi yang praktis membantu Anda tetap terhubung dengan grup tanpa harus selalu berada di depan komputer.
-
-Buka, berdiskusi, dan lanjutkan ide Anda kapan pun dibutuhkan.
-
-## D. How It Works Section
-
-**Teks pendukung:**
-
-MULAI BERKOLABORASI
-
-**Headline:**
-
-### Tiga Langkah Menuju Percakapan yang Lebih Produktif.
-
-**Deskripsi pembuka:**
-
-Mulai dengan sederhana. Satukan anggota grup Anda, kemudian libatkan AI ketika dibutuhkan.
-
-**01 — Buat Ruang Percakapan**
-
-Buat grup baru, tentukan pengaturan akses, lalu pilih penyedia dan model AI yang ingin digunakan dalam grup.
-
-**02 — Undang Anggota Anda**
-
-Bagikan tautan undangan kepada anggota dan kelola akses mereka agar percakapan tetap berada dalam ruang yang sesuai.
-
-**03 — Mulai Berdiskusi**
-
-Kirim pesan secara real-time, bertukar ide, dan panggil AI melalui mention ketika Anda membutuhkan informasi atau sudut pandang tambahan.
-
-**Tombol:** Buat Grup Anda
-
-## E. Value Proposition Section
-
-**Headline:**
-
-### AI Tidak Harus Mengambil Alih Percakapan untuk Membuat Perbedaan.
-
-**Deskripsi:**
-
-Kolaborasi yang baik terjadi ketika setiap orang memiliki kesempatan untuk berpikir, bertanya, dan mengembangkan gagasan bersama.
-
-Normchat menghadirkan AI sebagai bagian dari proses tersebut tanpa menjadikannya pusat dari setiap interaksi.
-
-Manusia tetap menjadi inti percakapan. AI hadir untuk membantu ketika dibutuhkan.
-
-Dengan cara ini, diskusi dapat berlangsung secara alami, sementara anggota grup tetap memiliki kendali atas bagaimana dan kapan AI dilibatkan.
-
-**Tombol:** Kenali Normchat
-
-## F. Final CTA Section
-
-**Headline:**
-
-### Mari Mulai Percakapan yang Lebih Baik.
-
-**Deskripsi:**
-
-Satukan anggota grup Anda dalam satu ruang, libatkan AI saat dibutuhkan, dan berikan kesempatan bagi setiap ide untuk berkembang.
-
-**Tombol utama:** Mulai Sekarang
-
-**Tombol sekunder:** Lihat Paket Harga
-
-## G. Footer
-
-**Deskripsi brand:**
-
-Normchat menyatukan manusia dan AI dalam satu ruang percakapan untuk mendukung komunikasi real-time, pertukaran ide, dan kolaborasi yang lebih terarah.
-
-**Navigasi:**
-
-Home · About · Pricing · Contact
-
-**Tagline:**
-
-Percakapan Lebih Baik, Bersama.
+# 0. PANDUAN
+
+## Suara
+
+- Pakai **kamu**, bukan "Anda". Kalimat pendek, kata sehari-hari: grup, ngobrol, patungan, saldo, jawab.
+- Satu kalimat, satu maksud. Kalau penjelasan sudah selesai, berhenti.
+- Sebut hal yang nyata: `@normi`, Rp30.000, 250 Normkredit. Hindari kata yang bisa ditempel ke produk apa pun.
+
+## Aturan anti AI slop (dari catatan tulisan tangan)
+
+1. Jangan pakai pola "Bukan X, tapi Y" dan "Jika X maka Y". Tulis langsung apa yang terjadi.
+2. Tagline harus menempel ke merek: memuat nama Normi atau cara kerjanya (`@normi`).
+3. Deskripsi produk singkat, maksimal dua kalimat.
+4. Pilih kata yang dipakai orang sungguhan. Hindari: solusi, revolusioner, seamless, memberdayakan, tingkatkan, optimalkan, ekosistem, bermakna, terarah.
+5. Tanpa penjelasan bertele-tele. Satu paragraf maksimal tiga kalimat.
+6. Tanpa tanda pisah panjang (—) di dalam kalimat, dan tanpa tiga frasa berderet bernada puitis ("Satukan. Libatkan. Kembangkan.").
+
+## Tampilan
+
+Referensinya pola umum situs OpenAI dan Claude: putih, teks besar dan polos, satu demo produk di hero, warna sangat hemat, bagian pendek.
+
+| Hal | Aturan |
+|---|---|
+| Dasar | Putih `#FFFFFF`. Bagian selang-seling `#F7F8FA`. |
+| Teks | `#121C29`; teks sekunder `#5B6778`. |
+| Aksen | Navy `#1E2E43` untuk tombol utama. Koral `#FB6856` hanya untuk sebutan `@normi` dan satu penanda kecil. |
+| Garis | 1px `#E6E9EE`, sudut 12px. Tanpa bayangan tebal, tanpa gradasi. |
+| Huruf | Inter saja. Judul 600, isi 400. |
+| Lebar | Isi maksimal 1120px; teks bacaan maksimal 640px. Jarak antarbagian lega. |
+| Ikon | Pustaka **Better Icons** (`better-icons search` / `better-icons get`, sumber Iconify). Satu set saja, disarankan `ph:` (Phosphor Regular). **Jangan Lucide.** Ukuran 24px, warna navy. |
+| Tombol | Teks saja. **Tanpa ikon panah** dan tanpa ikon lain di dalam tombol. |
+| Ikon dipakai di | Kartu fitur dan langkah cara kerja saja. Bagian lain polos. |
 
 ---
 
-# 02. HALAMAN ABOUT
+# 1. TAGLINE
 
-## A. Hero Section
+**Rekomendasi: Ngobrol bareng, tanya Normi.**
 
-**Teks pendukung:**
+Pendek, terdengar seperti orang bicara, memuat nama merek, dan menjelaskan cara pakainya.
 
-TENTANG NORMCHAT
+Pilihan lain:
 
-**Headline:**
+| Tagline | Catatan |
+|---|---|
+| Grup chat yang ada Normi-nya. | Paling deskriptif, cocok untuk meta dan footer. |
+| Panggil Normi, lanjut ngobrol. | Menonjolkan `@normi`. |
+| Satu grup, satu Normi. | Paling singkat, cocok untuk logo dan tag media sosial. |
 
-# Dibangun untuk Percakapan. Dirancang untuk Kolaborasi.
+Deskripsi produk (satu baris, dipakai di footer dan kartu bagikan):
 
-**Subheadline:**
-
-Kami percaya bahwa obrolan grup seharusnya lebih dari sekadar tempat bertukar pesan. Obrolan grup dapat menjadi ruang untuk berbagi ide, mendiskusikan berbagai kemungkinan, dan melibatkan AI ketika bantuan tambahan dibutuhkan.
-
-Itulah gagasan yang mendasari Normchat.
-
-## B. About Normchat
-
-**Headline:**
-
-### Satu Ruang untuk Manusia dan AI.
-
-**Deskripsi:**
-
-Normchat adalah platform obrolan grup yang dirancang untuk menyatukan percakapan antarmanusia dengan bantuan AI.
-
-Alih-alih menjadikan AI sebagai tujuan yang terpisah, Normchat menghadirkannya sebagai bagian dari ruang diskusi. Anggota grup dapat bertukar pesan secara real-time dan memanggil AI melalui mention ketika membutuhkan bantuan atau sudut pandang tambahan.
-
-Hasilnya adalah pengalaman berinteraksi dengan AI yang lebih terhubung: manusia, percakapan, dan konteks diskusi tetap berada dalam satu ruang.
-
-Dengan pendekatan mobile-first, Normchat mengutamakan navigasi yang praktis dan interaksi yang mudah digunakan melalui perangkat mobile, sekaligus tetap mendukung penggunaan melalui desktop.
-
-Normchat merupakan produk dalam lini Uplift yang berada di bawah Sysnavia.
-
-## C. Our Approach
-
-**Teks pendukung:**
-
-PRINSIP KAMI
-
-**Headline:**
-
-### Teknologi Seharusnya Mengikuti Cara Manusia Berkomunikasi.
-
-**Deskripsi pembuka:**
-
-Kami percaya bahwa teknologi yang baik bukan sekadar menawarkan lebih banyak fitur. Teknologi seharusnya membantu manusia menyelesaikan kebutuhan dengan cara yang lebih sederhana dan sesuai dengan kebiasaan mereka.
-
-Prinsip tersebut membentuk pendekatan Normchat dalam menggabungkan manusia, AI, dan pengelolaan percakapan.
-
-### Prinsip 1 — AI yang Hadir pada Waktunya
-
-AI seharusnya membantu ketika dibutuhkan.
-
-Melalui sistem mention, Normchat memungkinkan anggota grup memanggil AI untuk membantu menjawab pertanyaan atau mengeksplorasi ide, tanpa membuat AI merespons setiap pesan secara otomatis.
-
-Anda tetap memegang kendali atas percakapan.
-
-### Prinsip 2 — Mengutamakan Pengalaman Mobile
-
-Percakapan tidak hanya berlangsung di depan komputer.
-
-Normchat dirancang dengan pendekatan mobile-first, menghadirkan navigasi ringkas dan interaksi yang nyaman untuk membantu pengguna tetap terhubung melalui perangkat yang mereka gunakan sehari-hari.
-
-### Prinsip 3 — Kendali yang Jelas
-
-Setiap grup memiliki kebutuhan dan karakteristik berbeda.
-
-Normchat menyediakan pengaturan akses grup dan hak pengguna untuk membantu pemilik grup mengelola anggota serta menentukan bagaimana ruang percakapan digunakan.
-
-Kolaborasi yang baik membutuhkan ruang yang terorganisasi.
-
-### Prinsip 4 — Menjaga Nilai Riwayat Percakapan
-
-Diskusi dapat berisi keputusan, gagasan, dan informasi yang penting untuk digunakan kembali.
-
-Melalui fitur pencadangan, pemulihan, dan ekspor percakapan, Normchat membantu grup mengelola riwayat diskusi agar dapat dijadikan referensi ketika diperlukan.
-
-Karena percakapan yang bermanfaat tidak harus berhenti berguna ketika diskusi berakhir.
-
-## D. Who Is Normchat For?
-
-**Headline:**
-
-### Untuk Mereka yang Berkembang Melalui Kolaborasi.
-
-**Deskripsi pembuka:**
-
-Normchat dirancang untuk berbagai kelompok yang ingin menggabungkan komunikasi sehari-hari dengan bantuan AI dalam satu ruang percakapan.
-
-### Tim dan Kelompok Proyek
-
-Diskusikan pekerjaan, bertukar gagasan, dan libatkan AI ketika tim membutuhkan perspektif tambahan untuk mengembangkan ide.
-
-### Kelompok Belajar
-
-Bahas materi, ajukan pertanyaan, dan manfaatkan AI untuk membantu menjelaskan konsep selama diskusi berlangsung.
-
-### Komunitas dan Kelompok Kolaborasi
-
-Satukan anggota dalam satu ruang percakapan dengan pengaturan akses grup serta riwayat diskusi yang dapat dikelola.
-
-Setiap kelompok memiliki tujuan yang berbeda. Normchat menyediakan ruang bersama untuk membantu percakapan mereka tetap terhubung.
-
-## E. Closing Section
-
-**Headline:**
-
-### Kolaborasi yang Lebih Baik Dimulai dari Percakapan.
-
-**Deskripsi:**
-
-Satukan orang-orang yang penting bagi Anda. Libatkan AI ketika dibutuhkan. Kembangkan ide bersama.
-
-Kenali pengalaman obrolan grup yang dirancang untuk mendukung cara manusia berkomunikasi.
-
-**Tombol utama:** Mulai Sekarang
-
-**Tombol sekunder:** Lihat Harga
+> Normi Chat adalah grup chat dengan AI yang dipakai bersama. Sebut @normi, dan Normi menjawab untuk seluruh grup.
 
 ---
 
-# 03. HALAMAN PRICING
+# 2. HOME
 
-## A. Hero Section
+## Hero
 
-**Teks pendukung:**
+**Judul:** Ngobrol bareng, tanya Normi.
 
-HARGA YANG SEDERHANA DAN TRANSPARAN
+**Isi:** Normi Chat adalah grup chat yang ada AI-nya. Sebut @normi di pesanmu, dan Normi menjawab untuk semua orang di grup.
 
-**Headline:**
+**Tombol:** Mulai sekarang · Lihat harga
 
-# Satu Paket untuk Memulai Kolaborasi Anda.
+**Catatan kecil:** Masuk dengan Google. Bayar pakai QRIS.
 
-**Subheadline:**
+**Visual:** Mockup chat. Rina: "Struktur proposalnya sudah kita sepakati belum?" Dimas: "Belum. Bagian anggaran masih kosong." Kamu: "@normi rangkum poin anggaran dari obrolan tadi." Normi: ringkasan dua poin. Keterangan di bawah: "Contoh percakapan. Normi hanya menjawab kalau dipanggil."
 
-Mulai dengan satu grup, satukan anggota Anda, dan gunakan bantuan AI ketika dibutuhkan. Tambahkan kapasitas anggota atau isi ulang kredit AI seiring berkembangnya kebutuhan grup.
+## Cara kerja
 
-**Teks pendukung:**
+**Judul:** Tiga langkah, langsung jalan.
 
-Langganan bulanan. Dua seat termasuk. Tambahan kapasitas tersedia sesuai kebutuhan.
+1. **Buat grup** (ikon `ph:users-three`): Bayar Rp30.000 lewat QRIS. Grupmu langsung dapat 250 Normkredit.
+2. **Ajak teman** (ikon `ph:link-simple`): Bagikan Share ID. Temanmu gabung dan ikut patungan untuk menambah saldo grup.
+3. **Panggil Normi** (ikon `ph:at`): Ketik @normi di chat. Semua orang di grup bisa melihat jawabannya.
 
-## B. Main Pricing Card
+**Tombol:** Buat grup
 
-**Nama paket:**
+## Fitur
 
-NORMCHAT SUBSCRIPTION
+**Judul:** Yang kamu dapat di dalam grup.
 
-**Harga:**
+| Ikon | Judul | Isi |
+|---|---|---|
+| `ph:at` | Normi menjawab kalau dipanggil | Obrolan antaranggota tidak diganggu. Sebut @normi, baru dia menjawab. |
+| `ph:coins` | Satu saldo untuk semua | Normkredit milik grup. Siapa pun di grup boleh pakai, tanpa langganan per orang. |
+| `ph:sliders-horizontal` | Pilih modelnya | Model cepat untuk obrolan harian, model yang lebih kuat untuk soal sulit. |
+| `ph:pencil-simple` | Edit, hapus, teruskan | Salah ketik bisa diedit, dan riwayat versinya bisa dilihat. Pesan bisa dihapus atau diteruskan ke grup lain. |
+| `ph:file-arrow-down` | Cadangan dan ekspor | Cadangan otomatis tiap malam, disimpan 30 hari. Riwayat bisa diunduh sebagai PDF atau DOCX. |
+| `ph:device-mobile` | Jalan di HP dan laptop | Buka dari browser, atau pasang ke layar utama. Tidak perlu unduh dari toko aplikasi. |
 
-# Rp25.000
+## Untuk siapa
 
-**Per grup / bulan**
+**Judul:** Dipakai kelompok yang sering diskusi.
 
-Satu ruang percakapan untuk grup Anda, dilengkapi kemampuan AI dan fitur pengelolaan percakapan.
+- **Kelompok tugas.** Tanya Normi langsung di grup, jadi semua anggota melihat jawaban yang sama.
+- **Tim kecil.** Rangkum diskusi panjang, cari ide judul, atau susun draf bareng.
+- **Komunitas.** Satu grup, satu saldo, biaya bisa dipatungi.
 
-**Fitur yang termasuk:**
+## Harga singkat
 
-- Satu langganan grup.
-- Dua seat anggota.
-- Sepuluh normkredit.
-- Fitur obrolan grup secara real-time.
-- Partisipasi AI yang dikonfigurasi untuk grup.
-- Pengaturan akses dan pengelolaan anggota.
-- Fitur pencadangan dan pemulihan percakapan.
-- Ekspor percakapan ke format PDF dan DOCX.
+**Judul:** Mulai dari Rp30.000.
 
-**Tombol utama:** Mulai Berlangganan
+**Isi:** Sekali bayar saat membuat grup, sudah termasuk 250 Normkredit. Tanpa langganan bulanan. Saldo habis, tinggal patungan.
 
-**Catatan:**
+**Tombol:** Lihat harga
 
-Satu paket langganan utama, dengan pilihan pembelian seat tambahan dan isi ulang normkredit secara terpisah.
+## Penutup
 
-## C. Additional Purchases
+**Judul:** Buka grup pertamamu.
 
-**Headline:**
+**Isi:** Butuh sekitar semenit. Masuk dengan Google, bayar lewat QRIS, lalu ajak teman.
 
-### Tambahkan Kapasitas Saat Anda Membutuhkannya.
-
-**Deskripsi pembuka:**
-
-Mulai dengan biaya yang jelas. Tambahkan seat anggota atau normkredit ketika grup Anda membutuhkan kapasitas lebih besar.
-
-### Seat Tambahan
-
-**Rp4.000 / seat**
-
-Butuh ruang untuk anggota baru? Tambahkan seat sesuai kebutuhan grup Anda.
-
-**Tombol:** Tambah Seat
-
-### Isi Ulang Normkredit
-
-**Rp1.000 / normkredit**
-
-Tambahkan kredit penggunaan AI ke saldo grup Anda. Satu normkredit setara dengan 1.000 token.
-
-Konsumsi token bergantung pada penggunaan aktual dan pengali yang ditetapkan untuk model AI yang dipilih.
-
-**Tombol:** Isi Ulang Normkredit
-
-## D. Pricing Transparency Section
-
-**Headline:**
-
-### Ketahui Apa yang Anda Bayarkan.
-
-**Deskripsi:**
-
-Normchat memisahkan biaya langganan utama dari pembelian kapasitas tambahan agar komponen biaya grup lebih mudah dipahami.
-
-Langganan utama mencakup akses grup beserta kuota yang tersedia dalam paket. Seat tambahan dan normkredit dapat dibeli ketika dibutuhkan.
-
-Penggunaan AI dihitung melalui token. Jumlah token yang dikonsumsi setiap permintaan dapat berbeda, bergantung pada penggunaan aktual dan pengali model AI yang dipilih.
-
-Karena itu, konsumsi AI tidak selalu sama untuk setiap permintaan. Periksa sisa normkredit grup Anda untuk memahami kapasitas penggunaan AI yang tersedia.
-
-## E. Frequently Asked Questions
-
-### Apakah Normchat memiliki paket gratis?
-
-Normchat menggunakan model langganan berbayar. Paket utama tersedia dengan harga Rp25.000 per grup per bulan, termasuk dua seat dan sepuluh normkredit.
-
-### Apa yang dimaksud dengan seat?
-
-Seat adalah kapasitas anggota dalam langganan grup. Paket utama mencakup dua seat. Jika membutuhkan kapasitas tambahan, Anda dapat membeli seat seharga Rp4.000 per seat.
-
-### Apa itu normkredit?
-
-Normkredit merupakan satuan kredit yang digunakan untuk mengelola penggunaan AI di Normchat.
-
-Satu normkredit setara dengan 1.000 token dan dihargai Rp1.000. Konsumsi token aktual bergantung pada penggunaan dan pengali model AI yang dipilih.
-
-### Apakah saya bisa menambah kredit AI?
-
-Ya. Anda dapat membeli normkredit tambahan ketika grup membutuhkan kapasitas penggunaan AI yang lebih besar.
-
-### Apakah saya bisa menambahkan anggota baru?
-
-Ya. Anda dapat membeli seat tambahan seharga Rp4.000 per seat.
-
-Anggota yang bergabung melalui mekanisme kontribusi grup juga mengikuti ketentuan kontribusi dan seat yang berlaku.
-
-### Model AI apa saja yang didukung Normchat?
-
-Normchat mendukung integrasi dengan OpenAI, Claude, dan Gemini. Pemilik grup dapat mengonfigurasi penyedia serta model AI yang digunakan dalam grup.
-
-## F. Final CTA Section
-
-**Headline:**
-
-### Siap Memulai Percakapan Bersama?
-
-**Deskripsi:**
-
-Mulai dengan satu ruang percakapan, satukan anggota grup Anda, dan tambahkan kapasitas sesuai kebutuhan.
-
-**Tombol utama:** Mulai Sekarang
-
-**Tombol sekunder:** Hubungi Kami
+**Tombol:** Mulai sekarang
 
 ---
 
-# 04. HALAMAN CONTACT
+# 3. TENTANG
 
-## A. Hero Section
+## Hero
 
-**Teks pendukung:**
+**Judul:** Kami bikin AI yang bisa dipakai bareng.
 
-HUBUNGI KAMI
+**Isi:** Selama ini AI dipakai sendiri-sendiri, jadi jawaban bagus tertinggal di layar satu orang. Normi Chat menaruh AI di dalam grup, supaya semua anggota ikut membaca dan ikut menimpali.
 
-**Headline:**
+## Tentang Normi Chat
 
-# Ada yang Ingin Ditanyakan? Mari Mulai Percakapan.
+Normi Chat adalah aplikasi grup chat dengan AI. Dibuat sebagai aplikasi web yang nyaman di HP dan tetap enak di laptop.
 
-**Subheadline:**
+Nama Normi dari kata *normies*: orang biasa yang ingin memakai AI tanpa harus paham teknisnya. Normi sendiri adalah AI di dalam grup. Panggil lewat `@normi`.
 
-Ingin mengenal Normchat lebih jauh, memahami paket harga, atau mencari informasi mengenai fitur yang tersedia?
+Normi Chat adalah produk lini Uplift dari Sysnavia.
 
-Kami membuka ruang untuk pertanyaan dan masukan Anda. Ceritakan apa yang ingin Anda ketahui agar kami dapat memahami kebutuhan Anda dengan lebih baik.
+## Prinsip kami
 
-## B. Contact Form Section
+**Judul:** Empat pegangan.
 
-**Headline:**
+1. **AI dipakai bersama.** Normi hanya ada di dalam grup. Tidak ada mode pribadi, supaya konteks diskusi tetap satu.
+2. **Menjawab saat dipanggil.** Normi tidak membaca dan membalas setiap pesan.
+3. **Bayar sesuai pemakaian.** Biaya dihitung dari jawaban yang benar-benar dibuat, lewat Normkredit.
+4. **Riwayat milik grup.** Pesan bisa dicadangkan, dipulihkan, dan diunduh kapan saja.
 
-### Apa yang Bisa Kami Bantu?
+## Penutup
 
-**Deskripsi:**
+**Judul:** Coba bareng grupmu.
 
-Sampaikan pertanyaan Anda atau ceritakan kebutuhan yang ingin Anda selesaikan. Informasi yang Anda berikan akan membantu kami memahami konteks pertanyaan tersebut.
-
-**Kolom formulir:**
-
-**Nama Lengkap**
-
-Placeholder: Masukkan nama lengkap Anda.
-
-**Alamat Email**
-
-Placeholder: Masukkan alamat email Anda.
-
-**Topik Pertanyaan**
-
-Pilihan:
-- Pertanyaan Umum
-- Harga dan Langganan
-- Integrasi AI
-- Grup dan Akses Anggota
-- Dukungan Teknis
-- Lainnya
-
-**Pesan**
-
-Placeholder:
-
-Ceritakan pertanyaan, kebutuhan, atau kendala yang sedang Anda hadapi...
-
-**Tombol kirim:** Kirim Pesan
-
-**Catatan keamanan:**
-
-Jangan sertakan kata sandi, API key, atau informasi sensitif lainnya dalam pesan Anda.
-
-**Pesan berhasil:**
-
-Terima kasih telah menghubungi kami. Pesan Anda berhasil dikirim.
-
-**Pesan gagal:**
-
-Pesan Anda belum berhasil dikirim. Periksa kembali informasi yang dimasukkan, kemudian coba lagi.
-
-## C. Alternative Contact Section
-
-**Headline:**
-
-### Belum Yakin Harus Memulai dari Mana?
-
-**Deskripsi:**
-
-Tidak masalah. Ceritakan apa yang ingin Anda lakukan dengan Normchat, baik untuk menyatukan kelompok, memahami harga, maupun menjelajahi integrasi AI yang tersedia.
-
-Informasi yang lebih jelas membantu kami memahami pertanyaan Anda.
-
-**Tombol:** Kirim Pertanyaan
-
-## D. Frequently Asked Questions
-
-### Di mana saya bisa melihat informasi harga Normchat?
-
-Kunjungi halaman Pricing untuk mengetahui harga langganan utama, seat yang termasuk dalam paket, kuota normkredit, dan pilihan pembelian tambahan.
-
-**Tombol:** Lihat Harga
-
-### Model AI apa saja yang didukung Normchat?
-
-Normchat mendukung integrasi dengan OpenAI, Claude, dan Gemini. Penggunaannya bergantung pada konfigurasi penyedia dan model AI untuk grup Anda.
-
-### Bagaimana cara mulai menggunakan Normchat?
-
-Pelajari paket langganan yang tersedia, masuk ke akun Anda, buat grup, konfigurasi pengaturan AI, kemudian undang anggota untuk mulai berdiskusi.
-
-**Tombol:** Mulai Sekarang
-
-## E. Closing Section
-
-**Headline:**
-
-### Setiap Kolaborasi Dimulai dari Sebuah Percakapan.
-
-**Deskripsi:**
-
-Ceritakan kebutuhan, pertanyaan, atau rencana Anda bersama Normchat.
-
-Mari mulai dengan percakapan.
-
-**Tombol:** Hubungi Normchat
+**Tombol:** Mulai sekarang · Lihat harga
 
 ---
 
-# ELEMEN GLOBAL WEBSITE
+# 4. HARGA
 
-## Navigasi Utama
+## Hero
 
-Home | About | Pricing | Contact
+**Judul:** Rp30.000 untuk mulai.
 
-**Tombol utama:** Mulai Sekarang
+**Isi:** Bayar sekali saat membuat grup dan langsung dapat 250 Normkredit. Saldo habis, anggota bisa patungan. Tidak ada langganan bulanan.
 
-## Pesan Utama Brand
+## Paket
 
-Normchat menyatukan manusia dan AI dalam satu ruang percakapan untuk mendukung komunikasi real-time, pertukaran ide, dan kolaborasi yang lebih terarah.
+| | Buat grup | Patungan dan isi ulang |
+|---|---|---|
+| Harga | Rp30.000 | Rp15.000 per paket |
+| Normkredit | 250 | 125 per paket |
+| Keterangan | Untuk membuat grup. Saldo jadi milik grup. | Anggota mana pun bisa menambah saldo grup. Maksimal 20 paket sekali bayar. |
+| Tombol | Buat grup | Isi ulang saldo |
 
-## Tagline Utama
+**Sudah termasuk di grup:**
 
-**Percakapan Lebih Baik, Bersama.**
+- Obrolan real-time untuk semua anggota
+- Normi lewat `@normi`
+- Pengaturan akses dan anggota
+- Cadangan dan pemulihan
+- Ekspor PDF dan DOCX
 
-## Alternatif Tagline
+**Catatan harga:** Pembayaran lewat QRIS. Biaya layanan QRIS 0,7% ditambahkan ke total dan terlihat sebelum kamu membayar.
 
-**1. AI Saat Dibutuhkan, Kendali Tetap di Tangan Anda.**
+## Cara Normkredit bekerja
 
-Menonjolkan cara kerja AI yang merespons ketika dipanggil.
+**Judul:** Apa yang memotong saldo?
 
-**2. Tempat Manusia dan AI Bertukar Pikiran.**
+1 Normkredit = Rp120.
 
-Menonjolkan pengalaman kolaborasi yang lebih natural dan human-centered.
+Saldo hanya terpotong saat Normi menjawab. Ngobrol antaranggota tidak memotong apa pun.
 
-**3. Satu Ruang, Lebih Banyak Ide.**
+Besar potongan tergantung panjang jawaban dan model yang dipilih. Sisa saldo selalu terlihat di dalam grup.
 
-Singkat, mudah diingat, dan cocok untuk identitas visual website.
+Model tertentu (Advanced) baru bisa dipakai kalau saldo grup minimal 500 Normkredit.
 
-**4. Lebih dari Sekadar Obrolan Grup.**
+## Workspace (opsional, belum final)
 
-Menekankan perbedaan Normchat dari platform obrolan grup biasa.
+**Judul:** Untuk banyak grup sekaligus.
 
----
+**Isi:** Workspace segera hadir untuk tim dan organisasi yang mengelola beberapa grup dengan satu saldo. Belum ada harga. Tulis ke kami kalau kamu mau dikabari.
 
-# SEO COPY WEBSITE
+**Tombol:** Hubungi kami
 
-## Home
+## Tanya jawab
 
-**Meta title:**
+**Ada paket gratis?**
+Belum. Membuat grup berbayar Rp30.000, sudah termasuk 250 Normkredit.
 
-Normchat — Platform Obrolan Grup dengan AI
+**Apa itu Normkredit?**
+Satuan saldo untuk pemakaian AI. Satu Normkredit Rp120. Saldonya milik grup.
 
-**Meta description:**
+**Siapa yang bayar kalau ada anggota baru?**
+Anggota yang gabung ikut patungan, dan hasilnya masuk ke saldo grup. Nilai minimal ditampilkan di halaman gabung.
 
-Satukan manusia dan AI dalam satu ruang obrolan grup. Berdiskusi secara real-time, panggil AI saat dibutuhkan, dan kelola riwayat percakapan dengan Normchat.
+**Ngobrol biasa memotong saldo?**
+Tidak. Saldo hanya terpotong saat Normi menjawab.
 
-## About
+**Bisa pakai AI sendirian, tanpa grup?**
+Tidak. Normi hanya ada di dalam grup.
 
-**Meta title:**
+**Saldo habis, bagaimana?**
+Siapa pun di grup bisa isi ulang lewat patungan. Obrolan antaranggota tetap jalan.
 
-Tentang Normchat — Obrolan Grup dan Kolaborasi dengan AI
+**Model AI apa yang dipakai?**
+Normi memakai model dari OpenAI. Kamu bisa memilih modelnya di pengaturan grup.
 
-**Meta description:**
+## Penutup
 
-Kenali Normchat, platform obrolan grup dengan pendekatan mobile-first yang menyatukan manusia dan AI melalui percakapan real-time serta fitur pengelolaan grup.
+**Judul:** Siap buat grup?
 
-## Pricing
-
-**Meta title:**
-
-Harga Normchat — Paket Langganan Obrolan Grup
-
-**Meta description:**
-
-Lihat harga langganan Normchat, seat anggota yang termasuk dalam paket, kuota normkredit, harga seat tambahan, dan pilihan isi ulang kredit AI.
-
-## Contact
-
-**Meta title:**
-
-Hubungi Normchat — Informasi dan Dukungan
-
-**Meta description:**
-
-Hubungi Normchat untuk pertanyaan mengenai langganan, integrasi AI, pengelolaan grup, dan dukungan teknis.
+**Tombol:** Mulai sekarang · Hubungi kami
 
 ---
 
-# CATATAN SEBELUM PUBLIKASI
+# 5. KONTAK
 
-1. Pastikan kembali harga, kuota normkredit, dan ketentuan billing sesuai dengan implementasi aplikasi.
-2. Tambahkan alamat email bisnis atau kanal dukungan resmi pada halaman Contact.
-3. Pastikan seluruh tombol CTA mengarah ke halaman atau tindakan yang benar.
-4. Klaim fitur pada website sebaiknya tetap sesuai dengan fitur yang benar-benar tersedia di aplikasi.
+## Hero
+
+**Judul:** Ada pertanyaan? Tulis ke kami.
+
+**Isi:** Soal harga, cara pakai, atau kendala di grupmu. Kami balas lewat email.
+
+## Formulir
+
+| Kolom | Label | Placeholder |
+|---|---|---|
+| Nama | Nama | Nama kamu |
+| Email | Email | nama@email.com |
+| Topik | Topik | Pertanyaan umum · Harga dan pembayaran · Grup dan anggota · Normi dan model AI · Kendala teknis · Lainnya |
+| Pesan | Pesan | Ceritakan singkat apa yang kamu butuhkan |
+
+**Tombol:** Kirim pesan
+
+**Catatan di bawah form:** Jangan kirim kata sandi atau data pembayaran lewat formulir ini.
+
+**Berhasil:** Terima kasih. Pesanmu sudah terkirim, kami balas lewat email.
+
+**Gagal:** Pesan belum terkirim. Cek isian lalu coba lagi.
+
+## Tanya jawab
+
+**Di mana lihat harga?** Di halaman Harga. **Tombol:** Lihat harga
+
+**Bagaimana cara mulai?** Masuk dengan Google, buat grup, lalu ajak teman lewat Share ID.
+
+**Model AI apa yang dipakai?** Model dari OpenAI. Pilihannya ada di pengaturan grup.
+
+## Penutup
+
+**Judul:** Kami baca setiap pesan.
+
+**Isi:** Alamat email dukungan: **[isi alamat resmi]**.
+
+---
+
+# 6. MASUK
+
+**Judul:** Masuk ke Normi Chat
+
+**Isi:** Pakai akun Google-mu.
+
+**Tombol:** Masuk dengan Google
+
+**Catatan kecil:** Dengan masuk, kamu menyetujui syarat dan kebijakan privasi kami.
+
+---
+
+# 7. ELEMEN GLOBAL
+
+**Navigasi:** Home · Tentang · Harga · Kontak
+**Tombol navigasi:** Mulai sekarang (kanan atas, teks saja, tanpa ikon)
+**Footer, baris merek:** Normi Chat. Ngobrol bareng, tanya Normi.
+**Footer, deskripsi:** Grup chat dengan AI yang dipakai bersama.
+**Footer, bawah:** Produk Uplift dari Sysnavia · Syarat · Privasi
+
+---
+
+# 8. SEO
+
+| Halaman | Judul | Deskripsi |
+|---|---|---|
+| Home | Normi Chat: grup chat dengan AI | Ngobrol bareng, tanya Normi. Sebut @normi di grup dan AI menjawab untuk semua anggota. Mulai Rp30.000. |
+| Tentang | Tentang Normi Chat | Normi Chat memasukkan AI ke dalam grup chat supaya dipakai bareng. Produk Uplift dari Sysnavia. |
+| Harga | Harga Normi Chat: mulai Rp30.000 | Buat grup Rp30.000 sudah termasuk 250 Normkredit. Patungan Rp15.000 per 125 Normkredit. |
+| Kontak | Kontak Normi Chat | Tanya soal harga, cara pakai, atau kendala grup. Kami balas lewat email. |
+
+---
+
+# 9. CATATAN SEBELUM DIPASANG
+
+1. **Draf lama dibuang.** Harga Rp25.000 per bulan, dua seat, seat tambahan Rp4.000, dan Rp1.000 per Normkredit sudah tidak sesuai. Angka sekarang diambil dari `config/normchat.php` (Rp120 per NK, 250 NK untuk grup, 125 NK per paket) dan cocok dengan catatan konsepmu.
+2. **Penyedia AI hanya OpenAI.** Draf lama menyebut Claude dan Gemini; itu dihapus. Pilihan yang ada hanya model dalam OpenAI.
+3. **Nama merek "Normi Chat"** (dua kata), sesuai tampilan sekarang dan normi.chat. Draf lama masih "Normchat".
+4. **Workspace Team (Rp70.000) dan Bisnis (Rp230.000)** ada di catatan tulisan tanganmu tetapi belum final di `llm-rules.md`, jadi di halaman Harga hanya muncul sebagai "segera hadir" tanpa angka.
+5. **Perlu dicek sebelum tayang:** nilai minimal patungan di halaman gabung, ambang 500 NK untuk Advanced, jadwal cadangan 03.00 WIB dan masa simpan 30 hari, alamat email dukungan, dan halaman Syarat serta Privasi.
+6. **Belum diklaim di halaman:** Normi "ingat" riwayat grup. Fitur memorinya ada di kode, tapi tambahkan kalimatnya hanya setelah hasilnya dites.
+7. **Pasang ikon** dengan `better-icons get ph:<nama>`; semua ikon di atas memakai set Phosphor. Ganti set bila kamu mau, tapi pakai satu set saja dan bukan Lucide.
+8. **Warna situs** sekarang navy gelap dengan koral. Panduan di atas memindahkannya ke dasar putih, jadi `marketing/layout.blade.php` perlu ditulis ulang saat rancangan ini disetujui.

@@ -19,7 +19,6 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfileHistoryController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\LandingController;
-use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\PaymentCallbackController;
 use App\Http\Controllers\SuperadminController;
 use App\Http\Controllers\TopupController;
@@ -27,22 +26,12 @@ use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
 
 // ── Public / Auth ────────────────────────────────────────────
-Route::get('/', LandingController::class)->name('landing');
-Route::get('/normchat', LandingController::class)->name('landing.path');
-
-// Halaman marketing (company profile): Indonesia di path marketing, Inggris di '<path>/en'.
-$marketingPath = trim((string) config('app.normchat_marketing_path', '/normchat'), '/');
-foreach (['id' => '', 'en' => '/en'] as $lang => $suffix) {
-    Route::prefix($marketingPath.$suffix)
-        ->name($lang === 'en' ? 'marketing.en.' : 'marketing.')
-        ->group(function () use ($lang) {
-            Route::get('/about', [MarketingController::class, 'about'])->defaults('lang', $lang)->name('about');
-            Route::get('/pricing', [MarketingController::class, 'pricing'])->defaults('lang', $lang)->name('pricing');
-            Route::get('/contact', [MarketingController::class, 'contact'])->defaults('lang', $lang)->name('contact');
-            Route::post('/contact', [MarketingController::class, 'sendContact'])->defaults('lang', $lang)->middleware('throttle:5,10')->name('contact.send');
-        });
-}
-Route::get($marketingPath.'/en', LandingController::class)->defaults('lang', 'en')->name('landing.en');
+Route::get('/', [LandingController::class, 'home'])->name('landing');
+Route::get('/normchat', [LandingController::class, 'home'])->name('landing.path');
+Route::get('/about', [LandingController::class, 'about'])->name('about');
+Route::get('/pricing', [LandingController::class, 'pricing'])->name('pricing');
+Route::get('/contact', [LandingController::class, 'contact'])->name('contact');
+Route::post('/contact', [LandingController::class, 'sendContact'])->middleware('throttle:5,1')->name('contact.send');
 Route::get('/login', [AuthController::class, 'landing'])->name('login');
 
 // Google SSO (aktif)

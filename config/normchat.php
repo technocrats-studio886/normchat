@@ -168,8 +168,8 @@ return [
 
     'allow_interdotz_bearer_only' => filter_var(env('NORMCHAT_ALLOW_INTERDOTZ_BEARER_ONLY', true), FILTER_VALIDATE_BOOL),
 
-    // Email kontak di landing marketing. Kosong = bagian Kontak disembunyikan.
-    'contact_email' => env('NORMCHAT_CONTACT_EMAIL', ''),
+    // Email dukungan yang tampil di halaman Contact dan tujuan formulir kontak. Kosong = formulir hanya dicatat di log.
+    'support_email' => env('NORMCHAT_SUPPORT_EMAIL'),
 
     'product_logo_url' => env('NORMCHAT_PRODUCT_LOGO_URL', null),
     'product_icon_url' => env('NORMCHAT_PRODUCT_ICON_URL', null),
