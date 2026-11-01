@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Email dukungan yang tampil di halaman Contact dan tujuan formulir kontak. Kosong = formulir hanya dicatat di log.
+    'support_email' => env('NORMCHAT_SUPPORT_EMAIL'),
+
     // Sesi login berakhir setelah sekian hari tanpa aksi user (App\Http\Middleware\EndIdleSession).
     'session_idle_days' => (int) env('NORMCHAT_SESSION_IDLE_DAYS', 5),
 

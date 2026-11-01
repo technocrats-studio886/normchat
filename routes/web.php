@@ -22,8 +22,12 @@ use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
 
 // ── Public / Auth ────────────────────────────────────────────
-Route::get('/', LandingController::class)->name('landing');
-Route::get('/normchat', LandingController::class)->name('landing.path');
+Route::get('/', [LandingController::class, 'home'])->name('landing');
+Route::get('/normchat', [LandingController::class, 'home'])->name('landing.path');
+Route::get('/about', [LandingController::class, 'about'])->name('about');
+Route::get('/pricing', [LandingController::class, 'pricing'])->name('pricing');
+Route::get('/contact', [LandingController::class, 'contact'])->name('contact');
+Route::post('/contact', [LandingController::class, 'sendContact'])->middleware('throttle:5,1')->name('contact.send');
 Route::get('/login', [AuthController::class, 'landing'])->name('login');
 
 // Google SSO (aktif)
