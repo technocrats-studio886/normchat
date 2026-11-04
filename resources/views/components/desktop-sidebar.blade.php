@@ -4,7 +4,7 @@
 <aside class="nc-sidebar hidden lg:flex" data-group-search-scope="1" data-sidebar="1" aria-label="Daftar grup">
     <div class="nc-sidebar-head">
         <a href="{{ route('groups.index') }}" class="flex min-w-0 items-center gap-2" title="Beranda">
-            <img src="{{ asset('brand/logo-mark.svg') }}" alt="Normi Chat" class="h-8 w-8 shrink-0" draggable="false" />
+            <x-brand-mark alt="Normi Chat" class="h-8 w-8 shrink-0" />
             <span class="nc-sidebar-label truncate font-display text-lg font-extrabold text-slate-900">Normi Chat</span>
         </a>
         <div class="nc-sidebar-actions">
@@ -42,7 +42,7 @@
                data-group-card="1" data-group-search="{{ $row['group']->name }} {{ $row['group']->share_id }}"
                @if($isActive) aria-current="page" @endif>
                 <span class="nc-sidebar-avatar">
-                    {{ $row['initial'] }}
+                    <x-group-photo :group="$row['group']" />
                     @if($row['unread'] > 0 && ! $isActive)
                         <span class="nc-sidebar-dot">{{ $unreadLabel }}</span>
                     @endif

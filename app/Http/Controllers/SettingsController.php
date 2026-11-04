@@ -5,65 +5,80 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Group;
 use App\Models\GroupTokenContribution;
-use App\Models\Message;
-use App\Services\Credits\CreditWallet;
+use App\Services\Groups\GroupAvatars;
+use App\Services\Groups\GroupInfo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
-/** Halaman pengaturan grup: profil, anggota, arsip media/file/tautan, dan riwayat kontribusi. */
+/** Info grup (HP: halaman penuh; desktop: jendela/panel di ruang chat), simpan profil grup, riwayat patungan. */
 class SettingsController extends Controller
 {
-    private const ARCHIVE_LIMIT = 60;
-
-    public function show(Request $request, Group $group, CreditWallet $wallet): View
+    public function show(Request $request, Group $group, GroupInfo $info): View
     {
         $this->authorize('view', $group);
-        $user = $request->user();
 
-        $group->load(['groupToken', 'members.user', 'members.role']);
-
-        return view('settings.show', [
-            'group' => $group,
-            'members' => $group->members->where('status', 'active')->values(),
-            'mediaMessages' => $this->archive($group)->where('message_type', 'image')->get(),
-            'fileMessages' => $this->archive($group)->whereNotIn('message_type', ['image', 'voice'])->get(),
-            'linkMessages' => $this->linkMessages($group),
-            'canEditProfile' => $user->can('editGroupProfile', $group),
-            'canManageBilling' => $user->can('manageBilling', $group),
-            'canManageAiPersona' => $user->can('manageAiPersona', $group),
-            'canManageMembers' => $user->can('manageMembers', $group),
-            'creditBalance' => $wallet->balanceFor($group, $user),
-        ]);
+        return view('settings.show', $info->for($group, $request->user()));
     }
 
-    public function updateGroupProfile(Request $request, Group $group): RedirectResponse
+    public function updateGroupProfile(Request $request, Group $group, GroupAvatars $avatars): RedirectResponse
     {
         $this->authorize('editGroupProfile', $group);
 
+        // Profil atas (nama, deskripsi, foto) dan kata sandi di tab Pengaturan memakai form terpisah:
+        // field yang tidak dikirim tidak diubah.
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:120'],
-            'description' => ['nullable', 'string', 'max:500'],
+            'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:500'],
             'password' => ['nullable', 'string', 'min:4', 'max:100'],
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'remove_avatar' => ['nullable', 'boolean'],
+            'info_view' => ['nullable', 'in:main,manage'],
+        ], [
+            'avatar.image' => 'Foto grup harus berupa gambar.',
+            'avatar.mimes' => 'Foto grup harus JPG, PNG, atau WebP.',
+            'avatar.max' => 'Ukuran foto grup maksimal 5 MB.',
+            'password.min' => 'Kata sandi minimal 4 karakter.',
         ]);
 
-        $updates = [
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-        ];
+        $updates = [];
+        if (array_key_exists('name', $validated)) {
+            $updates['name'] = $validated['name'];
+        }
+        if ($request->has('description')) {
+            $updates['description'] = $validated['description'] ?? null;
+        }
         if (! empty($validated['password'])) {
             $updates['password_hash'] = Hash::make($validated['password']);
         }
 
-        $group->update($updates);
+        $oldAvatar = $group->avatar_path;
+        $avatarChange = null;
+        if ($request->hasFile('avatar')) {
+            $updates['avatar_path'] = $avatars->store($group, $request->file('avatar'));
+            $avatarChange = 'updated';
+        } elseif ($request->boolean('remove_avatar') && $oldAvatar) {
+            $updates['avatar_path'] = null;
+            $avatarChange = 'removed';
+        }
+
+        if ($updates !== []) {
+            $group->update($updates);
+        }
+        if ($avatarChange) {
+            $avatars->delete($oldAvatar);
+        }
         AuditLog::record('settings.update_group_profile', $request->user()->id, $group, [
             'updated_fields' => array_keys($updates),
             'password_updated' => isset($updates['password_hash']),
+            'avatar_updated' => $avatarChange === 'updated',
+            'avatar_removed' => $avatarChange === 'removed',
         ]);
 
-        return back()->with('success', 'Pengaturan disimpan.');
+        return back()
+            ->with('success', isset($updates['password_hash']) && count($updates) === 1 ? 'Kata sandi grup diganti.' : 'Info grup disimpan.')
+            ->with('group_info', $validated['info_view'] ?? 'main');
     }
 
     public function transactionHistory(Group $group): View
@@ -74,32 +89,5 @@ class SettingsController extends Controller
             'group' => $group,
             'contributions' => GroupTokenContribution::where('group_id', $group->id)->with('user:id,name')->latest('created_at')->get(),
         ]);
-    }
-
-    /** Pesan berlampiran terbaru grup. */
-    private function archive(Group $group): \Illuminate\Database\Eloquent\Builder
-    {
-        return Message::query()
-            ->where('group_id', $group->id)
-            ->whereNotNull('attachment_path')
-            ->latest('created_at')
-            ->take(self::ARCHIVE_LIMIT);
-    }
-
-    /** Pesan terbaru yang berisi tautan, dengan daftar URL-nya di `extracted_urls`. */
-    private function linkMessages(Group $group): Collection
-    {
-        return Message::query()
-            ->where('group_id', $group->id)
-            ->where('content', 'like', '%http%')
-            ->latest('created_at')
-            ->take(self::ARCHIVE_LIMIT)
-            ->get()
-            ->each(function (Message $message) {
-                preg_match_all('/https?:\/\/[^\s<]+/i', (string) $message->content, $urls);
-                $message->extracted_urls = $urls[0] ?? [];
-            })
-            ->filter(fn (Message $message) => $message->extracted_urls !== [])
-            ->values();
     }
 }

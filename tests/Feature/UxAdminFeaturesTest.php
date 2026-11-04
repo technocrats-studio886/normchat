@@ -8,7 +8,6 @@ use App\Models\Announcement;
 use App\Models\CreditLedgerEntry;
 use App\Models\Group;
 use App\Models\GroupMember;
-use App\Models\GroupTokenContribution;
 use App\Models\Message;
 use App\Models\PendingPayment;
 use App\Models\Role;
@@ -46,6 +45,8 @@ class UxAdminFeaturesTest extends TestCase
         config()->set('normchat.superadmin_emails', ['boss@normchat.test']);
         config()->set('services.midtrans.server_key', self::SERVER_KEY);
         config()->set('services.midtrans.is_production', false);
+        // User uji belum punya grup; grup gratis (FreeGroupsTest) akan membuatkannya dan mengalihkan /groups ke chat.
+        config()->set('normchat.pricing.free_groups_enabled', false);
         $this->boss = User::factory()->create(['email' => 'boss@normchat.test', 'name' => 'Boss']);
         $this->noel = User::factory()->create(['name' => 'Noel']);
     }
@@ -55,7 +56,7 @@ class UxAdminFeaturesTest extends TestCase
     public function test_superadmin_pages_use_the_admin_console_without_any_group_ui(): void
     {
         $pages = ['superadmin.index', 'superadmin.groups.index', 'superadmin.users.index', 'superadmin.finance', 'superadmin.openai',
-            'superadmin.promo', 'superadmin.announcements.index', 'superadmin.announcements.create', 'superadmin.audit', 'superadmin.settings', 'profile.show'];
+            'superadmin.free-groups', 'superadmin.announcements.index', 'superadmin.announcements.create', 'superadmin.audit', 'superadmin.settings', 'profile.show'];
 
         foreach ($pages as $route) {
             $html = $this->actingAs($this->boss)->get(route($route))->assertOk()->getContent();
@@ -198,53 +199,28 @@ class UxAdminFeaturesTest extends TestCase
         $this->assertSame(0, Announcement::count());
     }
 
-    // ── Bonus buat grup (B1) ──────────────────────────────
+    // ── Bonus buat grup (B1, dicabut 4 Nov 2026: diganti grup gratis) ──
 
-    public function test_group_bonus_is_locked_at_checkout_and_granted_on_payment(): void
+    public function test_checkouts_no_longer_carry_a_bonus_but_one_started_before_the_change_is_still_honored(): void
     {
-        $this->actingAs($this->boss)->post(route('superadmin.promo.update'), [
-            'group_bonus_enabled' => '1', 'group_bonus_credits' => '20',
-            'group_bonus_starts_at' => now()->subDay()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i'),
-            'group_bonus_ends_at' => now()->addDay()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i'),
-        ])->assertRedirect(route('superadmin.promo'));
-
-        $this->actingAs($this->noel)->get(route('groups.create'))->assertSee('Bonus +20 Normkredit')->assertSee('saldo awal 270 Normkredit');
+        app(NormkreditPricing::class)->update(['free_groups_enabled' => false]);
+        $this->actingAs($this->noel)->get(route('groups.create'))->assertDontSee('Bonus', false);
 
         Http::fake(['app.sandbox.midtrans.com/snap/v1/transactions' => Http::response(['token' => 't', 'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v4/redirection/t'], 201)]);
         $this->actingAs($this->noel)->post('/groups', ['name' => 'Panitia', 'password' => '1234']);
         $pending = PendingPayment::firstOrFail();
-        $this->assertEquals(20, $pending->metadata_json['bonus_credits']);
+        $this->assertArrayNotHasKey('bonus_credits', $pending->metadata_json);
 
-        // Promo dimatikan sebelum lunas: bonus tetap diberikan karena sudah dikunci.
-        app(NormkreditPricing::class)->update(['group_bonus_enabled' => false]);
+        // Checkout yang dimulai sebelum promo dicabut membawa bonusnya sendiri.
+        $pending->update(['metadata_json' => $pending->metadata_json + ['bonus_credits' => 20]]);
         $this->postJson('/api/webhooks/midtrans', $this->notification($pending))->assertOk();
 
         $group = Group::firstOrFail();
-        $this->assertSame('active', $group->status);
         $this->assertSame(270.0, (float) $group->groupToken()->value('remaining_credits'));
         $this->assertSame(['deposit', 'bonus'], CreditLedgerEntry::where('group_id', $group->id)->orderBy('id')->pluck('type')->all());
-        $bonus = GroupTokenContribution::where('source', GroupTokenContribution::SOURCE_BONUS)->firstOrFail();
-        $this->assertSame([20.0, 0], [(float) $bonus->credit_amount, (int) $bonus->price_paid]);
-
-        // Webhook ganda tidak menggandakan bonus; bonus bukan pendapatan.
         $this->postJson('/api/webhooks/midtrans', $this->notification($pending))->assertOk();
         $this->assertSame(270.0, (float) $group->groupToken()->value('remaining_credits'));
-        $this->actingAs($this->boss)->get(route('superadmin.finance'))->assertSee('Bonus 20,00 NK');
-    }
-
-    public function test_no_bonus_outside_the_period_or_when_disabled(): void
-    {
-        $pricing = app(NormkreditPricing::class);
-        $pricing->update(['group_bonus_enabled' => true, 'group_bonus_credits' => 20, 'group_bonus_starts_at' => now()->addDay()->toIso8601String(), 'group_bonus_ends_at' => '']);
-        $this->assertSame(0.0, $pricing->groupCreationBonus());
-        $this->assertSame(20.0, $pricing->groupCreationBonus(now()->addDays(2)));
-
-        $pricing->update(['group_bonus_starts_at' => '', 'group_bonus_ends_at' => now()->subMinute()->toIso8601String()]);
-        $this->assertSame(0.0, $pricing->groupCreationBonus());
-
-        $pricing->update(['group_bonus_ends_at' => '', 'group_bonus_enabled' => false]);
-        $this->assertSame(0.0, $pricing->groupCreationBonus());
-        $this->actingAs($this->noel)->get(route('groups.create'))->assertDontSee('data-group-bonus', false);
+        $this->actingAs($this->boss)->get(route('superadmin.finance'))->assertSee('Saldo gratis 20,00 NK');
     }
 
     private function group(User $owner, array $members = []): Group

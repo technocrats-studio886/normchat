@@ -14,6 +14,7 @@ use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\MessageHide;
+use App\Services\Groups\GroupInfo;
 use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Chat\AttachmentStorage;
 use App\Services\Chat\MentionNotifier;
@@ -53,7 +54,7 @@ class ChatController extends Controller
         return $group ? redirect()->route('chat.show', $group) : redirect()->route('groups.index');
     }
 
-    public function show(Request $request, Group $group, ModelAccess $access): View
+    public function show(Request $request, Group $group, ModelAccess $access, GroupInfo $info): View
     {
         $this->authorize('chat', $group);
         session(['last_chat_group_id' => $group->id]);
@@ -82,6 +83,8 @@ class ChatController extends Controller
 
         return view('chat.show', [
             'group' => $group,
+            // Info grup desktop (jendela melayang dan panel kanan), isinya sama dengan halaman Info grup HP.
+            'info' => $info->for($group, $viewer),
             // Dirender di browser oleh resources/js/chat/messages.js, sama dengan pesan realtime.
             'messages' => $messages->map(fn (Message $message) => $this->presenter->present($message, null, ['awaiting_ai' => $awaitingAi->has($message->id)]))->all(),
             // Tujuan "Bagikan": grup lain tempat user bisa mengirim pesan.

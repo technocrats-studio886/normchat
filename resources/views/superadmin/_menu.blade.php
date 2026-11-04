@@ -11,7 +11,7 @@
         'Uang' => [
             ['superadmin.finance', 'Keuangan & AI', 'M4 19V5m0 14h16M8 16v-5m4 5V8m4 8v-3'],
             ['superadmin.openai', 'Biaya OpenAI', 'M12 3v18m4-14H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H8'],
-            ['superadmin.promo', 'Promo', 'M20 12v8H4v-8m16 0H4m16 0V8H4v4m8-4v12m0-12c-1.5-3-5-3-5-.5S12 8 12 8zm0 0c1.5-3 5-3 5-.5S12 8 12 8z'],
+            ['superadmin.free-groups', 'Grup gratis', 'M20 12v8H4v-8m16 0H4m16 0V8H4v4m8-4v12m0-12c-1.5-3-5-3-5-.5S12 8 12 8zm0 0c1.5-3 5-3 5-.5S12 8 12 8z'],
         ],
         'Komunikasi' => [
             ['superadmin.announcements.index', 'Pengumuman', 'M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1zm12-2a5 5 0 0 1 0 8'],

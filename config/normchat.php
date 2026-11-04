@@ -51,11 +51,12 @@ return [
         // Batas keras token input per permintaan (konteks + pesan penanya + lampirannya).
         'max_input_tokens' => 16000,
         'daily_group_credit_limit' => 0,
-        // Promo bonus buat grup; diatur superadmin di Superadmin › Promo.
-        'group_bonus_enabled' => false,
-        'group_bonus_credits' => 20,
-        'group_bonus_starts_at' => null,
-        'group_bonus_ends_at' => null,
+        // Grup gratis per user (Superadmin › Grup gratis): grup ke-1 dan ke-2 tanpa bayar dengan saldo awal ini,
+        // masing-masing dengan slot anggota yang bergabung tanpa patungan. Grup ke-3 dst berbayar.
+        'free_groups_enabled' => true,
+        'free_first_group_credits' => 70,
+        'free_second_group_credits' => 50,
+        'free_group_member_slots' => 2,
         // Selisih kurs kartu & biaya bank di atas kurs pasar yang diisi superadmin (%).
         'card_margin_percent' => 2.0,
     ],
@@ -174,7 +175,9 @@ return [
     'allow_interdotz_bearer_only' => filter_var(env('NORMCHAT_ALLOW_INTERDOTZ_BEARER_ONLY', true), FILTER_VALIDATE_BOOL),
 
     // Email dukungan yang tampil di halaman Contact dan tujuan formulir kontak. Kosong = formulir hanya dicatat di log.
+    // Kotak masuk di normi.chat (diteruskan Dynadot ke email tim): pertanyaan umum dan kerja sama bisnis.
     'support_email' => env('NORMCHAT_SUPPORT_EMAIL'),
+    'business_email' => env('NORMCHAT_BUSINESS_EMAIL'),
 
     'product_logo_url' => env('NORMCHAT_PRODUCT_LOGO_URL', null),
     'product_icon_url' => env('NORMCHAT_PRODUCT_ICON_URL', null),

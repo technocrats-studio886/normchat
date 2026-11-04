@@ -102,8 +102,10 @@ class NormkreditPricingTest extends TestCase
         $owner = User::factory()->create();
         $group = $this->makeGroup($owner, 250);
 
-        $this->actingAs(User::factory()->create())
-            ->post("/join/{$group->share_id}", ['password' => '1234', 'packages' => 0])
+        $friend = User::factory()->create();
+        $this->actingAs($friend)->post("/join/{$group->share_id}/sandi", ['password' => '1234']);
+        $this->actingAs($friend)
+            ->post("/join/{$group->share_id}", ['packages' => 0])
             ->assertSessionHasErrors('packages');
     }
 
@@ -262,6 +264,7 @@ class NormkreditPricingTest extends TestCase
 
     public function test_payment_and_ai_pages_render_nk_pricing(): void
     {
+        config()->set('normchat.pricing.free_groups_enabled', false);
         $owner = User::factory()->create();
         $group = $this->makeGroup($owner, 300);
 
@@ -272,7 +275,9 @@ class NormkreditPricingTest extends TestCase
         $this->actingAs($owner)->get("/tokens/buy?group={$group->id}")
             ->assertOk()->assertSee('125 Normkredit')->assertSee('Rp15.000')->assertDontSee('Rp15.105')->assertSee('300,00 Normkredit');
 
-        $this->actingAs(User::factory()->create())->get("/join/{$group->share_id}")
+        $friend = User::factory()->create();
+        $this->actingAs($friend)->post("/join/{$group->share_id}/sandi", ['password' => '1234']);
+        $this->actingAs($friend)->get("/join/{$group->share_id}/lanjut")
             ->assertOk()->assertSee('125 Normkredit')->assertSee('Rp15.000')->assertDontSee('Rp15.105')->assertDontSee('Dots Units');
 
         $this->actingAs($owner)->get("/groups/{$group->id}/settings/ai-persona")

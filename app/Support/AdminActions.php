@@ -33,6 +33,7 @@ final class AdminActions
             'admin.announcement_stopped' => 'Menghentikan pengumuman "' . ($data['title'] ?? '') . '"',
             'admin.announcement_deleted' => 'Menghapus pengumuman "' . ($data['title'] ?? '') . '"',
             'admin.update_promo' => 'Mengubah promo bonus buat grup',
+            'admin.update_free_groups' => 'Mengubah pengaturan grup gratis',
             default => str_replace(['superadmin.', 'admin.', '_'], ['', '', ' '], $log->action),
         };
     }

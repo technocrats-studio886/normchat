@@ -139,12 +139,12 @@ class AdminReportController extends Controller
                 . ' sum(charged_credits) as charged, sum(provider_cost_idr) as cost_idr', AiUsageLog::NOT_ANSWERS)
             ->orderByDesc('cost_idr')->limit(20)->get();
 
-        // Bonus promo buat grup: Normkredit tanpa pembayaran, bukan pendapatan.
-        $bonusCredits = (float) GroupTokenContribution::whereBetween('created_at', [$from, $to])
-            ->where('source', GroupTokenContribution::SOURCE_BONUS)->sum('credit_amount');
+        // Saldo grup gratis (dan bonus buat grup lama): Normkredit tanpa pembayaran, bukan pendapatan.
+        $giftCredits = (float) GroupTokenContribution::whereBetween('created_at', [$from, $to])
+            ->whereIn('source', GroupTokenContribution::GIFT_SOURCES)->sum('credit_amount');
 
         return view('superadmin.finance', compact(
-            'transactions', 'revenueByDay', 'usageByModel', 'usageByGroup', 'maintenance', 'answers', 'recallByWeek', 'refusals', 'rupiahPerCredit', 'fromInput', 'toInput', 'bonusCredits'
+            'transactions', 'revenueByDay', 'usageByModel', 'usageByGroup', 'maintenance', 'answers', 'recallByWeek', 'refusals', 'rupiahPerCredit', 'fromInput', 'toInput', 'giftCredits'
         ));
     }
 

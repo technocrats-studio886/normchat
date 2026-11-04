@@ -18,6 +18,7 @@ class Group extends Model
     protected $fillable = [
         'name',
         'description',
+        'avatar_path',
         'owner_id',
         'password_hash',
         'approval_enabled',
@@ -28,11 +29,15 @@ class Group extends Model
         'ai_persona_guardrails',
         'status',
         'member_daily_credit_limit',
+        'free_member_slots',
+        'free_joins_used',
     ];
 
     protected $casts = [
         'approval_enabled' => 'boolean',
         'member_daily_credit_limit' => 'float',
+        'free_member_slots' => 'integer',
+        'free_joins_used' => 'integer',
     ];
 
     protected static function booted(): void
@@ -44,6 +49,42 @@ class Group extends Model
         });
         // Ingatan Normi berisi isi chat: ikut dihapus bersama grup, dibangun ulang bila grup dipulihkan.
         static::deleted(fn (Group $group) => app(MemoryMaintenance::class)->purge((int) $group->id));
+    }
+
+    /** Grup gratis: dibuat tanpa bayar dan punya slot anggota gratis (App\Services\FreeGroups). */
+    public function isFree(): bool
+    {
+        return (int) $this->free_member_slots > 0;
+    }
+
+    /** Sisa anggota yang masih bisa bergabung tanpa patungan. */
+    public function freeSlotsLeft(): int
+    {
+        return max(0, (int) $this->free_member_slots - (int) $this->free_joins_used);
+    }
+
+    /** Foto grup untuk anggota; null bila grup memakai inisial. `v` memecah cache saat foto diganti. */
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path ? route('groups.avatar', ['group' => $this->id, 'v' => substr(md5($this->avatar_path), 0, 8)]) : null;
+    }
+
+    /** Foto grup untuk calon anggota yang memegang kode grup (halaman /join/{kode}). */
+    public function joinAvatarUrl(): ?string
+    {
+        return $this->avatar_path ? route('groups.join.avatar', ['shareId' => $this->share_id, 'v' => substr(md5($this->avatar_path), 0, 8)]) : null;
+    }
+
+    /** Huruf pertama nama grup, dipakai bila belum ada foto. */
+    public function initial(): string
+    {
+        return Str::upper(Str::substr((string) $this->name, 0, 1));
+    }
+
+    /** Grup tanpa kata sandi (grup gratis otomatis): gabung cukup dengan kode grup. */
+    public function needsPassword(): bool
+    {
+        return filled($this->password_hash);
     }
 
     public static function generateUniqueShareId(): string

@@ -1,16 +1,16 @@
 @extends('marketing.layout', ['current' => 'contact'])
 
-@section('title', 'Contact Normi Chat')
-@section('description', 'Ask about prices, how to use Normi Chat, or a problem in your group. We reply by email.')
+@section('title', 'Contact | Normi Chat')
+@section('description', 'Send us your questions about prices or Normi, and we will reply by email.')
 
 @section('content')
 
     {{-- Hero + form --}}
     <section class="hero">
         <div class="wrap">
-            <h1>Questions? Write to us.</h1>
+            <h1>Talk to us.</h1>
             <div class="prose">
-                <p>About prices, how to use Normi Chat, or a problem in your group. We reply by email.</p>
+                <p>Send us your questions about prices or Normi, and we'll reply by email.</p>
             </div>
 
             @if (session('contact_status') === 'sent')
@@ -46,7 +46,7 @@
                 </div>
                 <div class="field">
                     <label for="message">Message</label>
-                    <textarea id="message" name="message" placeholder="Tell us briefly what you need" required>{{ old('message') }}</textarea>
+                    <textarea id="message" name="message" placeholder="Tell us what you need" required>{{ old('message') }}</textarea>
                     @error('message') <div class="err">{{ $message }}</div> @enderror
                 </div>
 
@@ -65,15 +65,15 @@
             <div class="faq">
                 <details>
                     <summary>Where can I see the prices?</summary>
-                    <p>On the <a href="{{ $page('/pricing') }}">Prices</a> page.</p>
+                    <p>You can find them on the <a href="{{ $page('/pricing') }}">Prices</a> page.</p>
                 </details>
                 <details>
                     <summary>How do I start?</summary>
-                    <p>Sign in with Google, create a group, then invite friends with the Share ID.</p>
+                    <p>Sign in with Google to get your first group, then share its group code with your friends.</p>
                 </details>
                 <details>
                     <summary>Which AI models are used?</summary>
-                    <p>Models from OpenAI. The choices are in the group settings.</p>
+                    <p>Normi uses OpenAI models, and you choose the level each time you ask Normi.</p>
                 </details>
             </div>
         </div>
@@ -83,9 +83,12 @@
     <section class="cta">
         <div class="wrap">
             <div class="prose">
-                <h2>We read every message.</h2>
+                <h2>You can also write to us by email.</h2>
                 @if ($supportEmail)
-                    <p>Support email: <a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a></p>
+                    <p>Write to <a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a> for questions about Normi Chat.</p>
+                @endif
+                @if ($businessEmail)
+                    <p>For partnerships and other business inquiries, write to <a href="mailto:{{ $businessEmail }}">{{ $businessEmail }}</a>.</p>
                 @endif
                 <div class="btn-row">
                     <a href="{{ $page('/pricing') }}" class="btn btn-ghost">See prices</a>

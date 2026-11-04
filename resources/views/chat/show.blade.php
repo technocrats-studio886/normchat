@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => $group->name.' - Normi Chat', 'group' => $group])
 
 @section('content')
-    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[var(--nc-chat-bg)] lg:left-[var(--nc-sidebar-w)] lg:right-0 lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-x-0 nc-sidebar-push" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}" data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
+    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[var(--nc-chat-bg)] lg:left-[var(--nc-sidebar-w)] lg:right-[var(--nc-info-w,0px)] lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-x-0 nc-sidebar-push" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}" data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
         @php
             $gt = $group->groupToken;
             $credits = $gt ? $gt->credits : 0;
@@ -19,15 +19,22 @@
             <a href="{{ route('groups.index') }}" class="flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 hover:bg-slate-100 lg:hidden" aria-label="Kembali">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 19-7-7 7-7"/></svg>
             </a>
-            <a href="{{ route('settings.show', $group) }}" class="flex min-w-0 flex-1 items-center gap-3 rounded-2xl transition hover:bg-slate-50" aria-label="Pengaturan grup">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-extrabold text-white" style="background: var(--nc-primary);">
-                    {{ $groupInitial }}
+            {{-- HP: membuka halaman Info grup. Desktop: resources/js/ui/group-info.js membuka jendela Info grup. --}}
+            <a href="{{ route('settings.show', $group) }}" class="flex min-w-0 flex-1 items-center gap-3 rounded-2xl transition hover:bg-slate-50" aria-label="Info grup" data-open-group-info>
+                <div class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white" style="background: var(--nc-primary);">
+                    <x-group-photo :group="$group" />
                 </div>
                 <div class="min-w-0 flex-1 py-1">
                     <p class="nc-chat-header-title truncate text-sm font-semibold">{{ $group->name }}</p>
                     <p class="nc-chat-header-subtitle truncate text-[11px]">{{ $memberCount }} anggota</p>
                 </div>
             </a>
+            <button type="button" class="hidden h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 lg:inline-flex" data-header-search aria-label="Cari pesan" title="Cari pesan">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"/></svg>
+            </button>
+            <button type="button" class="hidden h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 lg:inline-flex" data-info-side-toggle aria-label="Buka panel info grup" aria-expanded="false" title="Panel info grup">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path stroke-linecap="round" d="M15 4v16"/></svg>
+            </button>
             <button
                 type="button"
                 class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -39,6 +46,20 @@
                 </svg>
             </button>
         </div>
+
+        {{-- Grup gratis: ajakan untuk pemilik selama slot anggota gratis masih ada. Tersembunyi sampai
+             resources/js/ui/invite-card.js memastikan kartunya belum ditutup di perangkat ini. --}}
+        @if($viewerIsOwner && $group->freeSlotsLeft() > 0 && ! $group->isFrozen())
+            <div class="nc-invite-card hidden lg:mx-auto lg:w-[calc(100%-2rem)] lg:max-w-[var(--nc-room-max)]" data-invite-card="{{ $group->id }}">
+                <p class="min-w-0 flex-1 text-sm">
+                    Ajak {{ $group->freeSlotsLeft() }} teman bergabung gratis ke grup ini dengan kode <b class="font-mono">{{ $group->share_id }}</b>.
+                </p>
+                <div class="flex shrink-0 gap-2">
+                    <button type="button" class="btn-primary px-3 py-1.5 text-xs" data-open-share-sheet>Ajak teman</button>
+                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" data-invite-card-close>Tutup</button>
+                </div>
+            </div>
+        @endif
 
         {{-- Message search --}}
         <div class="hidden mx-3 mt-2 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm lg:mx-auto lg:w-[calc(100%-2rem)] lg:max-w-[var(--nc-room-max)]" data-message-search-bar="1">
@@ -278,11 +299,11 @@
                 </span>
                 <span>Bersihkan chat di perangkat ini</span>
             </button>
-            <a href="{{ route('settings.show', $group) }}" class="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-white/10" role="menuitem">
+            <a href="{{ route('settings.show', $group) }}" class="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-white/10" role="menuitem" data-open-group-info>
                 <span class="inline-flex h-5 w-5 items-center justify-center text-white/90">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.34.22.7.22 1.07"/></svg>
                 </span>
-                <span>Pengaturan grup</span>
+                <span>Info grup</span>
             </a>
             @if($viewerIsOwner)
                 <div class="my-1 border-t border-white/15"></div>
@@ -313,6 +334,19 @@
             </div>
         @endif
     </section>
+
+    {{-- Info grup desktop (docs/rancangan-info-grup.md): satu isi panel yang dipindah oleh
+         resources/js/ui/group-info.js ke jendela melayang atau ke panel kanan. --}}
+    <div class="nc-info-modal" data-info-modal hidden @if($info['infoView'] || $errors->hasAny(['name', 'description', 'avatar', 'password', 'member_daily_credit_limit'])) data-info-reopen @endif>
+        <div class="nc-info-modal-card" role="dialog" aria-modal="true" aria-label="Info grup" data-info-slot="modal"></div>
+    </div>
+    <aside class="nc-info-side" data-info-side aria-label="Info grup">
+        <div class="nc-info-side-inner" data-info-slot="side"></div>
+    </aside>
+    <div hidden data-info-holder>
+        @include('groups.info.panel', $info + ['mode' => 'embed'])
+    </div>
+    @include('groups.info.share-sheet', ['group' => $group])
 
 @endsection
 

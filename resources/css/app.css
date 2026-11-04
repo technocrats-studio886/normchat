@@ -339,6 +339,18 @@
     }
 
 
+    /* Tombol melayang "Buat grup" di daftar grup HP, tepat di atas navigasi bawah. */
+    .nc-fab {
+        @apply fixed z-40 inline-flex h-14 w-14 items-center justify-center rounded-full text-white transition lg:hidden;
+        right: 20px;
+        bottom: calc(env(safe-area-inset-bottom) + 92px);
+        background: var(--nc-primary);
+        box-shadow: var(--nc-shadow-md);
+    }
+    .nc-fab:hover { filter: brightness(1.08); }
+    .nc-fab:active { transform: scale(0.94); }
+    .nc-fab:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 3px; }
+
     /* ── Page shells ─────────────────────────────── */
     .page-shell { @apply min-h-screen px-4 pb-32 pt-5; }
 
@@ -1338,6 +1350,115 @@
     .nc-field .nc-input { width: 100%; }
     .nc-field-hint { margin-top: 4px; font-size: 12px; color: var(--nc-text-soft); }
 
+    /* Kartu ajakan grup gratis di bawah kepala chat (chat/show, resources/js/ui/invite-card.js). */
+    .nc-invite-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 12px;
+        margin: 8px 12px 0;
+        padding: 10px 12px;
+        border: 1px solid var(--nc-primary-line);
+        border-radius: 18px;
+        background: var(--nc-primary-light);
+        color: var(--nc-primary-text);
+    }
+    .nc-invite-card.hidden { display: none; }
+
+    /* ── Halaman masuk (auth/landing): satu kolom di tengah di semua ukuran layar, kalimat pemasaran di atas kartu
+       masuk. Font pemasaran: judul Bricolage Grotesque, isi Hanken Grotesk. ── */
+    .nc-login { min-height: 100vh; min-height: 100dvh; background: var(--nc-bg); color: var(--nc-text); font-family: 'Hanken Grotesk', var(--font-sans); }
+    .nc-login-brand, .nc-login-title, .nc-login-card-title { font-family: 'Bricolage Grotesque', 'Hanken Grotesk', var(--font-sans); }
+    .nc-login-single {
+        display: flex;
+        min-height: 100vh;
+        min-height: 100dvh;
+        width: 100%;
+        max-width: 30rem;
+        flex-direction: column;
+        align-items: center;
+        margin: 0 auto;
+        padding: calc(env(safe-area-inset-top) + 40px) 20px calc(env(safe-area-inset-bottom) + 24px);
+        text-align: center;
+    }
+    .nc-login-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; color: inherit; }
+    .nc-login-brand img { width: 32px; height: 32px; }
+    .nc-login-title { margin-top: 32px; font-size: 34px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
+    .nc-login-lead { margin-top: 12px; font-size: 16px; line-height: 1.55; color: var(--nc-text-soft); }
+    .nc-login-mention { font-weight: 600; color: var(--nc-ai-name); }
+    .nc-login-offer {
+        margin-top: 16px;
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: var(--nc-primary-light);
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.45;
+        color: var(--nc-primary-text);
+    }
+    /* Demo obrolan hidup di kolom yang sama (partials/live-demo-script). Tanpa JS semua gelembung tampil. */
+    .nc-login-preview { width: 100%; margin-top: 36px; }
+    .nc-login-preview-title { font-family: 'Bricolage Grotesque', 'Hanken Grotesk', var(--font-sans); font-size: 17px; font-weight: 600; color: var(--nc-text); }
+    .nc-login-preview-sub { margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--nc-text-soft); }
+    .nc-login-demo { display: grid; align-content: end; gap: 8px; width: 100%; margin-top: 16px; padding: 16px; border: 1px solid var(--nc-line); border-radius: 20px; background: var(--nc-chat-bg); text-align: left; }
+    .nc-login-bubble { justify-self: start; max-width: 85%; padding: 9px 13px; border: 1px solid var(--nc-chat-other-border); border-radius: 16px 16px 16px 6px; background: var(--nc-chat-other-bg); font-size: 14px; line-height: 1.45; color: var(--nc-chat-other-text); }
+    .nc-login-bubble b { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-login-bubble.is-mine { justify-self: end; border-color: transparent; border-radius: 16px 16px 6px 16px; background: var(--nc-mine); color: #ffffff; }
+    .nc-login-bubble.is-mine .nc-login-mention { color: #FFD5CF; }
+    .nc-login-bubble.is-normi { border-color: var(--nc-chat-ai-border); background: var(--nc-chat-ai-bg); color: var(--nc-chat-ai-text); }
+    .nc-login-bubble.is-normi b { color: var(--nc-ai-name); }
+    .nc-login-typing { display: none; }
+    .nc-login-dots { display: inline-flex; gap: 4px; margin-right: 6px; vertical-align: middle; }
+    .nc-login-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: nc-login-dot 1.2s ease-in-out infinite; }
+    .nc-login-dots i:nth-child(2) { animation-delay: 0.15s; }
+    .nc-login-dots i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes nc-login-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.45; } 30% { transform: translateY(-3px); opacity: 1; } }
+    .nc-login-demo.is-live [data-demo-step], .nc-login-demo.is-live .nc-login-typing { display: none; }
+    .nc-login-demo.is-live .is-shown { display: block; animation: nc-login-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+    @keyframes nc-login-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .nc-login-demo .is-streaming [data-demo-answer]::after { content: ''; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: currentColor; animation: nc-login-caret 0.9s steps(1) infinite; }
+    @keyframes nc-login-caret { 50% { opacity: 0; } }
+    .nc-login-mention.is-flash { border-radius: 4px; animation: nc-login-mention 1.2s ease-out; }
+    @keyframes nc-login-mention { 0% { background: rgba(196, 61, 46, 0.2); } 100% { background: transparent; } }
+    .nc-login-card { width: 100%; margin-top: 28px; padding: 24px; border: 1px solid var(--nc-line); border-radius: 24px; background: var(--nc-surface); box-shadow: var(--nc-shadow-soft); text-align: left; }
+    .nc-login-card-title { font-size: 20px; font-weight: 700; }
+    .nc-login-card-sub { margin-top: 4px; font-size: 14px; color: var(--nc-text-soft); }
+    .nc-login-alert { margin-top: 16px; padding: 10px 12px; border-radius: 12px; background: var(--nc-danger-soft); font-size: 13px; font-weight: 600; color: var(--nc-danger-text); }
+    .nc-login-google {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 14px 24px;
+        border: 1px solid var(--nc-line-strong);
+        border-radius: 9999px;
+        background: var(--nc-surface);
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--nc-text);
+        box-shadow: var(--nc-shadow-md);
+        transition: background-color 0.15s ease, transform 0.15s ease;
+    }
+    .nc-login-google:hover { background: var(--nc-surface-2); transform: scale(1.02); }
+    .nc-login-google:active { transform: scale(0.98); }
+    .nc-login-google.is-plain { padding: 12px 24px; font-weight: 600; box-shadow: none; }
+    .nc-login-google.is-loading { pointer-events: none; opacity: 0.85; }
+    .nc-login-google.is-loading::after { content: ''; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: nc-login-spin 0.7s linear infinite; }
+    @keyframes nc-login-spin { to { transform: rotate(360deg); } }
+    .nc-login-note { margin-top: 14px; text-align: center; font-size: 13px; color: var(--nc-text-soft); }
+    .nc-login-legal { margin-top: 10px; text-align: center; font-size: 12px; line-height: 1.5; color: var(--nc-text-soft); }
+    .nc-login-legal a { text-decoration: underline; text-underline-offset: 2px; }
+    .nc-login-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin-top: auto; padding-top: 32px; font-size: 13px; color: var(--nc-text-soft); }
+    .nc-login-foot a:hover { color: var(--nc-text); text-decoration: underline; }
+    @media (min-width: 1024px) {
+        .nc-login-single { padding-top: 72px; }
+        .nc-login-title { font-size: 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .nc-login-google.is-loading::after, .nc-login-dots i, .nc-login-demo .is-shown, .nc-login-mention.is-flash { animation: none; }
+        .nc-login-google:hover, .nc-login-google:active { transform: none; }
+    }
+
     /* ── Pengumuman superadmin (partials/announcement) ──
        Banner: strip melayang di atas konten (tidak menggeser tata letak chat). Popup: <dialog> di tengah. */
     .nc-announce { display: flex; flex-direction: column; gap: 12px; background: var(--nc-surface); color: var(--nc-text); }
@@ -1528,7 +1649,7 @@
         transition: width 0.2s ease;
     }
     .nc-sidebar-push {
-        transition: padding-left 0.2s ease, left 0.2s ease;
+        transition: padding-left 0.2s ease, left 0.2s ease, right 0.2s ease;
     }
     :root.nc-sidebar-dragging .nc-sidebar,
     :root.nc-sidebar-dragging .nc-sidebar-push { transition: none; }
@@ -1879,6 +2000,386 @@
 
     @keyframes ncFadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes ncSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* Logo ikut tema (components/brand-mark): versi putih di mode gelap. */
+    .nc-logo-on-dark { display: none; }
+    [data-mode="dark"] .nc-logo-on-light { display: none; }
+    [data-mode="dark"] .nc-logo-on-dark { display: inline-block; }
+
+    /* ── Info grup (docs/rancangan-info-grup.md) ───────────────────────────
+       Satu isi (.nc-info) untuk halaman HP (.nc-info-page) dan ruang chat desktop (.nc-info-embed)
+       yang dipindah ke jendela (.nc-info-modal) atau panel kanan (.nc-info-side). */
+    .nc-group-photo {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        object-fit: cover;
+    }
+    .nc-info { position: relative; color: var(--nc-text); padding-bottom: 12px; }
+    .nc-info-bar { display: flex; align-items: center; gap: 4px; padding: 10px 10px 0; min-height: 48px; }
+    .nc-info-bar-title { display: none; font-size: 15px; font-weight: 700; padding-left: 6px; }
+    .nc-info-icon-btn {
+        display: inline-grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        flex: none;
+        border-radius: 12px;
+        color: var(--nc-text-soft);
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .nc-info-icon-btn:hover { background: var(--nc-surface-2); color: var(--nc-text); }
+    .nc-info-icon-btn[hidden] { display: none; }
+
+    .nc-info-hero { padding: 4px 16px 0; }
+    .nc-info-hero-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        padding: 8px 4px 10px;
+        border-radius: 18px;
+        text-align: center;
+        color: inherit;
+    }
+    button.nc-info-hero-button { transition: background-color 0.15s ease; }
+    button.nc-info-hero-button:hover { background: var(--nc-surface-2); }
+    button.nc-info-hero-button:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
+    .nc-info-name-edit { display: inline-block; margin-left: 6px; vertical-align: -1px; color: var(--nc-text-soft); }
+    .nc-info-photo {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 96px;
+        height: 96px;
+        flex: none;
+        border-radius: 9999px;
+        background: var(--nc-primary);
+        color: #ffffff;
+        font-size: 36px;
+        font-weight: 800;
+        overflow: hidden;
+    }
+    button.nc-info-photo:focus-visible, .nc-info-photo-edit:focus-within { outline: 2px solid var(--nc-primary); outline-offset: 3px; }
+    .nc-info-photo-edit { display: flex; margin: 0 auto; width: 96px; height: 96px; cursor: pointer; }
+    .nc-info-photo-camera {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(10, 15, 22, 0.42);
+        color: #ffffff;
+    }
+    .nc-info-name { display: block; margin-top: 12px; font-size: 20px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+    .nc-info-meta { display: block; margin-top: 2px; font-size: 13px; color: var(--nc-text-soft); }
+    .nc-info-desc { display: block; margin-top: 8px; max-width: 34rem; font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+    .nc-info-add-desc { display: block; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--nc-primary-text); }
+
+    .nc-info-balance {
+        margin: 16px 16px 0;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+    }
+    .nc-info-balance-note { margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--nc-text-soft); }
+
+    .nc-info-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 16px 0; }
+    .nc-info-action {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 4px;
+        border-radius: 14px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--nc-text);
+        transition: background-color 0.15s ease;
+    }
+    .nc-info-action:hover { background: var(--nc-surface-2); }
+    .nc-info-action-icon { display: grid; place-items: center; color: var(--nc-primary-text); }
+
+    .nc-info-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 48px;
+        padding: 10px 16px;
+        color: var(--nc-text);
+        transition: background-color 0.15s ease;
+    }
+    a.nc-info-row:hover, button.nc-info-row:hover { background: var(--nc-surface-2); }
+    .nc-info-row.is-danger { color: var(--nc-danger-text); }
+    .nc-info-list {
+        margin: 12px 16px 0;
+        overflow: hidden;
+        border-radius: 16px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+    }
+    .nc-info-list > * + * { border-top: 1px solid var(--nc-line); }
+
+    .nc-info-tabs { display: flex; margin-top: 16px; border-bottom: 1px solid var(--nc-line); }
+    .nc-info-tab {
+        flex: 1;
+        padding: 12px 8px;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--nc-text-soft);
+        border-bottom: 3px solid transparent;
+    }
+    .nc-info-tab[aria-selected="true"] { color: var(--nc-text); border-color: var(--nc-primary); }
+
+    .nc-info-pane { padding-top: 10px; }
+
+    /* Tab Media: deretan gambar yang digeser kiri-kanan sampai gambar pertama/terakhir */
+    .nc-info-strip {
+        display: flex;
+        gap: 8px;
+        padding: 2px 16px 14px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity;
+        scroll-padding-inline: 16px;
+        scrollbar-width: thin;
+    }
+    .nc-info-strip-item {
+        flex: none;
+        width: 112px;
+        height: 112px;
+        overflow: hidden;
+        border-radius: 14px;
+        background: var(--nc-surface-2);
+        scroll-snap-align: start;
+    }
+    .nc-info-strip-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s ease; }
+    .nc-info-strip-item:hover img { transform: scale(1.04); }
+    .nc-info-strip-item:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
+
+    /* Penampil gambar layar penuh (resources/js/ui/media-viewer.js) */
+    .nc-media-viewer { position: fixed; inset: 0; z-index: 99; background: rgba(5, 8, 12, 0.94); color: #ffffff; animation: ncFadeIn 120ms ease; }
+    .nc-media-viewer[hidden] { display: none; }
+    :root.nc-media-viewer-on body { overflow: hidden; }
+    .nc-media-viewer-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: calc(env(safe-area-inset-top) + 10px) 12px 10px 18px;
+        background: linear-gradient(rgba(5, 8, 12, 0.7), transparent);
+    }
+    .nc-media-viewer-count { flex: 1; font-size: 14px; font-weight: 600; }
+    .nc-media-viewer-btn, .nc-media-viewer-nav {
+        display: inline-grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 9999px;
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.12);
+        transition: background-color 0.15s ease, opacity 0.15s ease;
+    }
+    .nc-media-viewer-btn:hover, .nc-media-viewer-nav:hover:not(:disabled) { background: rgba(255, 255, 255, 0.24); }
+    .nc-media-viewer-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 64px 12px 24px; touch-action: pan-y; user-select: none; }
+    .nc-media-viewer-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+    .nc-media-viewer-nav { position: absolute; top: 50%; z-index: 2; transform: translateY(-50%); }
+    .nc-media-viewer-nav.is-prev { left: 12px; }
+    .nc-media-viewer-nav.is-next { right: 12px; }
+    .nc-media-viewer-nav:disabled { opacity: 0.25; cursor: default; }
+    @media (max-width: 639.98px) { .nc-media-viewer-nav { display: none; } }
+    .nc-info-section-head { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 16px; }
+    .nc-info-member { display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 16px; }
+    .nc-info-member[hidden] { display: none; }
+    button.nc-info-member:hover { background: var(--nc-surface-2); }
+    .nc-info-avatar {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        flex: none;
+        border-radius: 9999px;
+        overflow: hidden;
+        background: var(--nc-primary);
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 700;
+    }
+    .nc-info-avatar-add { background: var(--nc-primary-light); color: var(--nc-primary-text); }
+    .nc-info-badge {
+        flex: none;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: var(--nc-primary-light);
+        color: var(--nc-primary-text);
+    }
+
+    .nc-info-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 4px);
+        z-index: 20;
+        min-width: 220px;
+        padding: 6px;
+        border-radius: 14px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.35);
+    }
+    .nc-info-menu[hidden] { display: none; }
+    .nc-info-more-menu { top: 0; }
+    .nc-info-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 9px 10px;
+        border-radius: 10px;
+        font-size: 14px;
+        text-align: left;
+        color: var(--nc-text);
+    }
+    .nc-info-menu-item:hover, .nc-info-menu-item:focus-visible { background: var(--nc-surface-2); }
+    .nc-info-menu-item.is-danger { color: var(--nc-danger-text); }
+
+    .nc-info-pane-head { display: flex; align-items: center; gap: 6px; padding: 4px 12px 8px 8px; }
+    .nc-info-edit { margin: 4px 16px 0; padding: 16px 14px 14px; border-radius: 16px; background: var(--nc-surface); border: 1px solid var(--nc-line); }
+    .nc-info-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+    /* Tampilan aktif: tab, mode edit profil atas, tampilan lengkap Media/Tautan/Berkas */
+    .nc-info:not([data-info-tab="members"]) [data-info-pane="members"],
+    .nc-info:not([data-info-tab="media"]) [data-info-pane="media"],
+    .nc-info:not([data-info-tab="manage"]) [data-info-pane="manage"],
+    .nc-info:not([data-info-editing]) .nc-info-edit,
+    .nc-info[data-info-editing] .nc-info-hero,
+    .nc-info[data-info-view="archive"] .nc-info-main,
+    .nc-info:not([data-info-view="archive"]) .nc-info-archive { display: none; }
+
+    /* Halaman HP ala WhatsApp: tombol bulat */
+    .nc-info-page-shell { min-height: 100vh; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+    @media (min-width: 1024px) {
+        .nc-info-page-shell { max-width: 520px; margin: 0 auto; padding-top: 24px; }
+    }
+    @media (max-width: 1023.98px) {
+        .nc-info-page .nc-info-action { background: transparent; border: 0; padding: 0; gap: 8px; }
+        .nc-info-page .nc-info-action-icon {
+            width: 56px;
+            height: 44px;
+            border-radius: 9999px;
+            background: var(--nc-surface);
+            border: 1px solid var(--nc-line);
+        }
+        .nc-info-page .nc-info-action:hover .nc-info-action-icon { background: var(--nc-surface-2); }
+        .nc-info-page .nc-info-hero .nc-info-photo { width: 112px; height: 112px; font-size: 42px; }
+    }
+
+    /* Ruang chat desktop: jendela melayang dan panel kanan */
+    .nc-info-embed .nc-info-bar-title { display: block; }
+    .nc-info-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 85;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 40px 16px;
+        background: rgba(10, 15, 22, 0.5);
+        animation: ncFadeIn 120ms ease;
+    }
+    .nc-info-modal[hidden] { display: none; }
+    .nc-info-modal-card {
+        width: 100%;
+        max-width: 420px;
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border-radius: 20px;
+        background: var(--nc-bg, var(--nc-surface-2));
+        box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.5);
+        animation: ncSlideUp 160ms ease;
+    }
+    .nc-info-side { display: none; }
+    @media (min-width: 1024px) {
+        :root { --nc-info-w: 0px; }
+        :root.nc-info-open { --nc-info-w: 360px; }
+        .nc-info-side {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 35;
+            display: block;
+            width: var(--nc-info-w);
+            overflow: hidden;
+            border-left: 1px solid var(--nc-line);
+            background: var(--nc-bg, var(--nc-surface-2));
+            transition: width 0.2s ease;
+        }
+        :root:not(.nc-info-open) .nc-info-side { border-left: 0; }
+        .nc-info-side-inner { width: 360px; height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+        .nc-info-side.is-flash { animation: ncInfoFlash 0.8s ease; }
+        :root.nc-info-open [data-info-side-toggle] { background: var(--nc-surface-2); color: var(--nc-text); }
+    }
+    @keyframes ncInfoFlash { 0%, 100% { box-shadow: none; } 30% { box-shadow: inset 4px 0 0 var(--nc-primary); } }
+
+    /* Lembar Tautan grup */
+    .nc-share-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 97;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 12px 12px calc(env(safe-area-inset-bottom) + 12px);
+        background: rgba(10, 15, 22, 0.5);
+        animation: ncFadeIn 120ms ease;
+    }
+    .nc-share-overlay[hidden] { display: none; }
+    @media (min-width: 640px) { .nc-share-overlay { align-items: center; } }
+    .nc-share-sheet {
+        width: 100%;
+        max-width: 400px;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        border-radius: 24px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.5);
+        animation: ncSlideUp 160ms ease;
+    }
+    .nc-share-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 10px 8px 16px; }
+    .nc-share-options { padding: 4px 8px 8px; }
+    .nc-share-options[hidden], .nc-share-qr[hidden] { display: none; }
+    .nc-share-option {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        width: 100%;
+        min-height: 52px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-size: 15px;
+        text-align: left;
+        color: var(--nc-text);
+    }
+    .nc-share-option > svg { color: var(--nc-text-soft); }
+    .nc-share-option:hover, .nc-share-option:focus-visible { background: var(--nc-surface-2); }
+    .nc-share-qr { display: grid; gap: 12px; padding: 4px 16px 16px; }
+    .nc-share-qr-canvas { justify-self: center; width: 240px; height: 240px; border-radius: 16px; background: #ffffff; }
+    .nc-share-status { min-height: 20px; padding: 0 16px 12px; font-size: 13px; font-weight: 600; text-align: center; color: var(--nc-primary-text); }
 
 }
 

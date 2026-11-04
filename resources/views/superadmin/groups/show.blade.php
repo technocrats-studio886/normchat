@@ -19,7 +19,7 @@
         $sources = \App\Models\GroupTokenContribution::SOURCE_LABELS;
     @endphp
 
-    <p class="mb-3"><span @class(['nc-status', 'is-ok' => ! $group->isFrozen(), 'is-danger' => $group->isFrozen()])>{{ $group->isFrozen() ? 'Dibekukan' : 'Aktif' }}</span></p>
+    <p class="mb-3"><span @class(['nc-status', 'is-ok' => ! $group->isFrozen(), 'is-danger' => $group->isFrozen()])>{{ $group->isFrozen() ? 'Dibekukan' : 'Aktif' }}</span>@if($group->isFree()) <span class="nc-status">Gratis · anggota gratis {{ $group->free_joins_used }}/{{ $group->free_member_slots }}</span>@endif</p>
 
     <dl class="nc-kpis">
         <div class="nc-kpi"><dt>Saldo</dt><dd>{{ $nk($token->credits) }} NK<small>Total masuk {{ $nk($token->total_credits) }} NK</small></dd></div>

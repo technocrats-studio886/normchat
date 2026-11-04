@@ -21,6 +21,6 @@ class GroupCreditController extends Controller
 
         return back()->with('success', $limit > 0
             ? 'Batas harian disimpan: ' . number_format($limit, 2, ',', '.') . ' Normkredit per anggota.'
-            : 'Batas harian dihapus.');
+            : 'Batas harian dihapus.')->with('group_info', 'manage');
     }
 }

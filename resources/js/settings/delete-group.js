@@ -1,14 +1,16 @@
 // Dialog hapus grup: tombol hapus aktif hanya setelah nama grup diketik persis.
+// Pembukanya bisa lebih dari satu (menu Lainnya dan Pengaturan di Info grup).
 
 export const initDeleteGroupDialog = () => {
-	const openButton = document.querySelector('[data-open-delete-group]');
 	const overlay = document.querySelector('[data-delete-group-overlay]');
-	const closeButton = document.querySelector('[data-close-delete-group]');
-	const input = document.querySelector('[data-delete-group-confirm-input]');
-	const submit = document.querySelector('[data-delete-group-submit]');
-	if (!openButton || !overlay || !closeButton || !input || !submit) {
+	const closeButton = overlay?.querySelector('[data-close-delete-group]');
+	const input = overlay?.querySelector('[data-delete-group-confirm-input]');
+	const submit = overlay?.querySelector('[data-delete-group-submit]');
+	if (!overlay || !closeButton || !input || !submit) {
 		return;
 	}
+	// Di luar jendela Info grup, supaya posisi fixed-nya tidak terpotong wadah yang bergulir.
+	document.body.appendChild(overlay);
 
 	const expected = overlay.getAttribute('data-expected-name') || '';
 	const show = () => {
@@ -23,10 +25,21 @@ export const initDeleteGroupDialog = () => {
 		overlay.classList.remove('flex');
 	};
 
-	openButton.addEventListener('click', show);
+	document.addEventListener('click', (event) => {
+		if (event.target instanceof Element && event.target.closest('[data-open-delete-group]')) {
+			event.preventDefault();
+			show();
+		}
+	});
 	closeButton.addEventListener('click', hide);
 	overlay.addEventListener('click', (event) => {
 		if (event.target === overlay) {
+			hide();
+		}
+	});
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && !overlay.classList.contains('hidden')) {
+			event.preventDefault();
 			hide();
 		}
 	});

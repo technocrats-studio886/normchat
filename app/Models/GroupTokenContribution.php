@@ -7,8 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class GroupTokenContribution extends Model
 {
-    /** Bonus Normkredit dari promo buat grup (tanpa pembayaran; bukan pendapatan). */
+    /** Bonus 20 NK dari promo buat grup (dicabut 4 Nov 2026; baris lama tetap ada). Bukan pendapatan. */
     public const SOURCE_BONUS = 'group_creation_bonus';
+
+    /** Saldo awal grup gratis (App\Services\FreeGroups). Tanpa pembayaran; bukan pendapatan. */
+    public const SOURCE_FREE_GROUP = 'free_group';
+
+    /** Sumber Normkredit pemberian Normi Chat (harga 0), dipisahkan dari pendapatan di Keuangan. */
+    public const GIFT_SOURCES = [self::SOURCE_FREE_GROUP, self::SOURCE_BONUS];
 
     /** Nama jenis transaksi untuk halaman superadmin. */
     public const SOURCE_LABELS = [
@@ -22,6 +28,7 @@ class GroupTokenContribution extends Model
         'group_creation' => 'Buat grup',
         'group_creation_midtrans' => 'Buat grup',
         self::SOURCE_BONUS => 'Bonus buat grup',
+        self::SOURCE_FREE_GROUP => 'Saldo awal gratis',
     ];
 
     protected $fillable = [

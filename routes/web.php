@@ -4,7 +4,7 @@ use App\Http\Controllers\AiSettingsController;
 use App\Http\Controllers\Admin\AdminGroupController;
 use App\Http\Controllers\Admin\AdminAnnouncementController;
 use App\Http\Controllers\Admin\AdminOpenAiController;
-use App\Http\Controllers\Admin\AdminPromoController;
+use App\Http\Controllers\Admin\AdminFreeGroupController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminUserController;
@@ -13,6 +13,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatPollController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GroupBackupController;
+use App\Http\Controllers\GroupAvatarController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\GroupCreditController;
 use App\Http\Controllers\GroupExportController;
@@ -30,11 +31,15 @@ use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
 
 // ── Public / Auth ────────────────────────────────────────────
-Route::get('/', [LandingController::class, 'home'])->name('landing');
-Route::get('/normchat', [LandingController::class, 'home'])->name('landing.path');
+// normi.chat langsung membuka halaman masuk (berisi kalimat pemasaran); situs Inggris tetap di /about dst.
+Route::get('/', [AuthController::class, 'landing'])->name('landing');
+Route::redirect('/normchat', '/')->name('landing.path');
+Route::get('/home', [LandingController::class, 'home'])->name('home');
 Route::get('/about', [LandingController::class, 'about'])->name('about');
 Route::get('/pricing', [LandingController::class, 'pricing'])->name('pricing');
 Route::get('/contact', [LandingController::class, 'contact'])->name('contact');
+Route::get('/terms', [LandingController::class, 'terms'])->name('terms');
+Route::get('/privacy', [LandingController::class, 'privacy'])->name('privacy');
 Route::post('/contact', [LandingController::class, 'sendContact'])->middleware('throttle:5,1')->name('contact.send');
 Route::get('/login', [AuthController::class, 'landing'])->name('login');
 
@@ -51,7 +56,10 @@ Route::middleware('interdotz.enabled')->group(function () {
 Route::get('/groups/payment-callback', PaymentCallbackController::class)->name('groups.payment.callback');
 
 // Join group via share ID
+Route::get('/join/{shareId}/avatar', [GroupAvatarController::class, 'showForJoin'])->middleware('auth')->name('groups.join.avatar');
 Route::get('/join/{shareId}', [GroupController::class, 'showJoin'])->middleware(['auth', 'not.superadmin'])->name('groups.join');
+Route::get('/join/{shareId}/lanjut', [GroupController::class, 'continueJoin'])->middleware(['auth', 'not.superadmin'])->name('groups.join.continue');
+Route::post('/join/{shareId}/sandi', [GroupController::class, 'verifyJoinPassword'])->middleware(['auth', 'not.superadmin', 'throttle:10,1'])->name('groups.join.password');
 Route::post('/join/{shareId}', [GroupController::class, 'joinViaShareId'])->middleware(['auth', 'not.superadmin'])->name('groups.join.submit');
 
 // ── Authenticated ────────────────────────────────────────────
@@ -85,6 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups/{group}/messages/{message}/canvas', [ChatController::class, 'canvas'])->middleware('group.permission')->name('chat.canvas');
 
     // Settings (view for active members, write actions restricted by permission)
+    Route::get('/groups/{group}/avatar', [GroupAvatarController::class, 'show'])->name('groups.avatar');
     Route::get('/groups/{group}/settings', [SettingsController::class, 'show'])->name('settings.show');
     Route::post('/groups/{group}/settings/profile', [SettingsController::class, 'updateGroupProfile'])->middleware('group.permission')->name('settings.profile.update');
     Route::get('/groups/{group}/settings/history-export', [GroupExportController::class, 'index'])->name('settings.history');
@@ -132,10 +141,10 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/pengumuman/{announcement}/tutup', [AnnouncementController::class, 'dismiss'])->name('announcements.dismiss');
 
-    // Superadmin: ringkasan, grup, user, keuangan & AI, biaya OpenAI, promo, pengumuman, log audit, pengaturan
+    // Superadmin: ringkasan, grup, user, keuangan & AI, biaya OpenAI, grup gratis, pengumuman, log audit, pengaturan
     Route::middleware('superadmin')->prefix('superadmin')->name('superadmin.')->group(function () {
-        Route::get('/promo', [AdminPromoController::class, 'index'])->name('promo');
-        Route::post('/promo', [AdminPromoController::class, 'update'])->name('promo.update');
+        Route::get('/grup-gratis', [AdminFreeGroupController::class, 'index'])->name('free-groups');
+        Route::post('/grup-gratis', [AdminFreeGroupController::class, 'update'])->name('free-groups.update');
         Route::get('/pengumuman', [AdminAnnouncementController::class, 'index'])->name('announcements.index');
         Route::get('/pengumuman/baru', [AdminAnnouncementController::class, 'create'])->name('announcements.create');
         Route::post('/pengumuman', [AdminAnnouncementController::class, 'store'])->name('announcements.store');

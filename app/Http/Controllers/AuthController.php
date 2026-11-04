@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\NormkreditPricing;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,8 +26,15 @@ class AuthController extends Controller
             return redirect()->intended(route('groups.index'));
         }
 
+        // Tawaran grup gratis dari setelan superadmin (App\Services\FreeGroups); kosong bila fiturnya mati.
+        $pricing = app(NormkreditPricing::class)->settings();
+        $freeCredits = ($pricing['free_groups_enabled'] ?? false) ? (float) ($pricing['free_first_group_credits'] ?? 0) : 0.0;
+
         return view('auth.landing', [
             'interdotzEnabled' => (bool) config('services.interdotz.enabled'),
+            'freeCredits' => $freeCredits > 0 ? $freeCredits : null,
+            'freeSlots' => max(0, (int) ($pricing['free_group_member_slots'] ?? 0)),
+            'freeSecondCredits' => $freeCredits > 0 && (float) ($pricing['free_second_group_credits'] ?? 0) > 0 ? (float) $pricing['free_second_group_credits'] : null,
         ]);
     }
 

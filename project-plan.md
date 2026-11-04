@@ -1,8 +1,6 @@
 # PROJECT PLAN
 
-## Company: Sysnavia
-
-## Product Line: Uplift
+## Company: Twenti Studio
 
 ## Product Name: Normchat
 

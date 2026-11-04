@@ -29,6 +29,8 @@ class MidtransPaymentFlowTest extends TestCase
         config()->set('normchat.superadmin_emails', []);
         config()->set('services.midtrans.server_key', self::SERVER_KEY);
         config()->set('services.midtrans.is_production', false);
+        // Alur bayar buat grup; grup gratis diuji di FreeGroupsTest.
+        config()->set('normchat.pricing.free_groups_enabled', false);
     }
 
     public function test_group_creation_starts_qris_checkout_for_250_credits_plus_fee(): void
@@ -95,8 +97,10 @@ class MidtransPaymentFlowTest extends TestCase
         $owner = User::factory()->create();
         $group = $this->activeGroup($owner);
 
-        $this->actingAs(User::factory()->create())
-            ->post("/join/{$group->share_id}", ['password' => '1234', 'packages' => 1])
+        $friend = User::factory()->create();
+        $this->actingAs($friend)->post("/join/{$group->share_id}/sandi", ['password' => '1234'])->assertRedirect("/join/{$group->share_id}/lanjut");
+        $this->actingAs($friend)
+            ->post("/join/{$group->share_id}", ['packages' => 1])
             ->assertRedirect(self::SNAP_URL);
         $this->assertDatabaseHas('pending_payments', ['payment_type' => 'group_join_midtrans', 'expected_amount' => 15105]);
 

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use Throwable;
 
+/** Situs pemasaran berbahasa Inggris (/home, /about, /pricing, /contact); normi.chat sendiri membuka halaman masuk. */
 class LandingController extends Controller
 {
     public const CONTACT_TOPICS = [
@@ -17,16 +18,26 @@ class LandingController extends Controller
         'Groups and members',
         'Normi and AI models',
         'Technical problem',
+        self::BUSINESS_TOPIC,
         'Other',
     ];
 
-    public function home(Request $request): View|RedirectResponse
-    {
-        if ($request->user()) {
-            return redirect()->route('groups.index');
-        }
+    /** Topik yang dikirim ke kotak masuk kerja sama bisnis (normchat.business_email), bukan dukungan. */
+    public const BUSINESS_TOPIC = 'Business partnership';
 
+    public function home(): View
+    {
         return view('marketing.home');
+    }
+
+    public function terms(): View
+    {
+        return view('marketing.terms');
+    }
+
+    public function privacy(): View
+    {
+        return view('marketing.privacy');
     }
 
     public function about(): View
@@ -58,7 +69,9 @@ class LandingController extends Controller
             'message' => ['required', 'string', 'min:10', 'max:3000'],
         ]);
 
-        $to = config('normchat.support_email');
+        $to = $data['topic'] === self::BUSINESS_TOPIC
+            ? (config('normchat.business_email') ?: config('normchat.support_email'))
+            : config('normchat.support_email');
         $body = "From: {$data['name']} <{$data['email']}>\nTopic: {$data['topic']}\n\n{$data['message']}";
 
         if (! $to) {

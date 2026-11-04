@@ -6,7 +6,7 @@
         <span class="nc-empty-pill">Pilih grup untuk mulai chat</span>
     </div>
 
-    <section class="page-shell lg:hidden" data-group-search-scope="1">
+    <section class="page-shell pb-44 lg:hidden" data-group-search-scope="1">
         {{-- Header --}}
         <div class="flex items-start justify-between">
             <a href="{{ route('profile.account') }}" class="flex items-center gap-3 rounded-full transition active:opacity-70" aria-label="Profil">
@@ -29,10 +29,7 @@
             @endif
         </div>
 
-        <div class="mt-6 flex items-center justify-between gap-3">
-            <h2 class="nc-section-title">Grup</h2>
-            <a href="{{ route('groups.create') }}" class="btn-primary px-4 py-2">Buat grup</a>
-        </div>
+        <h2 class="nc-section-title mt-6">Grup</h2>
 
         <form method="GET" action="" class="mt-3 flex items-center gap-2" data-join-by-id-form="{{ url('/join') }}">
             <input type="text" name="share_id" placeholder="Punya kode grup? Masukkan di sini" required autocomplete="off" class="nc-input min-w-0 flex-1" aria-label="Kode grup" data-join-by-id-input="1">
@@ -50,16 +47,20 @@
                     $memberCount = $activeMembers->count() + ($activeMembers->contains('user_id', $group->owner_id) ? 0 : 1);
                 @endphp
                 <a href="{{ route('chat.show', $group) }}" class="nc-list-row hover:bg-surface-2" data-group-card="1" data-group-search="{{ $group->name }} {{ $group->share_id }}">
-                    <span class="nc-sidebar-avatar h-11 w-11 text-sm">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($group->name, 0, 1)) }}</span>
+                    <span class="nc-sidebar-avatar h-11 w-11 text-sm"><x-group-photo :group="$group" /></span>
                     <span class="min-w-0 flex-1">
                         <span class="block truncate text-sm font-semibold">{{ $group->name }}</span>
                         <span class="block text-xs text-ink-soft">{{ $memberCount }} anggota{{ $group->isFrozen() ? ' · Dibekukan' : '' }}</span>
                     </span>
                 </a>
             @empty
-                <p class="nc-list-empty">Belum ada grup. Buat grup baru, atau gabung dengan kode dari temanmu.</p>
+                <p class="nc-list-empty">Belum ada grup. Ketuk tombol + untuk membuat grup, atau gabung dengan kode dari temanmu.</p>
             @endforelse
             <p class="nc-list-empty hidden" data-group-search-empty="1">Grup tidak ditemukan.</p>
         </div>
+
+        <a href="{{ route('groups.create') }}" class="nc-fab" aria-label="Buat grup" title="Buat grup">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
+        </a>
     </section>
 @endsection

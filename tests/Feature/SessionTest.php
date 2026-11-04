@@ -35,9 +35,10 @@ class SessionTest extends TestCase
 
     public function test_logged_in_user_skips_landing_and_login_pages(): void
     {
-        foreach (['/', '/normchat', '/login'] as $path) {
+        foreach (['/', '/login'] as $path) {
             $this->actingAs($this->user)->get($path)->assertRedirect(route('groups.index'));
         }
+        $this->actingAs($this->user)->get('/normchat')->assertRedirect('/');
     }
 
     public function test_guest_still_sees_landing(): void

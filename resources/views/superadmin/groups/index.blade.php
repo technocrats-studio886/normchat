@@ -32,7 +32,7 @@
                         <td class="max-md:hidden">{{ $group->members_count }}</td>
                         <td>{{ number_format((float) ($group->groupToken?->credits ?? 0), 2, ',', '.') }}</td>
                         <td class="max-md:hidden">{{ $group->last_activity ? \App\Support\UserTime::format(\Illuminate\Support\Carbon::parse($group->last_activity), 'j M Y, H.i') : '–' }}</td>
-                        <td class="max-sm:hidden"><span @class(['nc-status', 'is-ok' => ! $group->isFrozen(), 'is-danger' => $group->isFrozen()])>{{ $group->isFrozen() ? 'Dibekukan' : 'Aktif' }}</span></td>
+                        <td class="max-sm:hidden"><span @class(['nc-status', 'is-ok' => ! $group->isFrozen(), 'is-danger' => $group->isFrozen()])>{{ $group->isFrozen() ? 'Dibekukan' : 'Aktif' }}</span>@if($group->isFree()) <span class="nc-status">Gratis</span>@endif</td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="text-ink-soft">Tidak ada grup yang cocok.</td></tr>

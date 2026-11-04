@@ -2,7 +2,7 @@
 @php($admin = auth()->user())
 <aside class="nc-admin-side" aria-label="Navigasi admin">
     <a href="{{ route('superadmin.index') }}" class="nc-admin-brand">
-        <img src="{{ asset('brand/logo-mark.svg') }}" alt="" class="h-7 w-7 shrink-0" draggable="false" />
+        <x-brand-mark class="h-7 w-7 shrink-0" />
         <span>Normi Chat <small>Admin</small></span>
     </a>
     <div class="nc-admin-side-scroll nc-scroll">

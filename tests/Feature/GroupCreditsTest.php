@@ -217,12 +217,14 @@ class GroupCreditsTest extends TestCase
             ->assertOk()->assertSee('Dipakai semua anggota untuk Normi AI.')->assertDontSee('share_percent');
 
         $this->actingAs($this->owner)->get("/groups/{$this->group->id}/settings")
-            ->assertOk()->assertSee('Normkredit')->assertSee('250,00 NK')->assertSee('Batas pemakaian harian per anggota');
+            ->assertOk()->assertSee('Normkredit')->assertSee('250,00 NK')->assertSee('Batas harian per anggota')->assertSee('name="member_daily_credit_limit"', false);
 
         $this->actingAs($this->member)->get("/groups/{$this->group->id}/settings")
             ->assertOk()->assertSee('Batas pemakaian 10,00 NK per anggota per hari')->assertDontSee('name="member_daily_credit_limit"', false);
 
-        $this->actingAs(User::factory()->create())->get("/join/{$this->group->share_id}")
-            ->assertOk()->assertSee('Saldo grup')->assertDontSee('share_percent');
+        $friend = User::factory()->create();
+        $this->actingAs($friend)->post("/join/{$this->group->share_id}/sandi", ['password' => '1234']);
+        $this->actingAs($friend)->get("/join/{$this->group->share_id}/lanjut")
+            ->assertOk()->assertSee('saldo grup')->assertSee('10,00 Normkredit per hari')->assertDontSee('share_percent');
     }
 }

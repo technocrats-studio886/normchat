@@ -1,0 +1,2 @@
+{{-- Tombol utama situs pemasaran: panah kecil bergeser saat hover, status memuat saat diklik (partials/live-demo-script). --}}
+<a href="{{ $loginUrl }}" class="btn btn-arrow" data-cta>{{ $n['free'] ? 'Start your free group' : 'Create your group' }}<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>

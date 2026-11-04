@@ -33,10 +33,10 @@ Referensinya pola umum situs OpenAI dan Claude: putih, teks besar dan polos, sat
 | Teks | `#121C29`; teks sekunder `#5B6778`. |
 | Aksen | Navy `#1E2E43` untuk tombol utama. Koral `#FB6856` hanya untuk sebutan `@normi` dan satu penanda kecil. |
 | Garis | 1px `#E6E9EE`, sudut 12px. Tanpa bayangan tebal, tanpa gradasi. |
-| Huruf | Inter saja. Judul 600, isi 400. |
+| Huruf | Judul **Bricolage Grotesque** (600), isi **Hanken Grotesk** (400). Inter, Poppins, Space Grotesk, Geist, dan sejenisnya dihindari karena menjadi ciri situs buatan AI (keputusan user 4 Nov 2026). |
 | Lebar | Isi maksimal 1120px; teks bacaan maksimal 640px. Jarak antarbagian lega. |
 | Ikon | Pustaka **Better Icons** (`better-icons search` / `better-icons get`, sumber Iconify). Satu set saja, disarankan `ph:` (Phosphor Regular). **Jangan Lucide.** Ukuran 24px, warna navy. |
-| Tombol | Teks saja. **Tanpa ikon panah** dan tanpa ikon lain di dalam tombol. |
+| Tombol | Teks saja, kecuali CTA utama "Start your free group" yang diberi panah kecil yang bergeser saat hover (keputusan user 4 Nov 2026). |
 | Ikon dipakai di | Kartu fitur dan langkah cara kerja saja. Bagian lain polos. |
 
 ---
@@ -138,7 +138,7 @@ Normi Chat adalah aplikasi grup chat dengan AI. Dibuat sebagai aplikasi web yang
 
 Nama Normi dari kata *normies*: orang biasa yang ingin memakai AI tanpa harus paham teknisnya. Normi sendiri adalah AI di dalam grup. Panggil lewat `@normi`.
 
-Normi Chat adalah produk lini Uplift dari Sysnavia.
+Normi Chat dikembangkan oleh Twenti Studio.
 
 ## Prinsip kami
 
@@ -294,7 +294,7 @@ Normi memakai model dari OpenAI. Kamu bisa memilih modelnya di pengaturan grup.
 **Tombol navigasi:** Mulai sekarang (kanan atas, teks saja, tanpa ikon)
 **Footer, baris merek:** Normi Chat. Ngobrol bareng, tanya Normi.
 **Footer, deskripsi:** Grup chat dengan AI yang dipakai bersama.
-**Footer, bawah:** Produk Uplift dari Sysnavia · Syarat · Privasi
+**Footer, bawah:** © 2026 Twenti Studio · Syarat · Privasi
 
 ---
 
@@ -303,7 +303,7 @@ Normi memakai model dari OpenAI. Kamu bisa memilih modelnya di pengaturan grup.
 | Halaman | Judul | Deskripsi |
 |---|---|---|
 | Home | Normi Chat: grup chat dengan AI | Ngobrol bareng, tanya Normi. Sebut @normi di grup dan AI menjawab untuk semua anggota. Mulai Rp30.000. |
-| Tentang | Tentang Normi Chat | Normi Chat memasukkan AI ke dalam grup chat supaya dipakai bareng. Produk Uplift dari Sysnavia. |
+| Tentang | Tentang Normi Chat | Normi Chat memasukkan AI ke dalam grup chat supaya dipakai bareng. Dikembangkan oleh Twenti Studio. |
 | Harga | Harga Normi Chat: mulai Rp30.000 | Buat grup Rp30.000 sudah termasuk 250 Normkredit. Patungan Rp15.000 per 125 Normkredit. |
 | Kontak | Kontak Normi Chat | Tanya soal harga, cara pakai, atau kendala grup. Kami balas lewat email. |
 

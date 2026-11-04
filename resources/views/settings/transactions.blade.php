@@ -8,13 +8,15 @@
             @forelse ($contributions as $c)
                 @php
                     $isAdmin = $c->source === 'admin_adjustment';
-                    $isBonus = $c->source === \App\Models\GroupTokenContribution::SOURCE_BONUS;
+                    // Pemberian Normi Chat (saldo awal grup gratis, bonus lama): tanpa nomor transaksi.
+                    $isBonus = in_array($c->source, \App\Models\GroupTokenContribution::GIFT_SOURCES, true);
                     $sourceLabel = match($c->source) {
                         'patungan', 'patungan_midtrans' => 'Gabung',
                         'topup', 'topup_midtrans', 'interdotz_topup', 'interdotz_charge_topup' => 'Isi Normkredit',
                         'group_creation', 'group_creation_midtrans' => 'Buat grup',
                         'admin_adjustment' => 'Penyesuaian admin',
                         \App\Models\GroupTokenContribution::SOURCE_BONUS => 'Bonus buat grup',
+                        \App\Models\GroupTokenContribution::SOURCE_FREE_GROUP => 'Grup gratis',
                         default => 'Lainnya',
                     };
                 @endphp

@@ -134,7 +134,10 @@ class PaymentFulfillment
         }
     }
 
-    /** @param float $bonusCredits bonus promo buat grup yang dikunci saat checkout */
+    /**
+     * @param float $bonusCredits bonus promo buat grup yang dikunci saat checkout. Promo dicabut 4 Nov 2026 (diganti
+     *        grup gratis); hanya checkout yang dimulai sebelum itu yang masih membawanya. Boleh dihapus setelahnya.
+     */
     private function grant(PaymentPurpose $purpose, Group $group, User $user, Funding $funding, float $bonusCredits = 0.0): void
     {
         if ($this->ledger->hasContribution((string) $funding->reference, $purpose->contributionSource())) {

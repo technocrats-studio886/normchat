@@ -36,14 +36,17 @@ class NormkreditLedger
         });
     }
 
-    /** Bonus promo buat grup: tercatat di riwayat patungan (harga 0) dan ledger jenis "bonus". */
-    public function bonus(Group $group, User $user, float $credits, string $reference): GroupTokenContribution
+    /**
+     * Normkredit pemberian Normi Chat (saldo awal grup gratis, bonus lama): tercatat di riwayat patungan
+     * dengan harga 0 dan di ledger sebagai jenis "bonus", terpisah dari pendapatan.
+     */
+    public function bonus(Group $group, User $user, float $credits, string $reference, string $source = GroupTokenContribution::SOURCE_BONUS): GroupTokenContribution
     {
-        return DB::transaction(function () use ($group, $user, $credits, $reference) {
+        return DB::transaction(function () use ($group, $user, $credits, $reference, $source) {
             $contribution = GroupTokenContribution::create([
                 'group_id' => $group->id,
                 'user_id' => $user->id,
-                'source' => GroupTokenContribution::SOURCE_BONUS,
+                'source' => $source,
                 'credit_amount' => $credits,
                 'price_paid' => 0,
                 'payment_reference' => $reference,

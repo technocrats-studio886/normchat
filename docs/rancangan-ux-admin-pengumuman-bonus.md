@@ -147,6 +147,8 @@ https otomatis jadi link), `display` (`popup` | `banner`), `tone` (`info` | `pen
 
 ## 6. Bonus buat grup (B1)
 
+> **Diganti 4 Nov 2026** oleh grup gratis di `docs/rancangan-grup-gratis-login.md`. Bonus 20 NK dicabut; riwayat bonus yang sudah diberikan tetap tercatat.
+
 ### 6.1 Pengaturan (halaman superadmin "Promo")
 - **Bonus buat grup**: nilai NC (bawaan 20), mulai, selesai (WIB), saklar aktif. Ikut versi harga (`pricing_versions`)
   dan log audit.

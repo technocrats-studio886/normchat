@@ -96,40 +96,19 @@ Service yang jalan otomatis di [docker-compose.yml](docker-compose.yml):
 - `postgres` (Database)
 - `redis` (Cache/session/queue)
 
-## Konfigurasi Domain Landing -> App
+## Domain
 
-Use-case target:
-- Landing: `https://sysnavia.com/normchat`
-- App flow (pricing/login/payment): `https://normchat.sysnavia.com`
-
-Set env berikut saat deploy:
+Normi Chat (dikembangkan oleh Twenti Studio) berjalan di satu domain, `https://normi.chat`:
+- `/` halaman masuk, `/home` `/pricing` `/about` `/contact` `/terms` `/privacy` halaman pemasaran, sisanya aplikasi.
+- `/normchat` dialihkan ke `/`.
 
 ```env
-APP_URL=https://normchat.sysnavia.com
-MARKETING_URL=https://sysnavia.com
-NORMCHAT_APP_URL=https://normchat.sysnavia.com
-NORMCHAT_MARKETING_PATH=/normchat
-GOOGLE_REDIRECT_URI=https://normchat.sysnavia.com/auth/google/callback
-SESSION_DOMAIN=.sysnavia.com
+APP_URL=https://normi.chat
+MARKETING_URL=https://normi.chat
+NORMCHAT_APP_URL=https://normi.chat
+GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
+SESSION_DOMAIN=null
 ```
-
-Catatan:
-- Landing page menghasilkan link `Use Now` langsung ke `NORMCHAT_APP_URL/pricing`.
-- Route alias landing juga tersedia di `/normchat`.
-
-### Jika Landing dan App Berada di Repo Berbeda
-
-Bisa connect. Polanya adalah redirect lintas domain biasa, bukan share codebase.
-
-Skema:
-1. Repo Landing (`sysnavia.com`) menaruh CTA ke `https://normchat.sysnavia.com/pricing`.
-2. Repo App (repo ini) menangani flow auth/payment sampai masuk home.
-
-Hal penting agar aman/stabil:
-- Set `GOOGLE_REDIRECT_URI` ke domain app: `https://normchat.sysnavia.com/auth/google/callback`.
-- Gunakan `SESSION_DOMAIN=.sysnavia.com` jika ingin cookie lintas subdomain.
-- Pastikan CORS/cookie `Secure` aktif saat HTTPS penuh.
-- Tidak perlu monorepo; URL antar domain sudah cukup.
 
 ## Checklist Docker Sebelum Push/Deploy
 
@@ -147,9 +126,7 @@ Checklist produksi:
 	- `php artisan config:cache`
 	- `php artisan route:cache`
 	- `php artisan view:cache`
-5. Pasang reverse proxy (Nginx/Traefik/Caddy) untuk:
-	- `sysnavia.com/normchat` -> service `app`
-	- `normchat.sysnavia.com` -> service `app`
+5. Pasang reverse proxy (Nginx/Traefik/Caddy) untuk `normi.chat` -> service `nginx` (produksi memakai Caddy edge bersama).
 
 Jika ingin lebih production-grade, ganti built-in PHP server (`php -S`) dengan Nginx + PHP-FPM.
 

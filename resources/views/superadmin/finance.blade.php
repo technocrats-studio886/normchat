@@ -28,7 +28,7 @@
 
     <dl class="nc-kpis">
         <div class="nc-kpi"><dt>Pendapatan</dt><dd>{{ $rp($revenue) }}<small>{{ (int) $revenueByDay->sum('payments') }} pembayaran</small></dd></div>
-        <div class="nc-kpi"><dt>NK terjual</dt><dd>{{ $nk($revenueByDay->sum('credits')) }}<small>Bonus {{ $nk($bonusCredits) }} NK</small></dd></div>
+        <div class="nc-kpi"><dt>NK terjual</dt><dd>{{ $nk($revenueByDay->sum('credits')) }}<small>Saldo gratis {{ $nk($giftCredits) }} NK</small></dd></div>
         <div class="nc-kpi"><dt>NK terpakai</dt><dd>{{ $nk($charged) }}<small>{{ (int) $answers->total }} jawaban Normi</small></dd></div>
         <div class="nc-kpi"><dt>Biaya OpenAI</dt><dd>{{ $rp($answerCost + $maintenanceCost) }}<small>Tidak ditagih {{ $rp($maintenanceCost) }}</small></dd></div>
         <div class="nc-kpi"><dt>Margin pemakaian</dt><dd>{{ $chargedValue > 0 ? number_format(($chargedValue - $answerCost) / $chargedValue * 100, 1, ',', '.') . '%' : '–' }}<small>Sebelum QRIS, server, pajak</small></dd></div>

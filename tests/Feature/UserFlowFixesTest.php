@@ -58,6 +58,8 @@ class UserFlowFixesTest extends TestCase
     // B2
     public function test_user_without_groups_sees_the_group_code_field_right_away(): void
     {
+        // Dengan grup gratis aktif, user tanpa grup langsung dibuatkan grup (FreeGroupsTest).
+        config()->set('normchat.pricing.free_groups_enabled', false);
         $newcomer = User::factory()->create();
 
         $html = $this->actingAs($newcomer)->get(route('groups.index'))->assertOk()->getContent();
