@@ -6,68 +6,22 @@
 @endphp
 <html lang="id" data-theme-mode="{{ $uiTheme['mode'] }}" data-mode="{{ $uiMode }}" data-accent="{{ $uiTheme['accent'] }}">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    @auth
-        <meta name="auth-user-id" content="{{ auth()->id() }}">
-        <meta name="auth-user-name" content="{{ auth()->user()->name }}">
-        <meta name="auth-user-timezone" content="{{ auth()->user()->timezone }}" data-timezone-url="{{ route('profile.timezone.update') }}">
-    @endauth
-    <meta name="theme-color" content="{{ \App\Support\Themes::BROWSER[$uiMode] }}">
-    @include('partials.brand-head')
-    <link rel="manifest" href="{{ route('pwa.manifest') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-    <title>{{ $title ?? 'Normi Chat' }}</title>
-    {{-- Status sidebar desktop dipasang sebelum render agar tidak berkedip (resources/js/ui/sidebar.js). --}}
-    {{-- Semua <script> butuh nonce dari Content-Security-Policy (App\Http\Middleware\AddContentSecurityPolicy). --}}
-    {{-- Mode "Ikuti sistem": pilih terang/gelap dari setelan perangkat sebelum render, dan ikuti perubahannya. --}}
-    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">(() => { const html = document.documentElement; const query = matchMedia('(prefers-color-scheme: dark)'); const apply = () => { if (html.dataset.themeMode !== 'system') return; html.dataset.mode = query.matches ? 'dark' : 'light'; document.querySelector('meta[name="theme-color"]')?.setAttribute('content', query.matches ? '{{ \App\Support\Themes::BROWSER['dark'] }}' : '{{ \App\Support\Themes::BROWSER['light'] }}'); }; apply(); query.addEventListener('change', apply); })();</script>
-    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">try { if (localStorage.getItem('nc-sidebar') === 'collapsed') document.documentElement.classList.add('nc-sidebar-collapsed'); } catch (e) {}</script>
-    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @php
-            $viteEntries = ['resources/css/app.css'];
-            if (trim($__env->yieldContent('disableAppJs')) !== '1') {
-                $viteEntries[] = 'resources/js/app.js';
-            }
-        @endphp
-        @vite($viteEntries)
-    @else
-        <style>
-            body { margin: 0; font-family: Inter, sans-serif; }
-            .hidden { display: none; }
-            .google-btn {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 12px;
-                width: 100%;
-                border-radius: 9999px;
-                background: #1E2E43;
-                color: #fff;
-                font-weight: 700;
-                text-decoration: none;
-            }
-            .google-mark {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 26px;
-                height: 26px;
-                border-radius: 9999px;
-                background: #fff;
-            }
-        </style>
-    @endif
+    @include('partials.app-head')
 </head>
 <body class="normchat-bg min-h-screen antialiased">
+    @php
+        $isSuperadmin = auth()->user()?->isSuperadmin() ?? false;
+    @endphp
     @auth
-        <x-desktop-sidebar />
+        {{-- Superadmin tidak memakai grup: sidebar admin, bukan daftar grup. --}}
+        @if($isSuperadmin)
+            <x-admin-sidebar />
+        @else
+            <x-desktop-sidebar />
+        @endif
     @endauth
     {{-- Mobile: satu kolom max-w-md. Desktop (≥1024px): konten di panel kanan sidebar. --}}
-    <div class="@auth nc-sidebar-push lg:pl-[var(--nc-sidebar-w)] @endauth">
+    <div class="@auth {{ $isSuperadmin ? 'lg:pl-[232px]' : 'nc-sidebar-push lg:pl-[var(--nc-sidebar-w)]' }} @endauth">
     <div class="mx-auto min-h-screen w-full max-w-md lg:max-w-2xl">
         <main class="{{ auth()->check() ? 'pb-32 lg:pb-8' : 'pb-0' }}">
             @if (session('success'))
@@ -100,6 +54,12 @@
 
             @yield('content')
         </main>
+
+        @auth
+            @unless($isSuperadmin)
+                @include('partials.announcements')
+            @endunless
+        @endauth
 
         @auth
             @php

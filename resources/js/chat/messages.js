@@ -150,7 +150,6 @@ export const applyMessageRuns = (feed = chatFeed) => {
 
 	nodes.forEach((node, index) => {
 		node.classList.toggle('is-run-start', !sameRun(nodes[index - 1], node));
-		node.classList.toggle('is-run-end', !sameRun(node, nodes[index + 1]));
 	});
 };
 

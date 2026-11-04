@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\EndIdleSession::class,
             \App\Http\Middleware\EndBlockedSession::class,
+            \App\Http\Middleware\TrackUserSession::class,
             \App\Http\Middleware\AddContentSecurityPolicy::class,
         ]);
 

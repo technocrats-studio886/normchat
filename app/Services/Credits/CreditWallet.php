@@ -50,6 +50,21 @@ class CreditWallet
         });
     }
 
+    /** Bonus promo (mis. buat grup): menambah saldo seperti setoran, tercatat sebagai jenis "bonus" di ledger. */
+    public function bonus(Group $group, float $credits, array $refs = []): void
+    {
+        DB::transaction(function () use ($group, $credits, $refs) {
+            $token = $this->lockToken($group);
+            $before = $this->snapshot($token);
+            $token->update([
+                'total_credits' => $token->total_credits + $credits,
+                'remaining_credits' => $token->remaining_credits + $credits,
+            ]);
+            $this->record($token, $before, CreditLedgerEntry::BONUS, $credits, $refs);
+            $this->access->sync($token);
+        });
+    }
+
     /**
      * Penyesuaian saldo oleh superadmin (positif menambah, negatif mengurangi). Saldo yang sedang
      * ditahan untuk permintaan AI yang berjalan tidak bisa ditarik.

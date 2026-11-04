@@ -49,9 +49,11 @@ class MentionNotifier
             }
         }
 
+        // Yang mematikan notifikasi "saat disebut" (Akun > Notifikasi) tidak dikirimi.
+        $muted = $this->participants($group)->where('notify_mentions', false)->pluck('id')->map(fn ($id) => (int) $id)->all();
         $targets = array_unique(array_filter(
             array_map(fn ($handle) => $userIdsByHandle[$handle] ?? null, $handles),
-            fn ($userId) => $userId !== null && $userId !== (int) $sender->id
+            fn ($userId) => $userId !== null && $userId !== (int) $sender->id && ! in_array($userId, $muted, true)
         ));
 
         foreach ($targets as $userId) {

@@ -42,7 +42,11 @@ class GroupController extends Controller
 
     public function create(): View
     {
-        return view('groups.create', ['quote' => $this->pricing->quoteGroupCreation()]);
+        return view('groups.create', [
+            'quote' => $this->pricing->quoteGroupCreation(),
+            'bonus' => $this->pricing->groupCreationBonus(),
+            'bonusEndsAt' => $this->pricing->groupCreationBonusEndsAt(),
+        ]);
     }
 
     public function store(StoreGroupRequest $request): RedirectResponse
@@ -60,7 +64,10 @@ class GroupController extends Controller
         ]);
 
         try {
-            return redirect()->away($this->checkout->start($user, $group, PaymentPurpose::GroupCreate, $quote));
+            // Bonus promo dikunci saat checkout: tetap diberikan walau promo berakhir sebelum pembayaran lunas.
+            return redirect()->away($this->checkout->start($user, $group, PaymentPurpose::GroupCreate, $quote, [
+                'bonus_credits' => $this->pricing->groupCreationBonus(),
+            ]));
         } catch (CheckoutFailedException $e) {
             $group->forceDelete();
 

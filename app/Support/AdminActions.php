@@ -25,6 +25,14 @@ final class AdminActions
             'admin.update_pricing', 'superadmin.update_pricing' => 'Mengubah harga Normkredit',
             'admin.create_ai_model', 'superadmin.create_ai_model' => 'Menambah model AI ' . ($data['model_id'] ?? ''),
             'admin.update_ai_model', 'superadmin.update_ai_model' => 'Mengubah model AI ' . ($data['model_id'] ?? ''),
+            'admin.set_exchange_rate' => 'Mengisi kurs USD→IDR ' . number_format((float) ($data['market_rate'] ?? 0), 2, ',', '.'),
+            'admin.set_openai_budget' => 'Mengatur anggaran OpenAI bulanan',
+            'admin.set_openai_balance' => 'Mengisi saldo OpenAI',
+            'admin.announcement_saved' => 'Menyimpan pengumuman "' . ($data['title'] ?? '') . '"',
+            'admin.announcement_published' => 'Menayangkan pengumuman "' . ($data['title'] ?? '') . '"',
+            'admin.announcement_stopped' => 'Menghentikan pengumuman "' . ($data['title'] ?? '') . '"',
+            'admin.announcement_deleted' => 'Menghapus pengumuman "' . ($data['title'] ?? '') . '"',
+            'admin.update_promo' => 'Mengubah promo bonus buat grup',
             default => str_replace(['superadmin.', 'admin.', '_'], ['', '', ' '], $log->action),
         };
     }

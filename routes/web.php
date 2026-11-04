@@ -2,7 +2,10 @@
 
 use App\Http\Controllers\AiSettingsController;
 use App\Http\Controllers\Admin\AdminGroupController;
+use App\Http\Controllers\Admin\AdminAnnouncementController;
 use App\Http\Controllers\Admin\AdminOpenAiController;
+use App\Http\Controllers\Admin\AdminPromoController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\AuthController;
@@ -17,6 +20,7 @@ use App\Http\Controllers\InterdotzAuthController;
 use App\Http\Controllers\MailboxController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfileHistoryController;
+use App\Http\Controllers\ProfileSettingsController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PaymentCallbackController;
@@ -112,6 +116,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/account', [ProfileController::class, 'updateAccount'])->name('profile.account.update');
     Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme.update');
     Route::post('/profile/timezone', [ProfileController::class, 'updateTimezone'])->name('profile.timezone.update');
+    Route::get('/profile/zona-waktu', [ProfileSettingsController::class, 'timezone'])->name('profile.timezone');
+    Route::post('/profile/zona-waktu', [ProfileSettingsController::class, 'saveTimezone'])->name('profile.timezone.save');
+    Route::get('/profile/notifikasi', [ProfileSettingsController::class, 'notifications'])->name('profile.notifications');
+    Route::post('/profile/notifikasi', [ProfileSettingsController::class, 'saveNotifications'])->name('profile.notifications.save');
+    Route::get('/profile/perangkat', [ProfileSettingsController::class, 'sessions'])->name('profile.sessions');
+    Route::post('/profile/perangkat/keluar-lainnya', [ProfileSettingsController::class, 'logoutOthers'])->name('profile.sessions.logout-others');
+    Route::post('/profile/perangkat/{session}/keluar', [ProfileSettingsController::class, 'revoke'])->name('profile.sessions.revoke');
     // URL lama, dipertahankan untuk bookmark.
     Route::redirect('/profile/activity', '/profile/login-history')->name('profile.activity');
     Route::get('/profile/storage', [ProfileController::class, 'storage'])->name('profile.storage');
@@ -119,8 +130,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile/login-history', [ProfileHistoryController::class, 'logins'])->name('profile.login-history');
     Route::get('/profile/transactions', [ProfileHistoryController::class, 'transactions'])->name('profile.transactions');
 
-    // Superadmin: ringkasan, grup, user, keuangan & AI, log audit, pengaturan (model AI & harga)
+    Route::post('/pengumuman/{announcement}/tutup', [AnnouncementController::class, 'dismiss'])->name('announcements.dismiss');
+
+    // Superadmin: ringkasan, grup, user, keuangan & AI, biaya OpenAI, promo, pengumuman, log audit, pengaturan
     Route::middleware('superadmin')->prefix('superadmin')->name('superadmin.')->group(function () {
+        Route::get('/promo', [AdminPromoController::class, 'index'])->name('promo');
+        Route::post('/promo', [AdminPromoController::class, 'update'])->name('promo.update');
+        Route::get('/pengumuman', [AdminAnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('/pengumuman/baru', [AdminAnnouncementController::class, 'create'])->name('announcements.create');
+        Route::post('/pengumuman', [AdminAnnouncementController::class, 'store'])->name('announcements.store');
+        Route::get('/pengumuman/{announcement}', [AdminAnnouncementController::class, 'edit'])->name('announcements.edit');
+        Route::put('/pengumuman/{announcement}', [AdminAnnouncementController::class, 'update'])->name('announcements.update');
+        Route::post('/pengumuman/{announcement}/tayang', [AdminAnnouncementController::class, 'toggle'])->name('announcements.toggle');
+        Route::delete('/pengumuman/{announcement}', [AdminAnnouncementController::class, 'destroy'])->name('announcements.destroy');
         Route::get('/', [AdminReportController::class, 'dashboard'])->name('index');
         Route::get('/grup', [AdminGroupController::class, 'index'])->name('groups.index');
         Route::get('/grup/{group}', [AdminGroupController::class, 'show'])->name('groups.show');

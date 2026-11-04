@@ -1,160 +1,191 @@
-@extends('layouts.app', ['title' => 'Keuangan & AI - Admin Normi Chat'])
+@extends('layouts.admin')
+
+@section('heading', 'Keuangan & AI')
+
+@section('actions')
+    <a href="{{ route('superadmin.csv', ['transaksi', 'from' => $fromInput, 'to' => $toInput]) }}" class="btn-secondary px-3 py-2 text-sm">CSV transaksi</a>
+    <a href="{{ route('superadmin.csv', ['ai', 'from' => $fromInput, 'to' => $toInput]) }}" class="btn-secondary px-3 py-2 text-sm">CSV pemakaian AI</a>
+@endsection
 
 @section('content')
     @php
         $nk = fn ($value) => number_format((float) $value, 2, ',', '.');
         $rp = fn ($value) => 'Rp' . number_format((float) $value, 0, ',', '.');
-        $range = ['from' => $fromInput, 'to' => $toInput];
-        $sources = ['admin_adjustment' => 'Penyesuaian admin', 'topup' => 'Isi Normkredit', 'topup_midtrans' => 'Isi Normkredit', 'patungan' => 'Patungan', 'patungan_midtrans' => 'Patungan', 'group_creation' => 'Buat grup', 'group_creation_midtrans' => 'Buat grup'];
+        $pct = fn ($part, $total) => number_format((float) $part / max(1, (int) $total) * 100, 1, ',', '.') . '%';
+        $sources = \App\Models\GroupTokenContribution::SOURCE_LABELS;
+        $revenue = (float) $revenueByDay->sum('revenue');
+        $charged = (float) $usageByModel->sum('charged');
+        $answerCost = (float) $usageByModel->sum('cost_idr');
+        $maintenanceCost = (float) collect($maintenance)->sum('cost_idr');
+        $chargedValue = $charged * $rupiahPerCredit;
     @endphp
-    <section class="page-shell">
-        @include('superadmin._nav')
 
-        <form method="GET" class="nc-filter-bar">
-            <label class="nc-date"><span>Dari</span><input type="date" name="from" value="{{ $fromInput }}"></label>
-            <label class="nc-date"><span>Sampai</span><input type="date" name="to" value="{{ $toInput }}"></label>
-            <button type="submit" class="btn-secondary self-end px-4 py-2">Terapkan</button>
-            <a href="{{ route('superadmin.csv', ['transaksi'] + $range) }}" class="btn-secondary self-end px-4 py-2">CSV transaksi</a>
-            <a href="{{ route('superadmin.csv', ['ai'] + $range) }}" class="btn-secondary self-end px-4 py-2">CSV pemakaian AI</a>
-        </form>
+    <form method="GET" class="nc-filter-bar">
+        <label class="nc-date"><span>Dari</span><input type="date" name="from" value="{{ $fromInput }}"></label>
+        <label class="nc-date"><span>Sampai</span><input type="date" name="to" value="{{ $toInput }}"></label>
+        <button type="submit" class="btn-secondary self-end px-4 py-2">Terapkan</button>
+    </form>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Pendapatan per hari</h2>
-            <div class="nc-table-wrap">
-                <table class="nc-table">
-                    <thead><tr><th>Tanggal</th><th>Pembayaran</th><th>NK</th><th>Pendapatan</th></tr></thead>
-                    <tbody>
-                        @forelse($revenueByDay as $row)
-                            <tr><td>{{ \Illuminate\Support\Carbon::parse($row->day)->translatedFormat('j M Y') }}</td><td>{{ (int) $row->payments }}</td><td>{{ $nk($row->credits) }}</td><td>{{ $rp($row->revenue) }}</td></tr>
-                        @empty
-                            <tr><td colspan="4">Belum ada pembayaran pada rentang ini.</td></tr>
-                        @endforelse
-                    </tbody>
-                    @if($revenueByDay->isNotEmpty())
-                        <tfoot><tr><th>Total</th><th>{{ (int) $revenueByDay->sum('payments') }}</th><th>{{ $nk($revenueByDay->sum('credits')) }}</th><th>{{ $rp($revenueByDay->sum('revenue')) }}</th></tr></tfoot>
-                    @endif
-                </table>
-            </div>
+    <dl class="nc-kpis">
+        <div class="nc-kpi"><dt>Pendapatan</dt><dd>{{ $rp($revenue) }}<small>{{ (int) $revenueByDay->sum('payments') }} pembayaran</small></dd></div>
+        <div class="nc-kpi"><dt>NK terjual</dt><dd>{{ $nk($revenueByDay->sum('credits')) }}<small>Bonus {{ $nk($bonusCredits) }} NK</small></dd></div>
+        <div class="nc-kpi"><dt>NK terpakai</dt><dd>{{ $nk($charged) }}<small>{{ (int) $answers->total }} jawaban Normi</small></dd></div>
+        <div class="nc-kpi"><dt>Biaya OpenAI</dt><dd>{{ $rp($answerCost + $maintenanceCost) }}<small>Tidak ditagih {{ $rp($maintenanceCost) }}</small></dd></div>
+        <div class="nc-kpi"><dt>Margin pemakaian</dt><dd>{{ $chargedValue > 0 ? number_format(($chargedValue - $answerCost) / $chargedValue * 100, 1, ',', '.') . '%' : '–' }}<small>Sebelum QRIS, server, pajak</small></dd></div>
+    </dl>
+
+    <nav class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Bagian halaman">
+        @foreach(['pendapatan' => 'Pendapatan', 'model' => 'Per model', 'konteks' => 'Konteks Normi', 'tidak-ditagih' => 'Tidak ditagih', 'ditolak' => 'Ditolak', 'grup' => 'Grup terbesar', 'transaksi' => 'Transaksi'] as $anchor => $label)
+            <a href="#{{ $anchor }}" class="font-semibold text-primary-ink hover:underline">{{ $label }}</a>
+        @endforeach
+    </nav>
+
+    <section class="nc-panel" id="pendapatan">
+        <div class="nc-panel-head"><h2 class="nc-panel-title">Pendapatan per hari</h2></div>
+        <div class="nc-table-wrap">
+            <table class="nc-table">
+                <thead><tr><th>Tanggal</th><th>Pembayaran</th><th>NK</th><th>Pendapatan</th></tr></thead>
+                <tbody>
+                    @forelse($revenueByDay as $row)
+                        <tr><td>{{ \Illuminate\Support\Carbon::parse($row->day)->translatedFormat('j M Y') }}</td><td>{{ (int) $row->payments }}</td><td>{{ $nk($row->credits) }}</td><td>{{ $rp($row->revenue) }}</td></tr>
+                    @empty
+                        <tr><td colspan="4" class="text-ink-soft">Belum ada pembayaran pada rentang ini.</td></tr>
+                    @endforelse
+                </tbody>
+                @if($revenueByDay->isNotEmpty())
+                    <tfoot><tr><th>Total</th><th>{{ (int) $revenueByDay->sum('payments') }}</th><th>{{ $nk($revenueByDay->sum('credits')) }}</th><th>{{ $rp($revenue) }}</th></tr></tfoot>
+                @endif
+            </table>
         </div>
+    </section>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Pemakaian & biaya AI per model</h2>
-            <div class="nc-table-wrap">
-                <table class="nc-table">
-                    <thead><tr><th>Model</th><th>Permintaan</th><th>Token masuk rata-rata</th><th>Tercache</th><th>NK ditagih</th><th>Biaya OpenAI</th><th>Biaya per jawaban</th><th>Margin kotor</th></tr></thead>
-                    <tbody>
-                        @forelse($usageByModel as $row)
-                            @php($revenue = (float) $row->charged * $rupiahPerCredit)
-                            <tr>
-                                <td class="font-mono">{{ $row->model }}</td>
-                                <td>{{ (int) $row->requests }}</td>
-                                <td>{{ number_format((float) $row->avg_input, 0, ',', '.') }}</td>
-                                <td>{{ (int) $row->input > 0 ? number_format($row->cached / $row->input * 100, 1, ',', '.') . '%' : '-' }}</td>
-                                <td>{{ $nk($row->charged) }}</td>
-                                <td>{{ $rp($row->cost_idr) }}</td>
-                                <td>{{ (int) $row->requests > 0 ? 'Rp' . number_format((float) $row->cost_idr / (int) $row->requests, 2, ',', '.') : '-' }}</td>
-                                <td>{{ $revenue > 0 ? number_format(($revenue - $row->cost_idr) / $revenue * 100, 1, ',', '.') . '%' : '-' }}</td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="8">Belum ada pemakaian AI pada rentang ini.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            <p class="nc-section-note mt-2">Margin kotor = (NK ditagih × Rp{{ number_format($rupiahPerCredit, 0, ',', '.') }} − biaya OpenAI) ÷ NK ditagih, sebelum biaya QRIS, server, dan pajak.</p>
+    <section class="nc-panel" id="model">
+        <div class="nc-panel-head">
+            <h2 class="nc-panel-title">Pemakaian per model</h2>
+            <p class="nc-panel-note">Margin = (NK × Rp{{ number_format($rupiahPerCredit, 0, ',', '.') }} − biaya OpenAI) ÷ nilai NK</p>
         </div>
-
-        <div class="nc-section">
-            <h2 class="nc-section-title">Konteks jawaban Normi</h2>
-            @php($totalAnswers = max(1, (int) $answers->total))
-            <div class="nc-stats">
-                <div class="nc-stat"><p>Jawaban</p><b>{{ (int) $answers->total }}</b></div>
-                <div class="nc-stat"><p>Memakai ringkasan grup</p><b>{{ number_format($answers->with_summary / $totalAnswers * 100, 1, ',', '.') }}%</b></div>
-                <div class="nc-stat"><p>Mencari pesan lama</p><b>{{ number_format($answers->searched / $totalAnswers * 100, 1, ',', '.') }}%</b></div>
-                <div class="nc-stat"><p>Memanggil pemahaman (Luna)</p><b>{{ number_format($answers->understood / $totalAnswers * 100, 1, ',', '.') }}%</b></div>
-                <div class="nc-stat"><p>Gagal mengingat</p><b>{{ number_format($answers->recall_failed / $totalAnswers * 100, 1, ',', '.') }}%</b></div>
-            </div>
-            <p class="nc-section-note mt-2">Gagal mengingat = Normi harus minta klarifikasi karena rujukannya tidak ketemu, atau pertanyaan merujuk pembicaraan sebelumnya ("kemarin", "yang tadi", membalas pesan lama) tapi tidak ada pesan lama yang cocok. Pertanyaan umum tidak dihitung.</p>
-            @if($recallByWeek->isNotEmpty())
-                <div class="nc-table-wrap mt-3">
-                    <table class="nc-table">
-                        <thead><tr><th>Minggu mulai</th><th>Jawaban</th><th>Gagal mengingat</th><th>Persen</th></tr></thead>
-                        <tbody>
-                            @foreach($recallByWeek as $week)
-                                <tr>
-                                    <td>{{ \Carbon\Carbon::parse($week->week)->translatedFormat('j M Y') }}</td>
-                                    <td>{{ (int) $week->total }}</td>
-                                    <td>{{ (int) $week->failed }}</td>
-                                    <td>{{ number_format((int) $week->failed / max(1, (int) $week->total) * 100, 1, ',', '.') }}%</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
+        <div class="nc-table-wrap">
+            <table class="nc-table">
+                <thead><tr><th>Model</th><th>Jawaban</th><th>Token masuk rata-rata</th><th>Tercache</th><th>NK ditagih</th><th>Biaya OpenAI</th><th>Biaya per jawaban</th><th>Margin</th></tr></thead>
+                <tbody>
+                    @forelse($usageByModel as $row)
+                        @php($value = (float) $row->charged * $rupiahPerCredit)
+                        <tr>
+                            <td class="font-mono text-xs">{{ $row->model }}</td>
+                            <td>{{ (int) $row->requests }}</td>
+                            <td>{{ number_format((float) $row->avg_input, 0, ',', '.') }}</td>
+                            <td>{{ (int) $row->input > 0 ? $pct($row->cached, $row->input) : '–' }}</td>
+                            <td>{{ $nk($row->charged) }}</td>
+                            <td>{{ $rp($row->cost_idr) }}</td>
+                            <td>{{ (int) $row->requests > 0 ? 'Rp' . number_format((float) $row->cost_idr / (int) $row->requests, 2, ',', '.') : '–' }}</td>
+                            <td>{{ $value > 0 ? number_format(($value - $row->cost_idr) / $value * 100, 1, ',', '.') . '%' : '–' }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="8" class="text-ink-soft">Belum ada pemakaian pada rentang ini.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
+    </section>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Biaya OpenAI yang tidak ditagih ke grup</h2>
-            <p class="nc-section-note">Pemeliharaan ingatan Normi dan permintaan yang ditolak setelah ada biaya. Dibayar dari saldo OpenAI, tidak memotong Normkredit grup.</p>
-            <div class="nc-table-wrap">
+    <section class="nc-panel" id="konteks">
+        <div class="nc-panel-head">
+            <h2 class="nc-panel-title">Konteks jawaban Normi</h2>
+            <p class="nc-panel-note">Gagal mengingat: Normi minta klarifikasi, atau pesan lama yang dirujuk tidak ketemu</p>
+        </div>
+        <dl class="nc-kpis">
+            <div class="nc-kpi"><dt>Memakai ringkasan grup</dt><dd>{{ $pct($answers->with_summary, $answers->total) }}</dd></div>
+            <div class="nc-kpi"><dt>Mencari pesan lama</dt><dd>{{ $pct($answers->searched, $answers->total) }}</dd></div>
+            <div class="nc-kpi"><dt>Memanggil pemahaman</dt><dd>{{ $pct($answers->understood, $answers->total) }}</dd></div>
+            <div class="nc-kpi"><dt>Gagal mengingat</dt><dd>{{ $pct($answers->recall_failed, $answers->total) }}</dd></div>
+        </dl>
+        @if($recallByWeek->isNotEmpty())
+            <div class="nc-table-wrap mt-3">
                 <table class="nc-table">
-                    <thead><tr><th>Jenis</th><th>Panggilan</th><th>Token masuk</th><th>Biaya OpenAI</th></tr></thead>
+                    <thead><tr><th>Minggu mulai</th><th>Jawaban</th><th>Gagal mengingat</th><th>Persen</th></tr></thead>
                     <tbody>
-                        @foreach(['context_summary' => 'Ringkasan grup & topik', 'context_understanding' => 'Pemahaman pertanyaan', 'embedding' => 'Embedding pesan', 'refused' => 'Permintaan ditolak setelah ada biaya (mis. transkripsi)'] as $kind => $label)
-                            @php($row = $maintenance[$kind] ?? null)
-                            <tr><td>{{ $label }}</td><td>{{ (int) ($row->calls ?? 0) }}</td><td>{{ number_format((int) ($row->input ?? 0), 0, ',', '.') }}</td><td>{{ $rp($row->cost_idr ?? 0) }}</td></tr>
+                        @foreach($recallByWeek as $week)
+                            <tr><td>{{ \Carbon\Carbon::parse($week->week)->translatedFormat('j M Y') }}</td><td>{{ (int) $week->total }}</td><td>{{ (int) $week->failed }}</td><td>{{ $pct($week->failed, $week->total) }}</td></tr>
                         @endforeach
                     </tbody>
                 </table>
             </div>
-        </div>
+        @endif
+    </section>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Permintaan ditolak</h2>
+    <section class="nc-panel" id="tidak-ditagih">
+        <div class="nc-panel-head">
+            <h2 class="nc-panel-title">Biaya OpenAI tidak ditagih</h2>
+            <p class="nc-panel-note">Dari saldo OpenAI, tidak memotong Normkredit grup</p>
+        </div>
+        <div class="nc-table-wrap">
+            <table class="nc-table">
+                <thead><tr><th>Jenis</th><th>Panggilan</th><th>Token masuk</th><th>Biaya OpenAI</th></tr></thead>
+                <tbody>
+                    @foreach(['context_summary' => 'Ringkasan grup & topik', 'context_understanding' => 'Pemahaman pertanyaan', 'embedding' => 'Embedding pesan', 'refused' => 'Ditolak setelah ada biaya'] as $kind => $label)
+                        @php($row = $maintenance[$kind] ?? null)
+                        <tr><td>{{ $label }}</td><td>{{ (int) ($row->calls ?? 0) }}</td><td>{{ number_format((int) ($row->input ?? 0), 0, ',', '.') }}</td><td>{{ $rp($row->cost_idr ?? 0) }}</td></tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="nc-admin-cols lg:grid-cols-2">
+        <section class="nc-panel" id="ditolak">
+            <div class="nc-panel-head"><h2 class="nc-panel-title">Permintaan ditolak</h2></div>
             <div class="nc-table-wrap">
                 <table class="nc-table">
                     <thead><tr><th>Alasan</th><th>Jumlah</th></tr></thead>
                     <tbody>
-                        @foreach(['credits' => 'Normkredit grup tidak cukup', 'model_locked' => 'Model terkunci (saldo < ambang)', 'daily_limit' => 'Batas harian grup', 'spend_guard' => 'Anggaran / saldo OpenAI', 'too_long' => 'Pesan atau lampiran terlalu panjang', 'no_model' => 'Model atau API key tidak tersedia'] as $reason => $label)
+                        @foreach(['credits' => 'Normkredit tidak cukup', 'model_locked' => 'Model terkunci', 'daily_limit' => 'Batas harian', 'spend_guard' => 'Anggaran / saldo OpenAI', 'too_long' => 'Pesan atau lampiran terlalu panjang', 'no_model' => 'Model / API key tidak tersedia'] as $reason => $label)
                             <tr><td>{{ $label }}</td><td>{{ (int) ($refusals[$reason] ?? 0) }}</td></tr>
                         @endforeach
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Grup dengan biaya AI terbesar</h2>
+        <section class="nc-panel" id="grup">
+            <div class="nc-panel-head"><h2 class="nc-panel-title">Grup dengan biaya terbesar</h2></div>
             <div class="nc-table-wrap">
                 <table class="nc-table">
-                    <thead><tr><th>Grup</th><th>Permintaan</th><th>NK ditagih</th><th>Biaya OpenAI</th></tr></thead>
+                    <thead><tr><th>Grup</th><th>Jawaban</th><th>NK</th><th>Biaya</th></tr></thead>
                     <tbody>
                         @forelse($usageByGroup as $row)
-                            <tr><td><a href="{{ route('superadmin.groups.show', $row->id) }}" class="underline">{{ $row->name }}</a></td><td>{{ (int) $row->requests }}</td><td>{{ $nk($row->charged) }}</td><td>{{ $rp($row->cost_idr) }}</td></tr>
+                            <tr><td class="max-w-[12rem] truncate"><a href="{{ route('superadmin.groups.show', $row->id) }}" class="font-medium hover:underline">{{ $row->name }}</a></td><td>{{ (int) $row->requests }}</td><td>{{ $nk($row->charged) }}</td><td>{{ $rp($row->cost_idr) }}</td></tr>
                         @empty
-                            <tr><td colspan="4">Belum ada pemakaian AI pada rentang ini.</td></tr>
+                            <tr><td colspan="4" class="text-ink-soft">Belum ada pemakaian pada rentang ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
+    </div>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Transaksi</h2>
-            <div class="nc-list">
-                @forelse($transactions as $row)
-                    <div class="nc-list-row">
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold">{{ $row->group?->name ?? 'Grup dihapus' }} · {{ $sources[$row->source] ?? $row->source }} · {{ $row->credit_amount > 0 ? '+' : '' }}{{ $nk($row->credit_amount) }} NK</p>
-                            <p class="text-xs text-ink-soft">{{ \App\Support\UserTime::format($row->created_at) }} · {{ $row->user?->name ?? 'Akun dihapus' }}{{ $row->price_paid > 0 ? ' · ' . $rp($row->price_paid) : '' }}{{ $row->note ? ' · ' . $row->note : '' }}</p>
-                        </div>
-                    </div>
-                @empty
-                    <p class="nc-list-empty">Tidak ada transaksi pada rentang ini.</p>
-                @endforelse
-            </div>
-            <div class="mt-4">{{ $transactions->links() }}</div>
+    <section class="nc-panel" id="transaksi">
+        <div class="nc-panel-head"><h2 class="nc-panel-title">Transaksi</h2></div>
+        <div class="nc-table-wrap">
+            <table class="nc-table">
+                <thead><tr><th>Grup</th><th class="max-sm:hidden">Jenis</th><th>NK</th><th class="max-md:hidden">Bayar</th><th>Waktu</th></tr></thead>
+                <tbody>
+                    @forelse($transactions as $row)
+                        <tr>
+                            <td class="max-w-[14rem]">
+                                <span class="block truncate font-medium">{{ $row->group?->name ?? 'Grup dihapus' }}</span>
+                                <span class="block truncate text-xs text-ink-soft">{{ $row->user?->name ?? 'Akun dihapus' }}{{ $row->note ? ' · ' . $row->note : '' }}</span>
+                            </td>
+                            <td class="max-sm:hidden">{{ $sources[$row->source] ?? $row->source }}</td>
+                            <td>{{ $row->credit_amount > 0 ? '+' : '' }}{{ $nk($row->credit_amount) }}</td>
+                            <td class="max-md:hidden">{{ $row->price_paid > 0 ? $rp($row->price_paid) : '–' }}</td>
+                            <td>{{ \App\Support\UserTime::format($row->created_at, 'j M, H.i') }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="text-ink-soft">Tidak ada transaksi pada rentang ini.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
+        <div class="mt-4">{{ $transactions->links() }}</div>
     </section>
 @endsection

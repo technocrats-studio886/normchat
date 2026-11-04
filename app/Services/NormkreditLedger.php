@@ -36,6 +36,24 @@ class NormkreditLedger
         });
     }
 
+    /** Bonus promo buat grup: tercatat di riwayat patungan (harga 0) dan ledger jenis "bonus". */
+    public function bonus(Group $group, User $user, float $credits, string $reference): GroupTokenContribution
+    {
+        return DB::transaction(function () use ($group, $user, $credits, $reference) {
+            $contribution = GroupTokenContribution::create([
+                'group_id' => $group->id,
+                'user_id' => $user->id,
+                'source' => GroupTokenContribution::SOURCE_BONUS,
+                'credit_amount' => $credits,
+                'price_paid' => 0,
+                'payment_reference' => $reference,
+            ]);
+            $this->wallet->bonus($group, $credits, ['user_id' => $user->id, 'contribution_id' => $contribution->id]);
+
+            return $contribution;
+        });
+    }
+
     public function hasContribution(string $reference, string $source): bool
     {
         return GroupTokenContribution::query()

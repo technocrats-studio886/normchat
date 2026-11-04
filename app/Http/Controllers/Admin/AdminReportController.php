@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminAlert;
+use App\Models\AiCostReconciliation;
 use App\Models\AiRequestRefusal;
 use App\Models\AiUsageLog;
 use App\Models\AuditLog;
@@ -30,15 +32,53 @@ class AdminReportController extends Controller
         $sales = fn ($since) => GroupTokenContribution::where('created_at', '>=', $since)->where('price_paid', '>', 0)
             ->selectRaw('count(*) as payments, coalesce(sum(price_paid), 0) as revenue')->first();
 
+        $frozen = Group::where('status', Group::STATUS_FROZEN)->count();
+
         return view('superadmin.dashboard', [
             'users' => ['total' => User::count(), 'new' => User::where('created_at', '>=', $month)->count(), 'blocked' => User::whereNotNull('blocked_at')->count()],
-            'groups' => ['active' => Group::where('status', 'active')->count(), 'frozen' => Group::where('status', Group::STATUS_FROZEN)->count(), 'new' => Group::where('created_at', '>=', $month)->count()],
+            'groups' => ['active' => Group::where('status', 'active')->count(), 'frozen' => $frozen, 'new' => Group::where('created_at', '>=', $month)->count()],
             'salesToday' => $sales($today),
             'salesMonth' => $sales($month),
             'usageToday' => $usage($today),
             'usageMonth' => $usage($month),
             'rupiahPerCredit' => $pricing->rupiahPerCredit(),
+            'attention' => $this->attention($pricing, $today, $frozen),
+            'recentPayments' => GroupTokenContribution::where('price_paid', '>', 0)
+                ->with(['group' => fn ($query) => $query->withTrashed()->select('id', 'name'), 'user:id,name'])
+                ->latest('id')->limit(6)->get(),
+            'recentActions' => AuditLog::where(fn ($query) => $query->where('action', 'like', 'admin.%')->orWhere('action', 'like', 'superadmin.%'))
+                ->with('actor:id,name')->latest('id')->limit(6)->get(),
         ]);
+    }
+
+    /**
+     * Hal yang butuh tindakan superadmin sekarang; kosong = tidak ada.
+     *
+     * @return list<array{text: string, url: string, danger: bool}>
+     */
+    private function attention(NormkreditPricing $pricing, CarbonImmutable $today, int $frozen): array
+    {
+        $items = AdminAlert::query()->open()->get()
+            ->map(fn (AdminAlert $alert) => ['text' => $alert->title, 'url' => route('superadmin.openai') . '#peringatan', 'danger' => $alert->level === 'danger'])
+            ->all();
+
+        $rate = $pricing->rate();
+        if ($rate === null || CarbonImmutable::parse($rate['created_at'])->lt(now()->subDay())) {
+            $items[] = ['text' => $rate === null ? 'Kurs USD→IDR belum pernah diisi' : 'Kurs USD→IDR belum diperbarui lebih dari 24 jam', 'url' => route('superadmin.openai') . '#kurs', 'danger' => false];
+        }
+        if ($frozen > 0) {
+            $items[] = ['text' => $frozen . ' grup sedang dibekukan', 'url' => route('superadmin.groups.index', ['status' => Group::STATUS_FROZEN]), 'danger' => false];
+        }
+        $refused = AiRequestRefusal::where('created_at', '>=', $today)->count();
+        if ($refused > 0) {
+            $items[] = ['text' => $refused . ' permintaan ke Normi ditolak hari ini', 'url' => route('superadmin.finance') . '#ditolak', 'danger' => false];
+        }
+        $reconciliation = AiCostReconciliation::query()->latest('date')->first();
+        if ($reconciliation && abs((float) $reconciliation->diff_percent) > (float) config('normchat.spend.reconcile_alert_percent', 5)) {
+            $items[] = ['text' => 'Selisih biaya OpenAI ' . number_format(abs((float) $reconciliation->diff_percent), 1, ',', '.') . '% pada rekonsiliasi terakhir', 'url' => route('superadmin.openai') . '#rekonsiliasi', 'danger' => false];
+        }
+
+        return $items;
     }
 
     /** "?, ?, ?" untuk whereIn mentah. */
@@ -99,8 +139,12 @@ class AdminReportController extends Controller
                 . ' sum(charged_credits) as charged, sum(provider_cost_idr) as cost_idr', AiUsageLog::NOT_ANSWERS)
             ->orderByDesc('cost_idr')->limit(20)->get();
 
+        // Bonus promo buat grup: Normkredit tanpa pembayaran, bukan pendapatan.
+        $bonusCredits = (float) GroupTokenContribution::whereBetween('created_at', [$from, $to])
+            ->where('source', GroupTokenContribution::SOURCE_BONUS)->sum('credit_amount');
+
         return view('superadmin.finance', compact(
-            'transactions', 'revenueByDay', 'usageByModel', 'usageByGroup', 'maintenance', 'answers', 'recallByWeek', 'refusals', 'rupiahPerCredit', 'fromInput', 'toInput'
+            'transactions', 'revenueByDay', 'usageByModel', 'usageByGroup', 'maintenance', 'answers', 'recallByWeek', 'refusals', 'rupiahPerCredit', 'fromInput', 'toInput', 'bonusCredits'
         ));
     }
 

@@ -10,6 +10,7 @@ import { mergePollStatsIntoCache, refreshPollCardsFromFeed } from './polls.js';
 import { markGroupRead, markGroupVisited, noteUnseenIncomingMessage, refreshScrollBottomButton, rememberLatestMessageId, syncScrollBottomCount } from './read-state.js';
 import { escapeHtml, scrollChatToBottom } from './utils.js';
 import { initVoicePlayers } from './voice-player.js';
+import { playNotifySound } from '../ui/notify-sound.js';
 
 const showMentionToast = (payload) => {
 	const stack = ensureMentionToastStack();
@@ -120,6 +121,9 @@ const onMessageSent = (payload) => {
 
 	const distFromBottomBefore = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
 	const isMine = message.sender_type === 'user' && Number(message.sender_id || 0) === authUserId;
+	if (!isMine && document.hidden) {
+		playNotifySound();
+	}
 
 	if (isMine && pendingMessagesByLocalId.size > 0) {
 		const match = findPendingFor(message);
@@ -184,6 +188,7 @@ export const initRealtime = () => {
 			}
 
 			showMentionToast(payload);
+			playNotifySound();
 		});
 	}
 

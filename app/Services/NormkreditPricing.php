@@ -37,6 +37,11 @@ class NormkreditPricing
         'max_input_tokens' => 'int',
         'daily_group_credit_limit' => 'float',
         'card_margin_percent' => 'float',
+        // Promo bonus buat grup (Superadmin › Promo); waktu dalam UTC ISO-8601.
+        'group_bonus_enabled' => 'bool',
+        'group_bonus_credits' => 'float',
+        'group_bonus_starts_at' => 'string',
+        'group_bonus_ends_at' => 'string',
     ];
 
     public function settings(): array
@@ -51,7 +56,12 @@ class NormkreditPricing
         $settings = (array) config('normchat.pricing', []);
         foreach ($overrides as $key => $value) {
             if ($value !== null && $value !== '') {
-                $settings[$key] = self::EDITABLE[$key] === 'int' ? (int) $value : (float) $value;
+                $settings[$key] = match (self::EDITABLE[$key]) {
+                    'int' => (int) $value,
+                    'bool' => $value === '1',
+                    'string' => (string) $value,
+                    default => (float) $value,
+                };
             }
         }
 
@@ -70,6 +80,32 @@ class NormkreditPricing
     public function get(string $key): int|float
     {
         return $this->settings()[$key];
+    }
+
+    /**
+     * Bonus NK untuk grup yang checkout-nya dimulai pada $at (bawaan: sekarang); 0 bila promo mati atau di luar periode.
+     */
+    public function groupCreationBonus(?\DateTimeInterface $at = null): float
+    {
+        $settings = $this->settings();
+        $credits = (float) ($settings['group_bonus_credits'] ?? 0);
+        if (! ($settings['group_bonus_enabled'] ?? false) || $credits <= 0) {
+            return 0.0;
+        }
+
+        $at = \Carbon\CarbonImmutable::instance($at ?? now());
+        $starts = filled($settings['group_bonus_starts_at'] ?? null) ? \Carbon\CarbonImmutable::parse($settings['group_bonus_starts_at']) : null;
+        $ends = filled($settings['group_bonus_ends_at'] ?? null) ? \Carbon\CarbonImmutable::parse($settings['group_bonus_ends_at']) : null;
+
+        return ($starts === null || $at->gte($starts)) && ($ends === null || $at->lt($ends)) ? $credits : 0.0;
+    }
+
+    /** Akhir promo bonus buat grup yang sedang berjalan (untuk ditampilkan), atau null. */
+    public function groupCreationBonusEndsAt(): ?\Carbon\CarbonImmutable
+    {
+        $ends = $this->settings()['group_bonus_ends_at'] ?? null;
+
+        return filled($ends) ? \Carbon\CarbonImmutable::parse($ends) : null;
     }
 
     public function rupiahPerCredit(): int

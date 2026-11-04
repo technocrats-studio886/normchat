@@ -1,85 +1,119 @@
-@extends('layouts.app', ['title' => $group->name . ' - Admin Normi Chat'])
+@extends('layouts.admin')
+
+@section('heading', $group->name)
+@section('back', route('superadmin.groups.index'))
+
+@section('actions')
+    <form method="POST" action="{{ route('superadmin.groups.freeze', $group) }}" data-confirm="{{ $group->isFrozen() ? 'Aktifkan kembali grup ini?' : 'Bekukan grup ini? Anggota masih bisa membaca riwayat, tetapi tidak bisa mengirim pesan atau memakai Normi.' }}" data-confirm-label="{{ $group->isFrozen() ? 'Aktifkan' : 'Bekukan' }}">
+        @csrf
+        <button type="submit" class="btn-secondary px-3 py-2 text-sm">{{ $group->isFrozen() ? 'Aktifkan kembali' : 'Bekukan grup' }}</button>
+    </form>
+@endsection
 
 @section('content')
     @php
         $nk = fn ($value) => number_format((float) $value, 2, ',', '.');
         $rp = fn ($value) => 'Rp' . number_format((float) $value, 0, ',', '.');
-        $time = fn ($value) => $value ? \App\Support\UserTime::format(\Illuminate\Support\Carbon::parse($value)) : '–';
+        $time = fn ($value) => $value ? \App\Support\UserTime::format(\Illuminate\Support\Carbon::parse($value), 'j M Y, H.i') : '–';
         $roles = ['owner' => 'Pemilik', 'admin' => 'Admin', 'member' => 'Anggota'];
-        $sources = ['admin_adjustment' => 'Penyesuaian admin', 'topup' => 'Isi Normkredit', 'topup_midtrans' => 'Isi Normkredit', 'patungan' => 'Patungan', 'patungan_midtrans' => 'Patungan', 'group_creation' => 'Buat grup', 'group_creation_midtrans' => 'Buat grup'];
+        $sources = \App\Models\GroupTokenContribution::SOURCE_LABELS;
     @endphp
-    <section class="page-shell">
-        @include('superadmin._nav')
 
-        <x-page-header :back="route('superadmin.groups.index')" :title="$group->name" :subtitle="$group->isFrozen() ? 'Dibekukan' : 'Aktif'" />
+    <p class="mb-3"><span @class(['nc-status', 'is-ok' => ! $group->isFrozen(), 'is-danger' => $group->isFrozen()])>{{ $group->isFrozen() ? 'Dibekukan' : 'Aktif' }}</span></p>
 
-        <div class="nc-stats">
-            <div class="nc-stat"><p>Saldo</p><b>{{ $nk($token->credits) }} NK</b><span>Total masuk {{ $nk($token->total_credits) }} NK</span></div>
-            <div class="nc-stat"><p>Pemakaian AI 30 hari</p><b>{{ $nk($usage->charged) }} NK</b><span>{{ (int) $usage->requests }} permintaan · biaya {{ $rp($usage->cost_idr) }}</span></div>
-            <div class="nc-stat"><p>Aktivitas</p><b>{{ number_format($messageCount, 0, ',', '.') }} pesan</b><span>Terakhir {{ $time($lastActivity) }}</span></div>
+    <dl class="nc-kpis">
+        <div class="nc-kpi"><dt>Saldo</dt><dd>{{ $nk($token->credits) }} NK<small>Total masuk {{ $nk($token->total_credits) }} NK</small></dd></div>
+        <div class="nc-kpi"><dt>Pemakaian Normi 30 hari</dt><dd>{{ $nk($usage->charged) }} NK<small>{{ (int) $usage->requests }} jawaban · biaya {{ $rp($usage->cost_idr) }}</small></dd></div>
+        <div class="nc-kpi"><dt>Pesan</dt><dd>{{ number_format($messageCount, 0, ',', '.') }}<small>Terakhir {{ $time($lastActivity) }}</small></dd></div>
+    </dl>
+    <p class="mt-2 text-xs text-ink-soft">Isi pesan dan lampiran tidak ditampilkan untuk admin.</p>
+
+    <div class="nc-admin-cols lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div>
+            <section class="nc-panel">
+                <div class="nc-panel-head"><h2 class="nc-panel-title">Anggota</h2></div>
+                <div class="nc-table-wrap">
+                    <table class="nc-table">
+                        <thead><tr><th>Nama</th><th>Peran</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="block font-medium">{{ $group->owner?->name ?? 'Pemilik dihapus' }}</span><span class="block text-xs text-ink-soft">{{ $group->owner?->email }}</span></td>
+                                <td>Pemilik</td>
+                            </tr>
+                            @foreach($group->members->where('user_id', '!=', $group->owner_id) as $member)
+                                <tr>
+                                    <td><span class="block font-medium">{{ $member->user?->name ?? 'Akun dihapus' }}</span><span class="block text-xs text-ink-soft">{{ $member->user?->email }}</span></td>
+                                    <td>{{ $roles[$member->role?->key] ?? 'Anggota' }}{{ $member->status !== 'active' ? ' · ' . $member->status : '' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="nc-panel">
+                <div class="nc-panel-head"><h2 class="nc-panel-title">Transaksi Normkredit</h2></div>
+                <div class="nc-table-wrap">
+                    <table class="nc-table">
+                        <thead><tr><th>Jenis</th><th>NK</th><th class="max-sm:hidden">Bayar</th><th>Waktu</th></tr></thead>
+                        <tbody>
+                            @forelse($transactions as $row)
+                                <tr>
+                                    <td class="max-w-[14rem]">
+                                        <span class="block truncate font-medium">{{ $sources[$row->source] ?? $row->source }}</span>
+                                        <span class="block truncate text-xs text-ink-soft">{{ $row->user?->name ?? 'Akun dihapus' }}{{ $row->note ? ' · ' . $row->note : '' }}</span>
+                                    </td>
+                                    <td>{{ $row->credit_amount > 0 ? '+' : '' }}{{ $nk($row->credit_amount) }}</td>
+                                    <td class="max-sm:hidden">{{ $row->price_paid > 0 ? $rp($row->price_paid) : '–' }}</td>
+                                    <td>{{ $time($row->created_at) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="text-ink-soft">Belum ada transaksi.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
-        <p class="mt-2 text-xs text-ink-soft">Isi pesan dan lampiran tidak ditampilkan untuk admin.</p>
 
-        <div class="nc-section mt-6">
-            <h2 class="nc-section-title">Anggota</h2>
-            <div class="nc-list">
-                <div class="nc-list-row"><div class="min-w-0 flex-1"><p class="text-sm font-semibold">{{ $group->owner?->name ?? 'Pemilik dihapus' }}</p><p class="text-xs text-ink-soft">{{ $group->owner?->email }} · Pemilik</p></div></div>
-                @foreach($group->members->where('user_id', '!=', $group->owner_id) as $member)
-                    <div class="nc-list-row"><div class="min-w-0 flex-1"><p class="text-sm font-semibold">{{ $member->user?->name ?? 'Akun dihapus' }}</p><p class="text-xs text-ink-soft">{{ $member->user?->email }} · {{ $roles[$member->role?->key] ?? 'Anggota' }}{{ $member->status !== 'active' ? ' · ' . $member->status : '' }}</p></div></div>
-                @endforeach
-            </div>
-        </div>
+        <div>
+            <section class="nc-panel">
+                <div class="nc-panel-head"><h2 class="nc-panel-title">Tambah atau kurangi Normkredit</h2></div>
+                <form method="POST" action="{{ route('superadmin.groups.credits', $group) }}" class="nc-box space-y-3 p-4">
+                    @csrf
+                    <label class="nc-field"><span>Jumlah NK</span><input type="number" name="amount" step="0.01" required placeholder="50 atau -20" class="nc-input" value="{{ old('amount') }}"></label>
+                    <label class="nc-field"><span>Alasan</span><input type="text" name="reason" required minlength="5" maxlength="500" placeholder="mis. kompensasi gangguan 27 Okt" class="nc-input" value="{{ old('reason') }}"></label>
+                    <p class="nc-field-hint">Angka negatif mengurangi saldo. Alasan tercatat di transaksi grup dan log audit.</p>
+                    <button type="submit" class="btn-primary w-full py-2">Simpan</button>
+                </form>
+            </section>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Tambah atau kurangi Normkredit</h2>
-            <p class="nc-section-note">Angka negatif mengurangi saldo. Alasan wajib dan tercatat di riwayat transaksi grup serta log audit.</p>
-            <form method="POST" action="{{ route('superadmin.groups.credits', $group) }}" class="mt-3 grid gap-2 sm:grid-cols-[10rem_1fr_auto]">
-                @csrf
-                <input type="number" name="amount" step="0.01" required placeholder="mis. 50 atau -20" class="nc-input" value="{{ old('amount') }}" aria-label="Jumlah Normkredit">
-                <input type="text" name="reason" required minlength="5" maxlength="500" placeholder="Alasan, mis. kompensasi gangguan 27 Okt" class="nc-input" value="{{ old('reason') }}" aria-label="Alasan">
-                <button type="submit" class="btn-primary px-4 py-2">Simpan</button>
-            </form>
-        </div>
-
-        <div class="nc-section">
-            <h2 class="nc-section-title">Transaksi</h2>
-            <div class="nc-list">
-                @forelse($transactions as $row)
-                    <div class="nc-list-row">
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold">{{ $sources[$row->source] ?? $row->source }} · {{ $row->credit_amount > 0 ? '+' : '' }}{{ $nk($row->credit_amount) }} NK</p>
-                            <p class="text-xs text-ink-soft">{{ $time($row->created_at) }} · {{ $row->user?->name ?? 'Akun dihapus' }}{{ $row->price_paid > 0 ? ' · ' . $rp($row->price_paid) : '' }}{{ $row->note ? ' · ' . $row->note : '' }}</p>
+            <section class="nc-panel">
+                <div class="nc-panel-head"><h2 class="nc-panel-title">Tindakan admin</h2></div>
+                <div class="nc-box">
+                    @forelse($audit as $log)
+                        <div class="nc-box-row">
+                            <span class="min-w-0 flex-1">
+                                <span class="block">{{ \App\Support\AdminActions::label($log) }}</span>
+                                <span class="block text-xs text-ink-soft">{{ $log->actor?->name ?? 'Sistem' }} · {{ $time($log->created_at) }}</span>
+                            </span>
                         </div>
-                    </div>
-                @empty
-                    <p class="nc-list-empty">Belum ada transaksi.</p>
-                @endforelse
-            </div>
-        </div>
+                    @empty
+                        <p class="nc-box-empty">Belum ada tindakan admin untuk grup ini.</p>
+                    @endforelse
+                </div>
+            </section>
 
-        <div class="nc-section">
-            <h2 class="nc-section-title">Tindakan admin</h2>
-            <div class="nc-list">
-                @forelse($audit as $log)
-                    <div class="nc-list-row"><div class="min-w-0 flex-1"><p class="text-sm">{{ \App\Support\AdminActions::label($log) }}</p><p class="text-xs text-ink-soft">{{ $time($log->created_at) }} · {{ $log->actor?->name ?? 'Sistem' }}</p></div></div>
-                @empty
-                    <p class="nc-list-empty">Belum ada tindakan admin untuk grup ini.</p>
-                @endforelse
-            </div>
+            <section class="nc-panel">
+                <div class="nc-panel-head"><h2 class="nc-panel-title">Hapus grup</h2></div>
+                <form method="POST" action="{{ route('superadmin.groups.destroy', $group) }}" class="nc-box space-y-3 border-danger-line p-4">
+                    @csrf
+                    @method('DELETE')
+                    <p class="text-sm text-ink-soft">Grup, pesan, dan anggotanya dihapus. Ketik nama grup untuk melanjutkan.</p>
+                    <input type="text" name="confirm_name" required class="nc-input w-full" placeholder="{{ $group->name }}" aria-label="Ketik nama grup untuk menghapus" autocomplete="off">
+                    <button type="submit" class="nc-button-danger w-full py-2">Hapus grup</button>
+                </form>
+            </section>
         </div>
-
-        <div class="nc-section">
-            <h2 class="nc-section-title">Bekukan atau hapus</h2>
-            <form method="POST" action="{{ route('superadmin.groups.freeze', $group) }}" class="mt-2" data-confirm="{{ $group->isFrozen() ? 'Aktifkan kembali grup ini?' : 'Bekukan grup ini? Anggota masih bisa membaca riwayat, tetapi tidak bisa mengirim pesan atau memakai Normi.' }}" data-confirm-label="{{ $group->isFrozen() ? 'Aktifkan' : 'Bekukan' }}">
-                @csrf
-                <button type="submit" class="btn-secondary w-full py-2.5">{{ $group->isFrozen() ? 'Aktifkan kembali' : 'Bekukan grup' }}</button>
-            </form>
-            <form method="POST" action="{{ route('superadmin.groups.destroy', $group) }}" class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-                @csrf
-                @method('DELETE')
-                <input type="text" name="confirm_name" required class="nc-input" placeholder="Ketik {{ $group->name }} untuk menghapus" aria-label="Ketik nama grup untuk menghapus" autocomplete="off">
-                <button type="submit" class="nc-button-danger px-4 py-2">Hapus grup</button>
-            </form>
-        </div>
-    </section>
+    </div>
 @endsection

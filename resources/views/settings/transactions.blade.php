@@ -8,21 +8,23 @@
             @forelse ($contributions as $c)
                 @php
                     $isAdmin = $c->source === 'admin_adjustment';
+                    $isBonus = $c->source === \App\Models\GroupTokenContribution::SOURCE_BONUS;
                     $sourceLabel = match($c->source) {
                         'patungan', 'patungan_midtrans' => 'Gabung',
                         'topup', 'topup_midtrans', 'interdotz_topup', 'interdotz_charge_topup' => 'Isi Normkredit',
                         'group_creation', 'group_creation_midtrans' => 'Buat grup',
                         'admin_adjustment' => 'Penyesuaian admin',
+                        \App\Models\GroupTokenContribution::SOURCE_BONUS => 'Bonus buat grup',
                         default => 'Lainnya',
                     };
                 @endphp
                 <div class="nc-list-row">
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-semibold">{{ $isAdmin ? 'Admin Normi Chat' : ($c->user->name ?? 'Akun dihapus') }} <span class="nc-badge">{{ $sourceLabel }}</span></p>
+                        <p class="truncate text-sm font-semibold">{{ $isAdmin ? 'Admin Normi Chat' : ($isBonus ? 'Normi Chat' : ($c->user->name ?? 'Akun dihapus')) }} <span class="nc-badge">{{ $sourceLabel }}</span></p>
                         <p class="mt-0.5 text-xs text-ink-soft">{{ \App\Support\UserTime::format($c->created_at, 'j M Y, H.i') }}{{ $c->price_paid > 0 ? ' · Rp' . number_format((int) $c->price_paid, 0, ',', '.') : '' }}</p>
                         @if($c->note)
                             <p class="mt-0.5 text-xs text-ink-soft">Alasan: {{ $c->note }}</p>
-                        @elseif($c->payment_reference && ! $isAdmin)
+                        @elseif($c->payment_reference && ! $isAdmin && ! $isBonus)
                             <p class="mt-0.5 truncate font-mono text-[11px] text-ink-soft">No. transaksi {{ $c->payment_reference }}</p>
                         @endif
                     </div>

@@ -16,7 +16,7 @@ final class LoginDevice
             str_contains($ua, 'windows') => 'Windows',
             str_contains($ua, 'mac os') || str_contains($ua, 'macintosh') => 'macOS',
             str_contains($ua, 'linux') => 'Linux',
-            default => 'Perangkat lain',
+            default => 'Perangkat tidak dikenal',
         };
         $browser = match (true) {
             $ua === '' => null,

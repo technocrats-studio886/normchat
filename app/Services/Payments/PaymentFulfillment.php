@@ -63,7 +63,7 @@ class PaymentFulfillment
                     $paidAmount,
                     $reference,
                     $paymentMethod,
-                ));
+                ), (float) ($meta['bonus_credits'] ?? 0));
             }
 
             $locked->update([
@@ -134,16 +134,24 @@ class PaymentFulfillment
         }
     }
 
-    private function grant(PaymentPurpose $purpose, Group $group, User $user, Funding $funding): void
+    /** @param float $bonusCredits bonus promo buat grup yang dikunci saat checkout */
+    private function grant(PaymentPurpose $purpose, Group $group, User $user, Funding $funding, float $bonusCredits = 0.0): void
     {
         if ($this->ledger->hasContribution((string) $funding->reference, $purpose->contributionSource())) {
             return;
         }
 
+        if ($purpose === PaymentPurpose::GroupCreate && $group->status !== 'active') {
+            $this->membership->activateGroup($group, $user, $funding);
+            if ($bonusCredits > 0) {
+                $this->ledger->bonus($group, $user, $bonusCredits, (string) $funding->reference);
+            }
+
+            return;
+        }
+
         match ($purpose) {
-            PaymentPurpose::GroupCreate => $group->status !== 'active'
-                ? $this->membership->activateGroup($group, $user, $funding)
-                : null,
+            PaymentPurpose::GroupCreate => null,
             PaymentPurpose::GroupJoin => $this->membership->activateJoin($group, $user, $funding),
             PaymentPurpose::Topup => $funding->credits > 0
                 ? $this->ledger->credit($group, $user, $funding, $purpose->contributionSource())

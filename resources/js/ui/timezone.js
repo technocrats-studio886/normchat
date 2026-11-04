@@ -6,7 +6,8 @@ import { chatApiRequest } from '../chat/utils.js';
 export const initTimezoneSync = () => {
 	const meta = document.querySelector('meta[name="auth-user-timezone"]');
 	const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-	if (!meta || !zone || meta.getAttribute('content') === zone) {
+	// Zona yang dipilih manual (Akun > Zona waktu) tidak ditimpa zona perangkat.
+	if (!meta || !zone || meta.dataset.timezoneMode === 'manual' || meta.getAttribute('content') === zone) {
 		return;
 	}
 

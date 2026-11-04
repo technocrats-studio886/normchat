@@ -29,12 +29,23 @@ use Illuminate\Support\Facades\Crypt;
     'api_key_encrypted',
     'theme_mode',
     'theme_accent',
+    'timezone_mode',
+    'notify_mentions',
+    'notify_sound',
 ])]
 #[Hidden(['password', 'remember_token', 'access_token_encrypted', 'refresh_token_encrypted', 'api_key_encrypted'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
+
+    /** Sama dengan default kolom, agar model baru (belum dimuat ulang) tidak terbaca "mati". */
+    protected $attributes = [
+        'timezone_mode' => 'auto',
+        'notify_mentions' => true,
+        'notify_sound' => false,
+        'session_version' => 0,
+    ];
 
     /**
      * Konversi tipe atribut.
@@ -47,6 +58,9 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'token_expires_at' => 'datetime',
             'password' => 'hashed',
+            'notify_mentions' => 'boolean',
+            'notify_sound' => 'boolean',
+            'session_version' => 'integer',
         ];
     }
 

@@ -79,6 +79,7 @@
                     @endif
                 </div>
             @endif
+            @if($group->share_id)
             <div class="nc-list mt-3">
                 <div class="nc-list-row">
                     <div class="min-w-0 flex-1"><p class="text-xs text-ink-soft">Kode grup untuk mengajak teman</p><p class="font-mono text-sm font-semibold">{{ $group->share_id }}</p></div>
@@ -86,6 +87,7 @@
                     <button type="button" class="btn-secondary shrink-0 px-3 py-1.5 text-xs" data-share-group-url="{{ route('groups.join', $group->share_id) }}" data-share-group-name="{{ $group->name }}">Bagikan</button>
                 </div>
             </div>
+            @endif
         </div>
 
         <div class="nc-section">

@@ -51,6 +51,11 @@ return [
         // Batas keras token input per permintaan (konteks + pesan penanya + lampirannya).
         'max_input_tokens' => 16000,
         'daily_group_credit_limit' => 0,
+        // Promo bonus buat grup; diatur superadmin di Superadmin › Promo.
+        'group_bonus_enabled' => false,
+        'group_bonus_credits' => 20,
+        'group_bonus_starts_at' => null,
+        'group_bonus_ends_at' => null,
         // Selisih kurs kartu & biaya bank di atas kurs pasar yang diisi superadmin (%).
         'card_margin_percent' => 2.0,
     ],

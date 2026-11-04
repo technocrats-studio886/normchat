@@ -13,6 +13,8 @@ class CreditLedgerEntry extends Model
     /** Saldo grup saat ledger mulai dipakai (ditulis sekali oleh migrasi). */
     public const OPENING = 'opening';
     public const DEPOSIT = 'deposit';
+    /** Bonus promo buat grup (tanpa pembayaran). */
+    public const BONUS = 'bonus';
     public const HOLD = 'hold';
     public const SETTLE = 'settle';
     public const RELEASE = 'release';

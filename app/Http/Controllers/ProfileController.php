@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\GroupTokenContribution;
+use App\Models\UserSession;
 use App\Services\Files\StoredFiles;
 use App\Services\Profile\StorageUsage;
 use App\Support\Themes;
+use App\Support\UserTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,6 +33,10 @@ class ProfileController extends Controller
             'loginCount' => AuditLog::where('actor_id', $user->id)->whereIn('action', ProfileHistoryController::LOGIN_ACTIONS)->count(),
             'transactionCount' => GroupTokenContribution::where('user_id', $user->id)->count(),
             'theme' => Themes::for($user),
+            'timezoneLabel' => ($user->timezone_mode === 'manual' ? 'Manual · ' : 'Otomatis · ')
+                . ProfileSettingsController::zoneLabel(UserTime::zone($user)),
+            'notifyLabel' => 'Saat disebut: ' . ($user->notify_mentions ? 'aktif' : 'mati') . ' · bunyi: ' . ($user->notify_sound ? 'aktif' : 'mati'),
+            'sessionCount' => UserSession::query()->live()->where('user_id', $user->id)->count(),
         ]);
     }
 
@@ -81,7 +87,10 @@ class ProfileController extends Controller
     public function updateTimezone(Request $request): JsonResponse
     {
         $timezone = $request->validate(['timezone' => ['required', 'string', 'timezone:all']])['timezone'];
-        $request->user()->forceFill(['timezone' => $timezone])->save();
+        // Zona waktu yang dipilih manual (Akun > Zona waktu) tidak ditimpa zona perangkat.
+        if ($request->user()->timezone_mode !== 'manual') {
+            $request->user()->forceFill(['timezone' => $timezone])->save();
+        }
 
         return response()->json(['ok' => true]);
     }

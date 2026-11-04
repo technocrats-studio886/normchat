@@ -383,14 +383,14 @@
 
     /* ── Pesan chat (resources/js/chat/messages.js) ──
        .nc-msg = satu baris: avatar + tumpukan bubble. Pesan beruntun dari orang yang sama
-       (is-run-start … is-run-end) dirapatkan: nama di pesan pertama, avatar di pesan terakhir. */
+       dirapatkan; seperti WhatsApp, nama dan avatar hanya di pesan pertama (is-run-start). */
     .nc-feed-empty {
         @apply py-10 text-center text-sm;
         color: var(--nc-text-soft);
     }
     .nc-msg {
         display: flex;
-        align-items: flex-end;
+        align-items: flex-start;
         gap: 8px;
         margin-top: 2px;
     }
@@ -418,7 +418,7 @@
         overflow: hidden;
         visibility: hidden;
     }
-    .nc-msg.is-run-end .nc-avatar { visibility: visible; }
+    .nc-msg.is-run-start .nc-avatar { visibility: visible; }
     .nc-avatar-img {
         display: block;
         width: 100%;
@@ -469,11 +469,9 @@
         overflow-wrap: anywhere;
     }
     .nc-msg-stack.is-wide .nc-bubble { width: 100%; }
-    /* Sudut bubble yang menghadap avatar dirapatkan di dalam rangkaian. */
-    .nc-msg--mine:not(.is-run-start) .nc-bubble { border-top-right-radius: 6px; }
-    .nc-msg--mine .nc-bubble { border-bottom-right-radius: 6px; }
-    .nc-msg:not(.nc-msg--mine):not(.is-run-start) .nc-bubble { border-top-left-radius: 6px; }
-    .nc-msg:not(.nc-msg--mine) .nc-bubble { border-bottom-left-radius: 6px; }
+    /* "Ekor" bubble di sudut atas pesan pertama rangkaian, menghadap avatar (pesan sendiri: kanan atas). */
+    .nc-msg--mine.is-run-start .nc-bubble { border-top-right-radius: 6px; }
+    .nc-msg:not(.nc-msg--mine).is-run-start .nc-bubble { border-top-left-radius: 6px; }
 
     .nc-msg-name {
         display: none;
@@ -1123,25 +1121,274 @@
     .nc-switch input:checked::after { transform: translateX(16px); }
     .nc-switch input:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
 
-    /* ── Superadmin (resources/views/superadmin) ── */
-    .nc-admin-tabs { display: flex; gap: 4px; margin-top: 10px; overflow-x: auto; border-bottom: 1px solid var(--nc-line); }
-    .nc-admin-tabs a {
-        flex: none;
-        padding: 8px 12px;
-        border-bottom: 2px solid transparent;
-        font-size: 14px;
+    /* ── Akun & pengaturan (components/settings-row, resources/views/profile) ── */
+    .nc-settings-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 16px;
+        padding: 14px 16px;
+        border: 1px solid var(--nc-line);
+        border-radius: 16px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+    }
+    .nc-settings-card:hover { background: var(--nc-surface-2); }
+    .nc-settings-label {
+        margin: 22px 4px 8px;
+        font-size: 12px;
         font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
         color: var(--nc-text-soft);
     }
-    .nc-admin-tabs a:hover { color: var(--nc-text); }
-    .nc-admin-tabs a.is-active { border-color: var(--nc-primary); color: var(--nc-primary-text); }
-    .nc-flash { margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--nc-primary-light); color: var(--nc-primary-text); font-size: 14px; font-weight: 600; }
-    .nc-flash.is-error { background: var(--nc-danger-soft); color: var(--nc-danger-text); }
-    .nc-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-    .nc-stat { padding: 12px 14px; border: 1px solid var(--nc-line); border-radius: 16px; background: var(--nc-surface); }
-    .nc-stat p { font-size: 12px; font-weight: 600; color: var(--nc-text-soft); }
-    .nc-stat b { display: block; margin-top: 4px; font-size: 18px; color: var(--nc-text); }
-    .nc-stat span { display: block; margin-top: 2px; font-size: 12px; color: var(--nc-text-soft); }
+    .nc-settings-group { overflow: hidden; border: 1px solid var(--nc-line); border-radius: 16px; background: var(--nc-surface); }
+    .nc-settings-row {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 12px;
+        padding: 13px 16px;
+        text-align: left;
+        color: var(--nc-text);
+    }
+    .nc-settings-row + .nc-settings-row { border-top: 1px solid var(--nc-line); }
+    a.nc-settings-row:hover,
+    button.nc-settings-row:hover { background: var(--nc-surface-2); }
+    .nc-settings-row-icon {
+        display: flex;
+        width: 40px;
+        height: 40px;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: var(--nc-primary-light);
+        color: var(--nc-primary-text);
+    }
+    .nc-settings-row-icon svg { width: 20px; height: 20px; }
+
+    /* ── Konsol superadmin (layouts/admin) ──
+       Desktop: sidebar 232px + konten lebar. HP: bilah atas + laci menu (<dialog>). */
+    .nc-admin { background: var(--nc-bg); color: var(--nc-text); }
+    .nc-admin-side {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 40;
+        display: none;
+        width: 232px;
+        flex-direction: column;
+        border-right: 1px solid var(--nc-line);
+        background: var(--nc-surface);
+    }
+    .nc-admin-brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 10px; font-weight: 700; }
+    .nc-admin-brand small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-admin-side-scroll { flex: 1; overflow-y: auto; padding: 0 10px 12px; }
+    .nc-admin-nav-label {
+        margin: 16px 10px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--nc-text-soft);
+    }
+    .nc-admin-nav a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--nc-text-soft);
+    }
+    .nc-admin-nav a svg { width: 18px; height: 18px; flex: none; }
+    .nc-admin-nav a:hover { background: var(--nc-surface-2); color: var(--nc-text); }
+    .nc-admin-nav a.is-active { background: var(--nc-primary-light); color: var(--nc-primary-text); font-weight: 600; }
+    .nc-admin-account { display: flex; align-items: center; gap: 10px; margin: 8px 10px 12px; padding: 8px 10px; border-radius: 10px; }
+    .nc-admin-account:hover,
+    .nc-admin-account.is-active { background: var(--nc-surface-2); }
+    .nc-admin-account-avatar {
+        display: flex;
+        width: 32px;
+        height: 32px;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: var(--nc-primary);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+    }
+    .nc-admin-main { min-width: 0; }
+    .nc-admin-top {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--nc-line);
+        background: var(--nc-bg);
+    }
+    .nc-admin-title { font-size: 19px; font-weight: 700; line-height: 1.25; }
+    .nc-admin-back { font-size: 13px; color: var(--nc-text-soft); }
+    .nc-admin-back:hover { color: var(--nc-text); }
+    .nc-admin-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .nc-admin-menu-btn {
+        display: flex;
+        width: 36px;
+        height: 36px;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        color: var(--nc-text);
+    }
+    .nc-admin-menu-btn svg { width: 22px; height: 22px; }
+    .nc-admin-menu-btn:hover { background: var(--nc-surface-2); }
+    .nc-admin-content { max-width: 1180px; padding: 16px 16px 48px; }
+    .nc-admin-alertbar,
+    .nc-admin-flash {
+        display: flex;
+        max-width: 1148px;
+        align-items: center;
+        gap: 10px;
+        margin: 12px 16px 0;
+        padding: 9px 12px;
+        border: 1px solid var(--nc-line);
+        border-radius: 10px;
+        background: var(--nc-surface);
+        font-size: 13px;
+        color: var(--nc-text);
+    }
+    .nc-admin-alertbar-dot { width: 8px; height: 8px; flex: none; border-radius: 9999px; background: var(--nc-primary); }
+    .nc-admin-alertbar.is-danger,
+    .nc-admin-flash.is-error { border-color: var(--nc-danger-line); background: var(--nc-danger-soft); color: var(--nc-danger-text); }
+    .nc-admin-alertbar.is-danger .nc-admin-alertbar-dot { background: var(--nc-danger); }
+    .nc-admin-flash { border-color: transparent; background: var(--nc-primary-light); color: var(--nc-primary-text); font-weight: 600; }
+    .nc-admin-drawer {
+        width: min(86vw, 320px);
+        max-width: none;
+        height: 100dvh;
+        max-height: none;
+        margin: 0;
+        padding: 10px 0;
+        border: 0;
+        border-right: 1px solid var(--nc-line);
+        background: var(--nc-surface);
+        color: var(--nc-text);
+    }
+    .nc-admin-drawer[open] { display: flex; flex-direction: column; }
+    .nc-admin-drawer::backdrop { background: rgba(9, 16, 26, 0.45); }
+    .nc-admin-drawer .nc-admin-nav { flex: 1; overflow-y: auto; padding: 0 10px; }
+    .nc-admin-drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 20px; }
+    @media (min-width: 1024px) {
+        .nc-admin-side { display: flex; }
+        .nc-admin-main { padding-left: 232px; }
+        .nc-admin-top { position: static; padding: 24px 32px 12px; border-bottom: 0; }
+        .nc-admin-top [data-admin-menu-open] { display: none; }
+        .nc-admin-title { font-size: 22px; }
+        .nc-admin-content { padding: 12px 32px 56px; }
+        .nc-admin-alertbar,
+        .nc-admin-flash { margin: 4px 32px 0; }
+    }
+
+    /* Isi halaman admin: baris angka, panel bertajuk, kotak, status. */
+    .nc-kpis {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--nc-line);
+        border-radius: 12px;
+        background: var(--nc-line);
+    }
+    .nc-kpi { padding: 14px 16px; background: var(--nc-surface); }
+    .nc-kpi dt { font-size: 12px; color: var(--nc-text-soft); }
+    .nc-kpi dd { margin-top: 4px; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+    .nc-kpi dd small { display: block; margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--nc-text-soft); }
+    @media (min-width: 768px) {
+        .nc-kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+    }
+    .nc-panel { margin-top: 28px; }
+    .nc-panel:first-child { margin-top: 0; }
+    /* Kolom berdampingan: jarak antarbaris dari grid, agar judul panel di tiap kolom sejajar. */
+    .nc-admin-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px 32px; margin-top: 28px; }
+    .nc-admin-cols:first-child { margin-top: 0; }
+    .nc-admin-cols > .nc-panel, .nc-admin-cols > * > .nc-panel:first-child { margin-top: 0; }
+    .nc-panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 8px; }
+    .nc-panel-title { font-size: 15px; font-weight: 600; }
+    .nc-panel-note { font-size: 13px; color: var(--nc-text-soft); }
+    .nc-panel-head a { font-size: 13px; font-weight: 600; color: var(--nc-primary-text); }
+    .nc-box { border: 1px solid var(--nc-line); border-radius: 12px; background: var(--nc-surface); }
+    .nc-box-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; font-size: 14px; }
+    .nc-box-row + .nc-box-row { border-top: 1px solid var(--nc-line); }
+    .nc-box-empty { padding: 14px; font-size: 13px; color: var(--nc-text-soft); }
+    .nc-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--nc-text-soft); }
+    .nc-status::before { content: ""; width: 7px; height: 7px; border-radius: 9999px; background: currentColor; }
+    .nc-status.is-ok { color: var(--nc-primary-text); }
+    .nc-status.is-danger { color: var(--nc-danger-text); }
+    .nc-form-grid { display: grid; gap: 12px; }
+    @media (min-width: 640px) { .nc-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .nc-field { display: block; }
+    .nc-field > span { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-field .nc-input { width: 100%; }
+    .nc-field-hint { margin-top: 4px; font-size: 12px; color: var(--nc-text-soft); }
+
+    /* ── Pengumuman superadmin (partials/announcement) ──
+       Banner: strip melayang di atas konten (tidak menggeser tata letak chat). Popup: <dialog> di tengah. */
+    .nc-announce { display: flex; flex-direction: column; gap: 12px; background: var(--nc-surface); color: var(--nc-text); }
+    .nc-announce-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+    .nc-announce-text { margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--nc-text-soft); white-space: pre-line; overflow-wrap: anywhere; }
+    .nc-announce-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .nc-announce--popup { padding: 20px; }
+    .nc-announce--popup .nc-announce-title { font-size: 17px; }
+    .nc-announce--popup.is-important .nc-announce-title { color: var(--nc-danger-text); }
+    .nc-announce--banner {
+        padding: 12px 14px;
+        border: 1px solid var(--nc-line);
+        border-left: 4px solid var(--nc-primary);
+        border-radius: 14px;
+        box-shadow: 0 12px 32px -14px rgba(9, 16, 26, 0.4);
+    }
+    .nc-announce--banner.is-important { border-left-color: var(--nc-danger); }
+    .nc-announce--banner .nc-announce-text { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .nc-announce.is-preview { box-shadow: none; }
+    .nc-announce--banner.is-preview { border-width: 0 0 0 4px; border-radius: 0; }
+    @media (min-width: 640px) {
+        .nc-announce--banner { flex-direction: row; align-items: center; }
+    }
+    .nc-announce-banner-wrap {
+        position: fixed;
+        z-index: 70;
+        top: calc(env(safe-area-inset-top) + 8px);
+        right: 12px;
+        left: 12px;
+        max-width: 40rem;
+        margin: 0 auto;
+    }
+    @media (min-width: 1024px) {
+        .nc-announce-banner-wrap { left: calc(var(--nc-sidebar-w, 0px) + 24px); right: 24px; }
+    }
+    .nc-announce-dialog {
+        width: min(92vw, 28rem);
+        max-height: calc(100dvh - 48px);
+        margin: auto;
+        overflow-y: auto;
+        padding: 0;
+        border: 0;
+        border-radius: 16px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        box-shadow: 0 24px 60px -20px rgba(9, 16, 26, 0.5);
+    }
+    .nc-announce-dialog::backdrop { background: rgba(9, 16, 26, 0.5); }
+    .nc-announce-dialog:focus { outline: none; }
+
+    /* ── Superadmin (resources/views/superadmin) ── */
     .nc-filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
     .nc-filter-bar input[type="search"],
     .nc-filter-bar select,
@@ -1168,7 +1415,8 @@
     }
     .nc-button-danger { border-radius: 12px; background: var(--nc-danger); color: #ffffff; font-size: 14px; font-weight: 600; }
     .nc-button-danger:hover { background: var(--nc-danger-hover); }
-    .nc-table-wrap { margin-top: 10px; overflow-x: auto; border: 1px solid var(--nc-line); border-radius: 16px; background: var(--nc-surface); }
+    /* relative: teks sr-only (absolute) di sel ikut terpotong, tidak melebarkan halaman di HP. */
+    .nc-table-wrap { position: relative; margin-top: 10px; overflow-x: auto; border: 1px solid var(--nc-line); border-radius: 16px; background: var(--nc-surface); }
     .nc-table { width: 100%; font-size: 13px; color: var(--nc-text); }
     .nc-table th, .nc-table td { padding: 9px 12px; text-align: right; white-space: nowrap; }
     .nc-table th:first-child, .nc-table td:first-child { text-align: left; }

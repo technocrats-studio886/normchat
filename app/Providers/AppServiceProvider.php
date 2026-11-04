@@ -8,6 +8,10 @@ use App\Services\Payments\MidtransGateway;
 use App\Services\NormkreditPricing;
 use App\Services\Payments\PaymentGateway;
 use Carbon\Carbon;
+use App\Models\UserSession;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +34,19 @@ class AppServiceProvider extends ServiceProvider
         // Nama hari & bulan dari server (translatedFormat) ikut bahasa aplikasi.
         Carbon::setLocale(app()->getLocale());
         Gate::policy(Group::class, GroupPolicy::class);
+
+        // Akun > Perangkat & sesi (App\Http\Middleware\TrackUserSession): versi sesi dipasang saat masuk,
+        // dan perangkat yang keluar dihapus dari daftar.
+        Event::listen(Login::class, function (Login $event) {
+            if (request()->hasSession()) {
+                request()->session()->put('session_version', (int) ($event->user->session_version ?? 0));
+            }
+        });
+        Event::listen(Logout::class, function () {
+            if (request()->hasSession()) {
+                UserSession::query()->where('session_hash', UserSession::hashFor(request()->session()->getId()))->delete();
+            }
+        });
 
         // Halaman marketing: URL antar halaman, tautan masuk, dan harga terkini (termasuk timpaan superadmin).
         View::composer('marketing.*', function ($view) {
