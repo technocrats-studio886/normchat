@@ -15,7 +15,12 @@ use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\MessageHide;
+use App\Models\User;
+use App\Services\Chat\MessageSearch;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use App\Services\Groups\GroupInfo;
+use App\Services\Links\LinkPreviews;
 use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Chat\AttachmentStorage;
 use App\Services\Chat\MentionNotifier;
@@ -38,6 +43,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ChatController extends Controller
 {
     private const VISIBLE_MESSAGES = 80;
+
+    /** Pesan sebelum dan sesudah pesan target pada potongan "around". */
+    private const AROUND_SPAN = 30;
 
     public function __construct(
         private readonly MessagePresenter $presenter,
@@ -63,17 +71,7 @@ class ChatController extends Controller
         $group->load(['owner', 'members.user', 'members.role', 'groupToken']);
 
         $viewer = $request->user();
-        $messages = Message::withTrashed()
-            ->where('group_id', $group->id)
-            ->visibleTo($viewer)
-            ->whereNotIn('id', MessageHide::where('user_id', $viewer->id)->select('message_id'))
-            ->with(['sender:id,name,avatar_url', 'replyToMessage.sender:id,name'])
-            ->withCount('versions')
-            ->orderByDesc('id')
-            ->take(self::VISIBLE_MESSAGES)
-            ->get()
-            ->reverse()
-            ->values();
+        $messages = $this->recentMessages($group, $viewer);
         // Pertanyaan yang masih menunggu jawaban Normi tidak bisa diedit dulu.
         $awaitingAi = ChatMessageQueue::whereIn('message_id', $messages->pluck('id'))->whereIn('status', ['queued', 'processing'])->pluck('message_id')->flip();
 
@@ -109,6 +107,80 @@ class ChatController extends Controller
             ]]),
             'groupCredits' => (float) ($token?->credits ?? 0),
             'defaultAiModel' => $group->resolvedAiModel()?->model_id,
+        ]);
+    }
+
+    /** Pesan yang tampil di feed user ini: yang boleh dilihat, tidak disembunyikan sendiri, termasuk yang sudah dihapus. */
+    private function feedQuery(Group $group, User $viewer): Builder
+    {
+        return Message::withTrashed()
+            ->where('group_id', $group->id)
+            ->visibleTo($viewer)
+            ->whereNotIn('id', MessageHide::where('user_id', $viewer->id)->select('message_id'))
+            ->with(['sender:id,name,avatar_url', 'replyToMessage.sender:id,name'])
+            ->withCount('versions');
+    }
+
+    /** Pesan terakhir yang dimuat saat chat dibuka, urut lama ke baru. */
+    private function recentMessages(Group $group, User $viewer): Collection
+    {
+        return $this->feedQuery($group, $viewer)
+            ->orderByDesc('id')
+            ->take(self::VISIBLE_MESSAGES)
+            ->get()
+            ->reverse()
+            ->values();
+    }
+
+    /** Muat ulang pesan terakhir (tombol "Ke pesan terbaru" setelah melompat ke pesan lama). */
+    public function recent(Request $request, Group $group): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        $viewer = $request->user();
+        $messages = $this->recentMessages($group, $viewer);
+        $awaitingAi = ChatMessageQueue::whereIn('message_id', $messages->pluck('id'))->whereIn('status', ['queued', 'processing'])->pluck('message_id')->flip();
+        $historyFrom = (int) ($this->membership($group, $request)?->history_from_message_id ?? 0);
+
+        return response()->json([
+            'show_created_card' => $messages->count() < self::VISIBLE_MESSAGES || $historyFrom > 0,
+            'messages' => $messages->map(fn (Message $message) => $this->presenter->present($message, null, ['awaiting_ai' => $awaitingAi->has($message->id)]))->all(),
+        ]);
+    }
+
+    /** Cari pesan di seluruh riwayat grup yang boleh dilihat user (docs/rancangan-cari-pesan.md). */
+    public function search(Request $request, Group $group, MessageSearch $search): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        $data = $request->validate([
+            'q' => ['required', 'string', 'max:200'],
+            'before_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        return response()->json($search->run($group, $request->user(), (string) $data['q'], (int) ($data['before_id'] ?? 0)));
+    }
+
+    /** Potongan feed di sekitar satu pesan lama, untuk pesan yang tidak ada di pesan awal yang dimuat. */
+    public function around(Request $request, Group $group, int $message): JsonResponse
+    {
+        $this->authorize('chat', $group);
+        $viewer = $request->user();
+
+        $target = $this->feedQuery($group, $viewer)->find($message);
+        abort_if(! $target, 404);
+
+        $older = $this->feedQuery($group, $viewer)->where('id', '<', $target->id)->orderByDesc('id')->limit(self::AROUND_SPAN + 1)->get();
+        $newer = $this->feedQuery($group, $viewer)->where('id', '>', $target->id)->orderBy('id')->limit(self::AROUND_SPAN + 1)->get();
+        $hasOlder = $older->count() > self::AROUND_SPAN;
+        $hasNewer = $newer->count() > self::AROUND_SPAN;
+
+        $chunk = $older->take(self::AROUND_SPAN)->reverse()->push($target)->merge($newer->take(self::AROUND_SPAN))->values();
+        $awaitingAi = ChatMessageQueue::whereIn('message_id', $chunk->pluck('id'))->whereIn('status', ['queued', 'processing'])->pluck('message_id')->flip();
+
+        return response()->json([
+            'target_id' => $target->id,
+            'has_older' => $hasOlder,
+            'has_newer' => $hasNewer,
+            'messages' => $chunk->map(fn (Message $item) => $this->presenter->present($item, null, ['awaiting_ai' => $awaitingAi->has($item->id)]))->all(),
         ]);
     }
 
@@ -189,6 +261,8 @@ class ChatController extends Controller
             'awaiting_ai' => $message->isAddressedToAi(),
         ]);
         event(new MessageSent($group->id, $payload));
+        // Pratinjau tautan dibaca di antrean; kartunya menyusul lewat event link.preview.ready.
+        app(LinkPreviews::class)->forNewMessage($message);
 
         if ($content !== '') {
             $this->mentions->notify($group, $message, $user, $content);
@@ -229,6 +303,7 @@ class ChatController extends Controller
             'awaiting_ai' => $actions->isAwaitingAi($message),
         ]);
         event(new MessageUpdated((int) $group->id, $payload));
+        app(LinkPreviews::class)->forNewMessage($message);
 
         return response()->json(['ok' => true, 'message' => $payload]);
     }

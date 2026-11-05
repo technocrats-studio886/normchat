@@ -61,14 +61,30 @@
             </div>
         @endif
 
-        {{-- Message search --}}
-        <div class="hidden mx-3 mt-2 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm lg:mx-auto lg:w-[calc(100%-2rem)] lg:max-w-[var(--nc-room-max)]" data-message-search-bar="1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
-            <input type="text" data-message-search-input="1" placeholder="Cari pesan" class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" autocomplete="off" />
-            <span class="text-[11px] font-medium text-slate-400" data-message-search-count="1"></span>
-            <button type="button" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100" data-close-search="1" aria-label="Tutup pencarian">
+        {{-- Cari pesan (resources/js/chat/message-search.js). HP: bilah menutupi header chat. Desktop: bilah di bawah
+             header, dan daftar hasil muncul di kolom kiri (components/desktop-sidebar). --}}
+        <div class="nc-search-bar hidden" data-message-search-bar="1" data-search-url="{{ route('chat.search', $group) }}" data-around-url-template="{{ route('chat.around', ['group' => $group, 'message' => '__MESSAGE__']) }}" data-recent-url="{{ route('chat.recent', $group) }}" role="search">
+            <button type="button" class="nc-search-btn lg:hidden" data-close-search="1" aria-label="Tutup pencarian">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 19-7-7 7-7"/></svg>
+            </button>
+            <svg xmlns="http://www.w3.org/2000/svg" class="hidden h-4 w-4 shrink-0 text-slate-400 lg:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
+            <input type="search" data-message-search-input="1" placeholder="Cari pesan" aria-label="Cari pesan" enterkeyhint="search" class="nc-search-input" autocomplete="off" />
+            <span class="nc-search-count" data-message-search-count="1" aria-live="polite"></span>
+            <button type="button" class="nc-search-btn" data-search-older="1" aria-label="Hasil lebih lama" title="Hasil lebih lama" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m5 15 7-7 7 7"/></svg>
+            </button>
+            <button type="button" class="nc-search-btn" data-search-newer="1" aria-label="Hasil lebih baru" title="Hasil lebih baru" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/></svg>
+            </button>
+            <button type="button" class="nc-search-btn hidden lg:inline-flex" data-close-search="1" aria-label="Tutup pencarian">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
             </button>
+        </div>
+
+        {{-- Feed sedang menampilkan potongan pesan lama (hasil pencarian di luar pesan yang dimuat). --}}
+        <div class="nc-old-banner hidden" data-old-banner="1" role="status">
+            <span>Menampilkan pesan lama</span>
+            <button type="button" data-old-banner-latest="1">Ke pesan terbaru</button>
         </div>
 
         {{-- Penanda tanggal melayang (resources/js/chat/day-markers.js) --}}

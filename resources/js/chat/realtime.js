@@ -2,10 +2,11 @@
 
 import { refreshModelLocks } from './composer/ai-options.js';
 import { cancelEditModeFor } from './composer/edit-mode.js';
-import { authUserId, chatFeed, groupId, pendingMessagesByLocalId } from './context.js';
+import { authUserId, chatFeed, feedState, groupId, pendingMessagesByLocalId } from './context.js';
 import { ensureMentionToastStack, highlightMessageInFeed } from './highlight.js';
 import { renderMermaidInNode } from './markdown.js';
 import { personColor } from './attachments.js';
+import { attachLinkPreview } from './link-preview.js';
 import { avatarHtml, buildMessageNode, flashEditedMessage, replaceRenderedMessageByPayload } from './messages.js';
 import { mergePollStatsIntoCache, refreshPollCardsFromFeed } from './polls.js';
 import { markGroupRead, markGroupVisited, noteUnseenIncomingMessage, refreshScrollBottomButton, rememberLatestMessageId, syncScrollBottomCount } from './read-state.js';
@@ -124,6 +125,17 @@ const onMessageSent = (payload) => {
 	const isMine = message.sender_type === 'user' && Number(message.sender_id || 0) === authUserId;
 	if (!isMine && document.hidden) {
 		playNotifySound();
+	}
+
+	// Feed sedang menampilkan potongan pesan lama (hasil pencarian): pesan baru tidak disisipkan, hanya dihitung.
+	// Pesan yang baru dikirim dari perangkat ini tetap diproses karena pesan sementaranya ada di feed.
+	if (feedState.detached && !(isMine && pendingMessagesByLocalId.size > 0)) {
+		if (!chatFeed.querySelector(`[data-message-id="${message.id}"]`)) {
+			feedState.pendingNew += 1;
+		}
+		syncScrollBottomCount();
+		refreshScrollBottomButton();
+		return;
 	}
 
 	if (isMine && pendingMessagesByLocalId.size > 0) {
@@ -261,6 +273,8 @@ export const initRealtime = () => {
 		});
 
 		groupChannel.listen('.message.sent', onMessageSent);
+		// Pratinjau tautan selesai dibaca di antrean: pasang kartunya di bubble.
+		groupChannel.listen('.link.preview.ready', (payload) => attachLinkPreview(chatFeed, payload?.message_id, payload?.link_preview));
 
 		groupChannel.listen('.message.updated', (payload) => {
 			if (!chatFeed || !payload?.message) {

@@ -18,7 +18,7 @@ final class Themes
 
     /** Aksen: warna di mode terang & gelap; keduanya ≥ 4,5:1 untuk teks putih. */
     public const ACCENTS = [
-        'navy' => ['label' => 'Navy', 'light' => '#1e2e43', 'dark' => '#3b5677'],
+        'navy' => ['label' => 'Navy', 'light' => '#1e2e43', 'dark' => '#44506a'],
         'toska' => ['label' => 'Toska', 'light' => '#0f6f68', 'dark' => '#197a72'],
         'biru' => ['label' => 'Biru laut', 'light' => '#1d5aa0', 'dark' => '#3a74b8'],
         'hijau' => ['label' => 'Hijau daun', 'light' => '#2f6a3e', 'dark' => '#3f8452'],
@@ -26,7 +26,7 @@ final class Themes
     ];
 
     /** Warna bar browser (meta theme-color) per mode. */
-    public const BROWSER = ['light' => '#ffffff', 'dark' => '#121C29'];
+    public const BROWSER = ['light' => '#ffffff', 'dark' => '#171513'];
 
     public const DEFAULT_MODE = 'system';
 

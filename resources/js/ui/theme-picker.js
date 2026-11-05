@@ -14,7 +14,7 @@ const applyToPage = ({ mode, accent }) => {
 	root.dataset.themeMode = mode;
 	root.dataset.mode = resolveMode(mode);
 	root.dataset.accent = accent;
-	document.querySelector('meta[name="theme-color"]')?.setAttribute('content', root.dataset.mode === 'dark' ? '#121C29' : '#ffffff');
+	document.querySelector('meta[name="theme-color"]')?.setAttribute('content', root.dataset.mode === 'dark' ? '#171513' : '#ffffff');
 };
 
 export const initThemePicker = () => {

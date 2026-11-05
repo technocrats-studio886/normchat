@@ -4,6 +4,7 @@ namespace App\Services\Chat;
 
 use App\Models\GroupMember;
 use App\Models\Message;
+use App\Services\Links\LinkPreviews;
 
 /** Bentuk pesan yang dikirim ke frontend (respons JSON dan event realtime). */
 class MessagePresenter
@@ -51,6 +52,8 @@ class MessagePresenter
                 'quote_text' => $replyTarget->trashed() ? '' : (string) ($message->reply_quote_text ?? ''),
                 'attachment_original_name' => $replyTarget->trashed() ? '' : (string) ($replyTarget->attachment_original_name ?? ''),
             ] : null,
+            // Kartu pratinjau tautan pertama (docs/rancangan-pratinjau-tautan.md); null sampai dibaca.
+            'link_preview' => $isDeleted || $message->sender_type !== 'user' ? null : app(LinkPreviews::class)->cardFor($message),
             // Pemberitahuan di tengah chat (App\Services\Chat\SystemMessages); teksnya disusun di browser per penonton.
             'system' => $message->sender_type === Message::SENDER_SYSTEM ? [
                 'event' => (string) $message->system_event,

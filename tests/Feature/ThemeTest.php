@@ -60,7 +60,7 @@ class ThemeTest extends TestCase
             $this->actingAs($this->user)->get($url)
                 ->assertOk()
                 ->assertSee('data-theme-mode="dark" data-mode="dark" data-accent="toska"', false)
-                ->assertSee('<meta name="theme-color" content="#121C29">', false);
+                ->assertSee('<meta name="theme-color" content="#171513">', false);
         }
     }
 

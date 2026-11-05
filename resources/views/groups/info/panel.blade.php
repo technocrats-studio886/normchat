@@ -339,20 +339,37 @@
                 </div>
             @endif
         </div>
-        <div class="hidden p-3" data-archive-panel="links">
-            @if($linkMessages->isEmpty())
-                <p class="px-1 py-6 text-center text-xs text-ink-soft">Belum ada tautan.</p>
+        <div class="hidden pb-3" data-archive-panel="links">
+            {{-- Kartu pratinjau (ketuk: buka tautan) + baris URL dan potongan chat (ketuk: lompat ke pesannya), ala WhatsApp. --}}
+            @if($linkGroups === [])
+                <p class="px-4 py-6 text-center text-xs text-ink-soft">Belum ada tautan.</p>
             @else
-                <ul class="divide-y divide-[var(--nc-line)]">
-                    @foreach($linkMessages as $m)
-                        @foreach($m->extracted_urls as $url)
-                            <li class="py-2.5">
-                                <a href="{{ $url }}" target="_blank" rel="noopener" class="block truncate text-sm text-primary-ink hover:underline">{{ $url }}</a>
-                                <p class="mt-0.5 text-[11px] text-ink-soft">{{ \App\Support\UserTime::format($m->created_at) }}</p>
+                @foreach($linkGroups as $period => $entries)
+                    <p class="nc-link-period">{{ \Illuminate\Support\Str::upper($period) }}</p>
+                    <ul class="nc-link-list">
+                        @foreach($entries as $entry)
+                            <li class="nc-link-entry">
+                                <a href="{{ $entry['url'] }}" target="_blank" rel="noopener noreferrer nofollow" class="nc-link-card">
+                                    <span class="nc-link-thumb">
+                                        @if($entry['image_url'])
+                                            <img src="{{ $entry['image_url'] }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-link-image>
+                                        @endif
+                                        <x-info-icon name="link" class="nc-link-thumb-icon h-7 w-7" />
+                                    </span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="nc-link-title">{{ $entry['title'] ?: $entry['url'] }}</span>
+                                        <span class="nc-link-domain">{{ $entry['domain'] }}</span>
+                                    </span>
+                                </a>
+                                <a href="{{ route('chat.show', ['group' => $group, 'message' => $entry['message_id']]) }}" class="nc-link-source" data-jump-message="{{ $entry['message_id'] }}" title="Lihat pesannya di chat">
+                                    <span class="nc-link-source-url">{{ $entry['url'] }}</span>
+                                    @if($entry['text'] !== '')<span class="nc-link-source-text">{{ $entry['text'] }}</span>@endif
+                                    <x-info-icon name="chevron" class="h-4 w-4 shrink-0 text-ink-soft" />
+                                </a>
                             </li>
                         @endforeach
-                    @endforeach
-                </ul>
+                    </ul>
+                @endforeach
             @endif
         </div>
         <div class="hidden p-3" data-archive-panel="files">

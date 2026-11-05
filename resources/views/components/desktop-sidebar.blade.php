@@ -25,12 +25,24 @@
         <button type="submit" class="btn-primary shrink-0 px-3 py-2 text-xs">Gabung</button>
     </form>
 
-    <div class="nc-sidebar-label px-3 pb-2">
+    <div class="nc-sidebar-label px-3 pb-2" data-group-search-row="1">
         <div class="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
             <input type="text" placeholder="Cari grup" class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" data-group-search-input="1" autocomplete="off" />
         </div>
     </div>
+
+    {{-- Hasil cari pesan di grup yang sedang dibuka; menggantikan daftar grup selama pencarian (resources/js/chat/message-search.js). --}}
+    <section class="nc-search-panel hidden" data-search-panel="1" aria-label="Hasil pencarian pesan">
+        <div class="nc-search-panel-head">
+            <p class="min-w-0 flex-1 truncate text-sm font-semibold">Cari di grup ini</p>
+            <button type="button" class="nc-sidebar-icon" data-close-search="1" aria-label="Tutup pencarian" title="Tutup pencarian">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
+            </button>
+        </div>
+        <p class="nc-search-panel-status" data-search-panel-status="1" aria-live="polite">Ketik minimal 2 huruf.</p>
+        <div class="nc-search-panel-list nc-scroll" data-search-panel-list="1"></div>
+    </section>
 
     <nav class="nc-sidebar-list nc-scroll" data-group-list data-viewer-id="{{ $user->id }}">
         @forelse($rows as $row)

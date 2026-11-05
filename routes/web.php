@@ -84,6 +84,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups/{group}/polls/stats', [ChatPollController::class, 'stats'])->middleware('group.permission')->name('chat.polls.stats');
     Route::post('/groups/{group}/polls/{message}/vote', [ChatPollController::class, 'vote'])->middleware('group.permission')->name('chat.polls.vote');
     Route::post('/groups/{group}/messages/read', [ChatController::class, 'markRead'])->middleware('group.permission')->name('chat.read');
+    Route::get('/groups/{group}/messages/search', [ChatController::class, 'search'])->middleware('group.permission')->name('chat.search');
+    Route::get('/groups/{group}/messages/recent', [ChatController::class, 'recent'])->middleware('group.permission')->name('chat.recent');
+    Route::get('/groups/{group}/messages/around/{message}', [ChatController::class, 'around'])->middleware('group.permission')->whereNumber('message')->name('chat.around');
     Route::patch('/groups/{group}/messages/{message}', [ChatController::class, 'update'])->middleware('group.permission')->name('chat.update');
     Route::delete('/groups/{group}/messages/{message}', [ChatController::class, 'destroy'])->middleware('group.permission')->name('chat.destroy');
     Route::post('/groups/{group}/messages/hide', [ChatController::class, 'hide'])->middleware('group.permission')->name('chat.hide');

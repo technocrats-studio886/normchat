@@ -4,6 +4,7 @@
 // (applyMessageRuns): nama hanya di pesan pertama, avatar hanya di pesan terakhir.
 
 import { buildSystemNode } from './system-messages.js';
+import { linkPreviewHtml } from './link-preview.js';
 import { personColor, renderAttachment, renderQuote } from './attachments.js';
 import { authUserId, chatFeed } from './context.js';
 import { renderMarkdown, renderMermaidInNode } from './markdown.js';
@@ -132,7 +133,7 @@ export const buildMessageNode = (message) => {
 		? `<div class="nc-bubble bubble-${tone}" data-message-body="1" data-message-bubble>${nameHtml}${deletedHtml}${timeHtml({ ...message, is_edited: false }, createdAt)}</div>`
 		: (pollData
 			? renderPollCard({ poll: pollData, tone, messageId: message?.id, headerHtml: nameHtml + forwardedHtml + quoteHtml, inlineTimeHtml: timeHtml(message, createdAt) })
-			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${textHtml}${timeHtml(message, createdAt)}</div>`);
+			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${isAi ? '' : linkPreviewHtml(message?.link_preview)}${textHtml}${timeHtml(message, createdAt)}</div>`);
 	const pendingHtml = message?.is_pending === true ? '<p class="nc-msg-pending">Mengirim…</p>' : '';
 
 	wrapper.innerHTML = `${isMine ? '' : avatarHtml(message, isAi)}<div class="nc-msg-stack${isWide ? ' is-wide' : ''}">${bubble}${pendingHtml}</div>`;

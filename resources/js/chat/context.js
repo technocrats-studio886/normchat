@@ -16,3 +16,11 @@ export const pollStatsUrlFromServer = String(chatFeed?.getAttribute('data-poll-s
 export const pollVoteUrlTemplateFromServer = String(chatFeed?.getAttribute('data-poll-vote-url-template') || '');
 export const pendingMessagesByLocalId = new Map();
 export const pollStatsById = new Map();
+
+// Feed sedang menampilkan potongan pesan lama (hasil pencarian di luar pesan yang dimuat), bukan pesan terbaru.
+// Selama itu pesan realtime tidak disisipkan dan status baca tidak maju (resources/js/chat/message-search.js).
+export const feedState = {
+	detached: false,
+	pendingNew: 0,
+	restore: null,
+};

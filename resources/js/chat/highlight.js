@@ -141,7 +141,7 @@ export const clearSearchHighlightsInFeed = (feed) => {
 let activeJumpFocusNode = null;
 let clearJumpFocusTimer = null;
 
-const animateJumpFocus = (target) => {
+export const animateJumpFocus = (target) => {
 	if (!(target instanceof HTMLElement)) {
 		return;
 	}
@@ -190,21 +190,74 @@ const highlightQuoteInMessage = (messageNode, quoteText) => {
 	return null;
 };
 
+const SEARCH_SKIP = '.nc-inline-time, .nc-msg-name, .nc-quote, .nc-forwarded, .nc-notice-label, .nc-msg-pending, button, svg, script, style, mark.nc-inline-highlight-search';
+
+/**
+ * Tandai semua kemunculan kata di bubble. Berjalan per simpul teks, sehingga tebal, daftar, tautan, dan
+ * format jawaban Normi tetap utuh. Mengembalikan <mark> yang dibuat (kosong bila tidak ada yang cocok).
+ */
 export const highlightSearchInMessage = (messageNode, queryText) => {
-	const cleanedQuery = String(queryText || '').trim();
-	if (cleanedQuery === '' || !(messageNode instanceof HTMLElement)) {
-		return false;
+	const phrase = String(queryText || '').trim().replace(/\s+/g, ' ');
+	if (phrase === '' || !(messageNode instanceof HTMLElement)) {
+		return [];
 	}
 
-	let hasHighlight = false;
-	const targets = getMessageHighlightTargets(messageNode, true);
-	targets.forEach((target) => {
-		if (applyInlineHighlight(target, cleanedQuery, { mode: 'search', highlightAll: true })) {
-			hasHighlight = true;
+	const root = messageNode.querySelector('[data-message-bubble]') || messageNode;
+	const pattern = new RegExp(escapeRegex(phrase).replace(/ /g, '\\s+'), 'gi');
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+		acceptNode: (node) => (node.parentElement?.closest(SEARCH_SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+	});
+	const textNodes = [];
+	while (walker.nextNode()) {
+		textNodes.push(walker.currentNode);
+	}
+
+	const marks = [];
+	textNodes.forEach((textNode) => {
+		const text = textNode.nodeValue || '';
+		pattern.lastIndex = 0;
+		let match = pattern.exec(text);
+		if (!match) {
+			return;
 		}
+
+		const fragment = document.createDocumentFragment();
+		let last = 0;
+		while (match) {
+			if (match[0] === '') {
+				pattern.lastIndex += 1;
+				match = pattern.exec(text);
+				continue;
+			}
+			fragment.appendChild(document.createTextNode(text.slice(last, match.index)));
+			const mark = document.createElement('mark');
+			mark.className = 'nc-inline-highlight-search';
+			mark.textContent = match[0];
+			fragment.appendChild(mark);
+			marks.push(mark);
+			last = match.index + match[0].length;
+			match = pattern.exec(text);
+		}
+		fragment.appendChild(document.createTextNode(text.slice(last)));
+		textNode.parentNode.replaceChild(fragment, textNode);
 	});
 
-	return hasHighlight;
+	return marks;
+};
+
+/** Tandai semua pesan di feed; penanda lama dibersihkan dulu sehingga aman dipanggil berulang. */
+export const highlightSearchInFeed = (feed, queryText) => {
+	if (!(feed instanceof HTMLElement)) {
+		return 0;
+	}
+
+	clearSearchHighlightsInFeed(feed);
+	let count = 0;
+	feed.querySelectorAll(':scope > .nc-msg').forEach((node) => {
+		count += highlightSearchInMessage(node, queryText).length;
+	});
+
+	return count;
 };
 
 export const highlightMessageInFeed = (messageId, replyQuote = '') => {

@@ -3,7 +3,20 @@
 // - Ruang chat desktop: satu isi panel dipindah ke jendela melayang (ketuk header) atau panel kanan
 //   (ikon buka/tutup di header, statusnya diingat per perangkat seperti sidebar kiri).
 
+import * as messageSearch from '../chat/message-search.js';
+import { highlightMessageInFeed } from '../chat/highlight.js';
 import { initMediaViewer } from './media-viewer.js';
+
+/**
+ * Lompat ke pesan di chat (tab Tautan). Memakai jumpToMessage dari pencarian (memuat potongan pesan lama)
+ * bila tersedia; selain itu hanya pesan yang sudah dimuat di feed. Mengembalikan true bila berhasil.
+ */
+const jumpToMessage = async (messageId) => {
+	if (typeof messageSearch.jumpToMessage === 'function') {
+		return messageSearch.jumpToMessage(messageId);
+	}
+	return highlightMessageInFeed(messageId);
+};
 
 const SIDE_CLASS = 'nc-info-open';
 const SIDE_KEY = 'nc-info-side';
@@ -246,6 +259,16 @@ const initEmbedded = (root) => {
 		syncToggle();
 	};
 
+	// Tab Tautan → baris di bawah kartu: lompat ke pesannya di chat ini (jendela ditutup, panel kanan tetap).
+	root.addEventListener('click', async (event) => {
+		const link = event.target instanceof Element ? event.target.closest('[data-jump-message]') : null;
+		if (!link) return;
+		event.preventDefault();
+		closeModal();
+		const jumped = await jumpToMessage(Number(link.getAttribute('data-jump-message')));
+		if (!jumped) window.location.href = link.href;
+	});
+
 	const panel = initPanel(root, {
 		onClose: () => (root.parentElement === sideSlot ? setSide(false) : closeModal()),
 		onSearch: () => {
@@ -302,6 +325,15 @@ export const initGroupInfo = () => {
 		url.searchParams.delete('search');
 		window.history.replaceState(window.history.state, '', url);
 		window.setTimeout(openSearch, 0);
+	}
+	// ?message=ID (dari tab Tautan di halaman Info grup HP): lompat ke pesan itu setelah feed siap.
+	const targetMessage = Number(new URLSearchParams(window.location.search).get('message') || 0);
+	if (targetMessage > 0 && document.querySelector('[data-chat-feed]')) {
+		const url = new URL(window.location.href);
+		url.searchParams.delete('message');
+		window.history.replaceState(window.history.state, '', url);
+		// Sesudah gulir awal read-state (80/260 ms) supaya tidak tertimpa.
+		window.setTimeout(() => { jumpToMessage(targetMessage); }, 450);
 	}
 	if (!root) return;
 

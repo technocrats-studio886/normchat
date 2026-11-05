@@ -1,6 +1,6 @@
 // Status baca, tombol scroll-ke-bawah, dan penanda pesan baru.
 
-import { chatFeed, chatReadUrlFromServer, hasReadBeforeFromServer, lastReadMessageIdFromServer, latestMessageIdFromServer, unreadCountFromServer } from './context.js';
+import { chatFeed, chatReadUrlFromServer, feedState, hasReadBeforeFromServer, lastReadMessageIdFromServer, latestMessageIdFromServer, unreadCountFromServer } from './context.js';
 import { highlightMessageInFeed } from './highlight.js';
 import { chatApiRequest, scrollChatToBottom } from './utils.js';
 
@@ -69,7 +69,8 @@ const extractLatestMessageIdFromDom = () => {
 };
 
 export const markGroupRead = async (targetMessageId = 0) => {
-	if (!chatReadUrlFromServer) {
+	// Potongan pesan lama (hasil pencarian): pesan terbaru belum terlihat, jadi belum boleh ditandai terbaca.
+	if (!chatReadUrlFromServer || feedState.detached) {
 		return;
 	}
 
@@ -111,6 +112,10 @@ export const markGroupRead = async (targetMessageId = 0) => {
 };
 
 export const markGroupVisited = () => {
+	if (feedState.detached) {
+		return;
+	}
+
 	if (!shouldShowFirstOpenSkip && hasVisitedGroupBefore && firstOpenPendingCount <= 0) {
 		return;
 	}
@@ -123,6 +128,12 @@ export const markGroupVisited = () => {
 
 export const syncScrollBottomCount = () => {
 	if (!(scrollBottomCount instanceof HTMLElement)) {
+		return;
+	}
+
+	if (feedState.detached) {
+		scrollBottomCount.textContent = feedState.pendingNew > 99 ? '99+' : String(feedState.pendingNew);
+		scrollBottomCount.classList.toggle('hidden', feedState.pendingNew <= 0);
 		return;
 	}
 
@@ -224,7 +235,7 @@ export const initReadState = () => {
 
 			syncScrollBottomCount();
 
-			if (distFromBottom > 200 || shouldShowFirstOpenSkip || pendingSkipReplySourceMessageId > 0) {
+			if (distFromBottom > 200 || shouldShowFirstOpenSkip || pendingSkipReplySourceMessageId > 0 || feedState.detached) {
 				scrollBottomBtn.classList.remove('hidden');
 				scrollBottomBtn.classList.add('inline-flex');
 			} else {
@@ -236,6 +247,16 @@ export const initReadState = () => {
 		refreshScrollBottomButton = checkScrollPos;
 		chatFeed.addEventListener('scroll', checkScrollPos, { passive: true });
 		scrollBottomBtn.addEventListener('click', () => {
+			// Sedang di potongan pesan lama: muat ulang pesan terbaru, bukan menggulir ke dasar potongan.
+			if (feedState.detached && feedState.restore) {
+				feedState.restore().then(() => {
+					markGroupVisited();
+					syncScrollBottomCount();
+					checkScrollPos();
+				});
+				return;
+			}
+
 			if (pendingSkipReplySourceMessageId > 0) {
 				const sourceId = pendingSkipReplySourceMessageId;
 				setPendingSkipReplySourceMessageId(0);

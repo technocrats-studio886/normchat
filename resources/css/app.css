@@ -62,7 +62,7 @@
        Setiap elemen ber-data-mode mendefinisikan ulang SEMUA token, sehingga pratinjau di panel tema
        bisa memakai mode/aksen lain tanpa mengubah halaman. ── */
     :root,
-    [data-accent="navy"] { --accent: #1e2e43; --accent-dark: #3b5677; }
+    [data-accent="navy"] { --accent: #1e2e43; --accent-dark: #44506a; }
     [data-accent="toska"] { --accent: #0f6f68; --accent-dark: #197a72; }
     [data-accent="biru"] { --accent: #1d5aa0; --accent-dark: #3a74b8; }
     [data-accent="hijau"] { --accent: #2f6a3e; --accent-dark: #3f8452; }
@@ -148,22 +148,24 @@
         --color-coral-900: #852F27;
     }
 
+    /* Mode gelap "grafit hangat" (keputusan user 5 Nov 2026): abu gelap kecokelatan yang serasi dengan coral
+       logo, sengaja tidak biru agar tidak mirip Telegram. Aksen tema pilihan pengguna tetap dipakai. */
     [data-mode="dark"] {
         color-scheme: dark;
-        --nc-bg: #121C29;
-        --nc-surface: #1A2738;
-        --nc-surface-2: #233247;
-        --nc-text: #F3F5F8;
-        --nc-text-soft: #A1B0C5;
-        --nc-muted: #8C9BB1;
-        --nc-line: rgba(161, 176, 197, 0.22);
-        --nc-line-strong: rgba(161, 176, 197, 0.36);
+        --nc-bg: #171513;
+        --nc-surface: #211E1B;
+        --nc-surface-2: #2C2824;
+        --nc-text: #F5F2EE;
+        --nc-text-soft: #B8AFA5;
+        --nc-muted: #A0968B;
+        --nc-line: rgba(184, 175, 165, 0.20);
+        --nc-line-strong: rgba(184, 175, 165, 0.34);
 
         --nc-primary: var(--accent-dark);
         --nc-primary-hover: color-mix(in srgb, var(--accent-dark) 85%, #000000);
         --nc-primary-text: color-mix(in srgb, var(--accent-dark) 40%, #ffffff);
-        --nc-primary-light: color-mix(in srgb, var(--accent-dark) 26%, #1A2738);
-        --nc-primary-line: color-mix(in srgb, var(--accent-dark) 60%, #1A2738);
+        --nc-primary-light: color-mix(in srgb, var(--accent-dark) 26%, #211E1B);
+        --nc-primary-line: color-mix(in srgb, var(--accent-dark) 60%, #211E1B);
         --nc-mine: var(--accent-dark);
 
         --nc-danger: #C43D2E;
@@ -173,21 +175,21 @@
         --nc-danger-line: rgba(251, 104, 86, 0.38);
 
         --nc-ai-name: #FECCC5;
-        --nc-chat-bg: #121C29;
-        --nc-chat-header-bg: rgba(26, 39, 56, 0.94);
-        --nc-chat-header-border: rgba(161, 176, 197, 0.25);
-        --nc-chat-header-title: #F3F5F8;
-        --nc-chat-header-subtitle: #A1B0C5;
-        --nc-chat-other-bg: #1E2E43;
-        --nc-chat-other-text: #F3F5F8;
-        --nc-chat-other-border: rgba(161, 176, 197, 0.25);
-        --nc-chat-ai-bg: #2E2228;
+        --nc-chat-bg: #171513;
+        --nc-chat-header-bg: rgba(33, 30, 27, 0.94);
+        --nc-chat-header-border: rgba(184, 175, 165, 0.24);
+        --nc-chat-header-title: #F5F2EE;
+        --nc-chat-header-subtitle: #B8AFA5;
+        --nc-chat-other-bg: #26221F;
+        --nc-chat-other-text: #F5F2EE;
+        --nc-chat-other-border: rgba(184, 175, 165, 0.22);
+        --nc-chat-ai-bg: #33241F;
         --nc-chat-ai-text: #FFE4E0;
         --nc-chat-ai-border: rgba(251, 104, 86, 0.4);
-        --nc-chat-composer-input-bg: #1E2E43;
-        --nc-chat-composer-text: #F3F5F8;
-        --nc-chat-composer-soft: #A1B0C5;
-        --nc-chat-composer-line: rgba(161, 176, 197, 0.25);
+        --nc-chat-composer-input-bg: #26221F;
+        --nc-chat-composer-text: #F5F2EE;
+        --nc-chat-composer-soft: #B8AFA5;
+        --nc-chat-composer-line: rgba(184, 175, 165, 0.24);
 
         --nc-person-0: #5cc8a0;
         --nc-person-1: #d995c9;
@@ -202,19 +204,19 @@
         --nc-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
 
         /* Teks gelap jadi terang, latar terang jadi gelap. */
-        --color-slate-50: #1A2738;
-        --color-slate-100: #233247;
-        --color-slate-200: #2E3F56;
-        --color-slate-300: #4A5D77;
-        --color-slate-400: #8C9BB1;
-        --color-slate-500: #A1AEC0;
-        --color-slate-600: #B4BFCE;
-        --color-slate-700: #C6CFDC;
-        --color-slate-800: #DCE2EA;
-        --color-slate-900: #EEF1F5;
-        --color-slate-950: #F7F9FB;
-        --color-coral-50: #33232A;
-        --color-coral-100: #43292D;
+        --color-slate-50: #211E1B;
+        --color-slate-100: #2C2824;
+        --color-slate-200: #3A3530;
+        --color-slate-300: #5C554D;
+        --color-slate-400: #A0968B;
+        --color-slate-500: #ADA49A;
+        --color-slate-600: #BFB7AD;
+        --color-slate-700: #D0C9C0;
+        --color-slate-800: #E3DDD6;
+        --color-slate-900: #F1EDE8;
+        --color-slate-950: #F9F7F4;
+        --color-coral-50: #35251F;
+        --color-coral-100: #452B25;
         --color-coral-200: #633836;
         --color-coral-300: #8A4741;
         --color-coral-700: #FDA99E;
@@ -390,7 +392,7 @@
     .nc-chat-header-card [data-open-settings="1"]:hover,
     .nc-chat-header-card a[aria-label="Kembali"]:hover,
     .nc-chat-header-card a[aria-label="Pengaturan grup"]:hover {
-        background: rgba(161, 176, 197, 0.16);
+        background: color-mix(in srgb, var(--nc-text-soft) 16%, transparent);
     }
 
     /* ── Pesan chat (resources/js/chat/messages.js) ──
@@ -1572,7 +1574,7 @@
         color: var(--nc-chat-composer-soft, var(--nc-text-soft));
     }
     .composer-model-btn:hover {
-        background: rgba(161, 176, 197, 0.18);
+        background: color-mix(in srgb, var(--nc-text-soft) 18%, transparent);
         color: var(--nc-chat-composer-text, var(--nc-text));
     }
     .composer-mode-chip {
@@ -1592,7 +1594,7 @@
     }
     .composer-menu-item:hover,
     .composer-menu-item.is-selected {
-        background: rgba(161, 176, 197, 0.16);
+        background: color-mix(in srgb, var(--nc-text-soft) 16%, transparent);
     }
     /* Saran @mention yang terpilih (keyboard ↑/↓ atau kursor). */
     .nc-mention-option.is-active { background: var(--nc-surface-2); }
@@ -1619,7 +1621,7 @@
         color: var(--nc-chat-composer-soft, var(--nc-text-soft));
     }
     .composer-iconbtn:hover {
-        background: rgba(161, 176, 197, 0.18);
+        background: color-mix(in srgb, var(--nc-text-soft) 18%, transparent);
         color: var(--nc-chat-composer-text, var(--nc-text));
     }
     .composer-send {
@@ -1956,9 +1958,17 @@
         box-shadow: 0 0 0 1px color-mix(in srgb, var(--nc-primary) 28%, transparent);
         animation: ncQuoteGlow 1400ms ease;
     }
-    .nc-inline-highlight-search {
-        background: rgba(52, 68, 88, 0.26);
-        color: inherit;
+    /* Kata yang dicari: kuning di semua tema dengan teks gelap supaya terbaca di bubble terang maupun berwarna;
+       hasil yang sedang dipilih lebih pekat (resources/js/chat/message-search.js). */
+    mark.nc-inline-highlight-search {
+        background: #fde047;
+        color: #1c1917;
+        padding: 0 0.1em;
+        margin: 0 -0.04em;
+    }
+    mark.nc-inline-highlight-search.is-current {
+        background: #fb923c;
+        box-shadow: 0 0 0 1px #fb923c;
     }
     .nc-jump-focus {
         animation: ncJumpFocusPulse 1400ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -2071,6 +2081,143 @@
     .nc-day-float.is-visible { opacity: 1; transform: translate(-50%, 0); }
     .nc-day-float:empty { display: none; }
 
+    /* ── Cari pesan (resources/js/chat/message-search.js) ──
+       HP: bilah menutupi header chat. Desktop: bilah di bawah header, hasil di kolom kiri. */
+    .nc-search-bar {
+        position: absolute;
+        left: 0.75rem;
+        right: 0.75rem;
+        top: 0.75rem;
+        z-index: 40;
+        align-items: center;
+        gap: 0.25rem;
+        height: 4.2rem;
+        padding: 0 0.5rem;
+        border: 1px solid var(--nc-chat-header-border, var(--nc-line));
+        border-radius: 1.5rem;
+        background: var(--nc-surface);
+        box-shadow: var(--nc-shadow-md);
+    }
+    .nc-search-input {
+        min-width: 0;
+        flex: 1 1 auto;
+        height: 2.5rem;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--nc-text);
+        font-size: 16px;
+    }
+    .nc-search-input::placeholder { color: var(--nc-text-soft); }
+    .nc-search-input::-webkit-search-cancel-button { display: none; }
+    .nc-search-count {
+        flex: none;
+        color: var(--nc-text-soft);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .nc-search-btn {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 9999px;
+        color: var(--nc-text-soft);
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nc-search-btn:hover:not(:disabled) { background: var(--nc-surface-2); color: var(--nc-text); }
+    .nc-search-btn:disabled { opacity: 0.35; cursor: default; }
+    @media (min-width: 1024px) {
+        .nc-search-bar {
+            position: static;
+            width: calc(100% - 2rem);
+            max-width: var(--nc-room-max);
+            height: auto;
+            margin: 0.5rem auto 0;
+            padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+            border-radius: 1rem;
+            border-color: var(--nc-line);
+            box-shadow: var(--nc-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.06));
+        }
+        .nc-search-input { font-size: 14px; }
+    }
+
+    /* Potongan pesan lama */
+    .nc-old-banner {
+        z-index: 20;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        margin: 0.5rem auto 0;
+        padding: 0.375rem 0.5rem 0.375rem 1rem;
+        border: 1px solid var(--nc-line);
+        border-radius: 9999px;
+        background: var(--nc-surface);
+        color: var(--nc-text-soft);
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .nc-old-banner:not(.hidden) { display: flex; }
+    .nc-old-banner button {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        background: var(--nc-primary);
+        color: #ffffff;
+        font-weight: 700;
+    }
+    .nc-old-banner button:hover { background: var(--nc-primary-hover); }
+
+    /* Kolom kiri desktop: hasil cari menggantikan daftar grup selama pencarian */
+    .nc-sidebar.is-searching [data-group-list],
+    .nc-sidebar.is-searching [data-group-search-row],
+    .nc-sidebar.is-searching [data-sidebar-join-form] { display: none; }
+    .nc-search-panel { display: flex; min-height: 0; flex: 1 1 0; flex-direction: column; }
+    .nc-search-panel.hidden { display: none; }
+    .nc-search-panel-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0 0.75rem 0 1rem;
+        color: var(--nc-text);
+    }
+    .nc-search-panel-status {
+        padding: 0.5rem 1rem 0.5rem;
+        color: var(--nc-text-soft);
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .nc-search-panel-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 0 0.5rem 0.5rem; }
+    .nc-search-result {
+        display: flex;
+        width: 100%;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.625rem;
+        border-radius: 1rem;
+        color: var(--nc-text);
+        text-align: left;
+        transition: background 0.15s ease;
+    }
+    .nc-search-result:hover { background: var(--nc-surface-2); }
+    .nc-search-result.is-active { background: var(--nc-primary-light); }
+    .nc-search-result-avatar { width: 2.5rem; height: 2.5rem; flex: none; visibility: visible; }
+    .nc-search-result-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; }
+    .nc-search-result-date { flex: none; color: var(--nc-text-soft); font-size: 11px; }
+    .nc-search-result-snippet {
+        display: -webkit-box;
+        margin-top: 0.125rem;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        color: var(--nc-text-soft);
+        font-size: 13px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
     /* Sedang mengetik: foto profil bulat bertumpuk ke kanan + nama */
     .nc-typing { display: flex; align-items: center; gap: 8px; padding: 4px 0 10px; }
     .nc-typing.hidden { display: none; }
@@ -2085,6 +2232,79 @@
     .nc-typing-dots i:nth-child(3) { animation-delay: 0.3s; }
     @keyframes ncTypingDot { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
     @media (prefers-reduced-motion: reduce) { .nc-typing-dots i { animation: none; opacity: 0.7; } }
+
+    /* ── Pratinjau tautan (docs/rancangan-pratinjau-tautan.md) ─────────── */
+    /* Tab Tautan di "Media, tautan, dan dok": kartu + baris URL dan potongan chat, ala WhatsApp */
+    .nc-link-period { padding: 14px 16px 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--nc-text-soft); }
+    .nc-link-list { display: grid; gap: 4px; padding: 0 12px; }
+    .nc-link-entry { border-radius: 16px; overflow: hidden; }
+    .nc-link-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-radius: 16px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        overflow: hidden;
+        color: var(--nc-text);
+        transition: background-color 0.15s ease;
+    }
+    .nc-link-card:hover { background: var(--nc-surface-2); }
+    .nc-link-thumb {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 76px;
+        height: 76px;
+        flex: none;
+        background: var(--nc-surface-2);
+        color: var(--nc-text-soft);
+    }
+    .nc-link-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .nc-link-title {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        padding-right: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .nc-link-domain { display: block; margin-top: 2px; font-size: 12.5px; color: var(--nc-text-soft); }
+    .nc-link-source {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        padding: 8px 6px 12px 8px;
+        font-size: 13px;
+        color: var(--nc-text-soft);
+    }
+    .nc-link-source:hover .nc-link-source-url { text-decoration: underline; }
+    .nc-link-source-url { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--nc-text); }
+    .nc-link-source-text { min-width: 0; flex: 1 1 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Kartu di bubble chat */
+    .nc-msg-link-card {
+        display: block;
+        max-width: 22rem;
+        margin: 2px 0 6px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        border-left: 3px solid color-mix(in srgb, currentColor 45%, transparent);
+        color: inherit;
+        text-decoration: none;
+    }
+    .nc-msg-link-card:hover { background: color-mix(in srgb, currentColor 13%, transparent); }
+    .nc-msg-link-image { display: block; aspect-ratio: 1.91 / 1; overflow: hidden; background: color-mix(in srgb, currentColor 6%, transparent); }
+    .nc-msg-link-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .nc-msg-link-body { display: grid; gap: 2px; padding: 8px 10px; }
+    .nc-msg-link-title { font-size: 13.5px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .nc-msg-link-desc { font-size: 12.5px; line-height: 1.4; opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .nc-msg-link-domain { font-size: 11.5px; opacity: 0.8; }
 
     /* Kartu "grup dibuat" di paling atas feed */
     .nc-created-card {
