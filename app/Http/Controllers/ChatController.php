@@ -10,6 +10,7 @@ use App\Models\AiModel;
 use App\Models\AuditLog;
 use App\Models\ChatMessageQueue;
 use App\Models\Group;
+use App\Models\GroupDraft;
 use App\Models\GroupMember;
 use App\Models\GroupToken;
 use App\Models\Message;
@@ -85,6 +86,10 @@ class ChatController extends Controller
             'group' => $group,
             // Info grup desktop (jendela melayang dan panel kanan), isinya sama dengan halaman Info grup HP.
             'info' => $info->for($group, $viewer),
+            'draft' => GroupDraft::unexpired()->where(['group_id' => $group->id, 'user_id' => $viewer->id])->first(),
+            'historyFromMessageId' => $historyFrom = (int) ($group->members->firstWhere('user_id', $viewer->id)?->history_from_message_id ?? 0),
+            // Kartu "grup dibuat" di paling atas bila feed sudah sampai awal yang boleh dilihat user.
+            'showCreatedCard' => $messages->count() < self::VISIBLE_MESSAGES || $historyFrom > 0,
             // Dirender di browser oleh resources/js/chat/messages.js, sama dengan pesan realtime.
             'messages' => $messages->map(fn (Message $message) => $this->presenter->present($message, null, ['awaiting_ai' => $awaitingAi->has($message->id)]))->all(),
             // Tujuan "Bagikan": grup lain tempat user bisa mengirim pesan.
@@ -165,6 +170,8 @@ class ChatController extends Controller
                 }
 
                 AuditLog::record('chat.send_message', $user->id, $message, [], $group->id);
+                // Pesan terkirim: draf grup ini selesai di semua perangkat.
+                GroupDraft::where(['group_id' => $group->id, 'user_id' => $user->id])->delete();
 
                 return $message;
             });
@@ -198,6 +205,7 @@ class ChatController extends Controller
         $this->authorize('chat', $group);
         $this->ensureNotFrozen($group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_if($message->isSystem(), 403);
         abort_unless($actions->canEdit($request->user(), $message), 403);
 
         $validated = $request->validate([
@@ -239,6 +247,7 @@ class ChatController extends Controller
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_if($message->isSystem(), 403);
         abort_unless($actions->canDeleteForAll($request->user(), $group, $message), 403);
         $this->ensureNotFrozen($group);
 
@@ -266,7 +275,7 @@ class ChatController extends Controller
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
-        abort_if($message->isNotice(), 403);
+        abort_if($message->isNotice() || $message->isSystem(), 403);
 
         $ids = $request->validate([
             'group_ids' => ['required', 'array', 'min:1', 'max:20'],
@@ -308,6 +317,8 @@ class ChatController extends Controller
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
         abort_if(! $message->attachment_path || ! $message->attachment_disk, 404);
+        // Lampiran sebelum anggota baru bergabung tertutup sampai pemilik mengirim riwayat pesan.
+        abort_unless(Message::withTrashed()->whereKey($message->id)->visibleTo(request()->user())->exists(), 404);
 
         // File kecil dari cache Redis, file besar langsung dari S3.
         $size = $files->size($message->attachment_disk, $message->attachment_path);
@@ -358,8 +369,14 @@ class ChatController extends Controller
 
     private function unreadCount(Group $group, int $lastReadMessageId): int
     {
+        $viewer = request()->user();
+
+        // Sama dengan lencana daftar grup: pesan orang lain saja, tanpa pemberitahuan sistem.
         return (int) Message::query()
             ->where('group_id', $group->id)
+            ->visibleTo($viewer)
+            ->where('sender_type', '!=', Message::SENDER_SYSTEM)
+            ->where(fn ($query) => $query->whereNull('sender_id')->orWhere('sender_id', '!=', $viewer->id))
             ->when($lastReadMessageId > 0, fn ($query) => $query->where('id', '>', $lastReadMessageId))
             ->count();
     }

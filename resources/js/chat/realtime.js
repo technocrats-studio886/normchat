@@ -5,7 +5,8 @@ import { cancelEditModeFor } from './composer/edit-mode.js';
 import { authUserId, chatFeed, groupId, pendingMessagesByLocalId } from './context.js';
 import { ensureMentionToastStack, highlightMessageInFeed } from './highlight.js';
 import { renderMermaidInNode } from './markdown.js';
-import { buildMessageNode, flashEditedMessage, replaceRenderedMessageByPayload } from './messages.js';
+import { personColor } from './attachments.js';
+import { avatarHtml, buildMessageNode, flashEditedMessage, replaceRenderedMessageByPayload } from './messages.js';
 import { mergePollStatsIntoCache, refreshPollCardsFromFeed } from './polls.js';
 import { markGroupRead, markGroupVisited, noteUnseenIncomingMessage, refreshScrollBottomButton, rememberLatestMessageId, syncScrollBottomCount } from './read-state.js';
 import { escapeHtml, scrollChatToBottom } from './utils.js';
@@ -201,29 +202,30 @@ export const initRealtime = () => {
 				return;
 			}
 
-			const labels = Array.from(activeTypingUsers.values());
-			if (!labels.length) {
+			const people = Array.from(activeTypingUsers.values());
+			if (!people.length) {
 				typingIndicator.classList.add('hidden');
-				typingIndicator.textContent = '';
+				typingIndicator.innerHTML = '';
 				return;
 			}
 
+			// Foto profil bulat yang saling menumpuk (maks. 3) + nama: "A", "A dan B", "A, B, dan C".
+			const names = people.map((person) => person.name);
+			const text = names.length === 1
+				? names[0]
+				: (names.length === 2 ? `${names[0]} dan ${names[1]}` : `${names.slice(0, -1).join(', ')}, dan ${names[names.length - 1]}`);
+			const avatars = people.slice(0, 3).map((person) => `<span class="nc-typing-avatar" style="--person: ${person.isAi ? 'var(--nc-ai-name)' : personColor(person.id)}">${avatarHtml({ sender_avatar_url: person.avatar }, person.isAi)}</span>`).join('');
 			typingIndicator.classList.remove('hidden');
-			if (labels.length === 1) {
-				typingIndicator.textContent = `${labels[0]} sedang mengetik...`;
-				return;
-			}
-
-			typingIndicator.textContent = `${labels.length} orang sedang mengetik...`;
+			typingIndicator.innerHTML = `<span class="nc-typing-avatars" aria-hidden="true">${avatars}</span><span class="nc-typing-text">${escapeHtml(text)} sedang mengetik<span class="nc-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></span>`;
 		};
 
-		const updateTypingState = (key, label, isTyping) => {
+		const updateTypingState = (key, person, isTyping) => {
 			if (!key) {
 				return;
 			}
 
 			if (isTyping) {
-				activeTypingUsers.set(key, label || 'User');
+				activeTypingUsers.set(key, person);
 			} else {
 				activeTypingUsers.delete(key);
 			}
@@ -231,15 +233,20 @@ export const initRealtime = () => {
 			renderTypingIndicator();
 		};
 
+		// Untuk uji browser tanpa server realtime: terapkan status mengetik secara langsung.
+		window.ncTyping = { set: updateTypingState };
+
 		groupChannel.listenForWhisper('typing', (payload) => {
 			const senderId = Number(payload?.sender_id || 0);
 			if (senderId === authUserId) {
 				return;
 			}
 
+			const fullName = String(payload?.sender_name || 'Anggota').trim();
 			updateTypingState(
-				`user:${senderId || payload?.sender_name || 'unknown'}`,
-				String(payload?.sender_name || 'User'),
+				`user:${senderId || fullName || 'unknown'}`,
+				// Nama depan saja supaya tiga nama tetap muat satu baris.
+				{ id: senderId, name: fullName.split(/\s+/)[0] || 'Anggota', avatar: String(payload?.sender_avatar || ''), isAi: false },
 				Boolean(payload?.is_typing)
 			);
 		});
@@ -250,7 +257,7 @@ export const initRealtime = () => {
 				return;
 			}
 
-			updateTypingState('ai', String(payload?.sender_name || 'Normi AI'), Boolean(payload?.is_typing));
+			updateTypingState('ai', { id: 0, name: String(payload?.sender_name || 'Normi AI'), avatar: '', isAi: true }, Boolean(payload?.is_typing));
 		});
 
 		groupChannel.listen('.message.sent', onMessageSent);
@@ -310,6 +317,10 @@ export const initRealtime = () => {
 
 			if (['removed', 'left'].includes(String(payload?.action || ''))) {
 				window.location.href = '/groups';
+			}
+			// Pemilik mengirim riwayat pesan: muat ulang supaya pesan sebelum bergabung tampil.
+			if (String(payload?.action || '') === 'history_shared') {
+				window.location.reload();
 			}
 		});
 	}

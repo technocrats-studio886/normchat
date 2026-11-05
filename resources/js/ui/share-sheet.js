@@ -72,6 +72,8 @@ export const initShareSheet = () => {
 		if (trigger) {
 			event.preventDefault();
 			open();
+			// "Undang via tautan atau kode QR": langsung ke Kode QR.
+			if (trigger.dataset.shareStart === 'qr') overlay.querySelector('[data-share-action="qr"]')?.click();
 		}
 	});
 	overlay.addEventListener('click', async (event) => {

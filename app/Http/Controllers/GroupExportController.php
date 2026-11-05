@@ -59,7 +59,7 @@ class GroupExportController extends Controller
     {
         $this->authorize('exportChat', $group);
 
-        return response()->json(['ok' => true, 'count' => $builder->count($group, ExportOptions::fromRequest($request, $request->user()))]);
+        return response()->json(['ok' => true, 'count' => $builder->count($group, ExportOptions::fromRequest($request, $request->user()), $request->user())]);
     }
 
     public function store(Request $request, Group $group): JsonResponse

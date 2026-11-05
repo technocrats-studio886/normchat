@@ -10,13 +10,13 @@
             {{-- Nama grup --}}
             <div class="panel-card px-4 py-3">
                 <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nama Grup</label>
-                <input type="text" name="name" value="{{ old('name') }}" placeholder="Contoh: Tim Marketing" required class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
+                <input type="text" name="name" value="{{ old('name') }}" placeholder="Contoh: Tim Marketing" required maxlength="{{ \App\Models\Group::NAME_MAX }}" data-char-count class="mt-1 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
             </div>
 
             {{-- Deskripsi --}}
             <div class="panel-card px-4 py-3">
                 <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Deskripsi</label>
-                <textarea name="description" rows="2" placeholder="Opsional" class="mt-1 w-full resize-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400">{{ old('description') }}</textarea>
+                <textarea name="description" rows="2" placeholder="Opsional" maxlength="{{ \App\Models\Group::DESCRIPTION_MAX }}" data-char-count class="mt-1 w-full resize-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400">{{ old('description') }}</textarea>
             </div>
 
             {{-- Password --}}

@@ -10,6 +10,7 @@ import { attachmentInput, chatForm } from './composer/elements.js';
 import { initFeedClicks } from './composer/feed-clicks.js';
 import { initEditMode } from './composer/edit-mode.js';
 import { initComposerInput } from './composer/input.js';
+import { initDraft } from './composer/draft.js';
 import { initMessageActions } from './composer/message-actions.js';
 import { initReplyPreviewPicker } from './composer/quote-picker.js';
 import { initReply } from './composer/reply.js';
@@ -37,4 +38,5 @@ export const initComposer = () => {
 	initVoiceRecorder();
 	initComposerInput();
 	initSend();
+	initDraft();
 };

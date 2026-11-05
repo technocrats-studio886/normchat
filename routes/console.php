@@ -81,6 +81,13 @@ Artisan::command('interdotz:sync-client-profile {--token=} {--dry-run} {--logo-u
 })->purpose('Sync Normi Chat client profile and image metadata to Interdotz backend');
 
 // Dijalankan service "scheduler" di docker-compose.yml.
+// Draf pesan hanya berlaku 24 jam (docs/rancangan-alur-chat-wa.md); yang lebih tua dibuang.
+Artisan::command('normchat:prune-drafts', function () {
+    $deleted = \App\Models\GroupDraft::query()->where('updated_at', '<', now()->subHours(\App\Models\GroupDraft::TTL_HOURS))->delete();
+    $this->info("Draf kedaluwarsa dihapus: {$deleted}");
+})->purpose('Hapus draf pesan yang lebih dari 24 jam');
+
+Schedule::command('normchat:prune-drafts')->hourly()->withoutOverlapping();
 Schedule::command('normchat:backup-groups')->dailyAt('03:00')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();
 Schedule::command('normchat:prune-exports')->dailyAt('03:30')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();
 // Biaya OpenAI & ingatan Normi (docs/rancangan-llm-rules.md).

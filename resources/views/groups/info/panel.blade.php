@@ -1,14 +1,13 @@
 {{-- Info grup (docs/rancangan-info-grup.md, revisi 2). Data dari App\Services\Groups\GroupInfo.
      $mode = 'page' : halaman Info grup HP (ala WhatsApp).
      $mode = 'embed': ruang chat desktop; resources/js/ui/group-info.js memindahnya ke jendela atau panel kanan.
-     Status di root: data-info-tab (members | media | manage), data-info-view (main | archive),
-     data-info-editing (profil atas sedang diedit). --}}
+     Status di root: data-info-tab (members | media | manage), data-info-view (main | archive);
+     bagian profil yang sedang diedit memakai data-editing di [data-info-field]. --}}
 @php
     $fmtNk = fn ($value) => number_format((float) $value, 2, ',', '.');
     $isPage = ($mode ?? 'page') === 'page';
     $authId = (int) auth()->id();
     $view = $infoView ?? 'main';
-    $editing = $canEditProfile && ($view === 'edit' || $errors->hasAny(['name', 'description', 'avatar']));
     $tab = in_array($view, ['media', 'manage'], true) ? $view : ($errors->hasAny(['password', 'member_daily_credit_limit']) ? 'manage' : 'members');
     $limit = $group->member_daily_credit_limit;
     $archiveTotal = $mediaCount + $linkCount + $fileCount;
@@ -16,7 +15,7 @@
     $mediaUrl = fn ($m) => route('chat.attachment', ['group' => $group->id, 'message' => $m->id]);
 @endphp
 <div class="nc-info {{ $isPage ? 'nc-info-page' : 'nc-info-embed' }}" data-group-info
-     data-info-tab="{{ $tab }}" data-info-view="main" @if($editing) data-info-editing @endif
+     data-info-tab="{{ $tab }}" data-info-view="main"
      data-chat-url="{{ route('chat.show', $group) }}">
 
     {{-- Bilah atas --}}
@@ -35,64 +34,71 @@
     </div>
 
     <div class="nc-info-main">
-        {{-- Profil atas. Pengelola mengetuknya untuk masuk mode edit (seperti aplikasi chat umumnya). --}}
+        {{-- Profil atas. Pengelola mengedit per bagian: ketuk foto (menu Ganti/Hapus, langsung diunggah),
+             ketuk nama (kolom nama saja), atau ketuk deskripsi (kotak deskripsi saja). --}}
         <div class="nc-info-hero" data-info-hero>
             @if($canEditProfile)
-                <button type="button" class="nc-info-hero-button" data-info-edit-open aria-label="Ubah foto, nama, dan deskripsi grup">
-            @else
-                <div class="nc-info-hero-button">
-            @endif
-                <span class="nc-info-photo"><x-group-photo :group="$group" /></span>
-                <span class="nc-info-name">
-                    {{ $group->name }}
-                    @if($canEditProfile)<x-info-icon name="pencil" class="nc-info-name-edit h-4 w-4" />@endif
-                </span>
-                <span class="nc-info-meta">Grup · {{ $memberCount }} anggota</span>
-                @if($group->description)
-                    <span class="nc-info-desc">{{ $group->description }}</span>
-                @elseif($canEditProfile)
-                    <span class="nc-info-add-desc">Tambah deskripsi grup</span>
-                @endif
-            @if($canEditProfile)
-                </button>
-            @else
+                <div class="relative">
+                    <button type="button" class="nc-info-photo nc-info-photo-button" data-info-menu-toggle aria-haspopup="menu" aria-expanded="false" aria-label="Ubah foto grup" data-info-photo-current>
+                        <x-group-photo :group="$group" />
+                        <span class="nc-info-photo-badge" aria-hidden="true"><x-info-icon name="camera" class="h-4 w-4" /></span>
+                        <span class="nc-info-photo-busy" hidden data-info-photo-busy>Mengunggah…</span>
+                    </button>
+                    <div class="nc-info-menu nc-info-photo-menu" role="menu" hidden data-info-menu>
+                        <label for="info_group_avatar" class="nc-info-menu-item cursor-pointer" role="menuitem" tabindex="0" data-info-photo-pick>
+                            <x-info-icon name="camera" class="h-4 w-4" />{{ $group->avatar_path ? 'Ganti foto' : 'Pasang foto' }}
+                        </label>
+                        @if($group->avatar_path)
+                            <form method="POST" action="{{ route('settings.profile.update', $group) }}" data-confirm="Hapus foto grup? Grup kembali memakai huruf awal namanya." data-confirm-label="Hapus foto">
+                                @csrf
+                                <input type="hidden" name="remove_avatar" value="1">
+                                <button type="submit" class="nc-info-menu-item is-danger" role="menuitem"><x-info-icon name="trash" class="h-4 w-4" />Hapus foto</button>
+                            </form>
+                        @endif
+                    </div>
+                    <form method="POST" action="{{ route('settings.profile.update', $group) }}" enctype="multipart/form-data" hidden data-info-photo-form>
+                        @csrf
+                        <input id="info_group_avatar" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" data-info-photo-input aria-label="Pilih foto grup">
+                    </form>
                 </div>
+                @error('avatar')<p class="mt-2 text-xs font-semibold text-danger-ink" role="alert">{{ $message }}</p>@enderror
+
+                <div class="nc-info-field" data-info-field="name" @if($errors->has('name')) data-editing @endif>
+                    <button type="button" class="nc-info-field-view nc-info-name" data-info-field-edit aria-label="Ubah nama grup">
+                        {{ $group->name }}<x-info-icon name="pencil" class="nc-info-name-edit h-4 w-4" />
+                    </button>
+                    <form method="POST" action="{{ route('settings.profile.update', $group) }}" class="nc-info-field-form" data-info-field-form>
+                        @csrf
+                        <div class="flex items-center gap-2">
+                            <input type="text" name="name" value="{{ old('name', $group->name) }}" required maxlength="{{ \App\Models\Group::NAME_MAX }}" data-char-count class="nc-input min-w-0 flex-1 text-center text-base font-bold" aria-label="Nama grup" data-info-field-input data-original="{{ $group->name }}">
+                            <button type="submit" class="nc-info-icon-btn nc-info-field-ok" aria-label="Simpan nama"><x-info-icon name="check" /></button>
+                            <button type="button" class="nc-info-icon-btn" data-info-field-cancel aria-label="Batal"><x-info-icon name="close" /></button>
+                        </div>
+                        @error('name')<p class="mt-1 text-xs font-semibold text-danger-ink" role="alert">{{ $message }}</p>@enderror
+                    </form>
+                </div>
+                <p class="nc-info-meta">Grup · {{ $memberCount }} anggota</p>
+                <div class="nc-info-field" data-info-field="description" @if($errors->has('description')) data-editing @endif>
+                    <button type="button" class="nc-info-field-view {{ $group->description ? 'nc-info-desc' : 'nc-info-add-desc' }}" data-info-field-edit aria-label="{{ $group->description ? 'Ubah deskripsi grup' : 'Tambah deskripsi grup' }}">{{ $group->description ?: 'Tambah deskripsi grup' }}</button>
+                    <form method="POST" action="{{ route('settings.profile.update', $group) }}" class="nc-info-field-form" data-info-field-form>
+                        @csrf
+                        <textarea name="description" rows="3" maxlength="{{ \App\Models\Group::DESCRIPTION_MAX }}" data-char-count class="nc-input w-full text-sm" placeholder="Deskripsi grup (opsional)" aria-label="Deskripsi grup" data-info-field-input data-original="{{ $group->description }}">{{ old('description', $group->description) }}</textarea>
+                        @error('description')<p class="mt-1 text-xs font-semibold text-danger-ink" role="alert">{{ $message }}</p>@enderror
+                        <div class="mt-2 flex justify-end gap-2">
+                            <button type="button" class="btn-secondary px-4 py-1.5 text-sm" data-info-field-cancel>Batal</button>
+                            <button type="submit" class="btn-primary px-4 py-1.5 text-sm">Simpan</button>
+                        </div>
+                    </form>
+                </div>
+            @else
+                <span class="nc-info-photo"><x-group-photo :group="$group" /></span>
+                <p class="nc-info-name">{{ $group->name }}</p>
+                <p class="nc-info-meta">Grup · {{ $memberCount }} anggota</p>
+                @if($group->description)
+                    <p class="nc-info-desc">{{ $group->description }}</p>
+                @endif
             @endif
         </div>
-
-        @if($canEditProfile)
-            <form method="POST" action="{{ route('settings.profile.update', $group) }}" enctype="multipart/form-data" class="nc-info-edit" data-info-edit-form>
-                @csrf
-                <input type="hidden" name="info_view" value="main">
-                <label class="nc-info-photo nc-info-photo-edit" title="Ganti foto grup">
-                    <span data-info-photo-current><x-group-photo :group="$group" /></span>
-                    <img alt="" class="nc-group-photo" hidden data-info-photo-preview />
-                    <span class="nc-info-photo-camera"><x-info-icon name="camera" class="h-7 w-7" /></span>
-                    <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" class="sr-only" data-info-photo-input aria-label="Pilih foto grup">
-                </label>
-                <input type="hidden" name="remove_avatar" value="0" data-info-photo-remove-input>
-                <p class="mt-2 text-center text-xs text-ink-soft">
-                    Ketuk foto untuk mengganti (JPG, PNG, atau WebP, maksimal 5 MB).
-                    @if($group->avatar_path)
-                        <button type="button" class="font-semibold text-danger-ink hover:underline" data-info-photo-remove>Hapus foto</button>
-                    @endif
-                </p>
-                @error('avatar')<p class="mt-1 text-center text-xs font-semibold text-danger-ink">{{ $message }}</p>@enderror
-                <label class="mt-3 block">
-                    <span class="text-xs font-semibold text-ink-soft">Nama grup</span>
-                    <input type="text" name="name" value="{{ old('name', $group->name) }}" required maxlength="120" class="nc-input mt-1 w-full" data-info-edit-name>
-                </label>
-                @error('name')<p class="mt-1 text-xs font-semibold text-danger-ink">{{ $message }}</p>@enderror
-                <label class="mt-3 block">
-                    <span class="text-xs font-semibold text-ink-soft">Deskripsi (opsional)</span>
-                    <textarea name="description" rows="3" maxlength="500" class="nc-input mt-1 w-full">{{ old('description', $group->description) }}</textarea>
-                </label>
-                <div class="nc-info-edit-actions">
-                    <button type="button" class="btn-secondary px-4 py-2" data-info-edit-cancel>Batal</button>
-                    <button type="submit" class="btn-primary px-5 py-2">Simpan</button>
-                </div>
-            </form>
-        @endif
 
         {{-- Saldo grup: tepat di bawah profil --}}
         <div class="nc-info-balance">

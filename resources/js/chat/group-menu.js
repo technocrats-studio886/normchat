@@ -220,7 +220,7 @@ export const initGroupMenu = () => {
 				if (choice) {
 					try {
 						await chatApiRequest(`${chatMessagesBaseUrl}/hide`, { method: 'POST', body: { all: true } });
-						chatFeed?.querySelectorAll('.nc-msg').forEach((node) => node.remove());
+						chatFeed?.querySelectorAll('.nc-msg, .nc-system-msg').forEach((node) => node.remove());
 						showMenuToast('Chat dibersihkan');
 					} catch {
 						showMenuToast('Gagal membersihkan chat');

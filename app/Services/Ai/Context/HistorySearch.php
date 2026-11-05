@@ -221,6 +221,7 @@ class HistorySearch
             ->with(['sender:id,name', 'replyToMessage.sender:id,name'])
             ->where('group_id', $group->id)
             ->where('id', '<', $beforeId)
-            ->whereNull('visible_to_user_id');
+            ->whereNull('visible_to_user_id')
+            ->where('sender_type', '!=', Message::SENDER_SYSTEM);
     }
 }

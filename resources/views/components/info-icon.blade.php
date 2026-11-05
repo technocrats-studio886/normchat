@@ -23,6 +23,7 @@
         'hash' => '<path d="M9 4 7 20M17 4l-2 16M4.5 9h16M3.5 15h16"/>',
         'qr' => '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"/>',
         'link' => '<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>',
+        'check' => '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
         'pencil' => '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
         'chevron' => '<path d="m9 5 7 7-7 7"/>',
         'back' => '<path d="m15 5-7 7 7 7"/>',

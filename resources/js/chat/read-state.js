@@ -159,20 +159,56 @@ export const noteUnseenIncomingMessage = () => {
 	firstOpenPendingCount += 1;
 };
 
+/** Pemisah di atas pesan belum dibaca pertama (pesan orang lain sesudah last_read_message_id). */
+const placeUnreadSeparator = () => {
+	if (!chatFeed || !hasVisitedGroupBefore || serverLastReadMessageId <= 0 || unreadCountFromServer <= 0) {
+		return null;
+	}
+	const nodes = Array.from(chatFeed.querySelectorAll(':scope > [data-message-id], :scope > [data-system-message-id]'));
+	const idOf = (node) => Number(node.getAttribute('data-message-id') || node.getAttribute('data-system-message-id') || 0);
+	const first = nodes.find((node) => idOf(node) > serverLastReadMessageId && node.dataset.messageMine !== '1') || nodes[0];
+	if (!first) {
+		return null;
+	}
+	const separator = document.createElement('div');
+	separator.className = 'nc-unread-sep';
+	separator.setAttribute('role', 'separator');
+	separator.setAttribute('data-unread-separator', '');
+	separator.innerHTML = `<span>${unreadCountFromServer} pesan belum dibaca</span>`;
+	chatFeed.insertBefore(separator, first);
+	return separator;
+};
+
 export const initReadState = () => {
 	latestKnownMessageId = Math.max(latestKnownMessageId, extractLatestMessageIdFromDom());
 
 	if (chatFeed) {
-		const jumpToLatest = () => {
+		// Ada pesan belum dibaca dan grup pernah dibuka: mulai di bagian terakhir yang dilihat, dengan pemisah
+		// "N pesan belum dibaca" di atas pesan belum dibaca pertama (docs/rancangan-alur-chat-wa.md poin 1).
+		const unreadSeparator = placeUnreadSeparator();
+		let userScrolled = false;
+		const markUserScroll = () => { userScrolled = true; };
+		chatFeed.addEventListener('wheel', markUserScroll, { passive: true, once: true });
+		chatFeed.addEventListener('touchmove', markUserScroll, { passive: true, once: true });
+		const jumpToStart = () => {
+			if (userScrolled) return;
+			if (unreadSeparator?.isConnected) {
+				chatFeed.scrollTop = Math.max(0, unreadSeparator.offsetTop - chatFeed.offsetTop - 72);
+				return;
+			}
 			scrollChatToBottom('auto');
 		};
-		requestAnimationFrame(jumpToLatest);
+		requestAnimationFrame(jumpToStart);
 		// Re-run after images/fonts load so height is final.
-		window.setTimeout(jumpToLatest, 80);
-		window.setTimeout(jumpToLatest, 260);
-		window.addEventListener('load', jumpToLatest, { once: true });
+		window.setTimeout(jumpToStart, 80);
+		window.setTimeout(jumpToStart, 260);
+		window.addEventListener('load', jumpToStart, { once: true });
 		window.setTimeout(() => {
-			markGroupRead();
+			// Dibuka di pemisah belum dibaca: pesan baru ditandai terbaca saat user menggulir sampai bawah
+			// (penangan scroll di bawah), bukan langsung saat dibuka.
+			if (!unreadSeparator) {
+				markGroupRead();
+			}
 			syncScrollBottomCount();
 		}, 300);
 	}

@@ -79,6 +79,18 @@ class DocxChatExporter implements ChatExporter
 
     private function row($section, ExportEntry $entry): void
     {
+        if ($entry->notice !== null) {
+            // Pemberitahuan tengah: satu baris abu-abu rata tengah, deskripsi lama dicoret di bawahnya.
+            $section->addText($entry->notice['text'] . ' · ' . $entry->sentAt->format('H.i'), ['size' => 8, 'color' => self::GREY], ['alignment' => Jc::CENTER, 'spaceBefore' => 60, 'spaceAfter' => 20]);
+            if ($entry->notice['before'] !== null) {
+                $section->addText($entry->notice['before'], ['size' => 8, 'color' => self::GREY, 'strikethrough' => true], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+            }
+            if ($entry->notice['after'] !== null) {
+                $section->addText($entry->notice['after'], ['size' => 8, 'color' => self::GREY], ['alignment' => Jc::CENTER, 'spaceAfter' => 60]);
+            }
+
+            return;
+        }
         $table = $section->addTable(['width' => 5000, 'unit' => 'pct', 'cellMargin' => 0]);
         $table->addRow(null, ['cantSplit' => true]);
         $style = $entry->isMine

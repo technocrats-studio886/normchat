@@ -32,7 +32,7 @@
         </div>
     </div>
 
-    <nav class="nc-sidebar-list nc-scroll">
+    <nav class="nc-sidebar-list nc-scroll" data-group-list data-viewer-id="{{ $user->id }}">
         @forelse($rows as $row)
             @php($isActive = $row['group']->id === $activeGroupId)
             @php($unreadLabel = $row['unread'] > 99 ? '99+' : $row['unread'])
@@ -40,23 +40,20 @@
                class="nc-sidebar-item {{ $isActive ? 'is-active' : '' }}"
                title="{{ $row['group']->name }}"
                data-group-card="1" data-group-search="{{ $row['group']->name }} {{ $row['group']->share_id }}"
+               data-group-row="{{ $row['group']->id }}" data-activity-at="{{ $row['activity_at'] }}" data-draft-at="{{ $row['draft_at'] }}" data-unread="{{ $isActive ? 0 : $row['unread'] }}" @if($isActive) data-row-active @endif
                @if($isActive) aria-current="page" @endif>
                 <span class="nc-sidebar-avatar">
                     <x-group-photo :group="$row['group']" />
-                    @if($row['unread'] > 0 && ! $isActive)
-                        <span class="nc-sidebar-dot">{{ $unreadLabel }}</span>
-                    @endif
+                    <span class="nc-sidebar-dot" data-row-dot @if(! ($row['unread'] > 0 && ! $isActive)) hidden @endif>{{ $unreadLabel }}</span>
                 </span>
                 <span class="nc-sidebar-label min-w-0 flex-1">
                     <span class="flex items-baseline gap-2">
                         <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ $row['group']->name }}</span>
-                        <span class="nc-sidebar-time shrink-0 text-[11px]">{{ $row['time'] }}</span>
+                        <span class="nc-sidebar-time shrink-0 text-[11px]" data-row-time>{{ $row['time'] }}</span>
                     </span>
                     <span class="mt-0.5 flex items-center gap-2">
-                        <span class="nc-sidebar-preview min-w-0 flex-1 truncate text-[13px]">{{ $row['preview'] }}</span>
-                        @if($row['unread'] > 0 && ! $isActive)
-                            <span class="nc-sidebar-badge">{{ $unreadLabel }}</span>
-                        @endif
+                        @include('groups.partials.row-preview', ['row' => $row, 'class' => 'nc-sidebar-preview min-w-0 flex-1 truncate text-[13px]'])
+                        <span class="nc-sidebar-badge" data-row-badge @if(! ($row['unread'] > 0 && ! $isActive)) hidden @endif>{{ $unreadLabel }}</span>
                     </span>
                 </span>
             </a>

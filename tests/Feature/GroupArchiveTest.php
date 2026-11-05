@@ -134,9 +134,12 @@ class GroupArchiveTest extends TestCase
 
         $document = app(ChatExportBuilder::class)->build($this->group, ExportOptions::fromArray(['format' => 'pdf', 'timezone' => 'Asia/Makassar']), $this->owner);
 
-        $this->assertSame([false, false, true], array_map(fn ($entry) => $entry->isMine, $document->entries));
-        $this->assertSame([true, false, true], array_map(fn ($entry) => $entry->runStart, $document->entries));
-        $this->assertSame([false, true, true], array_map(fn ($entry) => $entry->runEnd, $document->entries));
+        // Baris pertama: pemberitahuan "… membuat grup ini" (rentang ekspor mencakup hari grup dibuat).
+        $this->assertStringEndsWith('membuat grup ini.', $document->entries[0]->notice['text'] ?? '');
+        $messages = array_values(array_filter($document->entries, fn ($entry) => $entry->notice === null));
+        $this->assertSame([false, false, true], array_map(fn ($entry) => $entry->isMine, $messages));
+        $this->assertSame([true, false, true], array_map(fn ($entry) => $entry->runStart, $messages));
+        $this->assertSame([false, true, true], array_map(fn ($entry) => $entry->runEnd, $messages));
         $this->assertSame('Asia/Makassar', $document->exportedAt->getTimezone()->getName());
     }
 

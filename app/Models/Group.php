@@ -15,6 +15,11 @@ class Group extends Model
 {
     use SoftDeletes;
 
+    /** Batas panjang nama dan deskripsi grup (keputusan user 5 Nov 2026). */
+    public const NAME_MAX = 60;
+
+    public const DESCRIPTION_MAX = 300;
+
     protected $fillable = [
         'name',
         'description',

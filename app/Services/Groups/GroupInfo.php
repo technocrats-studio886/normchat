@@ -31,18 +31,18 @@ class GroupInfo
         $members = $group->members->where('status', 'active')
             ->sortBy(fn ($member) => [(int) $member->user_id === (int) $group->owner_id ? 0 : (($member->role->key ?? '') === 'admin' ? 1 : 2), mb_strtolower((string) $member->user?->name)])
             ->values();
-        $links = $this->linkMessages($group);
+        $links = $this->linkMessages($group, $user);
         $view = session('group_info');
 
         return [
             'group' => $group,
             'members' => $members,
             'memberCount' => $members->count() + ($members->contains('user_id', $group->owner_id) ? 0 : 1),
-            'mediaMessages' => $this->archive($group)->where('message_type', 'image')->get(),
-            'fileMessages' => $this->archive($group)->whereNotIn('message_type', ['image', 'voice'])->get(),
+            'mediaMessages' => $this->archive($group, $user)->where('message_type', 'image')->get(),
+            'fileMessages' => $this->archive($group, $user)->whereNotIn('message_type', ['image', 'voice'])->get(),
             'linkMessages' => $links,
-            'mediaCount' => $this->archive($group, false)->where('message_type', 'image')->count(),
-            'fileCount' => $this->archive($group, false)->whereNotIn('message_type', ['image', 'voice'])->count(),
+            'mediaCount' => $this->archive($group, $user, false)->where('message_type', 'image')->count(),
+            'fileCount' => $this->archive($group, $user, false)->whereNotIn('message_type', ['image', 'voice'])->count(),
             'linkCount' => $links->sum(fn (Message $message) => count($message->extracted_urls)),
             'isOwner' => $group->isOwnedBy($user),
             'canEditProfile' => $user->can('editGroupProfile', $group),
@@ -57,18 +57,21 @@ class GroupInfo
     }
 
     /** Pesan berlampiran terbaru grup. */
-    private function archive(Group $group, bool $limit = true): Builder
+    private function archive(Group $group, User $user, bool $limit = true): Builder
     {
-        $query = Message::query()->where('group_id', $group->id)->whereNotNull('attachment_path');
+        // Anggota baru yang riwayatnya belum dikirim hanya melihat media sesudah ia bergabung.
+        $query = Message::query()->where('group_id', $group->id)->visibleTo($user)->whereNotNull('attachment_path');
 
         return $limit ? $query->latest('created_at')->take(self::ARCHIVE_LIMIT) : $query;
     }
 
     /** Pesan terbaru yang berisi tautan, dengan daftar URL-nya di `extracted_urls`. */
-    private function linkMessages(Group $group): Collection
+    private function linkMessages(Group $group, User $user): Collection
     {
         return Message::query()
             ->where('group_id', $group->id)
+            ->visibleTo($user)
+            ->where('sender_type', '!=', Message::SENDER_SYSTEM)
             ->where('content', 'like', '%http%')
             ->latest('created_at')
             ->take(self::ARCHIVE_LIMIT)

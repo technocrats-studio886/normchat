@@ -3,7 +3,9 @@
 namespace App\Services\Exports;
 
 use App\Models\Group;
+use App\Models\GroupMember;
 use App\Models\Message;
+use App\Services\Chat\SystemMessages;
 use App\Models\User;
 use App\Services\Chat\PollService;
 use App\Services\Files\StoredFiles;
@@ -32,15 +34,22 @@ class ChatExportBuilder
 
     public function build(Group $group, ExportOptions $options, User $exporter): ExportDocument
     {
-        $messages = $options->query((int) $group->id)
+        $messages = $options->query((int) $group->id, $exporter)
             ->with(['sender:id,name,avatar_url', 'replyToMessage.sender:id,name', 'versions', 'deleter:id,name'])
             ->get()
             ->reject(fn (Message $message) => ! $options->polls && $this->polls->parse($message->content) !== null)
             ->values();
         $polls = $options->polls ? $this->polls->summariesFor($messages) : [];
 
-        $entries = $messages->map(fn (Message $message) => $this->entry($message, $exporter, $options, $polls[(int) $message->id] ?? null))->all();
+        $entries = $messages->map(fn (Message $message) => $message->sender_type === Message::SENDER_SYSTEM
+            ? $this->noticeEntry($message, $options)
+            : $this->entry($message, $exporter, $options, $polls[(int) $message->id] ?? null))->all();
         $this->markRuns($entries, $messages->all());
+        // "X membuat grup ini" di awal bila rentang ekspor mencakup hari grup dibuat dan pengekspor boleh melihat awal grup.
+        $created = $this->createdEntry($group, $options, $exporter);
+        if ($created !== null) {
+            array_unshift($entries, $created);
+        }
 
         return new ExportDocument(
             (string) $group->name,
@@ -52,9 +61,36 @@ class ChatExportBuilder
     }
 
     /** Jumlah pesan yang akan masuk ekspor, untuk lembar filter. */
-    public function count(Group $group, ExportOptions $options): int
+    public function count(Group $group, ExportOptions $options, ?User $exporter = null): int
     {
-        return $options->query((int) $group->id)->count();
+        return $options->query((int) $group->id, $exporter)->count();
+    }
+
+    private function noticeEntry(Message $message, ExportOptions $options): ExportEntry
+    {
+        $meta = (array) ($message->system_meta ?? []);
+        $at = CarbonImmutable::parse($message->created_at)->setTimezone($options->timezone)->locale('id');
+        $details = $message->system_event === SystemMessages::DESCRIPTION_CHANGED;
+
+        return ExportEntry::notice(
+            $at,
+            SystemMessages::text((string) $message->system_event, $meta),
+            $details ? (trim((string) ($meta['before'] ?? '')) ?: null) : null,
+            $details ? (trim((string) ($meta['after'] ?? '')) ?: null) : null,
+        );
+    }
+
+    private function createdEntry(Group $group, ExportOptions $options, User $exporter): ?ExportEntry
+    {
+        [$from, $to] = $options->bounds();
+        $createdAt = CarbonImmutable::parse($group->created_at);
+        $restricted = GroupMember::where('group_id', $group->id)->where('user_id', $exporter->id)->whereNotNull('history_from_message_id')->exists();
+        if ($restricted || $options->senders !== [] || ($from && $createdAt->lt($from)) || ($to && $createdAt->gt($to))) {
+            return null;
+        }
+        $owner = $group->owner?->name ?? 'Pemilik';
+
+        return ExportEntry::notice($createdAt->setTimezone($options->timezone)->locale('id'), "{$owner} membuat grup ini.");
     }
 
     private function entry(Message $message, User $exporter, ExportOptions $options, ?array $poll): ExportEntry

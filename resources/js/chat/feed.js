@@ -3,6 +3,7 @@
 
 import { chatFeed } from './context.js';
 import { renderMermaidInNode } from './markdown.js';
+import { applyDaySeparators, initFloatingDay } from './day-markers.js';
 import { applyMessageRuns, avatarFallbackHtml, buildMessageNode } from './messages.js';
 import { refreshPollCardsFromFeed } from './polls.js';
 import { initVoicePlayers } from './voice-player.js';
@@ -31,7 +32,7 @@ const removeEmptyStateOnFirstMessage = () => {
 	}
 
 	const observer = new MutationObserver(() => {
-		if (chatFeed.querySelector('.nc-msg')) {
+		if (chatFeed.querySelector('.nc-msg, .nc-system-msg')) {
 			emptyState.remove();
 			observer.disconnect();
 		}
@@ -50,6 +51,7 @@ const keepMessageRunsUpdated = () => {
 		window.requestAnimationFrame(() => {
 			scheduled = false;
 			applyMessageRuns(chatFeed);
+			applyDaySeparators(chatFeed);
 		});
 	};
 
@@ -67,6 +69,8 @@ export const initRenderedFeed = () => {
 	chatFeed.insertBefore(fragment, typingIndicator);
 
 	applyMessageRuns(chatFeed);
+	applyDaySeparators(chatFeed);
+	initFloatingDay(chatFeed);
 	keepMessageRunsUpdated();
 	removeEmptyStateOnFirstMessage();
 	initVoicePlayers(chatFeed);

@@ -71,6 +71,9 @@
             </button>
         </div>
 
+        {{-- Penanda tanggal melayang (resources/js/chat/day-markers.js) --}}
+        <div class="nc-day-float" data-day-float aria-hidden="true"></div>
+
         {{-- Messages --}}
         <div
             class="nc-scroll mt-3 flex-1 overflow-y-auto px-4 py-3 pb-56 lg:px-[max(1.5rem,calc((100%_-_var(--nc-room-max))/2))]"
@@ -86,13 +89,36 @@
             data-poll-stats-url="{{ route('chat.polls.stats', $group) }}"
             data-poll-vote-url-template="{{ route('chat.polls.vote', ['group' => $group, 'message' => '__MESSAGE__']) }}"
             data-viewer-is-moderator="{{ $viewerIsModerator ? '1' : '0' }}"
+            data-viewer-is-owner="{{ $viewerIsOwner ? '1' : '0' }}"
+            data-history-url-template="{{ route('groups.members.history', ['group' => $group, 'user' => 0]) }}"
+            data-history-from="{{ $historyFromMessageId }}"
             data-messages-url="{{ route('chat.store', $group) }}"
             data-group-frozen="{{ $group->isFrozen() ? '1' : '0' }}"
         >
+            @if($showCreatedCard)
+                {{-- Kartu "grup dibuat" (docs/rancangan-alur-chat-wa.md poin 5) --}}
+                <div class="nc-created-card">
+                    @if($viewerIsOwner)
+                        <a href="{{ route('settings.show', $group) }}" class="nc-created-photo" data-open-group-info aria-label="Ubah foto grup">
+                            <x-group-photo :group="$group" />
+                            <span class="nc-info-photo-badge" aria-hidden="true"><x-info-icon name="camera" class="h-4 w-4" /></span>
+                        </a>
+                    @else
+                        <span class="nc-created-photo"><x-group-photo :group="$group" /></span>
+                    @endif
+                    <p class="nc-created-title">{{ $viewerIsOwner ? 'Kamu yang membuat grup ini' : ($group->owner?->name ?? 'Pemilik') . ' membuat grup ini' }}</p>
+                    <p class="nc-created-meta">Grup · {{ $memberCount }} anggota</p>
+                    <p class="nc-created-note">Anggota bisa mengundang teman lewat tautan atau kode grup.</p>
+                    <div class="nc-created-actions">
+                        <button type="button" class="nc-created-button" data-open-share-sheet><x-info-icon name="add-member" />Tambah anggota</button>
+                        <button type="button" class="nc-created-button" data-open-share-sheet data-share-start="qr"><x-info-icon name="link" />Undang via tautan atau kode QR</button>
+                    </div>
+                </div>
+            @endif
             @if(empty($messages))
                 <p class="nc-feed-empty" data-feed-empty="1">Belum ada pesan. Sapa anggotamu, atau panggil <b>@normi</b> untuk bertanya.</p>
             @endif
-            <div class="hidden pb-2 text-[11px] text-slate-400" data-typing-indicator="1"></div>
+            <div class="nc-typing hidden" data-typing-indicator="1" role="status" aria-live="polite"></div>
         </div>
         {{-- Pesan awal; dirender oleh resources/js/chat/feed.js dengan templat yang sama seperti pesan realtime. --}}
         <script type="application/json" data-forward-targets nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">@json($forwardTargets, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)</script>
@@ -103,7 +129,9 @@
             @if($group->isFrozen())
                 <p class="nc-frozen-note" role="status">Grup ini dibekukan oleh admin Normi Chat. Pesan baru tidak bisa dikirim, riwayat tetap bisa dibaca.</p>
             @else
-            <form method="POST" action="{{ route('chat.store', $group) }}" class="relative" enctype="multipart/form-data" data-chat-form="1">
+            <form method="POST" action="{{ route('chat.store', $group) }}" class="relative" enctype="multipart/form-data" data-chat-form="1"
+                  data-group-id="{{ $group->id }}" data-draft-url="{{ route('groups.draft.beacon', $group) }}"
+                  data-draft="{{ json_encode($draft ? ['content' => $draft->content, 'reply_to_message_id' => $draft->reply_to_message_id] : null) }}">
                 @csrf
                 <input type="file" name="attachment" accept="{{ \App\Support\AttachmentRules::acceptAttribute() }}" class="hidden" data-chat-attachment="1" />
                 <input type="hidden" name="reply_to_message_id" value="" data-reply-to-input="1" />

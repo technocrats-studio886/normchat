@@ -106,15 +106,42 @@ class GroupInfoTest extends TestCase
         $this->group->update(['description' => 'Belajar bareng', 'member_daily_credit_limit' => 5]);
 
         $owner = $this->actingAs($this->owner)->get(route('settings.show', $this->group))->assertOk();
-        // Profil atas (ketuk untuk edit) → saldo + Tambah → Cari, Bagikan, Lainnya → tab Anggota | Media | Pengaturan.
-        $owner->assertSeeInOrder(['data-info-edit-open', 'Belajar bareng', 'data-info-edit-form', 'name="avatar"', 'Saldo grup', '>Tambah<', 'Cari', 'Bagikan', 'Lainnya', '>Anggota<', '>Media<', '>Pengaturan<', 'Tambah anggota', 'Media, tautan, dan dok', 'Kata sandi grup', 'Batas harian per anggota'], false)
+        // Profil atas, edit per bagian (foto, nama, deskripsi masing-masing punya form sendiri)
+        // → saldo + Tambah → Cari, Bagikan, Lainnya → tab Anggota | Media | Pengaturan.
+        $owner->assertSeeInOrder(['Ubah foto grup', 'Pasang foto', 'name="avatar"', 'data-info-field="name"', 'name="name"', 'data-info-field="description"', 'Belajar bareng', 'name="description"', 'Saldo grup', '>Tambah<', 'Cari', 'Bagikan', 'Lainnya', '>Anggota<', '>Media<', '>Pengaturan<', 'Tambah anggota', 'Media, tautan, dan dok', 'Kata sandi grup', 'Batas harian per anggota'], false)
             ->assertDontSee('Isi Normkredit')->assertDontSee('Kelola')->assertSee('name="member_daily_credit_limit"', false)
             ->assertSee('Hapus grup')->assertSee('data-share-sheet', false)->assertSee(route('groups.join', $this->group->share_id));
 
         $this->actingAs($this->member)->get(route('settings.show', $this->group))->assertOk()
-            ->assertDontSee('data-info-edit-open', false)->assertDontSee('name="avatar"', false)->assertDontSee('name="password"', false)
+            ->assertDontSee('data-info-field-edit', false)->assertDontSee('name="avatar"', false)->assertDontSee('name="password"', false)
             ->assertDontSee('name="member_daily_credit_limit"', false)
             ->assertSee('Batas pemakaian 5,00 NK per anggota per hari')->assertSee('Keluar grup')->assertDontSee('Hapus grup');
+    }
+
+    public function test_each_profile_part_saves_on_its_own(): void
+    {
+        $this->group->update(['description' => 'Deskripsi lama']);
+        $name = $this->group->name;
+
+        // Deskripsi saja: nama tetap.
+        $this->actingAs($this->owner)->post(route('settings.profile.update', $this->group), ['description' => 'Deskripsi baru'])->assertSessionHasNoErrors();
+        $this->assertSame([$name, 'Deskripsi baru'], [$this->group->fresh()->name, $this->group->fresh()->description]);
+
+        // Nama saja: deskripsi tetap.
+        $this->actingAs($this->owner)->post(route('settings.profile.update', $this->group), ['name' => 'Nama Baru'])->assertSessionHasNoErrors();
+        $this->assertSame(['Nama Baru', 'Deskripsi baru'], [$this->group->fresh()->name, $this->group->fresh()->description]);
+
+        // Foto saja: nama dan deskripsi tetap.
+        $this->actingAs($this->owner)->post(route('settings.profile.update', $this->group), ['avatar' => UploadedFile::fake()->image('a.png', 80, 80)])->assertSessionHasNoErrors();
+        $group = $this->group->fresh();
+        $this->assertSame(['Nama Baru', 'Deskripsi baru'], [$group->name, $group->description]);
+        $this->assertNotNull($group->avatar_path);
+
+        // Nama kosong ditolak dan kolom nama terbuka lagi dengan pesannya, bagian lain tidak.
+        $this->actingAs($this->owner)->from(route('settings.show', $this->group))->post(route('settings.profile.update', $this->group), ['name' => '']);
+        $html = $this->actingAs($this->owner)->get(route('settings.show', $this->group))->getContent();
+        $this->assertMatchesRegularExpression('/data-info-field="name"\s+data-editing/', $html);
+        $this->assertDoesNotMatchRegularExpression('/data-info-field="description"\s+data-editing/', $html);
     }
 
     public function test_password_form_changes_only_the_password_and_returns_to_the_settings_tab(): void

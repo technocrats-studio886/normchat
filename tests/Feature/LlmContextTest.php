@@ -102,6 +102,36 @@ class LlmContextTest extends TestCase
         $this->assertStringContainsString('pesan-ke-10', $history);
     }
 
+    public function test_member_whose_history_is_closed_only_gives_normi_what_they_can_see(): void
+    {
+        $old = collect(range(1, 4))->map(fn (int $n) => $this->say($this->group, $this->noel, "RAHASIA-LAMA-{$n}"));
+        GroupContextSummary::create([
+            'group_id' => $this->group->id,
+            'summary' => 'RINGKASAN-LAMA: grup membahas rahasia.',
+            'covered_until_message_id' => $old[2]->id,
+            'window_start_message_id' => $old[3]->id,
+        ]);
+        // Sari bergabung belakangan; pemilik belum mengirim riwayat pesan.
+        \App\Models\GroupMember::create(['group_id' => $this->group->id, 'user_id' => $this->sari->id, 'role_id' => \App\Models\Role::forKey(\App\Models\Role::MEMBER)->id, 'status' => 'active', 'joined_at' => now(), 'history_from_message_id' => $old[3]->id]);
+        app(\App\Services\Chat\SystemMessages::class)->record($this->group, \App\Services\Chat\SystemMessages::MEMBER_JOINED, $this->sari);
+        $this->say($this->group, $this->noel, 'Selamat datang Sari, besok kumpul jam 7.');
+
+        $context = app(ContextManager::class)->build($this->group, $this->say($this->group, $this->sari, '@normi besok kumpul jam berapa?'));
+
+        $window = collect($context->window)->pluck('content')->implode("\n");
+        $this->assertStringContainsString('besok kumpul jam 7', $window);
+        $this->assertStringNotContainsString('RAHASIA-LAMA', $window);
+        $this->assertStringNotContainsString('bergabung lewat tautan', $window, 'Pemberitahuan sistem bukan bagian obrolan.');
+        $this->assertNull($context->summary);
+        $this->assertSame([], $context->retrieved);
+        $this->assertSame([], $context->topics);
+
+        // Setelah riwayat dikirim, Normi memakai seluruh riwayat lagi.
+        \App\Models\GroupMember::where('user_id', $this->sari->id)->update(['history_from_message_id' => null]);
+        $context = app(ContextManager::class)->build($this->group, $this->say($this->group, $this->sari, '@normi ringkas ya'));
+        $this->assertSame('RINGKASAN-LAMA: grup membahas rahasia.', $context->summary);
+    }
+
     public function test_stale_summary_is_not_used(): void
     {
         $first = $this->say($this->group, $this->sari, 'pesan-awal');

@@ -11,10 +11,12 @@ use App\Models\AuditLog;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\Role;
+use App\Services\Chat\SystemMessages;
 use App\Services\FreeGroups;
 use App\Services\GroupMembership;
 use App\Services\NormkreditPricing;
 use App\Services\Payments\NormkreditCheckout;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +30,7 @@ class GroupController extends Controller
         private readonly GroupMembership $membership,
         private readonly NormkreditCheckout $checkout,
         private readonly FreeGroups $freeGroups,
+        private readonly SystemMessages $systemMessages,
     ) {
     }
 
@@ -46,14 +49,8 @@ class GroupController extends Controller
             }
         }
 
-        $groups = Group::query()
-            ->visibleTo($user)
-            ->with(['members', 'groupToken'])
-            ->withCount('members')
-            ->latest()
-            ->get();
-
-        return view('groups.index', ['groups' => $groups]);
+        // Urutan sama dengan sidebar desktop: berdraf dulu, lalu pesan terbaru (App\Services\Groups\GroupListRows).
+        return view('groups.index', ['rows' => app(\App\Services\Groups\GroupListRows::class)->for($user)]);
     }
 
     public function create(Request $request): View
@@ -273,11 +270,28 @@ class GroupController extends Controller
         }
 
         $member->delete();
+        $this->systemMessages->record($group, SystemMessages::MEMBER_REMOVED, $request->user(), $member->user);
 
         AuditLog::record('group.member_removed', $request->user()->id, $member, [], $group->id);
         event(new GroupMembershipChanged((int) $group->id, (int) $member->user_id, 'removed', null));
 
         return back()->with('success', 'Anggota dikeluarkan dari grup.')->with('group_info', 'members');
+    }
+
+    /** Pemilik mengirim riwayat pesan ke anggota yang bergabung belakangan (tautan di pemberitahuan bergabung). */
+    public function shareHistory(Request $request, Group $group, int $user): JsonResponse|RedirectResponse
+    {
+        abort_unless($group->isOwnedBy($request->user()), 403);
+        $member = GroupMember::query()->where('group_id', $group->id)->where('user_id', $user)->where('status', 'active')->firstOrFail();
+
+        $shared = $this->membership->shareHistory($group, $member->load('user'), $request->user());
+        if ($shared) {
+            event(new GroupMembershipChanged((int) $group->id, (int) $member->user_id, 'history_shared', null));
+        }
+
+        return $request->expectsJson()
+            ? response()->json(['ok' => true, 'shared' => $shared])
+            : back()->with('success', $shared ? 'Riwayat pesan dikirim ke ' . $member->user?->name . '.' : 'Riwayat pesan sudah dikirim sebelumnya.');
     }
 
     /** Anggota/admin keluar sendiri. Patungannya tetap jadi saldo grup; pesannya tetap ada. */
@@ -292,6 +306,7 @@ class GroupController extends Controller
         abort_unless($member !== null, 404);
 
         $member->delete();
+        $this->systemMessages->record($group, SystemMessages::MEMBER_LEFT, $user);
 
         AuditLog::record('group.member_left', $user->id, $member, [], $group->id);
         event(new GroupMembershipChanged((int) $group->id, (int) $user->id, 'left', null));

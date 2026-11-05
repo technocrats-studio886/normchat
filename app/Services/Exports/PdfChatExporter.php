@@ -57,8 +57,26 @@ class PdfChatExporter implements ChatExporter
             . '</body></html>';
     }
 
+    /** Pemberitahuan tengah (bergabung, keluar, grup dibuat, ganti nama/deskripsi/foto) + jam. */
+    private function noticeRow(ExportEntry $entry): string
+    {
+        $notice = $entry->notice;
+        $detail = '';
+        if ($notice['before'] !== null) {
+            $detail .= '<span class="detail before">' . $this->text($notice['before']) . '</span>';
+        }
+        if ($notice['after'] !== null) {
+            $detail .= '<span class="detail">' . $this->text($notice['after']) . '</span>';
+        }
+
+        return '<div class="notice"><span>' . $this->text($notice['text']) . ' · ' . e($entry->sentAt->format('H.i')) . $detail . '</span></div>';
+    }
+
     private function row(ExportEntry $entry): string
     {
+        if ($entry->notice !== null) {
+            return $this->noticeRow($entry);
+        }
         $side = $entry->isMine ? 'mine' : ($entry->isAi ? 'ai' : 'other');
         $bubble = '<div class="bubble">'
             . ($entry->runStart && ! $entry->isMine ? '<div class="name" style="color:' . $entry->color . '">' . $this->text($entry->senderName) . '</div>' : '')
@@ -194,6 +212,10 @@ class PdfChatExporter implements ChatExporter
             .sub { text-align: center; font-size: 8.5px; color: #5d6c80; margin-bottom: 10px; }
             .empty { text-align: center; color: #5d6c80; margin-top: 40px; }
             .day { text-align: center; margin: 12px 0 4px; }
+            .notice { text-align: center; margin: 6px 40px; }
+            .notice span { display: inline-block; background: #f3f5f8; color: #4a5a6e; font-size: 8.5px; padding: 3px 10px; border-radius: 8px; }
+            .notice .detail { display: block; margin-top: 2px; color: #6b7a8d; font-size: 8px; }
+            .notice .before { text-decoration: line-through; }
             .day span { background: #eef1f5; color: #5d6c80; font-size: 8px; padding: 2px 9px; border-radius: 8px; }
             table.row { width: 100%; border-collapse: collapse; margin-top: 2px; page-break-inside: avoid; }
             table.row.run-start { margin-top: 7px; }

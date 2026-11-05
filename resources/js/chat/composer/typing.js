@@ -20,6 +20,7 @@ export const whisperTyping = (isTyping) => {
 	groupChannel.whisper('typing', {
 		sender_id: authUserId,
 		sender_name: (document.querySelector('meta[name="auth-user-name"]')?.getAttribute('content') || 'User'),
+		sender_avatar: (document.querySelector('meta[name="auth-user-avatar"]')?.getAttribute('content') || ''),
 		is_typing: isTyping,
 	});
 };

@@ -45,10 +45,11 @@ class DesktopSidebarTest extends TestCase
         $group = $this->groupWith('Kelas BD', $me, [$friend]);
         $this->message($group, $friend, 'halo');
 
-        $this->actingAs($me)->get("/groups/{$group->id}/chat")
+        $html = $this->actingAs($me)->get("/groups/{$group->id}/chat")
             ->assertOk()
-            ->assertSee('aria-current="page"', false)
-            ->assertDontSee('nc-sidebar-badge', false);
+            ->assertSee('aria-current="page"', false)->getContent();
+        // Lencana selalu dirender (diperbarui langsung oleh group-list-live.js) tapi tersembunyi untuk grup yang dibuka.
+        $this->assertMatchesRegularExpression('/data-row-active.*?data-row-badge\s+hidden/s', $html);
     }
 
     public function test_guests_do_not_get_a_sidebar(): void

@@ -4,6 +4,7 @@ namespace App\Services\Ai\Context;
 
 use App\Models\AiUsageLog;
 use App\Models\Group;
+use App\Models\GroupMember;
 use App\Models\GroupContextSummary;
 use App\Models\GroupContextTopic;
 use App\Models\Message;
@@ -41,6 +42,11 @@ class ContextManager
 
     public function build(Group $group, Message $request): ContextBundle
     {
+        $floor = $this->historyFloor($group, $request);
+        if ($floor !== null) {
+            return $this->buildWithinVisibleHistory($group, $request, $floor);
+        }
+
         $state = GroupContextSummary::query()->where('group_id', $group->id)->first();
         $summary = $state?->usableSummaryBefore((int) $request->id);
         $anchor = $summary !== null ? $state->window_start_message_id : null;
@@ -101,10 +107,11 @@ class ContextManager
      *
      * @return list<Message>
      */
-    private function window(Group $group, Message $request, ?int $anchor): array
+    private function window(Group $group, Message $request, ?int $anchor, ?int $floor = null): array
     {
         $messages = $this->eligible($group, (int) $request->id)
             ->when($anchor !== null, fn (Builder $query) => $query->where('id', '>=', $anchor))
+            ->when($floor !== null, fn (Builder $query) => $query->where('id', '>', $floor))
             ->orderByDesc('id')
             ->limit(self::WINDOW_FETCH_LIMIT)
             ->get();
@@ -192,6 +199,42 @@ class ContextManager
         return $picked;
     }
 
+    /**
+     * Penanya yang riwayatnya belum dikirim pemilik (group_members.history_from_message_id): batas id pesan
+     * yang boleh ia lihat. Null = seluruh riwayat.
+     */
+    private function historyFloor(Group $group, Message $request): ?int
+    {
+        if ($request->sender_type !== 'user' || ! $request->sender_id) {
+            return null;
+        }
+        $floor = GroupMember::query()->where('group_id', $group->id)->where('user_id', $request->sender_id)->value('history_from_message_id');
+
+        return $floor !== null ? (int) $floor : null;
+    }
+
+    /**
+     * Konteks untuk penanya yang riwayatnya tertutup: hanya pesan sesudah ia bergabung. Ringkasan, topik,
+     * dan pencarian ingatan grup tidak dipakai karena bisa memuat obrolan sebelum ia bergabung.
+     */
+    private function buildWithinVisibleHistory(Group $group, Message $request, int $floor): ContextBundle
+    {
+        $window = $this->window($group, $request, null, $floor);
+        $understanding = $this->understanding->analyze($group, $request, $window, collect(), false);
+
+        return new ContextBundle(
+            summary: null,
+            window: $window,
+            topics: [],
+            retrieved: [],
+            intent: $understanding->intent,
+            ambiguous: $understanding->ambiguous,
+            understandingCalled: $understanding->usedModel,
+            searched: false,
+            refersToPast: $understanding->refersToPast,
+        );
+    }
+
     private function queryText(Message $request, Understanding $understanding): string
     {
         return trim(($understanding->intent ?? ContextUnderstanding::question($request)) . ' ' . implode(' ', $understanding->terms));
@@ -203,7 +246,8 @@ class ContextManager
             ->with(['sender:id,name', 'replyToMessage.sender:id,name'])
             ->where('group_id', $group->id)
             ->where('id', '<', $beforeId)
-            ->whereNull('visible_to_user_id');
+            ->whereNull('visible_to_user_id')
+            ->where('sender_type', '!=', Message::SENDER_SYSTEM);
     }
 
     public static function messageTokens(Message $message): int

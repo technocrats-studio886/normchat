@@ -19,6 +19,7 @@ final class ExportDocument
 
     public function count(): int
     {
-        return count($this->entries);
+        // Pemberitahuan tengah (bergabung, grup dibuat, …) bukan pesan.
+        return count(array_filter($this->entries, fn (ExportEntry $entry) => $entry->notice === null));
     }
 }

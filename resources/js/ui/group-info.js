@@ -18,8 +18,6 @@ const closeMenus = (root) => {
 
 const initPanel = (root, { onClose, onSearch }) => {
 	const scroller = () => root.closest('[data-info-scroll]') || root.parentElement;
-	const editForm = root.querySelector('[data-info-edit-form]');
-
 	const setTab = (tab) => {
 		root.dataset.infoTab = tab;
 		root.querySelectorAll('[data-info-tab-button]').forEach((button) => {
@@ -32,34 +30,27 @@ const initPanel = (root, { onClose, onSearch }) => {
 		closeMenus(root);
 		scroller()?.scrollTo?.({ top: 0 });
 	};
-	const resetEdit = () => {
-		if (!editForm) return;
-		editForm.reset();
-		const preview = editForm.querySelector('[data-info-photo-preview]');
-		if (preview) preview.hidden = true;
-		const current = editForm.querySelector('[data-info-photo-current]');
-		if (current && current.dataset.original !== undefined) current.innerHTML = current.dataset.original;
-		const remove = editForm.querySelector('[data-info-photo-remove]');
-		if (remove) {
-			remove.disabled = false;
-			remove.textContent = 'Hapus foto';
-		}
-		editForm.querySelector('[data-info-photo-remove-input]').value = '0';
+	// Edit per bagian profil atas: hanya bagian yang diketuk (nama atau deskripsi) yang jadi kolom isian.
+	const editingField = () => root.querySelector('[data-info-field][data-editing]');
+	const closeField = (field, { focusView = true } = {}) => {
+		if (!field) return;
+		const input = field.querySelector('[data-info-field-input]');
+		if (input) input.value = input.dataset.original ?? '';
+		field.removeAttribute('data-editing');
+		if (focusView) field.querySelector('[data-info-field-edit]')?.focus();
 	};
-	const setEditing = (on) => {
-		root.toggleAttribute('data-info-editing', on);
+	const openField = (field) => {
+		const current = editingField();
+		if (current && current !== field) closeField(current, { focusView: false });
 		closeMenus(root);
-		if (on) {
-			scroller()?.scrollTo?.({ top: 0 });
-			editForm?.querySelector('[data-info-edit-name]')?.focus();
-		} else {
-			resetEdit();
-			root.querySelector('[data-info-edit-open]')?.focus();
-		}
+		field.setAttribute('data-editing', '');
+		const input = field.querySelector('[data-info-field-input]');
+		input?.focus();
+		if (input instanceof HTMLInputElement) input.select();
 	};
 	/** Kembali ke keadaan awal saat jendela dibuka dari header. */
 	const reset = () => {
-		if (root.hasAttribute('data-info-editing')) setEditing(false);
+		closeField(editingField(), { focusView: false });
 		setView('main');
 		setTab('members');
 	};
@@ -79,12 +70,13 @@ const initPanel = (root, { onClose, onSearch }) => {
 			setTab(tab.getAttribute('data-info-tab-button') || 'members');
 			return;
 		}
-		if (target.closest('[data-info-edit-open]')) {
-			setEditing(true);
+		const fieldEdit = target.closest('[data-info-field-edit]');
+		if (fieldEdit) {
+			openField(fieldEdit.closest('[data-info-field]'));
 			return;
 		}
-		if (target.closest('[data-info-edit-cancel]')) {
-			setEditing(false);
+		if (target.closest('[data-info-field-cancel]')) {
+			closeField(target.closest('[data-info-field]'));
 			return;
 		}
 		if (target.closest('[data-info-close]')) {
@@ -141,32 +133,33 @@ const initPanel = (root, { onClose, onSearch }) => {
 			}
 			return;
 		}
-		const removePhoto = target.closest('[data-info-photo-remove]');
-		if (removePhoto && editForm) {
-			editForm.querySelector('[data-info-photo-remove-input]').value = '1';
-			editForm.querySelector('[data-info-photo-input]').value = '';
-			editForm.querySelector('[data-info-photo-preview]').hidden = true;
-			const current = editForm.querySelector('[data-info-photo-current]');
-			current.dataset.original ??= current.innerHTML;
-			current.textContent = (editForm.querySelector('[data-info-edit-name]')?.value || '?').trim().charAt(0).toUpperCase();
-			removePhoto.textContent = 'Foto akan dihapus setelah disimpan';
-			removePhoto.disabled = true;
+		if (target.closest('[data-info-photo-pick]')) {
+			// Label membuka pemilih berkas; menu ditutup supaya tidak tertinggal di atas pratinjau.
+			window.setTimeout(() => closeMenus(root), 0);
 			return;
 		}
 		if (!target.closest('[data-info-menu], [data-info-more-menu]')) closeMenus(root);
 	});
 
+	// Foto: setelah gambar dipilih, langsung diunggah (seperti aplikasi chat umumnya).
 	root.addEventListener('change', (event) => {
 		const input = event.target;
-		if (!(input instanceof HTMLInputElement) || !input.matches('[data-info-photo-input]') || !editForm) return;
+		if (!(input instanceof HTMLInputElement) || !input.matches('[data-info-photo-input]')) return;
 		const file = input.files?.[0];
-		const preview = editForm.querySelector('[data-info-photo-preview]');
-		if (!file || !(preview instanceof HTMLImageElement)) return;
+		if (!file) return;
+		const button = root.querySelector('[data-info-photo-current]');
+		const preview = document.createElement('img');
+		preview.className = 'nc-group-photo';
+		preview.alt = '';
 		preview.src = URL.createObjectURL(file);
-		preview.hidden = false;
-		editForm.querySelector('[data-info-photo-remove-input]').value = '0';
+		button?.querySelector('img.nc-group-photo')?.remove();
+		button?.prepend(preview);
+		root.querySelector('[data-info-photo-busy]')?.removeAttribute('hidden');
+		button?.setAttribute('aria-busy', 'true');
+		input.form?.submit();
 	});
 
+	// Enter di kolom nama menyimpan (bawaan form); Esc di kolom mana pun membatalkan bagian itu saja.
 	root.querySelector('[data-info-member-filter]')?.addEventListener('input', (event) => {
 		const query = event.target.value.trim().toLowerCase();
 		let shown = 0;
@@ -181,14 +174,14 @@ const initPanel = (root, { onClose, onSearch }) => {
 	document.addEventListener('click', (event) => {
 		if (!root.contains(event.target)) closeMenus(root);
 	});
-	// Esc berlapis: menu dulu, lalu mode edit / tampilan lengkap, baru jendela Info grup.
+	// Esc berlapis: menu dulu, lalu bagian yang sedang diedit / tampilan lengkap, baru jendela Info grup.
 	document.addEventListener('keydown', (event) => {
 		if (event.key !== 'Escape' || event.defaultPrevented || !root.isConnected || !root.offsetParent) return;
 		if (openMenuIn(root)) {
 			closeMenus(root);
 			event.preventDefault();
-		} else if (root.hasAttribute('data-info-editing')) {
-			setEditing(false);
+		} else if (editingField()) {
+			closeField(editingField());
 			event.preventDefault();
 		} else if (root.dataset.infoView === 'archive') {
 			setView('main');

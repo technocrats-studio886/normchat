@@ -116,6 +116,9 @@ Route::middleware('auth')->group(function () {
     // Members
     Route::post('/groups/{group}/members/{member}/promote', [GroupController::class, 'promoteMember'])->middleware('group.permission')->name('groups.members.promote');
     Route::post('/groups/{group}/members/{member}/remove', [GroupController::class, 'removeMember'])->middleware('group.permission')->name('groups.members.remove');
+    Route::post('/groups/{group}/history/{user}', [GroupController::class, 'shareHistory'])->whereNumber('user')->name('groups.members.history');
+    Route::put('/groups/{group}/draft', [\App\Http\Controllers\GroupDraftController::class, 'update'])->name('groups.draft.update');
+    Route::post('/groups/{group}/draft', [\App\Http\Controllers\GroupDraftController::class, 'update'])->name('groups.draft.beacon');
     Route::post('/groups/{group}/leave', [GroupController::class, 'leave'])->middleware('group.permission')->name('groups.leave');
 
     // Profile

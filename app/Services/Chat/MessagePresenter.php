@@ -2,6 +2,7 @@
 
 namespace App\Services\Chat;
 
+use App\Models\GroupMember;
 use App\Models\Message;
 
 /** Bentuk pesan yang dikirim ke frontend (respons JSON dan event realtime). */
@@ -50,12 +51,36 @@ class MessagePresenter
                 'quote_text' => $replyTarget->trashed() ? '' : (string) ($message->reply_quote_text ?? ''),
                 'attachment_original_name' => $replyTarget->trashed() ? '' : (string) ($replyTarget->attachment_original_name ?? ''),
             ] : null,
+            // Pemberitahuan di tengah chat (App\Services\Chat\SystemMessages); teksnya disusun di browser per penonton.
+            'system' => $message->sender_type === Message::SENDER_SYSTEM ? [
+                'event' => (string) $message->system_event,
+                'meta' => (array) ($message->system_meta ?? []),
+                'text' => (string) $message->content,
+                // Pemilik masih bisa mengirim riwayat ke anggota yang bergabung ini.
+                'history_pending' => $message->system_event === SystemMessages::MEMBER_JOINED && $this->historyPending($message),
+            ] : null,
             ...$extra,
         ];
     }
 
+    private function historyPending(Message $message): bool
+    {
+        $memberId = (int) ($message->system_meta['actor_id'] ?? 0);
+
+        return $memberId > 0 && GroupMember::query()
+            ->where('group_id', $message->group_id)
+            ->where('user_id', $memberId)
+            ->where('status', 'active')
+            ->whereNotNull('history_from_message_id')
+            ->exists();
+    }
+
     public function senderName(Message $message): string
     {
-        return $message->sender_type === 'ai' ? 'Normi AI' : ($message->sender?->name ?? 'Anggota');
+        return match ($message->sender_type) {
+            'ai' => 'Normi AI',
+            Message::SENDER_SYSTEM => 'Normi Chat',
+            default => $message->sender?->name ?? 'Anggota',
+        };
     }
 }

@@ -5,6 +5,7 @@
     @auth
         <meta name="auth-user-id" content="{{ auth()->id() }}">
         <meta name="auth-user-name" content="{{ auth()->user()->name }}">
+        <meta name="auth-user-avatar" content="{{ auth()->user()->avatar_url }}">
         <meta name="auth-user-timezone" content="{{ auth()->user()->timezone }}" data-timezone-url="{{ route('profile.timezone.update') }}" data-timezone-mode="{{ auth()->user()->timezone_mode }}">
         <meta name="auth-user-notify-sound" content="{{ auth()->user()->notify_sound ? '1' : '0' }}">
     @endauth

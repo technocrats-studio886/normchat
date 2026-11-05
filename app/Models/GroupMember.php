@@ -18,6 +18,7 @@ class GroupMember extends Model
         'joined_at',
         'last_read_message_id',
         'last_read_at',
+        'history_from_message_id',
     ];
 
     protected $casts = [

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Group;
 use App\Models\GroupTokenContribution;
+use App\Models\User;
+use App\Services\Chat\SystemMessages;
 use App\Services\Groups\GroupAvatars;
 use App\Services\Groups\GroupInfo;
 use Illuminate\Http\RedirectResponse;
@@ -29,8 +31,8 @@ class SettingsController extends Controller
         // Profil atas (nama, deskripsi, foto) dan kata sandi di tab Pengaturan memakai form terpisah:
         // field yang tidak dikirim tidak diubah.
         $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:120'],
-            'description' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'name' => ['sometimes', 'required', 'string', 'max:' . Group::NAME_MAX],
+            'description' => ['sometimes', 'nullable', 'string', 'max:' . Group::DESCRIPTION_MAX],
             'password' => ['nullable', 'string', 'min:4', 'max:100'],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'remove_avatar' => ['nullable', 'boolean'],
@@ -40,6 +42,8 @@ class SettingsController extends Controller
             'avatar.mimes' => 'Foto grup harus JPG, PNG, atau WebP.',
             'avatar.max' => 'Ukuran foto grup maksimal 5 MB.',
             'password.min' => 'Kata sandi minimal 4 karakter.',
+            'name.max' => 'Nama grup maksimal ' . Group::NAME_MAX . ' karakter.',
+            'description.max' => 'Deskripsi grup maksimal ' . Group::DESCRIPTION_MAX . ' karakter.',
         ]);
 
         $updates = [];
@@ -63,9 +67,11 @@ class SettingsController extends Controller
             $avatarChange = 'removed';
         }
 
+        $before = ['name' => $group->name, 'description' => $group->description];
         if ($updates !== []) {
             $group->update($updates);
         }
+        $this->recordProfileEvents($group, $request->user(), $before, $avatarChange);
         if ($avatarChange) {
             $avatars->delete($oldAvatar);
         }
@@ -79,6 +85,21 @@ class SettingsController extends Controller
         return back()
             ->with('success', isset($updates['password_hash']) && count($updates) === 1 ? 'Kata sandi grup diganti.' : 'Info grup disimpan.')
             ->with('group_info', $validated['info_view'] ?? 'main');
+    }
+
+    /** Pemberitahuan di tengah chat untuk perubahan nama, deskripsi, dan foto (hanya bila benar berubah). */
+    private function recordProfileEvents(Group $group, User $actor, array $before, ?string $avatarChange): void
+    {
+        $events = app(SystemMessages::class);
+        if ($group->wasChanged('name')) {
+            $events->record($group, SystemMessages::NAME_CHANGED, $actor, null, ['before' => $before['name'], 'after' => $group->name]);
+        }
+        if ($group->wasChanged('description') && trim((string) $before['description']) !== trim((string) $group->description)) {
+            $events->record($group, SystemMessages::DESCRIPTION_CHANGED, $actor, null, ['before' => (string) $before['description'], 'after' => (string) $group->description]);
+        }
+        if ($avatarChange) {
+            $events->record($group, $avatarChange === 'updated' ? SystemMessages::PHOTO_CHANGED : SystemMessages::PHOTO_REMOVED, $actor);
+        }
     }
 
     public function transactionHistory(Group $group): View

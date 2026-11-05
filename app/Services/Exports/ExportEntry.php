@@ -13,6 +13,7 @@ final class ExportEntry
      * @param  list<array{content: string, until: CarbonImmutable}>  $versions  isi sebelum diedit, terlama dulu
      * @param  array{question: string, options: list<array>, total_votes: int}|null  $poll
      * @param  array{kind: string, name: string, mime: string, image: ?string}|null  $attachment
+     * @param  array{text: string, before: ?string, after: ?string}|null  $notice  pemberitahuan di tengah (bukan bubble)
      */
     public function __construct(
         public readonly string $senderName,
@@ -31,6 +32,13 @@ final class ExportEntry
         public readonly ?array $attachment,
         public bool $runStart = true,
         public bool $runEnd = true,
+        public readonly ?array $notice = null,
     ) {
+    }
+
+    /** Baris pemberitahuan tengah: bergabung, keluar, grup dibuat, ganti nama, dll. */
+    public static function notice(CarbonImmutable $at, string $text, ?string $before = null, ?string $after = null): self
+    {
+        return new self('', false, false, '', null, $at, '', null, null, null, [], null, null, null, notice: ['text' => $text, 'before' => $before, 'after' => $after]);
     }
 }

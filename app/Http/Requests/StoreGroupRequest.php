@@ -9,8 +9,8 @@ class StoreGroupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:120'],
-            'description' => ['nullable', 'string', 'max:500'],
+            'name' => ['required', 'string', 'max:' . \App\Models\Group::NAME_MAX],
+            'description' => ['nullable', 'string', 'max:' . \App\Models\Group::DESCRIPTION_MAX],
             'password' => ['required', 'string', 'min:4', 'max:100'],
         ];
     }

@@ -36,21 +36,27 @@
             <button type="submit" class="btn-secondary shrink-0 px-4 py-2">Gabung</button>
         </form>
 
-        @if(count($groups) > 3)
+        @if(count($rows) > 3)
             <input type="search" placeholder="Cari grup" class="nc-input mt-3 w-full" aria-label="Cari grup" data-group-search-input="1" autocomplete="off">
         @endif
 
-        <div class="nc-list">
-            @forelse ($groups as $group)
-                @php
-                    $activeMembers = $group->members->where('status', 'active');
-                    $memberCount = $activeMembers->count() + ($activeMembers->contains('user_id', $group->owner_id) ? 0 : 1);
-                @endphp
-                <a href="{{ route('chat.show', $group) }}" class="nc-list-row hover:bg-surface-2" data-group-card="1" data-group-search="{{ $group->name }} {{ $group->share_id }}">
-                    <span class="nc-sidebar-avatar h-11 w-11 text-sm"><x-group-photo :group="$group" /></span>
+        <div class="nc-list" data-group-list data-viewer-id="{{ auth()->id() }}">
+            @forelse ($rows as $row)
+                @php($group = $row['group'])
+                @php($unreadLabel = $row['unread'] > 99 ? '99+' : $row['unread'])
+                <a href="{{ route('chat.show', $group) }}" class="nc-list-row hover:bg-surface-2" data-group-card="1" data-group-search="{{ $group->name }} {{ $group->share_id }}"
+                   data-group-row="{{ $group->id }}" data-activity-at="{{ $row['activity_at'] }}" data-draft-at="{{ $row['draft_at'] }}" data-unread="{{ $row['unread'] }}">
+                    <span class="nc-sidebar-avatar h-12 w-12 text-sm"><x-group-photo :group="$group" /></span>
                     <span class="min-w-0 flex-1">
-                        <span class="block truncate text-sm font-semibold">{{ $group->name }}</span>
-                        <span class="block text-xs text-ink-soft">{{ $memberCount }} anggota{{ $group->isFrozen() ? ' · Dibekukan' : '' }}</span>
+                        <span class="flex items-baseline gap-2">
+                            <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ $group->name }}</span>
+                            <span class="nc-sidebar-time shrink-0 text-[11px]" data-row-time>{{ $row['time'] }}</span>
+                        </span>
+                        <span class="mt-0.5 flex items-center gap-2">
+                            @include('groups.partials.row-preview', ['row' => $row, 'class' => 'nc-sidebar-preview min-w-0 flex-1 truncate text-[13px]'])
+                            <span class="nc-sidebar-badge" data-row-badge @unless($row['unread'] > 0) hidden @endunless>{{ $unreadLabel }}</span>
+                        </span>
+                        @if($group->isFrozen())<span class="block text-xs text-ink-soft">Dibekukan</span>@endif
                     </span>
                 </a>
             @empty

@@ -3,6 +3,7 @@
 // Normi AI diberi avatar. Pesan beruntun dari pengirim yang sama membentuk satu rangkaian
 // (applyMessageRuns): nama hanya di pesan pertama, avatar hanya di pesan terakhir.
 
+import { buildSystemNode } from './system-messages.js';
 import { personColor, renderAttachment, renderQuote } from './attachments.js';
 import { authUserId, chatFeed } from './context.js';
 import { renderMarkdown, renderMermaidInNode } from './markdown.js';
@@ -26,7 +27,7 @@ const userIconSvg = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="t
 /** Siluet Heroicons di lingkaran warna anggota, untuk yang belum punya foto atau fotonya gagal dimuat. */
 export const avatarFallbackHtml = () => `<span class="nc-avatar-fallback">${userIconSvg}</span>`;
 
-const avatarHtml = (message, isAi) => {
+export const avatarHtml = (message, isAi) => {
 	if (isAi) {
 		return '<span class="nc-avatar nc-avatar--ai" aria-hidden="true"><img src="/icons/icon-192.png" alt="" class="nc-avatar-img"></span>';
 	}
@@ -54,6 +55,9 @@ const timeHtml = (message, createdAt) => {
 };
 
 export const buildMessageNode = (message) => {
+	if (message?.sender_type === 'system') {
+		return buildSystemNode(message);
+	}
 	const isAi = message?.sender_type === 'ai';
 	const isMine = !isAi && message?.sender_type === 'user' && Number(message?.sender_id || 0) === authUserId;
 	const tone = isAi ? 'ai' : (isMine ? 'mine' : 'other');

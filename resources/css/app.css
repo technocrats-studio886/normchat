@@ -2006,6 +2006,142 @@
     [data-mode="dark"] .nc-logo-on-light { display: none; }
     [data-mode="dark"] .nc-logo-on-dark { display: inline-block; }
 
+    /* ── Alur chat ala WhatsApp (docs/rancangan-alur-chat-wa.md) ─────────── */
+    /* Pemberitahuan di tengah chat */
+    .nc-system-msg { display: flex; justify-content: center; margin: 10px 0; }
+    .nc-system-pill {
+        max-width: min(32rem, 92%);
+        padding: 6px 12px;
+        border-radius: 12px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        color: var(--nc-text-soft);
+        font-size: 12.5px;
+        line-height: 1.45;
+        text-align: center;
+        overflow-wrap: anywhere;
+    }
+    .nc-system-action { margin-left: 2px; font-weight: 700; color: var(--nc-primary-text); }
+    .nc-system-action:hover { text-decoration: underline; }
+    .nc-system-action:disabled { opacity: 0.6; }
+    .nc-system-done { margin-left: 4px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-system-detail { display: block; margin-top: 4px; color: var(--nc-text); white-space: pre-line; }
+    .nc-system-detail.is-before { color: var(--nc-text-soft); text-decoration: line-through; }
+
+    /* Pita tanggal dan pemisah belum dibaca */
+    .nc-day-sep, .nc-unread-sep { display: flex; justify-content: center; margin: 12px 0 8px; }
+    .nc-day-sep span {
+        padding: 4px 12px;
+        border-radius: 10px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        color: var(--nc-text-soft);
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .nc-unread-sep span {
+        width: 100%;
+        padding: 5px 12px;
+        background: var(--nc-primary-light);
+        color: var(--nc-primary-text);
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+        border-radius: 10px;
+    }
+    /* Penanda tanggal melayang: tampil saat digulir, hilang 1,5 detik kemudian */
+    .nc-day-float {
+        position: absolute;
+        top: 84px;
+        left: 50%;
+        z-index: 25;
+        padding: 5px 14px;
+        border-radius: 10px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        box-shadow: var(--nc-shadow-md);
+        color: var(--nc-text-soft);
+        font-size: 12.5px;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, -6px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .nc-day-float.is-visible { opacity: 1; transform: translate(-50%, 0); }
+    .nc-day-float:empty { display: none; }
+
+    /* Sedang mengetik: foto profil bulat bertumpuk ke kanan + nama */
+    .nc-typing { display: flex; align-items: center; gap: 8px; padding: 4px 0 10px; }
+    .nc-typing.hidden { display: none; }
+    .nc-typing-avatars { display: inline-flex; flex: none; }
+    .nc-typing-avatar { display: inline-flex; border-radius: 9999px; box-shadow: 0 0 0 2px var(--nc-chat-bg, var(--nc-bg)); }
+    .nc-typing-avatar + .nc-typing-avatar { margin-left: -10px; }
+    .nc-typing-avatar .nc-avatar { width: 26px; height: 26px; visibility: visible; }
+    .nc-typing-text { min-width: 0; font-size: 12.5px; color: var(--nc-text-soft); overflow-wrap: anywhere; }
+    .nc-typing-dots { display: inline-flex; gap: 2px; margin-left: 3px; vertical-align: middle; }
+    .nc-typing-dots i { width: 4px; height: 4px; border-radius: 9999px; background: currentColor; animation: ncTypingDot 1.2s infinite ease-in-out; }
+    .nc-typing-dots i:nth-child(2) { animation-delay: 0.15s; }
+    .nc-typing-dots i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes ncTypingDot { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+    @media (prefers-reduced-motion: reduce) { .nc-typing-dots i { animation: none; opacity: 0.7; } }
+
+    /* Kartu "grup dibuat" di paling atas feed */
+    .nc-created-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 26rem;
+        margin: 8px auto 16px;
+        padding: 20px 18px 16px;
+        border-radius: 20px;
+        background: var(--nc-surface);
+        border: 1px solid var(--nc-line);
+        text-align: center;
+    }
+    .nc-created-photo {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 76px;
+        height: 76px;
+        border-radius: 9999px;
+        background: var(--nc-primary);
+        color: #ffffff;
+        font-size: 28px;
+        font-weight: 800;
+    }
+    .nc-created-photo > .nc-group-photo { border-radius: 9999px; }
+    .nc-created-title { margin-top: 12px; font-size: 16px; font-weight: 800; color: var(--nc-text); }
+    .nc-created-meta { margin-top: 2px; font-size: 13px; color: var(--nc-text-soft); }
+    .nc-created-note { margin-top: 8px; font-size: 13px; line-height: 1.5; color: var(--nc-text-soft); }
+    .nc-created-actions { display: grid; gap: 8px; width: 100%; margin-top: 14px; }
+    .nc-created-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 9999px;
+        border: 1px solid var(--nc-line-strong);
+        color: var(--nc-primary-text);
+        font-size: 14px;
+        font-weight: 700;
+        transition: background-color 0.15s ease;
+    }
+    .nc-created-button:hover { background: var(--nc-surface-2); }
+
+    /* Daftar grup: label draf dan lencana yang bisa disembunyikan saat 0 */
+    .nc-draft-label { font-weight: 700; color: var(--nc-primary-text); }
+    .nc-sidebar-item.is-active .nc-draft-label { color: #ffffff; }
+    :root .nc-sidebar-dot[hidden], :root .nc-sidebar-badge[hidden], [data-row-draft][hidden], [data-row-last][hidden] { display: none; }
+
+    /* Penghitung sisa karakter (form-helpers: [data-char-count]) */
+    .nc-char-count { display: block; margin-top: 4px; font-size: 11px; text-align: right; color: var(--nc-text-soft); }
+    .nc-char-count.is-near { color: var(--nc-danger-text); }
+
     /* ── Info grup (docs/rancangan-info-grup.md) ───────────────────────────
        Satu isi (.nc-info) untuk halaman HP (.nc-info-page) dan ruang chat desktop (.nc-info-embed)
        yang dipindah ke jendela (.nc-info-modal) atau panel kanan (.nc-info-side). */
@@ -2033,20 +2169,50 @@
     .nc-info-icon-btn:hover { background: var(--nc-surface-2); color: var(--nc-text); }
     .nc-info-icon-btn[hidden] { display: none; }
 
-    .nc-info-hero { padding: 4px 16px 0; }
-    .nc-info-hero-button {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        width: 100%;
-        padding: 8px 4px 10px;
-        border-radius: 18px;
-        text-align: center;
-        color: inherit;
+    .nc-info-hero { display: flex; flex-direction: column; align-items: center; padding: 12px 20px 0; text-align: center; }
+    /* Edit per bagian (nama, deskripsi): tampilan biasa ⇄ kolom isian, hanya bagian yang diketuk. */
+    .nc-info-field { width: 100%; max-width: 34rem; text-align: center; }
+    .nc-info-field > .nc-info-field-view { display: inline-block; text-align: center; }
+    .nc-info-field > .nc-info-field-view.nc-info-name { margin-top: 10px; }
+    .nc-info-field-view { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 10px; color: inherit; transition: background-color 0.15s ease; }
+    .nc-info-field-view:hover { background: var(--nc-surface-2); }
+    .nc-info-field-view:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
+    .nc-info-field-form { display: none; margin-top: 10px; text-align: left; }
+    .nc-info-field[data-editing] .nc-info-field-view { display: none; }
+    .nc-info-field[data-editing] .nc-info-field-form { display: block; }
+    .nc-info-field-ok { background: var(--nc-primary); color: #ffffff; }
+    .nc-info-field-ok:hover { background: var(--nc-primary-hover); color: #ffffff; }
+    /* Foto: ketuk untuk menu Ganti/Hapus, lencana kamera di pojok. */
+    .nc-info-photo.nc-info-photo-button { overflow: visible; cursor: pointer; }
+    .nc-info-photo-button > .nc-group-photo { border-radius: 9999px; }
+    .nc-info-photo-button:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 3px; }
+    .nc-info-photo-badge {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 9999px;
+        background: var(--nc-surface);
+        color: var(--nc-text);
+        border: 1px solid var(--nc-line);
+        box-shadow: var(--nc-shadow-md);
     }
-    button.nc-info-hero-button { transition: background-color 0.15s ease; }
-    button.nc-info-hero-button:hover { background: var(--nc-surface-2); }
-    button.nc-info-hero-button:focus-visible { outline: 2px solid var(--nc-primary); outline-offset: 2px; }
+    .nc-info-photo-busy {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        border-radius: 9999px;
+        background: rgba(10, 15, 22, 0.55);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .nc-info-photo-busy[hidden] { display: none; }
+    .nc-info-photo-menu { left: 50%; right: auto; transform: translateX(-50%); min-width: 190px; }
     .nc-info-name-edit { display: inline-block; margin-left: 6px; vertical-align: -1px; color: var(--nc-text-soft); }
     .nc-info-photo {
         position: relative;
@@ -2062,16 +2228,6 @@
         font-size: 36px;
         font-weight: 800;
         overflow: hidden;
-    }
-    button.nc-info-photo:focus-visible, .nc-info-photo-edit:focus-within { outline: 2px solid var(--nc-primary); outline-offset: 3px; }
-    .nc-info-photo-edit { display: flex; margin: 0 auto; width: 96px; height: 96px; cursor: pointer; }
-    .nc-info-photo-camera {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        background: rgba(10, 15, 22, 0.42);
-        color: #ffffff;
     }
     .nc-info-name { display: block; margin-top: 12px; font-size: 20px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
     .nc-info-meta { display: block; margin-top: 2px; font-size: 13px; color: var(--nc-text-soft); }
@@ -2256,17 +2412,16 @@
     .nc-info-menu-item.is-danger { color: var(--nc-danger-text); }
 
     .nc-info-pane-head { display: flex; align-items: center; gap: 6px; padding: 4px 12px 8px 8px; }
-    .nc-info-edit { margin: 4px 16px 0; padding: 16px 14px 14px; border-radius: 16px; background: var(--nc-surface); border: 1px solid var(--nc-line); }
-    .nc-info-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
     /* Tampilan aktif: tab, mode edit profil atas, tampilan lengkap Media/Tautan/Berkas */
     .nc-info:not([data-info-tab="members"]) [data-info-pane="members"],
     .nc-info:not([data-info-tab="media"]) [data-info-pane="media"],
     .nc-info:not([data-info-tab="manage"]) [data-info-pane="manage"],
-    .nc-info:not([data-info-editing]) .nc-info-edit,
-    .nc-info[data-info-editing] .nc-info-hero,
     .nc-info[data-info-view="archive"] .nc-info-main,
     .nc-info:not([data-info-view="archive"]) .nc-info-archive { display: none; }
+    /* Halaman HP: tampilan lengkap punya panah kembali sendiri, jadi bilah atas (panah ke chat, bagikan, ⋮) disembunyikan. */
+    .nc-info-page[data-info-view="archive"] .nc-info-bar { display: none; }
+    .nc-info-page[data-info-view="archive"] .nc-info-pane-head { min-height: 48px; padding-top: calc(env(safe-area-inset-top) + 10px); }
 
     /* Halaman HP ala WhatsApp: tombol bulat */
     .nc-info-page-shell { min-height: 100vh; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }

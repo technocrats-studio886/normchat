@@ -10,6 +10,8 @@ use App\Models\GroupTokenContribution;
 use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\Message;
+use App\Services\Chat\SystemMessages;
 use App\Services\Credits\Funding;
 
 /**
@@ -18,8 +20,10 @@ use App\Services\Credits\Funding;
  */
 class GroupMembership
 {
-    public function __construct(private readonly NormkreditLedger $ledger)
-    {
+    public function __construct(
+        private readonly NormkreditLedger $ledger,
+        private readonly SystemMessages $events,
+    ) {
     }
 
     public function activateGroup(Group $group, User $owner, Funding $funding): void
@@ -44,7 +48,8 @@ class GroupMembership
 
     public function activateJoin(Group $group, User $member, Funding $funding): void
     {
-        $this->addMember($group, $member, Role::MEMBER);
+        $this->addMember($group, $member, Role::MEMBER, newcomer: true);
+        $this->events->record($group, SystemMessages::MEMBER_JOINED, $member);
 
         $group->subscription?->increment('included_seats');
 
@@ -69,17 +74,39 @@ class GroupMembership
     /** Bergabung lewat slot anggota gratis: tanpa patungan. */
     public function joinFree(Group $group, User $member): void
     {
-        $this->addMember($group, $member, Role::MEMBER);
+        $this->addMember($group, $member, Role::MEMBER, newcomer: true);
+        $this->events->record($group, SystemMessages::MEMBER_JOINED, $member);
 
         AuditLog::record('group.member_joined', $member->id, $group, ['free' => true]);
     }
 
-    private function addMember(Group $group, User $user, string $roleKey): void
+    /**
+     * $newcomer: anggota yang bergabung (termasuk gabung ulang) hanya melihat pesan sesudah ia masuk sampai
+     * pemilik mengirim riwayat pesan (docs/rancangan-alur-chat-wa.md). Grup tanpa pesan: tidak ada yang ditutup.
+     */
+    private function addMember(Group $group, User $user, string $roleKey, bool $newcomer = false): void
     {
+        $historyFrom = $newcomer ? Message::withTrashed()->where('group_id', $group->id)->max('id') : null;
+
         GroupMember::updateOrCreate(
             ['group_id' => $group->id, 'user_id' => $user->id],
-            ['role_id' => Role::forKey($roleKey)->id, 'status' => 'active', 'joined_at' => now()]
+            ['role_id' => Role::forKey($roleKey)->id, 'status' => 'active', 'joined_at' => now(), 'history_from_message_id' => $historyFrom ?: null]
+                // Pesan yang tertutup tidak dihitung belum dibaca.
+                + ($newcomer ? ['last_read_message_id' => $historyFrom ?: null] : [])
         );
+    }
+
+    /** Pemilik membuka seluruh riwayat untuk anggota yang bergabung belakangan. */
+    public function shareHistory(Group $group, GroupMember $member, User $owner): bool
+    {
+        if ($member->history_from_message_id === null || $member->status !== 'active') {
+            return false;
+        }
+        $member->update(['history_from_message_id' => null]);
+        $this->events->record($group, SystemMessages::HISTORY_SHARED, $owner, $member->user);
+        AuditLog::record('group.history_shared', $owner->id, $member, [], $group->id);
+
+        return true;
     }
 
     private function auditMetadata(Funding $funding): array

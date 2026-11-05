@@ -92,8 +92,11 @@ final class ExportOptions
         };
     }
 
-    /** Pesan grup yang masuk ekspor: termasuk yang dihapus (diberi penanda), tanpa pemberitahuan pribadi Normi. */
-    public function query(int $groupId): Builder
+    /**
+     * Pesan grup yang masuk ekspor: termasuk yang dihapus (diberi penanda) dan pemberitahuan tengah, tanpa
+     * pemberitahuan pribadi Normi. $exporter: anggota baru yang riwayatnya tertutup hanya mengekspor yang boleh ia lihat.
+     */
+    public function query(int $groupId, ?\App\Models\User $exporter = null): Builder
     {
         [$from, $to] = $this->bounds();
         $users = array_map('intval', array_filter($this->senders, fn ($sender) => $sender !== 'ai'));
@@ -101,6 +104,9 @@ final class ExportOptions
         return Message::withTrashed()
             ->where('group_id', $groupId)
             ->whereNull('visible_to_user_id')
+            ->when($exporter, fn (Builder $query) => $query->withinHistoryOf($exporter))
+            // Filter pengirim: pemberitahuan tengah tidak ikut.
+            ->when($this->senders !== [], fn (Builder $query) => $query->where('sender_type', '!=', Message::SENDER_SYSTEM))
             ->when($from, fn (Builder $query) => $query->where('created_at', '>=', $from))
             ->when($to, fn (Builder $query) => $query->where('created_at', '<=', $to))
             ->when($this->senders !== [], fn (Builder $query) => $query->where(fn (Builder $q) => $q

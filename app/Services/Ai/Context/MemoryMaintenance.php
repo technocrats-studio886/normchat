@@ -114,6 +114,7 @@ class MemoryMaintenance
     /** Pesan grup yang menjadi bahan ingatan: bukan pemberitahuan pribadi, tidak terhapus. */
     public static function eligible(int $groupId): Builder
     {
-        return Message::query()->where('group_id', $groupId)->whereNull('visible_to_user_id');
+        // Pemberitahuan sistem (bergabung, ganti nama, …) bukan bagian obrolan yang diingat Normi.
+        return Message::query()->where('group_id', $groupId)->whereNull('visible_to_user_id')->where('sender_type', '!=', Message::SENDER_SYSTEM);
     }
 }
