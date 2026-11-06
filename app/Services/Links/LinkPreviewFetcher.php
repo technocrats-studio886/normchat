@@ -12,11 +12,19 @@ use Throwable;
  * Membaca judul, nama situs, deskripsi, dan gambar sebuah tautan (og:/twitter:/<title>).
  * Aman terhadap SSRF: hanya http/https, host yang mengarah ke alamat privat/loopback/link-local ditolak,
  * koneksi dipaku ke IP yang sudah dicek (tidak bisa dibelokkan DNS rebinding), redirect dicek ulang,
- * batas waktu 6 detik, dan hanya 512 KB pertama yang dibaca.
+ * batas waktu 6 detik, dan HTML dibaca sampai </head> (maks. 2 MB; YouTube menaruh tag og di sekitar 780 KB).
+ * YouTube memakai oEmbed resminya (judul, kanal, thumbnail). TikTok tidak memberi info video ke server ini,
+ * baik lewat tag og maupun oEmbed, jadi tampil sebagai tautan biasa.
  */
 class LinkPreviewFetcher
 {
-    private const MAX_BYTES = 524288;
+    private const MAX_BYTES = 2097152;
+
+    /** oEmbed resmi per penyedia (host → endpoint). */
+    private const OEMBED = [
+        'youtube.com' => 'https://www.youtube.com/oembed?format=json&url=',
+        'youtu.be' => 'https://www.youtube.com/oembed?format=json&url=',
+    ];
     private const MAX_REDIRECTS = 3;
     private const USER_AGENT = 'NormiChatBot/1.0 (+https://normi.chat)';
 
@@ -59,11 +67,15 @@ class LinkPreviewFetcher
             }
             $body = $response->toPsrResponse()->getBody();
             $html = '';
-            while (! $body->eof() && strlen($html) < self::MAX_BYTES) {
+            // Cukup sampai </head>: semua tag pratinjau ada di sana.
+            while (! $body->eof() && strlen($html) < self::MAX_BYTES && stripos($html, '</head>') === false) {
                 $html .= $body->read(65536);
             }
 
-            return $this->parse(substr($html, 0, self::MAX_BYTES), $url);
+            $end = stripos($html, '</head>');
+            $html = $end === false ? substr($html, 0, self::MAX_BYTES) : substr($html, 0, $end + 7);
+
+            return $this->withOembed($this->parse($html, $url), $url);
         }
 
         return null;
@@ -106,6 +118,33 @@ class LinkPreviewFetcher
         ];
 
         return $result['title'] || $result['image_url'] || $result['description'] ? $result : null;
+    }
+
+    /** Lengkapi/ganti dengan oEmbed resmi penyedia (YouTube): judul, nama kanal, thumbnail. */
+    private function withOembed(?array $data, string $url): ?array
+    {
+        $host = preg_replace('/^(www\.|m\.)/', '', strtolower((string) parse_url($url, PHP_URL_HOST)));
+        $endpoint = self::OEMBED[$host] ?? null;
+        if ($endpoint === null || $this->safeTarget($endpoint) === null) {
+            return $data;
+        }
+        try {
+            $json = Http::withHeaders(['User-Agent' => self::USER_AGENT])->timeout(6)->connectTimeout(4)
+                ->withOptions(['allow_redirects' => false])->get($endpoint . urlencode($url))->json();
+        } catch (Throwable) {
+            return $data;
+        }
+        if (! is_array($json) || trim((string) ($json['title'] ?? '')) === '') {
+            return $data;
+        }
+        $thumb = (string) ($json['thumbnail_url'] ?? '');
+
+        return [
+            'title' => Str::limit($this->clean((string) $json['title']) ?? '', 290, '…'),
+            'site_name' => Str::limit($this->clean((string) ($json['provider_name'] ?? '')) ?? ($data['site_name'] ?? ''), 110, '…') ?: null,
+            'description' => ($author = $this->clean((string) ($json['author_name'] ?? ''))) ? Str::limit($author, 290, '…') : ($data['description'] ?? null),
+            'image_url' => str_starts_with($thumb, 'https://') && strlen($thumb) <= 2000 ? $thumb : ($data['image_url'] ?? null),
+        ];
     }
 
     /** [host, port, ip yang aman] atau null bila URL tidak boleh dibuka. */

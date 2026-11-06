@@ -91,17 +91,44 @@ class LinkPreviewTest extends TestCase
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'intranet.test') || str_contains($request->url(), '127.0.0.1'));
     }
 
-    public function test_only_the_first_512_kb_is_parsed_and_http_images_are_dropped(): void
+    public function test_reads_up_to_the_end_of_head_even_past_512_kb_and_drops_http_images(): void
     {
-        $page = '<html><head><meta property="og:title" content="Awal"><meta property="og:image" content="http://example.com/a.jpg"></head><body>'
-            . str_repeat('a', 700000) . '<meta property="og:description" content="Terlalu jauh"></body></html>';
+        // Seperti YouTube: tag og baru muncul jauh di dalam <head>.
+        $page = '<html><head><script>' . str_repeat('a', 700000) . '</script><meta property="og:title" content="Jauh di head">'
+            . '<meta property="og:image" content="http://example.com/a.jpg"></head><body><meta property="og:description" content="Di body"></body></html>';
         Http::fake(['*' => Http::response($page, 200, ['Content-Type' => 'text/html'])]);
 
         $data = app(LinkPreviewFetcher::class)->fetch('https://example.com/');
 
-        $this->assertSame('Awal', $data['title']);
-        $this->assertNull($data['image_url']);
-        $this->assertNull($data['description']);
+        $this->assertSame('Jauh di head', $data['title']);
+        $this->assertNull($data['image_url'], 'Gambar http tidak bisa tampil di halaman https.');
+        $this->assertNull($data['description'], 'Tag sesudah </head> tidak dibaca.');
+    }
+
+    public function test_youtube_uses_the_official_oembed_for_title_channel_and_thumbnail(): void
+    {
+        Http::fake([
+            'https://www.youtube.com/oembed*' => Http::response(['title' => 'Rick Astley - Never Gonna Give You Up', 'author_name' => 'Rick Astley', 'provider_name' => 'YouTube', 'thumbnail_url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']),
+            'https://www.youtube.com/watch*' => Http::response('<html><head><title>YouTube</title></head></html>', 200, ['Content-Type' => 'text/html']),
+        ]);
+
+        $data = app(LinkPreviewFetcher::class)->fetch('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+        $this->assertSame(['title' => 'Rick Astley - Never Gonna Give You Up', 'site_name' => 'YouTube', 'description' => 'Rick Astley', 'image_url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'], $data);
+        Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch'));
+    }
+
+    public function test_forwarding_a_message_with_a_link_queues_its_preview(): void
+    {
+        [$owner, $group] = $this->group();
+        $other = Group::create(['name' => 'Lain', 'owner_id' => $owner->id, 'status' => 'active']);
+        GroupMember::create(['group_id' => $other->id, 'user_id' => $owner->id, 'role_id' => Role::forKey(Role::OWNER)->id, 'status' => 'active', 'joined_at' => now()]);
+        $source = Message::create(['group_id' => $group->id, 'sender_type' => 'user', 'sender_id' => $owner->id, 'message_type' => 'text', 'content' => 'cek https://example.com/baru']);
+        Queue::fake();
+
+        $this->actingAs($owner)->postJson(route('chat.forward', ['group' => $group, 'message' => $source]), ['group_ids' => [$other->id]])->assertOk();
+
+        Queue::assertPushed(FetchLinkPreviewJob::class, fn ($job) => $job->url === 'https://example.com/baru' && $job->groupId === $other->id);
     }
 
     public function test_sending_a_link_queues_the_preview_and_the_card_reaches_the_bubble(): void

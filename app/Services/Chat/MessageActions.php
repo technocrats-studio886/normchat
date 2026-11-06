@@ -221,6 +221,7 @@ class MessageActions
             ]);
 
             event(new MessageSent((int) $target->id, $this->presenter->present($copy, $user->name)));
+            app(\App\Services\Links\LinkPreviews::class)->forNewMessage($copy);
             AuditLog::record('chat.forward_message', $user->id, $copy, ['from_message_id' => $source->id], $target->id);
             $count++;
         }
