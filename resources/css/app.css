@@ -2306,6 +2306,27 @@
     .nc-msg-link-desc { font-size: 12.5px; line-height: 1.4; opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .nc-msg-link-domain { font-size: 11.5px; opacity: 0.8; }
 
+    /* ── Blok kode di bubble (docs/rancangan-tur-dan-blok-kode.md) ─────────── */
+    .nc-codeblock { margin: 6px 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--nc-line); background: var(--nc-code-bg); color: var(--nc-code-text); }
+    .nc-user-text > .nc-codeblock:first-child { margin-top: 2px; }
+    .nc-user-text > .whitespace-pre-wrap { display: block; }
+    .nc-codeblock-head { display: flex; align-items: center; gap: 2px; padding: 4px 6px 4px 12px; border-bottom: 1px solid var(--nc-line); background: var(--nc-code-head); }
+    .nc-codeblock-lang { flex: 1; font-size: 12px; font-weight: 600; color: var(--nc-code-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .nc-codeblock-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: var(--nc-code-muted); transition: background-color 0.15s ease, color 0.15s ease; }
+    .nc-codeblock-btn svg { width: 17px; height: 17px; }
+    .nc-codeblock-btn:hover, .nc-codeblock-btn:focus-visible { background: color-mix(in srgb, var(--nc-code-text) 10%, transparent); color: var(--nc-code-text); }
+    .nc-codeblock-btn.is-done { color: var(--nc-code-string); }
+    .nc-codeblock .nc-code { margin: 0; padding: 10px 12px; overflow-x: auto; background: transparent; border: 0; border-radius: 0; font-size: 12.5px; line-height: 1.55; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; color: inherit; }
+    .nc-codeblock .nc-code code { background: transparent; padding: 0; color: inherit; font: inherit; }
+    /* Warna token highlight.js, mengikuti tema; semua ≥ 4.5:1 terhadap latar blok kode. */
+    .nc-codeblock .hljs-keyword, .nc-codeblock .hljs-selector-tag, .nc-codeblock .hljs-built_in, .nc-codeblock .hljs-literal, .nc-codeblock .hljs-type { color: var(--nc-code-keyword); }
+    .nc-codeblock .hljs-string, .nc-codeblock .hljs-regexp, .nc-codeblock .hljs-symbol, .nc-codeblock .hljs-template-variable, .nc-codeblock .hljs-addition { color: var(--nc-code-string); }
+    .nc-codeblock .hljs-number, .nc-codeblock .hljs-attr, .nc-codeblock .hljs-attribute, .nc-codeblock .hljs-variable, .nc-codeblock .hljs-params { color: var(--nc-code-number); }
+    .nc-codeblock .hljs-title, .nc-codeblock .hljs-function, .nc-codeblock .hljs-name, .nc-codeblock .hljs-section, .nc-codeblock .hljs-selector-class, .nc-codeblock .hljs-selector-id { color: var(--nc-code-title); }
+    .nc-codeblock .hljs-comment, .nc-codeblock .hljs-quote, .nc-codeblock .hljs-meta, .nc-codeblock .hljs-deletion { color: var(--nc-code-muted); font-style: italic; }
+    :root, [data-mode="light"] { --nc-code-bg: #F6F7F9; --nc-code-head: #ECEFF3; --nc-code-text: #1F2933; --nc-code-muted: #5B6573; --nc-code-keyword: #A1261D; --nc-code-string: #1F6B32; --nc-code-number: #8A4B00; --nc-code-title: #2F4FA3; }
+    [data-mode="dark"] { --nc-code-bg: #1B1916; --nc-code-head: #23201C; --nc-code-text: #EDE8E1; --nc-code-muted: #A99F94; --nc-code-keyword: #F29B8D; --nc-code-string: #9BD39E; --nc-code-number: #E8C27A; --nc-code-title: #9DB8F2; }
+
     /* Kartu "grup dibuat" di paling atas feed */
     .nc-created-card {
         display: flex;
@@ -2764,3 +2785,20 @@
     :where([data-mode="dark"]) .bg-white { background-color: var(--nc-surface); }
     :where([data-mode="dark"]) .ring-white { --tw-ring-color: var(--nc-surface); }
 }
+
+/* ── Tur pengenalan (driver.js) mengikuti token tema ───────────
+   Sengaja di luar @layer: CSS driver.js tidak berlapis, jadi aturan berlapis selalu kalah darinya. */
+.driver-popover.nc-tour { max-width: 340px; padding: 16px 16px 12px; border-radius: 16px; background: var(--nc-surface); color: var(--nc-text); border: 1px solid var(--nc-line); box-shadow: 0 20px 50px -14px rgba(0, 0, 0, 0.45); font-family: var(--font-sans); }
+.driver-popover.nc-tour .driver-popover-title { font-size: 16px; font-weight: 800; color: var(--nc-text); font-family: var(--font-sans); }
+.driver-popover.nc-tour .driver-popover-description { margin-top: 6px; font-size: 13.5px; line-height: 1.5; color: var(--nc-text-soft); }
+.driver-popover.nc-tour .driver-popover-description b { color: var(--nc-text); }
+.driver-popover.nc-tour .nc-tour-list { margin: 8px 0; display: grid; gap: 5px; padding-left: 16px; list-style: disc; }
+.driver-popover.nc-tour .driver-popover-progress-text { font-size: 12px; color: var(--nc-text-soft); }
+.driver-popover.nc-tour .driver-popover-navigation-btns button { padding: 6px 12px; border-radius: 9999px; border: 1px solid var(--nc-line-strong); background: var(--nc-surface); color: var(--nc-text); font-size: 13px; font-weight: 600; text-shadow: none; font-family: var(--font-sans); }
+.driver-popover.nc-tour .driver-popover-next-btn { background: var(--nc-primary) !important; border-color: var(--nc-primary) !important; color: #ffffff !important; }
+.driver-popover.nc-tour .driver-popover-close-btn { color: var(--nc-text-soft); }
+.driver-popover.nc-tour .driver-popover-arrow-side-left { border-left-color: var(--nc-surface); }
+.driver-popover.nc-tour .driver-popover-arrow-side-right { border-right-color: var(--nc-surface); }
+.driver-popover.nc-tour .driver-popover-arrow-side-top { border-top-color: var(--nc-surface); }
+.driver-popover.nc-tour .driver-popover-arrow-side-bottom { border-bottom-color: var(--nc-surface); }
+

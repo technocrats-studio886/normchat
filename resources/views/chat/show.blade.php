@@ -1,7 +1,8 @@
 @extends('layouts.app', ['title' => $group->name.' - Normi Chat', 'group' => $group])
 
 @section('content')
-    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[var(--nc-chat-bg)] lg:left-[var(--nc-sidebar-w)] lg:right-[var(--nc-info-w,0px)] lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-x-0 nc-sidebar-push" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}" data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
+    <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[var(--nc-chat-bg)] lg:left-[var(--nc-sidebar-w)] lg:right-[var(--nc-info-w,0px)] lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-x-0 nc-sidebar-push" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}"
+             @if(! auth()->user()->isSuperadmin() && (session('tour_due') || auth()->user()->tour_seen_at === null)) data-tour-due data-tour-seen-url="{{ route('tour.seen') }}" @endif data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
         @php
             $gt = $group->groupToken;
             $credits = $gt ? $gt->credits : 0;

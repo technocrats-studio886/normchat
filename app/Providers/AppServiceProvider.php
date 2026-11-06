@@ -43,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Login::class, function (Login $event) {
             if (request()->hasSession()) {
                 request()->session()->put('session_version', (int) ($event->user->session_version ?? 0));
+                // Tur pengenalan: dicek sebelum aktivitas login ini tercatat (docs/rancangan-tur-dan-blok-kode.md).
+                if ($event->user instanceof User && $event->user->tourDue()) {
+                    request()->session()->put('tour_due', true);
+                }
             }
             // Grup gratis pertama (App\Services\FreeGroups); /groups lalu membuka chat-nya, kecuali user datang
             // untuk tujuan lain (mis. tautan gabung grup teman).

@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use App\Support\Bidi;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,6 +34,8 @@ use Illuminate\Support\Facades\Crypt;
     'timezone_mode',
     'notify_mentions',
     'notify_sound',
+    'tour_seen_at',
+    'last_active_at',
 ])]
 #[Hidden(['password', 'remember_token', 'access_token_encrypted', 'refresh_token_encrypted', 'api_key_encrypted'])]
 class User extends Authenticatable
@@ -60,8 +64,16 @@ class User extends Authenticatable
             'password' => 'hashed',
             'notify_mentions' => 'boolean',
             'notify_sound' => 'boolean',
+            'tour_seen_at' => 'datetime',
+            'last_active_at' => 'datetime',
             'session_version' => 'integer',
         ];
+    }
+
+    /** Karakter kendali arah dibuang (lihat App\Support\Bidi). */
+    protected function name(): Attribute
+    {
+        return Attribute::make(set: fn ($value) => Bidi::strip($value));
     }
 
     public function ownedGroups(): HasMany
@@ -178,6 +190,20 @@ class User extends Authenticatable
      * Superadmin = email di NORMCHAT_SUPERADMIN_EMAILS. Mengakses panel
      * /superadmin dan melewati pembayaran.
      */
+    /** Tur pengenalan kembali tampil bila user tidak membuka aplikasi selama ini. */
+    public const TOUR_AGAIN_AFTER_DAYS = 21;
+
+    /** Tur jatuh tempo: belum pernah dilihat, atau user kembali setelah 3 minggu tidak aktif. */
+    public function tourDue(): bool
+    {
+        if ($this->isSuperadmin()) {
+            return false;
+        }
+
+        return $this->tour_seen_at === null
+            || ($this->last_active_at !== null && $this->last_active_at->lt(now()->subDays(self::TOUR_AGAIN_AFTER_DAYS)));
+    }
+
     public function isSuperadmin(): bool
     {
         $emails = array_map('strtolower', (array) config('normchat.superadmin_emails', []));

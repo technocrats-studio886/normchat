@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 use PhpOffice\PhpWord\Element\Cell;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\Shared\Html;
 use PhpOffice\PhpWord\SimpleType\Jc;
 use Throwable;
@@ -31,6 +32,19 @@ class DocxChatExporter implements ChatExporter
     }
 
     public function render(ExportDocument $document): string
+    {
+        // Bawaan PhpWord menulis teks mentah ke XML: pesan berisi & atau < membuat berkas Word rusak.
+        // Escaping dinyalakan hanya selama ekspor ini (AiDocumentGenerator meng-escape sendiri), lalu dikembalikan.
+        $escaping = Settings::isOutputEscapingEnabled();
+        Settings::setOutputEscapingEnabled(true);
+        try {
+            return $this->build($document);
+        } finally {
+            Settings::setOutputEscapingEnabled($escaping);
+        }
+    }
+
+    private function build(ExportDocument $document): string
     {
         $word = new PhpWord();
         $word->setDefaultFontName('Calibri');
@@ -153,7 +167,10 @@ class DocxChatExporter implements ChatExporter
         // Jawaban Normi (markdown) diubah ke HTML lalu ke Word; bila gagal dibaca, ditulis sebagai teks.
         if ($entry->isAi) {
             try {
-                Html::addHtml($cell, Str::markdown($entry->content, ['html_input' => 'escape', 'allow_unsafe_links' => false]));
+                $html = Str::markdown($entry->content, ['html_input' => 'escape', 'allow_unsafe_links' => false]);
+                // Tautan tak aman (javascript:, data:) atau kosong menjadi <a> tanpa href, dan PhpWord gagal menyimpan
+                // seluruh berkas karenanya (baru ketahuan saat save, di luar try ini). Tampilkan teksnya saja.
+                Html::addHtml($cell, (string) preg_replace('#<a(?![^>]*\bhref=)[^>]*>(.*?)</a>#s', '$1', $html));
 
                 return;
             } catch (Throwable) {

@@ -1,5 +1,23 @@
 // Render markdown balasan AI (tabel, list, blok kode, kutipan, mermaid).
 
+const CODE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>';
+const COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+
+/**
+ * Blok kode berlabel bahasa dengan ikon <> (masukkan ke kolom ketik) dan salin (resources/js/chat/code-blocks.js).
+ * $escapedCode sudah di-escape; bahasa dibatasi ke huruf, angka, + # . - _.
+ */
+export const codeBlockHtml = (lang, escapedCode) => {
+	const safeLang = String(lang || '').toLowerCase().replace(/[^a-z0-9+#._-]/g, '').slice(0, 20);
+	return `<div class="nc-codeblock" data-code-block><div class="nc-codeblock-head"><span class="nc-codeblock-lang">${safeLang || 'kode'}</span>`
+		+ `<button type="button" class="nc-codeblock-btn" data-code-to-composer aria-label="Ubah di kolom ketik" title="Ubah di kolom ketik">${CODE_ICON}</button>`
+		+ `<button type="button" class="nc-codeblock-btn" data-code-copy aria-label="Salin kode" title="Salin kode">${COPY_ICON}</button></div>`
+		+ `<pre class="nc-code"><code data-lang="${safeLang}">${escapedCode}</code></pre></div>`;
+};
+
+/** Pagar kode pembuka: ```bahasa (bahasa boleh berisi + # . - seperti c++, c#, objective-c). */
+export const FENCE_OPEN = /^```([\w+#.-]*)\s*$/;
+
 export const renderMarkdown = (escaped) => {
 	const lines = escaped.split('\n');
 	const out = [];
@@ -20,7 +38,7 @@ export const renderMarkdown = (escaped) => {
 		const line = lines[i];
 
 		// Blok kode berpagar (```bahasa ... ```); ```mermaid menjadi diagram.
-		const fence = line.trim().match(/^```(\w*)$/);
+		const fence = line.trim().match(FENCE_OPEN);
 		if (fence && fenceLang === null) {
 			closeList();
 			fenceLang = fence[1].toLowerCase();
@@ -33,7 +51,7 @@ export const renderMarkdown = (escaped) => {
 					const id = 'mermaid-' + Math.random().toString(36).slice(2, 10);
 					out.push(`<pre class="mermaid" id="${id}">${fenceLines.join('\n')}</pre>`);
 				} else {
-					out.push(`<pre class="nc-code"><code>${fenceLines.join('\n')}</code></pre>`);
+					out.push(codeBlockHtml(fenceLang, fenceLines.join('\n')));
 				}
 				fenceLang = null;
 			} else {
@@ -127,8 +145,11 @@ export const renderMarkdown = (escaped) => {
 
 	closeList();
 	if (inTable) out.push('</tbody></table></div>');
-	// Blok kode yang tidak ditutup tetap ditampilkan sebagai kode.
-	if (fenceLang !== null) out.push(`<pre class="nc-code"><code>${fenceLines.join('\n')}</code></pre>`);
+	// Blok kode yang tidak ditutup tetap ditampilkan sebagai kode (jawaban yang masih mengalir).
+	// Pagar tanpa isi sama sekali (``` nyasar di akhir) tampil sebagai teks, bukan kotak kode kosong.
+	if (fenceLang !== null) {
+		out.push(fenceLines.join('').trim() === '' ? `<p>\`\`\`${fenceLang}</p>` : codeBlockHtml(fenceLang, fenceLines.join('\n')));
+	}
 
 	return out.join('\n');
 };
@@ -156,7 +177,9 @@ const loadMermaid = () => {
 		// Content-Security-Policy hanya mengizinkan skrip bernonce (lihat AddContentSecurityPolicy).
 		script.nonce = document.querySelector('script[nonce]')?.nonce || '';
 		script.onload = () => {
-			window.mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
+			// Label sebagai teks SVG, bukan HTML: tag di label (mis. <img src=…>) tampil apa adanya dan tidak
+			// memuat gambar dari situs luar. securityLevel strict menangani sisanya (tanpa klik/skrip).
+			window.mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict', htmlLabels: false, flowchart: { htmlLabels: false } });
 			resolve(window.mermaid);
 		};
 		script.onerror = () => {

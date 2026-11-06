@@ -7,7 +7,7 @@ import { buildSystemNode } from './system-messages.js';
 import { linkPreviewHtml } from './link-preview.js';
 import { personColor, renderAttachment, renderQuote } from './attachments.js';
 import { authUserId, chatFeed } from './context.js';
-import { renderMarkdown, renderMermaidInNode } from './markdown.js';
+import { codeBlockHtml, FENCE_OPEN, renderMarkdown, renderMermaidInNode } from './markdown.js';
 import { parsePollContent, refreshPollCardsFromFeed, renderPollCard } from './polls.js';
 import { escapeAttr, escapeHtml } from './utils.js';
 import { initVoicePlayers } from './voice-player.js';
@@ -27,6 +27,47 @@ const userIconSvg = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="t
 
 /** Siluet Heroicons di lingkaran warna anggota, untuk yang belum punya foto atau fotonya gagal dimuat. */
 export const avatarFallbackHtml = () => `<span class="nc-avatar-fallback">${userIconSvg}</span>`;
+
+/**
+ * Teks pesan anggota: teks biasa, kecuali blok ```bahasa … ``` yang tampil sebagai blok kode (bisa disalin
+ * atau dimasukkan ke kolom ketik). Pesan tanpa pagar kode tetap satu span seperti sebelumnya.
+ */
+const userTextHtml = (raw) => {
+	if (!raw.includes('```')) {
+		return `<span class="whitespace-pre-wrap">${escapeHtml(raw)}</span>`;
+	}
+	const parts = [];
+	let text = [];
+	let code = null;
+	let lang = '';
+	const flushText = () => {
+		const value = text.join('\n').replace(/^\n+|\n+$/g, '');
+		if (value.trim() !== '') parts.push(`<span class="whitespace-pre-wrap">${escapeHtml(value)}</span>`);
+		text = [];
+	};
+	raw.split('\n').forEach((line) => {
+		if (code === null) {
+			const open = line.trim().match(FENCE_OPEN);
+			if (open) {
+				flushText();
+				code = [];
+				lang = open[1];
+			} else {
+				text.push(line);
+			}
+		} else if (line.trim() === '```') {
+			parts.push(codeBlockHtml(lang, escapeHtml(code.join('\n'))));
+			code = null;
+		} else {
+			code.push(line);
+		}
+	});
+	// Pagar yang tidak ditutup: bila berisi kode tetap jadi blok kode; tanpa isi (``` nyasar) tetap teks biasa.
+	if (code !== null && code.join('').trim() === '') text.push(`\`\`\`${lang}`);
+	else if (code !== null) parts.push(codeBlockHtml(lang, escapeHtml(code.join('\n'))));
+	flushText();
+	return `<div class="nc-user-text">${parts.join('')}</div>`;
+};
 
 export const avatarHtml = (message, isAi) => {
 	if (isAi) {
@@ -120,7 +161,7 @@ export const buildMessageNode = (message) => {
 		? ''
 		: (isAi
 			? `<div class="ai-markdown">${renderedMarkdown}</div>`
-			: `<span class="whitespace-pre-wrap">${escapeHtml(rawContent)}</span>`);
+			: userTextHtml(rawContent));
 	const isMediaOnly = !textHtml && /nc-bubble-media/.test(attachmentHtml);
 
 	const forwardedHtml = message?.forwarded_from

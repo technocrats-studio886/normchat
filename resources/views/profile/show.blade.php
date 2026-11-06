@@ -13,6 +13,7 @@
             'login' => 'M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9',
             'payment' => 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z',
             'feedback' => 'M8 9h8M8 13h5M5 4h14a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-5l-4 4v-4H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z',
+            'tour' => 'M12 3l2.4 5 5.6.8-4 3.9.9 5.5L12 15.6 7.1 18.2l.9-5.5-4-3.9 5.6-.8z',
         ];
     @endphp
     <section class="page-shell">
@@ -58,6 +59,9 @@
 
         <p class="nc-settings-label">Bantuan</p>
         <div class="nc-settings-group">
+            @unless($isSuperadmin)
+                <x-settings-row :href="route('tour.again')" :icon="$icons['tour']" title="Lihat tur lagi" subtitle="Kenali lagi fitur Normi Chat dalam 5 langkah" />
+            @endunless
             {{-- Laporan bug & masukan dikumpulkan di Canny. --}}
             <x-settings-row href="https://normi.canny.io/bug-report" external :icon="$icons['feedback']" title="Laporkan masalah" subtitle="Kirim laporan bug atau masukan ke tim Normi Chat" />
         </div>

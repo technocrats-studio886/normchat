@@ -43,6 +43,7 @@ class TrackUserSession
 
         if (! $row) {
             $device = LoginDevice::describe(['user_agent' => (string) $request->userAgent()]);
+            $user->forceFill(['last_active_at' => now()])->saveQuietly();
             UserSession::query()->create([
                 'user_id' => $user->id,
                 'session_hash' => $hash,
@@ -52,6 +53,7 @@ class TrackUserSession
             ]);
         } elseif ($row->last_active_at->lt(now()->subSeconds(self::TOUCH_SECONDS))) {
             $row->update(['last_active_at' => now(), 'ip' => $request->ip()]);
+            $user->forceFill(['last_active_at' => now()])->saveQuietly();
         }
 
         return $next($request);

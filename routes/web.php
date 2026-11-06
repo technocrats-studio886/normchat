@@ -57,6 +57,8 @@ Route::get('/groups/payment-callback', PaymentCallbackController::class)->name('
 
 // Join group via share ID
 Route::get('/join/{shareId}/avatar', [GroupAvatarController::class, 'showForJoin'])->middleware('auth')->name('groups.join.avatar');
+Route::post('/tour/seen', [\App\Http\Controllers\TourController::class, 'seen'])->middleware(['auth', 'not.superadmin'])->name('tour.seen');
+Route::get('/tour', [\App\Http\Controllers\TourController::class, 'again'])->middleware(['auth', 'not.superadmin'])->name('tour.again');
 Route::get('/join/{shareId}', [GroupController::class, 'showJoin'])->middleware(['auth', 'not.superadmin'])->name('groups.join');
 Route::get('/join/{shareId}/lanjut', [GroupController::class, 'continueJoin'])->middleware(['auth', 'not.superadmin'])->name('groups.join.continue');
 Route::post('/join/{shareId}/sandi', [GroupController::class, 'verifyJoinPassword'])->middleware(['auth', 'not.superadmin', 'throttle:10,1'])->name('groups.join.password');

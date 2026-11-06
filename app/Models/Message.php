@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\AiMode;
+use App\Support\Bidi;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -40,6 +42,18 @@ class Message extends Model
         'ai_mode' => AiMode::class,
         'system_meta' => 'array',
     ];
+
+    /** Karakter kendali arah dibuang (lihat App\Support\Bidi). */
+    protected function content(): Attribute
+    {
+        return Attribute::make(set: fn ($value) => Bidi::strip($value));
+    }
+
+    /** Karakter kendali arah dibuang (lihat App\Support\Bidi). */
+    protected function attachmentOriginalName(): Attribute
+    {
+        return Attribute::make(set: fn ($value) => Bidi::strip($value));
+    }
 
     public const SENDER_SYSTEM = 'system';
 

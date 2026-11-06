@@ -45,7 +45,12 @@ export const chatApiRequest = async (url, { method = 'GET', body } = {}) => {
 	return payload;
 };
 
+// Karakter kendali arah (RLO dkk.) dibuang supaya "tagihan \u202E0005" tidak tampil sebagai "5000" dan
+// tidak membalik teks di sekitarnya. Server sudah membuangnya untuk input baru (App\Support\Bidi); ini untuk data lama.
+const BIDI_CONTROLS = /[\u202A-\u202E\u2066-\u2069]/g;
+
 export const escapeHtml = (text) => String(text)
+	.replace(BIDI_CONTROLS, '')
 	.replace(/&/g, '&amp;')
 	.replace(/</g, '&lt;')
 	.replace(/>/g, '&gt;')
@@ -53,6 +58,7 @@ export const escapeHtml = (text) => String(text)
 	.replace(/'/g, '&#039;');
 
 export const escapeAttr = (text) => String(text)
+	.replace(BIDI_CONTROLS, '')
 	.replace(/&/g, '&amp;')
 	.replace(/"/g, '&quot;')
 	.replace(/</g, '&lt;')
