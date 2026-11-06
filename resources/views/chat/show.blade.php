@@ -93,7 +93,7 @@
 
         {{-- Messages --}}
         <div
-            class="nc-scroll mt-3 flex-1 overflow-y-auto px-4 py-3 pb-56 lg:px-[max(1.5rem,calc((100%_-_var(--nc-room-max))/2))]"
+            class="nc-scroll mt-3 flex-1 overflow-y-auto px-4 py-3 pb-[max(14rem,calc(var(--nc-composer-h,0px)+1.5rem))] lg:px-[max(1.5rem,calc((100%_-_var(--nc-room-max))/2))]"
             data-chat-group-id="{{ $group->id }}"
             data-auth-user-id="{{ auth()->id() }}"
             data-chat-feed="1"
@@ -181,7 +181,9 @@
                 <input type="hidden" name="ai_mode" value="" data-ai-mode-input="1" />
                 <input type="hidden" name="ai_model" value="{{ $activeAiModel?->model_id }}" data-ai-model-input="1" data-default-model="{{ $activeAiModel?->model_id }}" data-group-id="{{ $group->id }}" />
 
-                <div class="composer-pill relative" data-composer-main="1">
+                {{-- Ala WhatsApp: pill (+, teks, model) dan tombol kirim/mic bulat di sebelahnya. --}}
+                <div class="composer-row" data-composer-main="1">
+                <div class="composer-pill relative">
                     <div class="hidden px-3 pt-2.5" data-ai-mode-chip-row="1">
                         <span class="composer-mode-chip">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" data-ai-mode-chip-icon="1"></svg>
@@ -205,16 +207,6 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
                             </button>
                         @endif
-
-                        <button type="button" class="composer-send" data-record-voice="1" data-composer-voice-btn="1" aria-label="Rekam suara">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 11a6 6 0 1 0 12 0m-6 7v3m-3 0h6"/></svg>
-                        </button>
-
-                        <button type="submit" class="composer-send hidden" data-chat-send="1" aria-label="Kirim">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="nc-send-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12 20 4l-4 16-4.5-6.5L4.5 12Z"/></svg>
-                            {{-- Mode edit (resources/js/chat/composer/edit-mode.js): tombol kirim jadi centang. --}}
-                            <svg xmlns="http://www.w3.org/2000/svg" class="nc-save-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
-                        </button>
                     </div>
 
                     {{-- Menu plus: lampiran, polling, dan mode AI --}}
@@ -285,6 +277,16 @@
 
                     <div class="absolute bottom-full left-0 right-0 z-30 mb-2 hidden rounded-2xl border border-slate-200 bg-white shadow-lg" data-mention-menu="1" data-mention-items='@json($mentionSuggestions, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG)'></div>
                 </div>
+                    <button type="button" class="composer-send" data-record-voice="1" data-composer-voice-btn="1" aria-label="Rekam suara">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 11a6 6 0 1 0 12 0m-6 7v3m-3 0h6"/></svg>
+                    </button>
+
+                    <button type="submit" class="composer-send hidden" data-chat-send="1" aria-label="Kirim">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="nc-send-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12 20 4l-4 16-4.5-6.5L4.5 12Z"/></svg>
+                        {{-- Mode edit (resources/js/chat/composer/edit-mode.js): tombol kirim jadi centang. --}}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="nc-save-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                    </button>
+                </div>
 
                 <div class="hidden items-center gap-4 rounded-2xl bg-[#121C29] px-4 py-3 text-white shadow-xl" data-voice-recorder-panel="1">
                     <button type="button" class="shrink-0 text-navy-200 transition hover:text-white" data-voice-cancel="1" aria-label="Hapus rekaman" title="Hapus rekaman">
@@ -311,7 +313,7 @@
         </div>
 
         {{-- Scroll to bottom button --}}
-        <button type="button" class="nc-scroll-bottom-btn fixed z-20 right-4 hidden flex-col lg:right-[max(1rem,calc((100%_-_var(--nc-room-max))/2))] items-center gap-1.5 rounded-full bg-transparent transition" style="bottom: calc(env(safe-area-inset-bottom) + 78px);" data-scroll-bottom="1" data-mode="latest" aria-label="Ke pesan terbaru">
+        <button type="button" class="nc-scroll-bottom-btn fixed z-20 right-4 hidden flex-col lg:right-[max(1rem,calc((100%_-_var(--nc-room-max))/2))] items-center gap-1.5 rounded-full bg-transparent transition" style="bottom: calc(max(env(safe-area-inset-bottom) + 68px, var(--nc-composer-h, 0px)) + 10px);" data-scroll-bottom="1" data-mode="latest" aria-label="Ke pesan terbaru">
             <span class="nc-scroll-bottom-count hidden min-w-10 rounded-full px-2 py-0.5 text-center text-[11px] font-semibold shadow" data-scroll-bottom-count="1"></span>
             <span class="nc-scroll-bottom-icon inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-md">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>

@@ -1548,14 +1548,34 @@
     .nc-table tfoot th { border-top: 1px solid var(--nc-line-strong); }
 
     /* ── Composer ────────────────────────────────── */
-    /* Textbar ala Gemini: satu pill — [+] [teks] [model ▾] [mic/kirim], chip mode di atasnya. */
+    /* Kolom ketik: pill [+] [teks] [model ▾] dan tombol mic/kirim bulat di luar pill (ala WhatsApp), chip mode di atas teks. */
     .composer-shell {
         @apply fixed inset-x-0 z-30 mx-auto w-full max-w-md px-3 pt-2;
         bottom: 0;
-        /* Tanpa latar: yang terlihat hanya pill textbar, bukan kotak di belakangnya. */
-        background: transparent;
+        /* Latar sewarna latar chat supaya pesan yang digulir tidak terlihat di sekitar/di bawah pill
+           (laporan user 6 Nov 2026: teks Normi "tabrakan" dengan kolom ketik), memudar di tepi atas. */
+        background: var(--nc-chat-bg, var(--nc-bg));
         padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
     }
+    .composer-shell::before {
+        content: "";
+        position: absolute;
+        inset: auto 0 100% 0;
+        height: 18px;
+        background: linear-gradient(to bottom, transparent, var(--nc-chat-bg, var(--nc-bg)));
+        pointer-events: none;
+    }
+    /* Baris ala WhatsApp: pill (+, teks, model) melebar, tombol kirim/mic bulat di luar pill di sebelah kanan,
+       sejajar dasar pill saat kolom ketik meninggi. relative: popover pilihan edit menempel ke baris ini. */
+    .composer-row { position: relative; display: flex; align-items: flex-end; gap: 6px; }
+    .composer-row > .composer-pill { flex: 1 1 auto; min-width: 0; }
+    .composer-row > .composer-send {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 3px;
+        box-shadow: 0 6px 24px -12px rgba(18, 28, 41, 0.35);
+    }
+    .composer-row > .composer-send.hidden { display: none; }
     .composer-pill {
         @apply rounded-[28px] border;
         background: var(--nc-chat-composer-input-bg, #ffffff);
@@ -1566,9 +1586,17 @@
         @apply flex items-end gap-1 px-1.5 py-1.5;
     }
     .composer-input {
-        @apply min-h-10 max-h-28 min-w-0 flex-1 resize-none bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-slate-400;
+        @apply min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-slate-400;
+        /* Tinggi diatur composer/input.js (sampai ±40% layar); overflow hanya bila melewati batas itu. */
+        max-height: 40dvh;
+        overflow-y: hidden;
         color: var(--nc-chat-composer-text, var(--nc-text));
     }
+    /* Teks lebih dari satu baris: kolom ketik selebar pill di atas, tombol di baris bawah (+ kiri, model & kirim kanan). */
+    .composer-pill.is-multiline { border-radius: 24px; }
+    .composer-pill.is-multiline .composer-bar { flex-wrap: wrap; row-gap: 2px; }
+    .composer-pill.is-multiline .composer-input { order: -1; flex-basis: 100%; padding: 8px 10px 4px; }
+    .composer-pill.is-multiline [data-open-attach-menu] { margin-right: auto; }
     .composer-model-btn {
         @apply inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-3 text-xs font-semibold transition;
         color: var(--nc-chat-composer-soft, var(--nc-text-soft));
