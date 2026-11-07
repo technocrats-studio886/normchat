@@ -37,21 +37,32 @@ class SocialLogin
             throw new AccountUnavailableException('Akun ini diblokir. Hubungi admin Normi Chat bila menurutmu ini keliru.');
         }
 
-        $attributes = [
-            'name' => $name,
-            'email' => $email,
-            'avatar_url' => $avatarUrl ?: $user?->avatar_url,
-            'auth_provider' => $provider,
-            'provider_user_id' => $providerUserId,
-        ];
-
         if (! $user) {
-            return User::create($attributes + [
+            return User::create([
+                'name' => $name,
+                'email' => $email,
+                'avatar_url' => $avatarUrl,
+                'auth_provider' => $provider,
+                'provider_user_id' => $providerUserId,
                 'username' => $username ?: null,
                 'email_verified_at' => now(),
             ]);
         }
 
+        // Nama dan foto dari penyedia hanya bekal awal. Nama yang diubah pengguna di Akun tidak boleh tertimpa
+        // nama Google di login berikutnya (laporan user 7 Nov 2026); foto yang diunggah sendiri juga dipertahankan.
+        // Foto dari penyedia tetap disegarkan karena alamatnya bisa kedaluwarsa.
+        $attributes = [
+            'email' => $email,
+            'auth_provider' => $provider,
+            'provider_user_id' => $providerUserId,
+        ];
+        if (trim((string) $user->name) === '') {
+            $attributes['name'] = $name;
+        }
+        if ($avatarUrl && ! self::isUploadedAvatar((string) $user->avatar_url)) {
+            $attributes['avatar_url'] = $avatarUrl;
+        }
         if (! $user->username && $username) {
             $attributes['username'] = $username;
         }
@@ -59,6 +70,18 @@ class SocialLogin
         $user->update($attributes);
 
         return $user;
+    }
+
+    /** Foto yang diunggah lewat Akun (ProfileController::updateAccount): /avatars/… atau /storage/… di normi.chat. */
+    private static function isUploadedAvatar(string $avatarUrl): bool
+    {
+        $host = (string) parse_url($avatarUrl, PHP_URL_HOST);
+        if ($host !== '' && $host !== (string) parse_url((string) config('app.url'), PHP_URL_HOST)) {
+            return false;
+        }
+        $path = (string) parse_url($avatarUrl, PHP_URL_PATH);
+
+        return str_starts_with($path, '/avatars/') || str_starts_with($path, '/storage/');
     }
 
     public function signIn(User $user, Request $request, string $provider, string $method = 'sso'): void

@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EndBlockedSession::class,
             \App\Http\Middleware\TrackUserSession::class,
             \App\Http\Middleware\AddContentSecurityPolicy::class,
+            \App\Http\Middleware\PreventStaleHtml::class,
         ]);
 
         // Percayai reverse proxy Nginx (alamat IP & HTTPS asli user).

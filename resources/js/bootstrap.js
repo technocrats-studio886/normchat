@@ -1,6 +1,7 @@
 import axios from 'axios';
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import { initSessionGuard, reloadForSession } from './session-guard.js';
 
 window.axios = axios;
 window.Pusher = Pusher;
@@ -11,6 +12,8 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribut
 if (csrfToken) {
 	window.axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
 }
+
+initSessionGuard();
 
 const reverbKey = import.meta.env.VITE_REVERB_APP_KEY;
 
@@ -35,10 +38,32 @@ if (shouldBootRealtime) {
 		wssPort: Number(import.meta.env.VITE_REVERB_PORT || 8080),
 		forceTLS: (import.meta.env.VITE_REVERB_SCHEME || 'http') === 'https',
 		enabledTransports: ['ws', 'wss'],
-		authEndpoint: '/broadcasting/auth',
-		withCredentials: true,
-		auth: {
-			headers: csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {},
-		},
+		// Izin kanal privat lewat fetch sendiri: dengan Accept JSON, sesi yang habis dijawab 401 (bukan dialihkan
+		// ke /login berulang kali), lalu halaman dimuat ulang sekali agar pengguna dibawa ke halaman masuk.
+		authorizer: (channel) => ({
+			authorize: (socketId, callback) => {
+				fetch('/broadcasting/auth', {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: {
+						'Content-Type': 'application/json',
+						Accept: 'application/json',
+						'X-Requested-With': 'XMLHttpRequest',
+						...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+					},
+					body: JSON.stringify({ socket_id: socketId, channel_name: channel.name }),
+				})
+					.then((response) => {
+						if (response.status === 401 || response.status === 419) {
+							reloadForSession();
+							throw new Error('session_ended');
+						}
+						if (!response.ok) throw new Error(`broadcast_auth_${response.status}`);
+						return response.json();
+					})
+					.then((data) => callback(null, data))
+					.catch((error) => callback(error, null));
+			},
+		}),
 	});
 }
