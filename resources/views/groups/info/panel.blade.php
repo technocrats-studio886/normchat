@@ -12,7 +12,7 @@
     $limit = $group->member_daily_credit_limit;
     $archiveTotal = $mediaCount + $linkCount + $fileCount;
     $historyLabel = $canBackup ? 'Riwayat & cadangan' : 'Unduh riwayat chat';
-    $mediaUrl = fn ($m) => route('chat.attachment', ['group' => $group->id, 'message' => $m->id]);
+    $mediaUrl = fn ($m) => \App\Services\Chat\MessagePresenter::attachmentUrl($m);
 @endphp
 <div class="nc-info {{ $isPage ? 'nc-info-page' : 'nc-info-embed' }}" data-group-info
      data-info-tab="{{ $tab }}" data-info-view="main"

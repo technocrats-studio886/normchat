@@ -16,6 +16,12 @@ final class ChatResponder implements AiResponder
     ) {
     }
 
+    /** Jawaban teks: "sedang mengetik". */
+    public function activity(): string
+    {
+        return 'typing';
+    }
+
     public function respond(AiTask $task): AiReply
     {
         $systemPrompt = PromptBuilder::chatSystemPrompt($task->group);

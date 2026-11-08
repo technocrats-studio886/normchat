@@ -42,6 +42,11 @@ final class ImageResponder implements AiResponder
         return collect(self::TRIGGERS)->contains(fn (string $trigger) => str_contains($content, $trigger));
     }
 
+    public function activity(): string
+    {
+        return 'image';
+    }
+
     public function respond(AiTask $task): AiReply
     {
         $reference = $task->prompts->referenceImage($task->message);

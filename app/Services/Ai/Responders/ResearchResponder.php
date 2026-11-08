@@ -22,6 +22,11 @@ final class ResearchResponder implements AiResponder
     /** Perkiraan jumlah panggilan web search, untuk menahan biaya OpenAI di muka. */
     private const ESTIMATED_SEARCH_CALLS = 5;
 
+    public function activity(): string
+    {
+        return 'research';
+    }
+
     public function respond(AiTask $task): AiReply
     {
         $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation(

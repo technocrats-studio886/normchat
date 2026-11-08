@@ -31,6 +31,11 @@ final class CanvasResponder implements AiResponder
 
     private const MAX_PREVIOUS_CHARS = 60_000;
 
+    public function activity(): string
+    {
+        return 'canvas';
+    }
+
     public function respond(AiTask $task): AiReply
     {
         $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation(

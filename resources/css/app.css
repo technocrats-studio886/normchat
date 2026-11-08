@@ -560,6 +560,48 @@
         height: auto;
         max-height: 60vh;
     }
+    /* Gambar dimuat: skeleton berdenyut lalu cross-fade + blur ke gambar (resources/js/chat/media-cache.js).
+       Diadaptasi dari transitions.dev — "Skeleton loader and reveal" (https://transitions.dev). */
+    :root {
+        --nc-pulse-dur: 1000ms;
+        --nc-pulse-min: 0.5;
+        --nc-reveal-dur: 400ms;
+        --nc-reveal-blur: 2px;
+        --nc-reveal-ease: ease-in-out;
+    }
+    .nc-media-frame::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        border-radius: inherit;
+        background: color-mix(in srgb, currentColor 12%, transparent);
+        opacity: 1;
+        filter: blur(0);
+        pointer-events: none;
+        transition: opacity var(--nc-reveal-dur) var(--nc-reveal-ease), filter var(--nc-reveal-dur) var(--nc-reveal-ease);
+        animation: nc-pulse var(--nc-pulse-dur) ease-in-out infinite;
+    }
+    .nc-media-frame .nc-media-image {
+        opacity: 0;
+        filter: blur(var(--nc-reveal-blur));
+        transition: opacity var(--nc-reveal-dur) var(--nc-reveal-ease), filter var(--nc-reveal-dur) var(--nc-reveal-ease);
+    }
+    /* Sebelum gambar dimuat ukurannya belum diketahui: skeleton memberi bidang tetap supaya feed tidak melompat. */
+    .nc-media-frame:not(.is-revealed) { width: min(260px, 70vw); max-width: 100%; aspect-ratio: 4 / 3; }
+    .nc-media-frame:not(.is-revealed) .nc-media-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .nc-media-frame.is-revealed::before { opacity: 0; filter: blur(var(--nc-reveal-blur)); animation: none; }
+    .nc-media-frame.is-revealed .nc-media-image { opacity: 1; filter: blur(0); }
+    .nc-media-frame.is-broken { min-height: 64px; }
+    @keyframes nc-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: var(--nc-pulse-min); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .nc-media-frame::before,
+        .nc-media-frame .nc-media-image,
+        .nc-ai-image-pending { filter: none !important; animation: none !important; transition: opacity 0.01ms !important; }
+    }
     .nc-bubble.is-media-only { padding: 3px; }
     .nc-bubble.is-media-only .nc-msg-name { padding: 2px 8px 0; }
     .nc-bubble.is-media-only .nc-quote { width: auto; margin: 3px 3px 4px; }
@@ -1070,7 +1112,7 @@
     @keyframes ncSpin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .nc-spinner { animation-duration: 2.4s; } }
 
-    .nc-export-sheet { max-width: 420px; max-height: calc(100vh - 2rem); overflow-y: auto; }
+    .nc-export-sheet { max-width: 420px; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); overflow-y: auto; }
     .nc-export-sheet fieldset { display: grid; gap: 6px; }
     .nc-field-label { font-size: 12px; font-weight: 600; color: var(--nc-text-soft); }
     .nc-segment--2 { grid-template-columns: repeat(2, 1fr); }
@@ -1643,6 +1685,41 @@
     }
     .composer-input::placeholder {
         color: var(--nc-chat-composer-soft, var(--color-navy-400));
+    }
+    /* Halaman chat: dokumen tidak ikut tergulir di balik shell (resources/js/chat/shell.js). */
+    :root.nc-chat-locked,
+    :root.nc-chat-locked body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+    :root.nc-keyboard-open .composer-shell { padding-bottom: 8px; }
+    /* Membalas jawaban fitur Normi: "Ingin melakukan Deep Research lagi?" [Tidak] [Ya] di atas kolom ketik. */
+    .nc-mode-confirm {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 12px;
+        margin-bottom: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--nc-chat-composer-line, var(--nc-line));
+        border-radius: 18px;
+        background: var(--nc-chat-composer-input-bg, #ffffff);
+        color: var(--nc-chat-composer-text, var(--nc-text));
+        box-shadow: 0 6px 24px -12px rgba(18, 28, 41, 0.25);
+        animation: nc-confirm-in 180ms ease-out;
+    }
+    .nc-mode-confirm.hidden { display: none; }
+    .nc-mode-confirm-text { flex: 1 1 12rem; min-width: 0; font-size: 14px; font-weight: 600; }
+    .nc-mode-confirm-actions { display: flex; flex: none; gap: 8px; margin-left: auto; }
+    @keyframes nc-confirm-in {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { .nc-mode-confirm { animation: none; } }
+    /* Safari iOS memperbesar halaman saat kolom berfont < 16px difokus, sehingga tata letak chat bergeser
+       dan kolom ketik keluar layar (laporan user 9 Nov 2026). Hanya di iOS (-webkit-touch-callout). */
+    @supports (-webkit-touch-callout: none) {
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+        textarea,
+        select,
+        .composer-input { font-size: 16px !important; }
     }
     .composer-iconbtn {
         @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition;
@@ -2247,7 +2324,24 @@
     }
 
     /* Sedang mengetik: foto profil bulat bertumpuk ke kanan + nama */
-    .nc-typing { display: flex; align-items: center; gap: 8px; padding: 4px 0 10px; }
+    .nc-typing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0 10px; }
+    /* Normi sedang membuat gambar: bidang gambar berdenyut di bawah statusnya (skeleton transitions.dev). */
+    .nc-ai-image-pending {
+        display: flex;
+        flex-basis: 100%;
+        align-items: center;
+        justify-content: center;
+        width: min(240px, 66vw);
+        max-width: min(240px, 66vw);
+        aspect-ratio: 1;
+        margin-left: 34px;
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--nc-ai-name, var(--nc-primary)) 14%, var(--nc-surface-2, #eef1f5));
+        color: color-mix(in srgb, var(--nc-ai-name, var(--nc-primary)) 70%, transparent);
+        animation: nc-pulse var(--nc-pulse-dur) ease-in-out infinite;
+    }
+    .nc-ai-image-pending-icon { display: inline-flex; width: 40px; height: 40px; opacity: 0.85; }
+    .nc-ai-image-pending-icon svg { width: 100%; height: 100%; }
     .nc-typing.hidden { display: none; }
     .nc-typing-avatars { display: inline-flex; flex: none; }
     .nc-typing-avatar { display: inline-flex; border-radius: 9999px; box-shadow: 0 0 0 2px var(--nc-chat-bg, var(--nc-bg)); }
@@ -2693,7 +2787,7 @@
     .nc-info-page[data-info-view="archive"] .nc-info-pane-head { min-height: 48px; padding-top: calc(env(safe-area-inset-top) + 10px); }
 
     /* Halaman HP ala WhatsApp: tombol bulat */
-    .nc-info-page-shell { min-height: 100vh; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+    .nc-info-page-shell { min-height: 100vh; min-height: 100dvh; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
     @media (min-width: 1024px) {
         .nc-info-page-shell { max-width: 520px; margin: 0 auto; padding-top: 24px; }
     }
@@ -2727,7 +2821,7 @@
     .nc-info-modal-card {
         width: 100%;
         max-width: 420px;
-        max-height: calc(100vh - 80px);
+        max-height: calc(100vh - 80px); max-height: calc(100dvh - 80px);
         overflow-y: auto;
         overscroll-behavior: contain;
         border-radius: 20px;
@@ -2776,7 +2870,7 @@
     .nc-share-sheet {
         width: 100%;
         max-width: 400px;
-        max-height: calc(100vh - 24px);
+        max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px);
         overflow-y: auto;
         border-radius: 24px;
         background: var(--nc-surface);
@@ -2812,6 +2906,12 @@
 @layer utilities {
     :where([data-mode="dark"]) .bg-white { background-color: var(--nc-surface); }
     :where([data-mode="dark"]) .ring-white { --tw-ring-color: var(--nc-surface); }
+
+    /* Safari iOS: 100vh termasuk area di balik bilah alamat, jadi halaman terpotong di bawah. dvh mengikuti
+       tinggi layar yang benar-benar terlihat; browser tanpa dvh tetap memakai 100vh dari utilitas Tailwind. */
+    @supports (height: 100dvh) {
+        .min-h-screen { min-height: 100dvh; }
+    }
 }
 
 /* ── Tur pengenalan (driver.js) mengikuti token tema ───────────

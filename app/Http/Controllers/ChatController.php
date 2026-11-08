@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AiMode;
 use App\Events\MessageSent;
 use App\Events\MessageUpdated;
 use App\Http\Requests\SendMessageRequest;
@@ -66,7 +67,11 @@ class ChatController extends Controller
     public function show(Request $request, Group $group, ModelAccess $access, GroupInfo $info): View
     {
         $this->authorize('chat', $group);
-        session(['last_chat_group_id' => $group->id]);
+        // Prefetch saat kursor/jari berada di tautan grup (speculation rules di partials.app-head) belum
+        // berarti grup itu dibuka.
+        if (! str_contains(strtolower((string) $request->header('Sec-Purpose')), 'prefetch')) {
+            session(['last_chat_group_id' => $group->id]);
+        }
 
         $group->load(['owner', 'members.user', 'members.role', 'groupToken']);
 
@@ -237,7 +242,8 @@ class ChatController extends Controller
 
                 if (Message::isAiPrompt($content, $replyTarget)) {
                     // Pilihan composer hanya berarti bagi pesan yang memang ditujukan ke AI.
-                    $message->update(['ai_model' => $request->aiModel(), 'ai_mode' => $request->aiMode()]);
+                    // Mode dari menu fitur, atau dari tag fiturnya (@normi-image, @normi-research, ...).
+                    $message->update(['ai_model' => $request->aiModel(), 'ai_mode' => $request->aiMode() ?? AiMode::fromContent($content)]);
                     ChatMessageQueue::enqueue($message);
                 }
 
@@ -395,6 +401,18 @@ class ChatController extends Controller
         // Lampiran sebelum anggota baru bergabung tertutup sampai pemilik mengirim riwayat pesan.
         abort_unless(Message::withTrashed()->whereKey($message->id)->visibleTo(request()->user())->exists(), 404);
 
+        // URL berversi (MessagePresenter::attachmentUrl) tidak pernah berganti isi: simpan di cache browser
+        // selamanya. Tanpa versi yang cocok tetap 1 jam. ETag membuat muat ulang cukup dijawab 304.
+        $version = MessagePresenter::attachmentVersion($message);
+        $etag = '"' . $version . '"';
+        $requestedVersion = request()->query('v');
+        $cacheControl = is_string($requestedVersion) && hash_equals($version, $requestedVersion)
+            ? 'private, max-age=31536000, immutable'
+            : 'private, max-age=3600';
+        if (in_array($etag, array_map('trim', explode(',', (string) request()->header('If-None-Match'))), true)) {
+            return response()->stream(fn () => null, 304, ['ETag' => $etag, 'Cache-Control' => $cacheControl]);
+        }
+
         // File kecil dari cache Redis, file besar langsung dari S3.
         $size = $files->size($message->attachment_disk, $message->attachment_path);
         $stream = $size === null ? null : $files->stream($message->attachment_disk, $message->attachment_path);
@@ -415,7 +433,8 @@ class ChatController extends Controller
                 (string) preg_replace('/[^\x20-\x7E]|[%"\\\\\/]/', '_', Str::ascii($filename)) ?: 'lampiran'
             ),
             'Content-Length' => (string) $size,
-            'Cache-Control' => 'private, max-age=3600',
+            'Cache-Control' => $cacheControl,
+            'ETag' => $etag,
             'X-Content-Type-Options' => 'nosniff',
         ];
         // Lampiran tidak boleh berjalan sebagai halaman di asal normi.chat. PDF dikecualikan:

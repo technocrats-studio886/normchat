@@ -2,7 +2,7 @@
 
 @section('content')
     <section class="fixed inset-y-0 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden border-x border-slate-200/70 bg-[var(--nc-chat-bg)] lg:left-[var(--nc-sidebar-w)] lg:right-[var(--nc-info-w,0px)] lg:w-auto lg:max-w-none lg:translate-x-0 lg:border-x-0 nc-sidebar-push" data-chat-shell="1" data-groups-url="{{ route('groups.index') }}"
-             @if(! auth()->user()->isSuperadmin() && (session('tour_due') || auth()->user()->tour_seen_at === null)) data-tour-due data-tour-seen-url="{{ route('tour.seen') }}" @endif data-group-name="{{ $group->name }}" style="height: 100dvh; height: 100svh;">
+             @if(! auth()->user()->isSuperadmin() && (session('tour_due') || auth()->user()->tour_seen_at === null)) data-tour-due data-tour-seen-url="{{ route('tour.seen') }}" @endif data-group-name="{{ $group->name }}" style="height: 100vh; height: 100svh;">
         @php
             $gt = $group->groupToken;
             $credits = $gt ? $gt->credits : 0;
@@ -171,15 +171,25 @@
 
                 @php
                     $aiModes = [
-                        ['value' => 'guided_learning', 'label' => 'Guided Learning', 'hint' => 'Belajar bertahap', 'placeholder' => 'Mau belajar apa?', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.04A8.97 8.97 0 0 0 6 3.75c-1.05 0-2.06.18-3 .51v14.25A8.99 8.99 0 0 1 6 18c2.3 0 4.4.87 6 2.29m0-14.25a8.97 8.97 0 0 1 6-2.29c1.05 0 2.06.18 3 .51v14.25A8.99 8.99 0 0 0 18 18a8.97 8.97 0 0 0-6 2.29m0-14.25v14.25"/>'],
-                        ['value' => 'image', 'label' => 'Buat gambar', 'hint' => 'Dari deskripsimu', 'placeholder' => 'Gambar apa yang mau dibuat?', 'icon' => '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 15-5-5L5 21"/>'],
-                        ['value' => 'canvas', 'label' => 'Canvas', 'hint' => 'Halaman web atau dokumen', 'placeholder' => 'Mau dibuatkan apa?', 'icon' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18M9 9v11"/>'],
-                        ['value' => 'deep_research', 'label' => 'Deep Research', 'hint' => 'Riset dengan sumber', 'placeholder' => 'Mau riset tentang apa?', 'icon' => '<circle cx="11" cy="11" r="7"/><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5M8 11h6M11 8v6"/>'],
+                        ['value' => 'guided_learning', 'tag' => \App\Enums\AiMode::from('guided_learning')->tag(), 'label' => 'Guided Learning', 'hint' => 'Belajar bertahap', 'placeholder' => 'Mau belajar apa?', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.04A8.97 8.97 0 0 0 6 3.75c-1.05 0-2.06.18-3 .51v14.25A8.99 8.99 0 0 1 6 18c2.3 0 4.4.87 6 2.29m0-14.25a8.97 8.97 0 0 1 6-2.29c1.05 0 2.06.18 3 .51v14.25A8.99 8.99 0 0 0 18 18a8.97 8.97 0 0 0-6 2.29m0-14.25v14.25"/>'],
+                        ['value' => 'image', 'tag' => \App\Enums\AiMode::from('image')->tag(), 'label' => 'Buat gambar', 'hint' => 'Dari deskripsimu', 'placeholder' => 'Gambar apa yang mau dibuat?', 'icon' => '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 15-5-5L5 21"/>'],
+                        ['value' => 'canvas', 'tag' => \App\Enums\AiMode::from('canvas')->tag(), 'label' => 'Canvas', 'hint' => 'Halaman web atau dokumen', 'placeholder' => 'Mau dibuatkan apa?', 'icon' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18M9 9v11"/>'],
+                        ['value' => 'deep_research', 'tag' => \App\Enums\AiMode::from('deep_research')->tag(), 'label' => 'Deep Research', 'hint' => 'Riset dengan sumber', 'placeholder' => 'Mau riset tentang apa?', 'icon' => '<circle cx="11" cy="11" r="7"/><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5M8 11h6M11 8v6"/>'],
                     ];
                     $activeAiModel = $aiModels->firstWhere('model_id', $defaultAiModel) ?? $aiModels->first();
                 @endphp
                 <input type="hidden" name="ai_mode" value="" data-ai-mode-input="1" />
                 <input type="hidden" name="ai_model" value="{{ $activeAiModel?->model_id }}" data-ai-model-input="1" data-default-model="{{ $activeAiModel?->model_id }}" data-group-id="{{ $group->id }}" />
+
+                {{-- Membalas jawaban sebuah fitur Normi (mis. Deep Research): tanya dulu apakah fiturnya dipakai lagi
+                     (resources/js/chat/composer/ai-options.js). --}}
+                <div class="nc-mode-confirm hidden" data-ai-mode-confirm="1" role="alertdialog" aria-live="polite" aria-labelledby="nc-mode-confirm-text">
+                    <p class="nc-mode-confirm-text" id="nc-mode-confirm-text" data-ai-mode-confirm-text="1"></p>
+                    <div class="nc-mode-confirm-actions">
+                        <button type="button" class="btn-secondary px-4 py-1.5 text-xs" data-ai-mode-confirm-no="1">Tidak</button>
+                        <button type="button" class="btn-primary px-4 py-1.5 text-xs" data-ai-mode-confirm-yes="1">Ya</button>
+                    </div>
+                </div>
 
                 {{-- Ala WhatsApp: pill (+, teks, model) dan tombol kirim/mic bulat di sebelahnya. --}}
                 <div class="composer-row" data-composer-main="1">
@@ -221,7 +231,7 @@
                         </button>
                         <div class="my-1 border-t" style="border-color: var(--nc-chat-composer-line, #E4E9F0);"></div>
                         @foreach($aiModes as $mode)
-                            <button type="button" class="composer-menu-item" data-ai-mode-option="{{ $mode['value'] }}" data-ai-mode-label="{{ $mode['label'] }}" data-ai-mode-placeholder="{{ $mode['placeholder'] }}" role="menuitemradio" aria-checked="false">
+                            <button type="button" class="composer-menu-item" data-ai-mode-option="{{ $mode['value'] }}" data-ai-mode-tag="{{ $mode['tag'] }}" data-ai-mode-label="{{ $mode['label'] }}" data-ai-mode-placeholder="{{ $mode['placeholder'] }}" role="menuitemradio" aria-checked="false">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" data-ai-mode-icon="1">{!! $mode['icon'] !!}</svg>
                                 <span class="min-w-0 flex-1">
                                     <span class="block">{{ $mode['label'] }}</span>

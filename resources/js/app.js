@@ -2,6 +2,7 @@ import './bootstrap';
 import { initCanvas } from './chat/canvas.js';
 import { initChatShell } from './chat/shell.js';
 import { initRenderedFeed } from './chat/feed.js';
+import { initMediaReveal, settleMedia } from './chat/media-cache.js';
 import { initReadState } from './chat/read-state.js';
 import { initRealtime } from './chat/realtime.js';
 import { initComposer } from './chat/composer.js';
@@ -53,7 +54,10 @@ initMembershipWatch();
 initThemePicker();
 
 // Urutan inisialisasi mengikuti urutan app.js sebelum dipecah.
+// Listener skeleton→reveal gambar dipasang sebelum feed dirender (chat/media-cache.js).
+initMediaReveal();
 initRenderedFeed();
+settleMedia();
 initReadState();
 initRealtime();
 initComposer();

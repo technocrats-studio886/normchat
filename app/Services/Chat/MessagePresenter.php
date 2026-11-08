@@ -4,6 +4,7 @@ namespace App\Services\Chat;
 
 use App\Models\GroupMember;
 use App\Models\Message;
+use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Links\LinkPreviews;
 
 /** Bentuk pesan yang dikirim ke frontend (respons JSON dan event realtime). */
@@ -26,7 +27,7 @@ class MessagePresenter
             // Isi pesan yang dihapus untuk semua tetap di server (ekspor), tapi tidak dikirim ke browser.
             'content' => $isDeleted ? null : $message->content,
             'attachment_url' => ! $isDeleted && $message->attachment_path
-                ? route('chat.attachment', ['group' => $message->group_id, 'message' => $message->id])
+                ? self::attachmentUrl($message)
                 : null,
             'attachment_mime' => $isDeleted ? null : $message->attachment_mime,
             'attachment_original_name' => $isDeleted ? null : $message->attachment_original_name,
@@ -41,6 +42,8 @@ class MessagePresenter
             'is_notice' => $message->isNotice(),
             'is_answer' => $message->sender_type === 'ai' && $replyTarget !== null && ! $message->isNotice(),
             'forwarded_from' => $isDeleted ? null : $message->forwarded_from_name,
+            // Fitur Normi pesan ini: mode permintaan, atau fitur yang menghasilkan jawaban Normi.
+            'ai_mode' => $isDeleted ? null : $this->aiModeOf($message),
             'reply_to' => $replyTarget && ! $isDeleted ? [
                 'id' => (int) $replyTarget->id,
                 'sender_name' => $this->senderName($replyTarget),
@@ -64,6 +67,41 @@ class MessagePresenter
             ] : null,
             ...$extra,
         ];
+    }
+
+    /**
+     * URL lampiran berversi: isi lampiran satu pesan bisa berganti (jawab ulang Normi), jadi URL ikut
+     * berubah dan browser boleh menyimpan file di cache selamanya (ChatController::attachment).
+     */
+    public static function attachmentUrl(Message $message): string
+    {
+        return route('chat.attachment', [
+            'group' => $message->group_id,
+            'message' => $message->id,
+            'v' => self::attachmentVersion($message),
+        ]);
+    }
+
+    public static function attachmentVersion(Message $message): string
+    {
+        return substr(hash('xxh3', $message->attachment_disk . '|' . $message->attachment_path . '|' . $message->attachment_size), 0, 12);
+    }
+
+    private function aiModeOf(Message $message): ?string
+    {
+        if ($message->ai_mode) {
+            return $message->ai_mode->value;
+        }
+        if ($message->sender_type !== 'ai' || $message->isNotice()) {
+            return null;
+        }
+
+        // Jawaban lama (sebelum jawaban ditandai modenya): ikuti mode pertanyaannya atau jenis lampirannya.
+        return $message->replyToMessage?->ai_mode?->value ?? match ((string) $message->message_type) {
+            'image' => \App\Enums\AiMode::Image->value,
+            CanvasResponder::MESSAGE_TYPE => \App\Enums\AiMode::Canvas->value,
+            default => null,
+        };
     }
 
     private function historyPending(Message $message): bool

@@ -2,6 +2,7 @@
 
 namespace App\Services\Chat;
 
+use App\Enums\AiMode;
 use App\Events\UserMentioned;
 use App\Models\Group;
 use App\Models\Message;
@@ -84,7 +85,13 @@ class MentionNotifier
             ->values()
             ->all();
 
-        return [['type' => 'ai', 'label' => 'Normi AI', 'insert' => '@normi'], ...$users];
+        // Normi: chat biasa (@normi) lalu tag tiap fitur (@normi-image, @normi-research, ...).
+        $normi = [['type' => 'ai', 'label' => 'Normi AI', 'insert' => AiMode::CHAT_TAG]];
+        foreach (AiMode::cases() as $mode) {
+            $normi[] = ['type' => 'ai', 'label' => 'Normi · ' . $mode->label(), 'insert' => $mode->tag(), 'mode' => $mode->value];
+        }
+
+        return [...$normi, ...$users];
     }
 
     /** @return list<string> */

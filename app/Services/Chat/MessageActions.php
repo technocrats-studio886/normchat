@@ -2,6 +2,7 @@
 
 namespace App\Services\Chat;
 
+use App\Enums\AiMode;
 use App\Events\MessageDeleted;
 use App\Events\MessageSent;
 use App\Jobs\ProcessGroupChatQueueJob;
@@ -107,7 +108,10 @@ class MessageActions
                 'edited_by' => $user->id,
                 'edited_at' => now(),
             ]);
-            $message->update(['content' => $content]);
+            // Tag fitur di pesan menentukan modenya: ganti/hapus tag = ganti/hapus fitur saat dijawab ulang.
+            $tagged = AiMode::fromContent($content);
+            $wasTagged = AiMode::fromContent($previous) !== null;
+            $message->update(['content' => $content, ...($tagged || $wasTagged ? ['ai_mode' => $tagged] : [])]);
         });
         $this->memory->messageChanged($message, deleted: false);
 

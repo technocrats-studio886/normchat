@@ -80,9 +80,13 @@ class GroupAiAssistant
             return;
         }
 
-        event(new TypingStatus($group->id, 'ai', null, 'Normi AI', true));
+        // Status sesuai pekerjaannya: "sedang mengetik" hanya untuk jawaban teks; gambar, riset, canvas,
+        // dan dokumen punya status sendiri (laporan user 9 Nov 2026).
+        $responder = $this->responderFor($message);
+        $activity = $responder->activity();
+        event(new TypingStatus($group->id, 'ai', null, 'Normi AI', true, $activity));
         try {
-            $reply = $this->responderFor($message)->respond($task);
+            $reply = $responder->respond($task);
         } catch (InsufficientBudgetException $e) {
             $this->refuseTask($task, 'credits', $e->getMessage());
 
@@ -99,7 +103,7 @@ class GroupAiAssistant
             $task->releaseHold();
             throw $e;
         } finally {
-            event(new TypingStatus($group->id, 'ai', null, 'Normi AI', false));
+            event(new TypingStatus($group->id, 'ai', null, 'Normi AI', false, $activity));
         }
 
         [$reply, $creditsDue, $charged] = $this->bill($task, $reply);
@@ -167,7 +171,8 @@ class GroupAiAssistant
 
     private function responderFor(Message $message): AiResponder
     {
-        $mode = match ($message->ai_mode) {
+        // Pesan lama tanpa ai_mode tetap bisa memakai fitur lewat tag (@normi-image, dst.).
+        $mode = match ($message->ai_mode ?? AiMode::fromContent($message->content)) {
             AiMode::Image => new ImageResponder(),
             AiMode::Canvas => new CanvasResponder(),
             AiMode::DeepResearch => new ResearchResponder(),
@@ -251,6 +256,9 @@ class GroupAiAssistant
 
         return [
             'content' => self::withoutReplyMarkers($reply->text),
+            // Jawaban fitur (gambar, canvas, riset, guided learning) ditandai modenya: balasan ke jawaban
+            // ini menanyakan dulu apakah fitur yang sama dipakai lagi (resources/js/chat/composer/ai-options.js).
+            'ai_mode' => $reply->billable ? AiMode::fromReplyKind($reply->kind) : null,
             'message_type' => $attachment['message_type'] ?? 'text',
             'attachment_disk' => $attachment ? 'normchat_attachments' : null,
             'attachment_path' => $attachment['path'] ?? null,
@@ -347,6 +355,8 @@ class GroupAiAssistant
             'model' => $model?->model_id,
         ]);
         $this->postNotice($request, $text);
+        // Anggota lain sudah melihat status "Normi sedang …" sejak pertanyaan terkirim; hentikan.
+        event(new TypingStatus((int) $request->group_id, 'ai', null, 'Normi AI', false));
     }
 
     /** Pemberitahuan (saldo habis, model terkunci, dll.) hanya untuk penanya, membalas pertanyaannya. */

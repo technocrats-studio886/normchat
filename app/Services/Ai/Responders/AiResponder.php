@@ -15,4 +15,10 @@ interface AiResponder
      * @throws InsufficientBudgetException
      */
     public function respond(AiTask $task): AiReply;
+
+    /**
+     * Status yang ditampilkan ke grup selama balasan disiapkan (App\Events\TypingStatus::$activity):
+     * typing (sedang mengetik), image, research, canvas, document.
+     */
+    public function activity(): string;
 }

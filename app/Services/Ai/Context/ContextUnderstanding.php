@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai\Context;
 
+use App\Enums\AiMode;
 use App\Models\Group;
 use App\Models\GroupContextTopic;
 use App\Models\Message;
@@ -131,10 +132,10 @@ class ContextUnderstanding
         );
     }
 
-    /** Pertanyaan tanpa @normi. */
+    /** Pertanyaan tanpa tag Normi (@normi, @normi-image, @normi-research, ...). */
     public static function question(Message $request): string
     {
-        return trim((string) preg_replace('/(?<![\w@])@normi(?![\w])/iu', '', (string) $request->content));
+        return trim((string) preg_replace(AiMode::anyTagPattern(), '', (string) $request->content));
     }
 
     /** @return list<string> kata bermakna (huruf kecil, unik) */

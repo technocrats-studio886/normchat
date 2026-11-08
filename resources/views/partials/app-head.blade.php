@@ -21,6 +21,18 @@
     {{-- Mode "Ikuti sistem": pilih terang/gelap dari setelan perangkat sebelum render, dan ikuti perubahannya. --}}
     <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">(() => { const html = document.documentElement; const query = matchMedia('(prefers-color-scheme: dark)'); const apply = () => { if (html.dataset.themeMode !== 'system') return; html.dataset.mode = query.matches ? 'dark' : 'light'; document.querySelector('meta[name="theme-color"]')?.setAttribute('content', query.matches ? '{{ \App\Support\Themes::BROWSER['dark'] }}' : '{{ \App\Support\Themes::BROWSER['light'] }}'); }; apply(); query.addEventListener('change', apply); })();</script>
     <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">try { if (localStorage.getItem('nc-sidebar') === 'collapsed') document.documentElement.classList.add('nc-sidebar-collapsed'); if (localStorage.getItem('nc-info-side') === 'open') document.documentElement.classList.add('nc-info-open'); } catch (e) {}</script>
+    @auth
+        {{-- Page cache: halaman aplikasi di-prefetch saat tautannya disentuh/di-hover (Chrome, Edge), jadi
+             pindah halaman terasa instan. Hanya halaman GET tanpa efek samping; unduhan, lampiran, login,
+             dan pembayaran dikecualikan. Halaman hasil prefetch menyusulkan pesan terbaru (chat/realtime.js). --}}
+        <script type="speculationrules" nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
+        {"prefetch": [{"where": {"and": [
+            {"href_matches": ["/groups", "/groups/*/chat", "/groups/*/settings", "/groups/*/settings/ai-persona", "/groups/*/settings/history-export", "/groups/*/settings/transactions", "/profile", "/profile/*"]},
+            {"not": {"href_matches": ["/profile/*/download*", "/groups/payment-callback*"]}},
+            {"not": {"selector_matches": "[download], [target=_blank], [data-no-prefetch], form a[href^='#']"}}
+        ]}, "eagerness": "moderate"}]}
+        </script>
+    @endauth
     @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
         @php
             $viteEntries = ['resources/css/app.css'];

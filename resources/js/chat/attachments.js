@@ -3,6 +3,7 @@
 // anggota lain, maupun Normi AI, di tema terang dan gelap.
 
 import { renderCanvasCard } from './canvas.js';
+import { isMediaLoaded } from './media-cache.js';
 import { parsePollContent } from './polls.js';
 import { escapeAttr, escapeHtml } from './utils.js';
 
@@ -72,7 +73,9 @@ export const renderAttachment = (message) => {
 
 	if (type === 'image' || mime.startsWith('image/')) {
 		const alt = escapeAttr(`Gambar dari ${message?.sender_name || 'anggota'}`);
-		return `<a href="${safeUrl}" class="nc-bubble-media" data-attachment-open="1" data-attachment-kind="image" data-attachment-name="${safeNameAttr}"><img src="${safeUrl}" alt="${alt}" class="nc-media-image" loading="lazy"></a>`;
+		// Skeleton → reveal saat gambar selesai dimuat (media-cache.js); gambar yang sudah pernah tampil langsung terlihat.
+		const revealed = isMediaLoaded(url) ? ' is-revealed' : '';
+		return `<a href="${safeUrl}" class="nc-bubble-media nc-media-frame${revealed}" data-media-reveal data-attachment-open="1" data-attachment-kind="image" data-attachment-name="${safeNameAttr}"><img src="${safeUrl}" alt="${alt}" class="nc-media-image" loading="lazy" decoding="async" data-media-img></a>`;
 	}
 
 	if (type === 'video' || (mime.startsWith('video/') && mime !== 'video/webm')) {

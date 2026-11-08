@@ -2,10 +2,11 @@
 
 import { authUserId, chatFeed, pendingMessagesByLocalId } from '../context.js';
 import { renderMermaidInNode } from '../markdown.js';
+import { carryOverMedia, revokeLater } from '../media-cache.js';
 import { buildMessageNode } from '../messages.js';
 import { refreshPollCardsFromFeed } from '../polls.js';
 import { markGroupRead, markGroupVisited, rememberLatestMessageId } from '../read-state.js';
-import { typingIndicator } from '../realtime.js';
+import { noteAwaitingAi, typingIndicator } from '../realtime.js';
 import { chatApiRequest, scrollChatToBottom } from '../utils.js';
 import { initVoicePlayers } from '../voice-player.js';
 import { refreshAttachmentLabel } from './attachment.js';
@@ -113,10 +114,7 @@ export const initSend = () => {
 
 		if (duplicateNode instanceof HTMLElement && duplicateNode !== pending.node) {
 			pending.node.remove();
-
-			if (typeof pending.blobUrl === 'string') {
-				URL.revokeObjectURL(pending.blobUrl);
-			}
+			revokeLater(pending.blobUrl);
 
 			pendingMessagesByLocalId.delete(localId);
 			rememberLatestMessageId(serverMessageId);
@@ -129,13 +127,12 @@ export const initSend = () => {
 		const finalNode = buildMessageNode(serverMessage);
 		finalNode.setAttribute('data-message-id', String(serverMessageId || serverMessage.id));
 		finalNode.id = `message-${serverMessageId || serverMessage.id}`;
+		// Gambar lokal tetap tampil sampai gambar dari server selesai dimuat (tanpa kedip).
+		carryOverMedia(pending.node, finalNode);
 		pending.node.replaceWith(finalNode);
 		initVoicePlayers(finalNode);
 		renderMermaidInNode(finalNode);
-
-		if (typeof pending.blobUrl === 'string') {
-			URL.revokeObjectURL(pending.blobUrl);
-		}
+		revokeLater(pending.blobUrl);
 
 		pendingMessagesByLocalId.delete(localId);
 		rememberLatestMessageId(serverMessage?.id);
@@ -247,6 +244,8 @@ export const initSend = () => {
 			if (localId && result?.message) {
 				replacePendingMessage(localId, result.message);
 			}
+			// Pertanyaan ke Normi diterima: tampilkan langsung status yang sesuai (mengetik / membuat gambar / ...).
+			noteAwaitingAi(result?.message);
 		} catch {
 			if (localId) {
 				markPendingMessageFailed(localId);
@@ -258,7 +257,9 @@ export const initSend = () => {
 		}
 	});
 
-	window.addEventListener('beforeunload', () => {
+	// Sebelum koneksi realtime ditutup saat halaman ditinggalkan (realtime.js, event pagehide; bukan
+	// beforeunload agar halaman tetap bisa masuk Back-Forward Cache).
+	window.addEventListener('nc:realtime-closing', () => {
 		whisperTyping(false);
 	});
 };

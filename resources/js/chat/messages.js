@@ -8,6 +8,7 @@ import { linkPreviewHtml } from './link-preview.js';
 import { personColor, renderAttachment, renderQuote } from './attachments.js';
 import { authUserId, chatFeed } from './context.js';
 import { codeBlockHtml, FENCE_OPEN, renderMarkdown, renderMermaidInNode } from './markdown.js';
+import { carryOverMedia } from './media-cache.js';
 import { parsePollContent, refreshPollCardsFromFeed, renderPollCard } from './polls.js';
 import { escapeAttr, escapeHtml } from './utils.js';
 import { initVoicePlayers } from './voice-player.js';
@@ -133,6 +134,8 @@ export const buildMessageNode = (message) => {
 		messageAttachmentMime: String(message?.attachment_mime || ''),
 		messageAttachmentName: String(message?.attachment_original_name || ''),
 		messageReplyTo: String(Number(message?.reply_to?.id || 0)),
+		// Fitur Normi: mode permintaan, atau fitur yang menghasilkan jawaban Normi (App\Enums\AiMode).
+		messageAiMode: String(message?.ai_mode || ''),
 	});
 	// Penanda untuk aturan aksi (actions/rules.js).
 	[
@@ -224,6 +227,7 @@ export const replaceRenderedMessageByPayload = (message) => {
 	const nextNode = buildMessageNode(message);
 	nextNode.setAttribute('data-message-id', String(messageId));
 	nextNode.id = `message-${messageId}`;
+	carryOverMedia(currentNode, nextNode);
 	currentNode.replaceWith(nextNode);
 	initVoicePlayers(nextNode);
 	renderMermaidInNode(nextNode);

@@ -16,13 +16,24 @@ export const reloadForSession = () => {
 	window.location.reload();
 };
 
+/** Halaman ini dibuka lewat tombol kembali/maju (bisa dari cache HTTP browser, bukan dari server). */
+const isHistoryNavigation = () => {
+	try {
+		return performance.getEntriesByType('navigation')[0]?.type === 'back_forward';
+	} catch {
+		return false;
+	}
+};
+
 /**
- * Halaman dipulihkan dari Back-Forward Cache: tanyakan ke server apakah halaman ini masih sama.
- * Bila server kini mengalihkan (sudah keluar, atau sudah masuk di halaman masuk), muat ulang.
+ * Halaman dipulihkan dari Back-Forward Cache (atau dibuka lagi dari cache lewat tombol kembali/maju):
+ * tanyakan ke server apakah halaman ini masih sama. Bila server kini mengalihkan (sudah keluar, atau sudah
+ * masuk di halaman masuk), muat ulang. HTML memakai "no-cache" agar halaman boleh masuk Back-Forward Cache
+ * (App\Http\Middleware\PreventStaleHtml), jadi pemeriksaan ini yang menjaga sesi lama tidak tampil.
  */
 export const initSessionGuard = () => {
 	window.addEventListener('pageshow', (event) => {
-		if (!event.persisted) return;
+		if (!event.persisted && !isHistoryNavigation()) return;
 		fetch(window.location.href, { method: 'HEAD', credentials: 'same-origin', redirect: 'manual', cache: 'no-store' })
 			.then((response) => {
 				if (response.type === 'opaqueredirect' || response.status === 401 || response.status === 419) {

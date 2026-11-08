@@ -1,10 +1,24 @@
 // Pilihan AI di composer: model per pesan (menu model) dan mode jawaban (bagian bawah menu plus).
-// Mode tidak menggantikan @normi; saat mode dipilih, "@normi " disisipkan bila belum ada.
+// Tiap fitur punya tag sendiri: chat biasa @normi, fitur @normi-image, @normi-canvas, @normi-research,
+// @normi-learn (App\Enums\AiMode::tag()). Memilih fitur dari menu menulis tagnya ke kolom ketik, dan
+// mengetik tag fitur langsung mengaktifkan fiturnya: teks di kolom ketik selalu cocok dengan chip mode.
 
+import { chatFeed } from '../context.js';
 import { refreshSendVoiceToggle } from './attachment.js';
-import { attachMenu, attachMenuButton, chatForm, mentionInput } from './elements.js';
+import { isEditing } from './edit-mode.js';
+import { attachMenu, attachMenuButton, attachmentInput, chatForm, mentionInput, replyToInput } from './elements.js';
 
-const AI_MENTION = /(^|\s)@normi(?![\w])/i;
+const CHAT_TAG = '@normi';
+// Tag Normi pertama di teks: @normi atau @normi-<fitur>. Grup 2 = nama fitur (tanpa "@normi-").
+const NORMI_TAG = /(^|\s)@normi(?:-([a-z]+))?(?![\w-])/i;
+
+/** Pertanyaan saat membalas jawaban sebuah fitur (laporan user 9 Nov 2026). */
+const CONFIRM_QUESTIONS = {
+	deep_research: 'Ingin melakukan Deep Research lagi?',
+	image: 'Ingin membuat gambar lagi?',
+	canvas: 'Ingin memakai Canvas lagi?',
+	guided_learning: 'Ingin lanjut dengan Guided Learning?',
+};
 
 const modeInput = chatForm?.querySelector('[data-ai-mode-input]');
 const modelInput = chatForm?.querySelector('[data-ai-model-input]');
@@ -62,12 +76,38 @@ const selectModel = (modelId, persist = true) => {
 	return true;
 };
 
-const ensureAiMention = () => {
-	if (!(mentionInput instanceof HTMLTextAreaElement) || AI_MENTION.test(mentionInput.value)) {
+const modeOptions = () => Array.from(attachMenu?.querySelectorAll('[data-ai-mode-option]') || []);
+const modeOptionFor = (value) => modeOptions().find((option) => option.getAttribute('data-ai-mode-option') === value) || null;
+
+/** Mode dari tag fitur di teks ("@normi-image …" → "image"); '' untuk @normi biasa atau tanpa tag. */
+const modeFromText = (text) => {
+	const match = String(text || '').match(NORMI_TAG);
+	if (!match || !match[2]) {
+		return '';
+	}
+	const tag = `${CHAT_TAG}-${match[2]}`.toLowerCase();
+	const option = modeOptions().find((item) => String(item.getAttribute('data-ai-mode-tag') || '').toLowerCase() === tag);
+	return option?.getAttribute('data-ai-mode-option') || '';
+};
+
+/** Tulis $tag menggantikan tag Normi pertama di kolom ketik, atau sisipkan di depan bila belum ada. */
+const applyTag = (tag) => {
+	if (!(mentionInput instanceof HTMLTextAreaElement) || !tag) {
 		return;
 	}
 
-	mentionInput.value = `@normi ${mentionInput.value.replace(/^\s+/, '')}`;
+	const value = mentionInput.value;
+	const match = value.match(NORMI_TAG);
+	if (match) {
+		const start = match.index + match[1].length;
+		const end = match.index + match[0].length;
+		if (value.slice(start, end) === tag) {
+			return;
+		}
+		mentionInput.value = `${value.slice(0, start)}${tag}${value.slice(end)}`;
+	} else {
+		mentionInput.value = `${tag} ${value.replace(/^\s+/, '')}`;
+	}
 	// Bukan event input: sisipan otomatis tidak boleh tampil sebagai "sedang mengetik" ke anggota lain.
 	refreshSendVoiceToggle();
 };
@@ -82,7 +122,11 @@ const focusAtEnd = () => {
 	mentionInput.setSelectionRange(end, end);
 };
 
-const setMode = (option) => {
+/**
+ * Aktifkan mode $option (null = chat biasa). $syncText: tulis tag yang sesuai ke kolom ketik (dari menu);
+ * false bila perubahan justru berasal dari teks yang diketik.
+ */
+const setMode = (option, { syncText = true, focus = true } = {}) => {
 	if (!(modeInput instanceof HTMLInputElement)) {
 		return;
 	}
@@ -99,6 +143,10 @@ const setMode = (option) => {
 	}
 
 	if (!value) {
+		// Fitur dilepas: tag fitur di teks kembali menjadi @normi biasa.
+		if (syncText && modeFromText(mentionInput?.value)) {
+			applyTag(CHAT_TAG);
+		}
 		return;
 	}
 
@@ -109,8 +157,83 @@ const setMode = (option) => {
 	if (chipIcon && icon) {
 		chipIcon.innerHTML = icon.innerHTML;
 	}
-	ensureAiMention();
-	focusAtEnd();
+	if (syncText) {
+		applyTag(option.getAttribute('data-ai-mode-tag') || CHAT_TAG);
+	}
+	if (focus) {
+		focusAtEnd();
+	}
+};
+
+/** Chip mode mengikuti tag yang diketik (mis. menulis/menghapus "@normi-image"). */
+const syncModeFromText = () => {
+	if (!(modeInput instanceof HTMLInputElement) || isEditing()) {
+		return;
+	}
+	const fromText = modeFromText(mentionInput?.value);
+	if (fromText !== modeInput.value) {
+		setMode(fromText ? modeOptionFor(fromText) : null, { syncText: false, focus: false });
+	}
+};
+
+const confirmCard = chatForm?.querySelector('[data-ai-mode-confirm]');
+const confirmText = confirmCard?.querySelector('[data-ai-mode-confirm-text]');
+let confirmOption = null;
+let confirmBypass = false;
+
+const closeConfirm = () => {
+	confirmOption = null;
+	confirmCard?.classList.add('hidden');
+};
+
+/**
+ * Membalas jawaban sebuah fitur Normi (mis. hasil Deep Research) tanpa memilih fitur: fitur yang sama
+ * tidak langsung dipakai lagi; tanya dulu. Mengembalikan opsi mode yang perlu ditanyakan, atau null.
+ */
+const featureToConfirm = () => {
+	if (!(modeInput instanceof HTMLInputElement) || !(replyToInput instanceof HTMLInputElement) || isEditing()) {
+		return null;
+	}
+	if (modeInput.value || modeFromText(mentionInput?.value)) {
+		return null;
+	}
+	const hasContent = String(mentionInput?.value || '').trim() !== '' || Boolean(attachmentInput?.files?.length);
+	const replyId = Number(replyToInput.value || 0);
+	if (!hasContent || replyId <= 0) {
+		return null;
+	}
+
+	const target = chatFeed?.querySelector(`[data-message-id="${replyId}"]`);
+	if (!(target instanceof HTMLElement) || target.dataset.senderKey !== 'ai') {
+		return null;
+	}
+
+	return modeOptionFor(target.dataset.messageAiMode || '');
+};
+
+const openConfirm = (option) => {
+	if (!(confirmCard instanceof HTMLElement)) {
+		return false;
+	}
+	confirmOption = option;
+	const value = option.getAttribute('data-ai-mode-option') || '';
+	if (confirmText) {
+		confirmText.textContent = CONFIRM_QUESTIONS[value] || `Ingin memakai ${option.getAttribute('data-ai-mode-label') || 'fitur ini'} lagi?`;
+	}
+	confirmCard.classList.remove('hidden');
+	confirmCard.querySelector('[data-ai-mode-confirm-yes]')?.focus({ preventScroll: true });
+	return true;
+};
+
+/** Kirim setelah dijawab: Ya = pakai fiturnya lagi (tag fitur ditulis), Tidak = jawab dengan model biasa. */
+const answerConfirm = (useFeature) => {
+	const option = confirmOption;
+	closeConfirm();
+	if (useFeature && option) {
+		setMode(option, { focus: false });
+	}
+	confirmBypass = true;
+	chatForm?.requestSubmit();
 };
 
 const closeModelMenu = () => modelMenu?.classList.add('hidden');
@@ -239,11 +362,35 @@ export const initAiOptions = () => {
 
 	chatForm?.querySelector('[data-ai-mode-clear]')?.addEventListener('click', () => setMode(null));
 
-	// Mode tetap aktif untuk pesan berikutnya (seperti Gemini); siapkan lagi "@normi " setelah terkirim.
-	chatForm?.addEventListener('submit', () => {
+	mentionInput?.addEventListener('input', syncModeFromText);
+	// Draf yang dipulihkan (composer/draft.js, diinisialisasi setelah ini) bisa berisi tag fitur.
+	window.setTimeout(syncModeFromText, 0);
+
+	confirmCard?.querySelector('[data-ai-mode-confirm-yes]')?.addEventListener('click', () => answerConfirm(true));
+	confirmCard?.querySelector('[data-ai-mode-confirm-no]')?.addEventListener('click', () => answerConfirm(false));
+	// Batal membalas: pertanyaannya tidak berlaku lagi.
+	chatForm?.querySelector('[data-reply-clear]')?.addEventListener('click', closeConfirm);
+
+	// Didaftarkan sebelum send.js (lihat composer.js), jadi bisa menahan pengiriman sampai pertanyaan dijawab.
+	chatForm?.addEventListener('submit', (event) => {
+		if (!confirmBypass) {
+			const option = featureToConfirm();
+			if (option && openConfirm(option)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				return;
+			}
+		}
+		confirmBypass = false;
+		closeConfirm();
+
+		// Mode hanya berlaku untuk satu pesan: setelah terkirim, kolom ketik kembali ke chat biasa
+		// (laporan user 9 Nov 2026: chip Deep Research/Gambar masih "nyangkut" setelah pesan terkirim).
+		// setTimeout: listener send.js (didaftarkan setelah ini) membaca FormData lebih dulu secara sinkron,
+		// lalu mengosongkan kolom ketik; kolom kosong = pesan benar-benar terkirim.
 		window.setTimeout(() => {
 			if (modeInput instanceof HTMLInputElement && modeInput.value && mentionInput?.value === '') {
-				ensureAiMention();
+				setMode(null, { syncText: false, focus: false });
 			}
 		}, 0);
 	});
@@ -260,6 +407,7 @@ export const initAiOptions = () => {
 	document.addEventListener('keydown', (event) => {
 		if (event.key === 'Escape') {
 			closeModelMenu();
+			closeConfirm();
 			attachMenu?.classList.add('hidden');
 		}
 	});

@@ -97,6 +97,10 @@ export const initMentionMenu = () => {
 			mentionInput.value = next;
 			mentionInput.focus();
 			hideMentionMenu();
+			// Tag fitur Normi (@normi-image, ...) langsung mengaktifkan chip modenya (composer/ai-options.js).
+			if (item.type === 'ai') {
+				mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+			}
 		};
 
 		if (mentionInput instanceof HTMLTextAreaElement) {

@@ -25,6 +25,11 @@ final class DocumentResponder implements AiResponder
     {
     }
 
+    public function activity(): string
+    {
+        return 'document';
+    }
+
     public function respond(AiTask $task): AiReply
     {
         $userPrompt = trim((string) $task->message->content) ?: 'Buatkan dokumen ringkas berdasarkan konteks percakapan grup.';
