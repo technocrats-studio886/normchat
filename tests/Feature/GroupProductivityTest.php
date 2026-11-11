@@ -412,6 +412,51 @@ class GroupProductivityTest extends TestCase
         Http::assertNothingSent();
     }
 
+    // ── Saldo tipis + model reasoning (kasus Gugur Ganjal 11 Nov 2026) ──
+
+    public function test_canvas_is_refused_upfront_when_credits_cannot_cover_a_useful_answer(): void
+    {
+        $this->lowCreditSmartGroup();
+        Http::fake();
+
+        $this->runAi('@normi-canvas buatkan website portofolio', $this->owner);
+
+        Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/chat/completions'));
+        $notice = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertStringStartsWith('Normkredit grup belum cukup untuk Canvas dengan model Smart (sisa 6,21', $notice->content);
+        $this->assertNotSame('Normi AI sedang sibuk. Coba lagi sebentar lagi.', $notice->content);
+    }
+
+    public function test_empty_answer_from_token_limit_explains_credits_and_still_records_openai_cost(): void
+    {
+        $this->lowCreditSmartGroup();
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => ''], 'finish_reason' => 'length']],
+                'usage' => ['prompt_tokens' => 1500, 'completion_tokens' => 700],
+            ]),
+            'api.openai.com/v1/embeddings' => Http::response([], 500),
+        ]);
+        $before = (float) $this->group->groupToken()->first()->remaining_credits;
+
+        $this->runAi('@normi jelaskan teori relativitas selengkap mungkin', $this->owner);
+
+        $notice = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertStringStartsWith('Normkredit grup tinggal 6,21 NK, belum cukup untuk menyelesaikan jawaban dengan model Smart', $notice->content);
+        $this->assertEqualsWithDelta($before, (float) $this->group->groupToken()->first()->remaining_credits, 0.0001, 'Jawaban kosong tidak memotong NK.');
+        $log = AiUsageLog::where('group_id', $this->group->id)->latest('id')->firstOrFail();
+        $this->assertSame(0.0, (float) $log->charged_credits);
+        $this->assertGreaterThan(0, (float) $log->provider_cost_usd, 'Biaya OpenAI untuk token reasoning tetap tercatat.');
+        $this->assertContains('discarded', array_column($log->breakdown_json['lines'], 'component'));
+    }
+
+    private function lowCreditSmartGroup(): void
+    {
+        $this->group->update(['ai_model' => 'gpt-6.1-sol']);
+        $token = $this->group->groupToken()->first();
+        app(CreditWallet::class)->adjust($this->group, 6.2098 - (float) $token->remaining_credits);
+    }
+
     // ── Bantuan ────────────────────────────────────────────────
 
     /** Waktu uji dalam WIB, disetel sebagai UTC: Carbon memakai zona waktu "sekarang" palsu untuk tanggal dari database. */

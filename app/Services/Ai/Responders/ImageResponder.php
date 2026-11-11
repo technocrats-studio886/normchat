@@ -35,6 +35,11 @@ final class ImageResponder implements AiResponder
         . "precise = true bila hasil harus sangat presisi: mengedit detail gambar referensi, teks di dalam gambar, diagram, atau banyak elemen spesifik.\n"
         . 'use_reference = true bila user ingin mengedit atau memakai gambar yang dilampirkan / dibalas.';
 
+    /** $source: foto yang diedit bila bukan lampiran pesan ini atau pesan yang dibalas (App\Services\Ai\FeatureRouter::photoFor). */
+    public function __construct(private readonly ?\App\Models\Message $source = null)
+    {
+    }
+
     public static function wantsImage(string $content): bool
     {
         $content = strtolower($content);
@@ -49,7 +54,7 @@ final class ImageResponder implements AiResponder
 
     public function respond(AiTask $task): AiReply
     {
-        $reference = $task->prompts->referenceImage($task->message);
+        $reference = $task->prompts->referenceImage($this->source ?? $task->message);
         $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation(self::PLANNER_PROMPT, $context, $task->message));
 
         [$credits, $providerUsd] = $this->estimate($task, $messages, $reference !== null);

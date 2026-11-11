@@ -189,34 +189,6 @@ class NormiFilesAndSuggestionsTest extends TestCase
         $this->assertSame(0.0, (float) AiUsageLog::firstOrFail()->charged_credits);
     }
 
-    public function test_photo_edit_through_plain_tag_points_to_the_image_feature(): void
-    {
-        // Kasus nyata 10 Nov 2026: Normi menyarankan Canva.
-        Http::fake();
-        Storage::disk('normchat_attachments')->put('group-1/jas.jpg', 'jpeg');
-
-        $this->runAi([
-            'content' => 'Bikin dasi nya menjadi warna merah @normi',
-            'message_type' => 'image',
-            'attachment_disk' => 'normchat_attachments',
-            'attachment_path' => 'group-1/jas.jpg',
-            'attachment_mime' => 'image/jpeg',
-        ]);
-
-        $this->assertNoModelCall();
-        $question = Message::where('sender_type', 'user')->firstOrFail();
-        $reply = Message::where('sender_type', 'ai')->firstOrFail();
-        $this->assertStringContainsString('fitur Buat gambar', $reply->content);
-        $this->assertStringNotContainsStringIgnoringCase('canva', $reply->content);
-        $this->assertSame(300.0, $this->group->groupToken->fresh()->credits);
-
-        $suggestion = app(MessagePresenter::class)->present($reply)['suggestion'];
-        $this->assertSame('image', $suggestion['mode']);
-        $this->assertSame('@normi-image', $suggestion['tag']);
-        $this->assertSame((int) $question->id, $suggestion['reply_to']);
-        $this->assertSame('Bikin dasi nya menjadi warna merah', $suggestion['text']);
-    }
-
     public function test_questions_about_a_photo_are_still_answered_by_chat(): void
     {
         $this->fakeChat('Itu foto pria berjas.');
@@ -236,17 +208,19 @@ class NormiFilesAndSuggestionsTest extends TestCase
 
     public function test_chat_prompt_lists_normi_features_and_suggestion_marker_becomes_a_button(): void
     {
-        $this->fakeChat("Untuk riset jurnal terbaru, pakai Deep Research ya.\n[[fitur:deep_research]]");
+        // Permintaan yang jelas sudah langsung dikerjakan fiturnya (FeatureRouterTest); penanda tetap jadi tombol
+        // untuk kasus yang lolos dari router.
+        $this->fakeChat("Untuk itu pakai Deep Research ya.\n[[fitur:deep_research]]");
 
-        $this->runAi(['content' => '@normi carikan jurnal kematian ibu terbaru']);
+        $this->runAi(['content' => '@normi menurutmu kematian ibu di Indonesia gimana sekarang']);
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/chat/completions') && str_contains((string) $request['messages'][0]['content'], 'Jangan pernah menyarankan aplikasi atau situs lain')
             && str_contains((string) $request['messages'][0]['content'], '[[fitur:image]]'));
         $reply = Message::where('sender_type', 'ai')->firstOrFail();
-        $this->assertSame('Untuk riset jurnal terbaru, pakai Deep Research ya.', $reply->content);
+        $this->assertSame('Untuk itu pakai Deep Research ya.', $reply->content);
         $presented = app(MessagePresenter::class)->present($reply);
         $this->assertSame('deep_research', $presented['suggestion']['mode']);
-        $this->assertSame('carikan jurnal kematian ibu terbaru', $presented['suggestion']['text']);
+        $this->assertSame('menurutmu kematian ibu di Indonesia gimana sekarang', $presented['suggestion']['text']);
     }
 
     public function test_canvas_with_framework_project_offers_zip_download(): void

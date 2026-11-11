@@ -1,9 +1,9 @@
 @extends('marketing.layout', ['current' => 'pricing'])
 
 {{-- Copy: docs/rancangan-copy-marketing.md (revisi 3, anti-slop). Angka dari setelan ($n, view composer marketing). --}}
-@section('title', $n['free'] ? ($n['freeSecond'] ? 'Prices | Normi Chat | Your first two groups are free' : 'Prices | Normi Chat | Your first group is free') : "Prices | Normi Chat | From {$n['groupPrice']}")
+@section('title', $n['free'] ? 'Prices | Normi Chat | ' . $n['offer']->enGroups() . ($n['offer']->count() === 1 ? ' is free' : ' are free') : "Prices | Normi Chat | From {$n['groupPrice']}")
 @section('description', $n['free']
-    ? ($n['freeSecond'] ? 'Your first two groups are free. ' : 'Your first group is free. ') . 'Members make a one-time contribution to join and top up one shared balance, with no monthly subscription.'
+    ? $n['offer']->enGroups() . ($n['offer']->count() === 1 ? ' is free. ' : ' are free. ') . 'Members make a one-time contribution to join and top up one shared balance, with no monthly subscription.'
     : "A group costs {$n['groupPrice']} and starts with {$n['groupCredits']} Normkredit. Members make a one-time contribution to join and top up together.")
 
 @section('content')
@@ -13,7 +13,7 @@
         <div class="wrap">
             <h1>Pay for Normi together, with no monthly subscription.</h1>
             <div class="prose">
-                <p>Your group shares one balance, and Normi uses it when it answers.{{ $n['free'] ? ($n['freeSecond'] ? ' Your first two groups are free' : ' Your first group is free') . ", so you can try Normi with your friends before anyone pays. After that, a group costs {$n['groupPrice']} and starts with {$n['groupCredits']} Normkredit." : '' }}</p>
+                <p>Your group shares one balance, and Normi uses it when it answers.{{ $n['free'] ? ' ' . $n['offer']->enGroups() . ($n['offer']->count() === 1 ? ' is free' : ' are free') . ", so you can try Normi with your friends before anyone pays. After that, a group costs {$n['groupPrice']} and starts with {$n['groupCredits']} Normkredit." : '' }}</p>
             </div>
             <div class="btn-row">
                 @include('marketing.partials.cta')
@@ -30,7 +30,7 @@
                     <div class="card">
                         <span class="num">1</span>
                         <h3>Start free</h3>
-                        <p>Your first group comes with {{ $n['freeFirst'] }} Normkredit{{ $n['freeSecond'] ? " and your second with {$n['freeSecond']}" : '' }}.{{ $n['freeSlots'] > 0 ? " The first {$n['freeSlots']} friends who join each free group pay nothing." : '' }}</p>
+                        <p>{{ $n['offer']->enPerGroup() }}.{{ $n['freeSlots'] > 0 ? " The first {$n['freeSlots']} friends who join each free group pay nothing." : '' }}</p>
                     </div>
                 @endif
                 <div class="card">
@@ -56,9 +56,9 @@
                         <tr>
                             <th scope="col"><span class="sr-only">Compare</span></th>
                             @if ($n['free'])
-                                <th scope="col">Free groups (your {{ $n['freeSecond'] ? '1st and 2nd' : '1st' }})</th>
+                                <th scope="col">Free groups (your {{ $n['offer']->enColumn() }})</th>
                             @endif
-                            <th scope="col">{{ $n['free'] ? ($n['freeSecond'] ? 'From your 3rd group' : 'From your 2nd group') : 'Each group' }}</th>
+                            <th scope="col">{{ $n['free'] ? $n['offer']->enPaidFrom(short: true) : 'Each group' }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -69,7 +69,7 @@
                         </tr>
                         <tr>
                             <th scope="row">Starting balance</th>
-                            @if ($n['free'])<td>{{ $n['freeFirst'] }}{{ $n['freeSecond'] ? " / {$n['freeSecond']}" : '' }} Normkredit</td>@endif
+                            @if ($n['free'])<td>{{ $n['offer']->enCreditsCell() }} Normkredit</td>@endif
                             <td>{{ $n['groupCredits'] }} Normkredit</td>
                         </tr>
                         <tr>
@@ -197,7 +197,7 @@
                 <details>
                     <summary>Is there a free plan?</summary>
                     @if ($n['free'])
-                        <p>Each account gets {{ $n['freeSecond'] ? 'two free groups' : 'one free group' }}. The first comes with {{ $n['freeFirst'] }} Normkredit{{ $n['freeSecond'] ? " and the second with {$n['freeSecond']}" : '' }}{{ $n['freeSlots'] > 0 ? ", and the first {$n['freeSlots']} friends in each one join free" : '' }}. After that, a group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
+                        <p>Each account gets {{ $n['offer']->enAccountGets() }}. {{ $n['offer']->enPerGroup() }}{{ $n['freeSlots'] > 0 ? ", and the first {$n['freeSlots']} friends in each one join free" : '' }}. After that, a group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
                     @else
                         <p>We don't have a free plan at the moment. A group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
                     @endif

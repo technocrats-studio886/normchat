@@ -60,7 +60,8 @@ final class ReminderResponder implements AiResponder
             ['role' => 'user', 'content' => 'Sekarang ' . $now->translatedFormat('l, j F Y') . ' pukul ' . $now->format('H:i')
                 . ' (' . $now->getTimezone()->getName() . ').' . "\nPermintaan: " . trim((string) preg_replace(AiMode::anyTagPattern(), '', (string) $request->content)) . $context],
         ];
-        $task->planChat($prompt, 300);
+        // Jawabannya pendek, tapi model reasoning butuh ruang berpikir dulu (300 token bisa habis sebelum JSON ditulis).
+        $task->planChat($prompt, 1500, minOutputTokens: 600, feature: 'Pengingat');
         [$completion, $model] = $task->complete($prompt, 30, ['response_format' => ['type' => 'json_object']]);
         if (! $completion->hasText()) {
             return AiReply::failed(self::KIND);

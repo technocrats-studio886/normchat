@@ -25,9 +25,7 @@ use App\Services\Ai\Responders\CatchUpResponder;
 use App\Services\Ai\Responders\ChatResponder;
 use App\Services\Ai\Responders\ReminderResponder;
 use App\Services\Ai\Responders\TaskResponder;
-use App\Services\Ai\Files\FileRequest;
 use App\Services\Ai\Responders\FileResponder;
-use App\Services\Ai\Responders\ImageEditSuggestionResponder;
 use App\Services\Ai\Responders\ImageResponder;
 use App\Services\Ai\Responders\ResearchResponder;
 use App\Services\Chat\MessagePresenter;
@@ -89,7 +87,7 @@ class GroupAiAssistant
 
         // Status sesuai pekerjaannya: "sedang mengetik" hanya untuk jawaban teks; gambar, riset, canvas,
         // dan dokumen punya status sendiri (laporan user 9 Nov 2026).
-        $responder = $this->responderFor($message);
+        $responder = $this->responderFor($group, $message);
         $activity = $responder->activity();
         // Permintaan privat (ringkasan pesan belum dibaca): status dan jawabannya hanya untuk peminta.
         $privateFor = $message->visible_to_user_id ? (int) $message->visible_to_user_id : null;
@@ -181,7 +179,7 @@ class GroupAiAssistant
         );
     }
 
-    private function responderFor(Message $message): AiResponder
+    private function responderFor(Group $group, Message $message): AiResponder
     {
         // Ringkasan pesan yang belum dibaca (tombol di pembatas "pesan belum dibaca"); jawabannya untuk grup
         // (keputusan user 11 Nov 2026). Rentangnya hanya diisi server (ChatController::catchUp).
@@ -202,8 +200,6 @@ class GroupAiAssistant
             return $mode;
         }
 
-        // @normi biasa: permintaan yang jelas milik sebuah fitur langsung dikerjakan fitur itu (file, gambar baru),
-        // kecuali edit foto yang diarahkan dulu ke fitur Buat gambar (keputusan user 11 Nov 2026).
         $content = (string) $message->content;
         if (ReminderResponder::wants($content)) {
             return new ReminderResponder();
@@ -211,16 +207,19 @@ class GroupAiAssistant
         if (TaskResponder::wants($content)) {
             return new TaskResponder();
         }
-        $file = FileRequest::detect($content);
-        if ($file !== null) {
-            return new FileResponder($file);
-        }
-        if (ImageResponder::wantsImage($content)) {
-            return new ImageResponder();
-        }
-        $imageSource = ImageEditSuggestionResponder::wantsImageEdit($message);
 
-        return $imageSource !== null ? new ImageEditSuggestionResponder($imageSource) : new ChatResponder();
+        // @normi biasa: permintaan yang jelas milik sebuah fitur langsung dikerjakan fitur itu di balik layar
+        // (keputusan user 12 Nov 2026): gambar dan edit foto, Canvas, Deep Research, Guided Learning, Buat file.
+        $route = app(FeatureRouter::class)->route($group, $message);
+
+        return match ($route['mode'] ?? null) {
+            AiMode::Image => new ImageResponder($route['image_source'] ?? null),
+            AiMode::Canvas => new CanvasResponder(),
+            AiMode::DeepResearch => new ResearchResponder(),
+            AiMode::GuidedLearning => new ChatResponder(ModePrompts::GUIDED_LEARNING, 'guided_learning'),
+            AiMode::File => new FileResponder($route['file'] ?? null),
+            default => new ChatResponder(),
+        };
     }
 
     /**
@@ -231,7 +230,10 @@ class GroupAiAssistant
     private function bill(AiTask $task, AiReply $reply): array
     {
         if ($reply->text === null && $reply->attachment === null) {
-            $reply = AiReply::notice($reply->kind, self::BUSY_MESSAGE);
+            // Jawaban kosong karena token output habis (biasanya untuk reasoning) bukan "sibuk": katakan sebabnya.
+            // Tahanan NK dilepas dulu supaya sisa saldo yang disebut sudah benar.
+            $task->releaseHold();
+            $reply = AiReply::notice($reply->kind, $task->stoppedAtTokenLimit() ? $this->tokenLimitMessage($task) : self::BUSY_MESSAGE);
         }
 
         $creditsDue = $task->pricing->creditsForCost($task->meter->weightedCostUsd());
@@ -248,6 +250,17 @@ class GroupAiAssistant
         }
 
         return [$reply, $creditsDue, $charged];
+    }
+
+    private function tokenLimitMessage(AiTask $task): string
+    {
+        if (! $task->budgetCapped()) {
+            return 'Permintaan ini terlalu besar untuk sekali jawab. Persingkat atau pecah permintaannya, lalu coba lagi.';
+        }
+        $usable = $this->wallet->balanceFor($task->group, $task->requester)->usable();
+
+        return 'Normkredit grup tinggal ' . number_format($usable, 2, ',', '.') . ' NK, belum cukup untuk menyelesaikan jawaban dengan model '
+            . $task->model->label . '. Isi Normkredit atau pilih model yang lebih hemat. Normkredit tidak terpotong.';
     }
 
     private function postReply(Message $request, AiReply $reply): Message
@@ -309,7 +322,7 @@ class GroupAiAssistant
      */
     private function suggestionMeta(Message $request, string $mode, AiResponder $responder): array
     {
-        $replyTo = $responder instanceof ImageEditSuggestionResponder ? $responder->imageSource() : $request;
+        $replyTo = $request;
         if ($mode === AiMode::Image->value && ! $replyTo->hasImageAttachment()) {
             // "@normi" saja setelah mengirim foto (kasus 10 Nov 2026): foto terbaru si penanya yang dirujuk.
             $replyTo = Message::query()

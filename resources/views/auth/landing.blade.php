@@ -7,15 +7,9 @@
     $uiTheme = \App\Support\Themes::for(null);
     $uiMode = $uiTheme['mode'] === 'dark' ? 'dark' : 'light';
     $title = 'Normi Chat | Grup chat dengan AI';
-    $credits = $freeCredits ? number_format($freeCredits, 0, ',', '.') : null;
-    // Sama dengan /home dan /pricing: dua grup pertama gratis (70 lalu 50 NK), grup ke-3 dan seterusnya berbayar.
-    $second = ($freeSecondCredits ?? null) ? number_format($freeSecondCredits, 0, ',', '.') : null;
-    $offer = $credits
-        ? ($second
-            ? 'Dua grup pertamamu gratis, dengan ' . $credits . ' dan ' . $second . ' Normkredit.'
-            : 'Grup pertamamu gratis dengan ' . $credits . ' Normkredit.')
-          . ($freeSlots > 0 ? ' Di tiap grup gratis, ' . $freeSlots . ' teman pertama ikut tanpa biaya.' : '')
-        : null;
+    // Sama dengan /home dan /pricing: jumlah grup gratis dan saldonya dari Superadmin › Grup gratis (App\Support\FreeOffer).
+    $credits = $freeOffer->active() ? $freeOffer->first('.') : null;
+    $offer = $freeOffer->idSentence();
 @endphp
 <!DOCTYPE html>
 <html lang="id" data-theme-mode="{{ $uiTheme['mode'] }}" data-mode="{{ $uiMode }}" data-accent="{{ $uiTheme['accent'] }}">

@@ -44,6 +44,17 @@ final class AiTask
     /** Biaya OpenAI permintaan ini sudah dicatat di SpendGuard (sekali saja). */
     private bool $spendRecorded = false;
 
+    /**
+     * Jawaban OpenAI yang sudah diterima: [completion, model, sudah dicatat]. Jawaban yang tidak dipakai responder
+     * (kosong karena token habis untuk reasoning, JSON rusak) tetap dibayar ke OpenAI, jadi dicatat saat settle.
+     *
+     * @var list<array{0: ChatCompletion, 1: AiModel, 2: bool}>
+     */
+    private array $completions = [];
+
+    /** Alasan berhenti jawaban terakhir (stop, length, ...). */
+    private ?string $lastFinishReason = null;
+
     /** Konteks dari ContextManager; hanya diganti compose() bila melewati batas token input. */
     public ContextBundle $context;
 
@@ -117,7 +128,7 @@ final class AiTask
      * @throws InsufficientBudgetException
      * @throws SpendLimitReachedException
      */
-    public function planChat(array $messages, ?int $outputCeiling = null, int $extraInputTokens = 0, float $extraUsd = 0.0): RequestBudget
+    public function planChat(array $messages, ?int $outputCeiling = null, int $extraInputTokens = 0, float $extraUsd = 0.0, int $minOutputTokens = RequestBudget::MIN_OUTPUT_TOKENS, ?string $feature = null): RequestBudget
     {
         $balance = $this->wallet->balanceFor($this->group, $this->requester);
         // Kategori yang dikunci saldo tidak boleh memakai modal grup.
@@ -125,7 +136,7 @@ final class AiTask
         $usable = max(0.0, min($balance->usable(), $balance->groupTotal - $floor));
         $inputTokens = self::estimateInputTokens($messages) + $extraInputTokens;
         try {
-            $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling);
+            $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling, $minOutputTokens, $feature);
         } catch (InsufficientBudgetException $e) {
             if ($floor > 0 && $usable < $balance->usable()) {
                 throw new InsufficientBudgetException($this->access->floorMessage($this->model, $balance->groupTotal));
@@ -220,6 +231,7 @@ final class AiTask
             Log::warning('OpenAI response failed.', ['status' => $completion->status, 'body' => mb_substr($completion->errorBody, 0, 500)]);
         }
         $this->requestId ??= $completion->requestId;
+        $this->track($completion, $model);
 
         return [$completion, $model];
     }
@@ -252,8 +264,54 @@ final class AiTask
             Log::warning('OpenAI research failed.', ['status' => $completion->status, 'body' => mb_substr($completion->errorBody, 0, 500)]);
         }
         $this->requestId ??= $completion->requestId;
+        $this->track($completion, $model);
 
         return [$completion, $model];
+    }
+
+    private function track(ChatCompletion $completion, AiModel $model): void
+    {
+        $this->lastFinishReason = $completion->finishReason;
+        if ($completion->successful && ! $completion->hasText()) {
+            Log::warning('OpenAI returned no text.', [
+                'model' => $model->model_id,
+                'finish_reason' => $completion->finishReason,
+                'max_output_tokens' => $this->budget?->maxOutputTokens,
+                'output_tokens' => $completion->usage['output_tokens'] ?? null,
+            ]);
+        }
+        $this->completions[] = [$completion, $model, false];
+    }
+
+    /** Jawaban terakhir berhenti karena batas token output (bukan selesai). */
+    public function stoppedAtTokenLimit(): bool
+    {
+        return $this->lastFinishReason === 'length';
+    }
+
+    /** Batas output dipotong karena Normkredit (bukan plafon fitur). */
+    public function budgetCapped(): bool
+    {
+        return (bool) $this->budget?->isCapped;
+    }
+
+    /** Biaya jawaban yang diterima tapi tidak dipakai responder (lihat $completions). */
+    private function recordDiscarded(): void
+    {
+        foreach ($this->completions as $index => [$completion, $model, $recorded]) {
+            if ($recorded || ! $completion->successful) {
+                continue;
+            }
+            $this->completions[$index][2] = true;
+            $usage = $completion->usage;
+            if (($usage['input_tokens'] ?? 0) + ($usage['output_tokens'] ?? 0) <= 0) {
+                continue;
+            }
+            $this->meter->add('discarded', $model->model_id,
+                $model->costUsd($usage['input_tokens'], $usage['cached_input_tokens'], $usage['output_tokens']),
+                $model->multiplier, $usage);
+            $this->recordWebSearch((int) ($completion->webSearchCalls ?? 0));
+        }
     }
 
     /** Biaya per panggilan web search, ditagih dengan media multiplier seperti biaya alat lain. */
@@ -275,6 +333,11 @@ final class AiTask
     /** Catat biaya satu chat completion ke meter, dengan multiplier model yang dipakai. */
     public function recordChat(string $component, AiModel $model, ChatCompletion $completion): void
     {
+        foreach ($this->completions as $index => $tracked) {
+            if ($tracked[0] === $completion) {
+                $this->completions[$index][2] = true;
+            }
+        }
         $usage = $completion->usage;
         $this->meter->add(
             $component,
@@ -326,6 +389,7 @@ final class AiTask
         if ($this->spendRecorded) {
             return;
         }
+        $this->recordDiscarded();
         $this->spendRecorded = true;
 
         $cost = $this->meter->providerCostUsd();

@@ -58,7 +58,7 @@ class GroupController extends Controller
         return view('groups.create', [
             'quote' => $this->pricing->quoteGroupCreation(),
             'freeCredits' => $this->freeGroups->nextCredits($request->user()),
-            'freeLeft' => max(0, FreeGroups::QUOTA - $this->freeGroups->used($request->user())),
+            'freeLeft' => max(0, $this->freeGroups->quota() - $this->freeGroups->used($request->user())),
             'freeSlots' => $this->freeGroups->memberSlots(),
         ]);
     }

@@ -78,7 +78,9 @@ class AppServiceProvider extends ServiceProvider
             $pricing = app(NormkreditPricing::class)->settings();
             $idr = fn (int|float $n) => 'Rp'.number_format($n, 0, '.', ',');
             $count = fn (int|float $n) => number_format($n, 0, '.', ',');
-            $free = (bool) ($pricing['free_groups_enabled'] ?? false) && (float) ($pricing['free_first_group_credits'] ?? 0) > 0;
+            // Grup gratis dari Superadmin › Grup gratis: jumlah grup dan saldo tiap grup (App\Support\FreeOffer).
+            $offer = app(NormkreditPricing::class)->freeOffer();
+            $free = $offer->active();
             // Kategori terkunci (Advanced): terbuka saat saldo grup mencapai ambang ini (App\Services\Credits\ModelAccess).
             $advancedAt = AiModel::query()->where('is_active', true)->where('unlock_multiple', '>', 0)->min('unlock_multiple');
 
@@ -98,9 +100,9 @@ class AppServiceProvider extends ServiceProvider
                     'packCredits' => $count($pricing['package_credits']),
                     'maxPacks' => (int) $pricing['max_packages_per_payment'],
                     'free' => $free,
-                    'freeFirst' => $count((float) ($pricing['free_first_group_credits'] ?? 0)),
-                    'freeSecond' => (float) ($pricing['free_second_group_credits'] ?? 0) > 0 ? $count((float) $pricing['free_second_group_credits']) : null,
-                    'freeSlots' => (int) ($pricing['free_group_member_slots'] ?? 0),
+                    'freeFirst' => $offer->first(),
+                    'freeSlots' => $offer->memberSlots,
+                    'offer' => $offer,
                     'advancedAt' => $advancedAt ? $count((float) $advancedAt * $pricing['group_creation_credits']) : null,
                 ],
             ]);

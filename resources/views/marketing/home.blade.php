@@ -2,7 +2,7 @@
 
 {{-- Copy: docs/rancangan-copy-marketing.md (revisi 3, anti-slop). Angka dari setelan ($n, view composer marketing). --}}
 @section('title', 'Normi Chat | One AI for the whole group')
-@section('description', 'Mention @normi in your group chat and the whole group gets the same answer, paid from one shared balance.' . ($n['free'] ? ($n['freeSecond'] ? ' Your first two groups are free.' : ' Your first group is free.') : ''))
+@section('description', 'Mention @normi in your group chat and the whole group gets the same answer, paid from one shared balance.' . ($n['free'] ? ' ' . $n['offer']->enGroups() . ($n['offer']->count() === 1 ? ' is free.' : ' are free.') : ''))
 
 @section('content')
 
@@ -70,7 +70,7 @@
                     <svg class="icon" aria-hidden="true"><use href="#i-users-three"/></svg>
                     <h3>1. Start your group</h3>
                     @if ($n['free'])
-                        <p>Sign in with Google, and your first group is ready with {{ $n['freeFirst'] }} Normkredit for free.{{ $n['freeSecond'] ? " Your second group is free too, with {$n['freeSecond']} Normkredit." : '' }}</p>
+                        <p>Sign in with Google, and your first group is ready with {{ $n['freeFirst'] }} Normkredit for free.{{ $n['offer']->count() > 1 ? ' ' . ($n['offer']->count() === 2 ? 'Your second group is free too, with ' . $n['offer']->amounts()[1] . ' Normkredit.' : 'Your next ' . ($n['offer']->count() - 1) . ' groups are free too.') : '' }}</p>
                     @else
                         <p>Sign in with Google and pay {{ $n['groupPrice'] }} with QRIS. Your group starts with {{ $n['groupCredits'] }} Normkredit.</p>
                     @endif
@@ -204,10 +204,10 @@
     <section class="alt">
         <div class="wrap">
             @if ($n['free'])
-                <h2>{{ $n['freeSecond'] ? 'Your first two groups are on us.' : 'Your first group is on us.' }}</h2>
+                <h2>{{ $n['offer']->enGroups() }} {{ $n['offer']->count() === 1 ? 'is' : 'are' }} on us.</h2>
                 <div class="prose">
-                    <p>Your first group starts with {{ $n['freeFirst'] }} Normkredit{{ $n['freeSecond'] ? " and your second with {$n['freeSecond']}" : '' }}{{ $n['freeSlots'] > 0 ? ", and the first {$n['freeSlots']} friends in each one join free" : '' }}. Each additional member makes a one-time contribution before joining, and any member can top up later. There is no monthly subscription.</p>
-                    <p>{{ $n['freeSecond'] ? 'From your third group' : 'From your second group' }}, a group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
+                    <p>{{ $n['offer']->enPerGroup('starts') }}{{ $n['freeSlots'] > 0 ? ", and the first {$n['freeSlots']} friends in each one join free" : '' }}. Each additional member makes a one-time contribution before joining, and any member can top up later. There is no monthly subscription.</p>
+                    <p>{{ $n['offer']->enPaidFrom() }}, a group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
                 </div>
             @else
                 <h2>Your group pays once and tops up together.</h2>

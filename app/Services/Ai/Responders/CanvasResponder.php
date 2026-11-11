@@ -68,7 +68,7 @@ final class CanvasResponder implements AiResponder
 
         $detail = self::startDetail(ContextUnderstanding::question($task->message));
         $task->progress($detail === 'sedang menulis program' ? AiActivity::CODE : AiActivity::CANVAS, $detail);
-        $task->planChat($messages, self::MAX_OUTPUT_TOKENS);
+        $task->planChat($messages, self::MAX_OUTPUT_TOKENS, minOutputTokens: 4000, feature: 'Canvas');
         [$completion, $model] = $task->complete($messages, 300, ['response_format' => ['type' => 'json_object']]);
 
         if (! $completion->hasText()) {

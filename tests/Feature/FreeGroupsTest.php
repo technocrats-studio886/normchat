@@ -48,7 +48,7 @@ class FreeGroupsTest extends TestCase
             ->assertSee('From your 3rd group')->assertDontSee('Groups after that');
 
         // Grup kedua tidak gratis lagi: semua halaman ikut menyebut satu grup gratis dan harga mulai grup ke-2.
-        config()->set('normchat.pricing.free_second_group_credits', 0);
+        config()->set('normchat.pricing.free_group_credits', '70');
         $this->get('/')->assertSee('Grup pertamamu gratis dengan 70 Normkredit.')->assertDontSee('Dua grup');
         $this->get('/home')->assertSee('Your first group is on us.')->assertSee('From your second group, a group costs Rp30,000');
         $this->get('/pricing')->assertSee('From your 2nd group')->assertDontSee('first two groups');
@@ -148,11 +148,14 @@ class FreeGroupsTest extends TestCase
     public function test_pricing_survives_a_cache_that_still_holds_the_removed_bonus_keys(): void
     {
         // Cache produksi dibuat sebelum promo bonus dicabut; tanpa penyaring, setiap halaman yang membaca harga error.
-        \Illuminate\Support\Facades\Cache::forever('normchat:pricing-settings', ['group_bonus_enabled' => '1', 'group_bonus_starts_at' => '2026-11-01T00:00:00Z', 'free_first_group_credits' => '90']);
+        // Kunci lama free_first_group_credits (sebelum daftar grup gratis, 12 Nov 2026) juga diabaikan.
+        \Illuminate\Support\Facades\Cache::forever('normchat:pricing-settings', ['group_bonus_enabled' => '1', 'group_bonus_starts_at' => '2026-11-01T00:00:00Z', 'free_first_group_credits' => '20', 'free_group_credits' => '90,40']);
 
-        $settings = app(\App\Services\NormkreditPricing::class)->settings();
+        $pricing = app(\App\Services\NormkreditPricing::class);
+        $settings = $pricing->settings();
         $this->assertArrayNotHasKey('group_bonus_enabled', $settings);
-        $this->assertSame(90.0, $settings['free_first_group_credits']);
+        $this->assertArrayNotHasKey('free_first_group_credits', $settings);
+        $this->assertSame([90.0, 40.0], $pricing->freeGroupCredits());
     }
 
     // ── Gabung ke grup gratis ─────────────────────────────
@@ -260,11 +263,11 @@ class FreeGroupsTest extends TestCase
         $boss = User::factory()->create(['email' => 'boss@normchat.test']);
         $first = app(FreeGroups::class)->ensureFirstGroup(User::factory()->create());
 
-        $this->actingAs($boss)->post(route('superadmin.free-groups.update'), ['free_first_group_credits' => 70, 'free_second_group_credits' => 50, 'free_group_member_slots' => 2])
+        $this->actingAs($boss)->post(route('superadmin.free-groups.update'), ['free_group_credits' => [70, 50], 'free_group_member_slots' => 2])
             ->assertRedirect(route('superadmin.free-groups'));
         $this->assertNull(app(FreeGroups::class)->ensureFirstGroup(User::factory()->create()), 'saklar mati');
 
-        $this->actingAs($boss)->post(route('superadmin.free-groups.update'), ['free_groups_enabled' => '1', 'free_first_group_credits' => 100, 'free_second_group_credits' => 40, 'free_group_member_slots' => 3]);
+        $this->actingAs($boss)->post(route('superadmin.free-groups.update'), ['free_groups_enabled' => '1', 'free_group_credits' => [100, 40], 'free_group_member_slots' => 3]);
         $next = app(FreeGroups::class)->ensureFirstGroup(User::factory()->create());
         $this->assertSame([100.0, 3], [(float) $next->groupToken()->value('remaining_credits'), $next->free_member_slots]);
         $this->assertSame(2, $first->fresh()->free_member_slots);
@@ -274,6 +277,41 @@ class FreeGroupsTest extends TestCase
         $this->actingAs($boss)->get(route('superadmin.free-groups'))->assertOk()
             ->assertSee('Grup gratis dibuat')->assertSee('170 NK')->assertDontSee('Buat grup');
         $this->actingAs($boss)->get('/')->assertRedirect(route('groups.index'));
+    }
+
+    public function test_superadmin_sets_how_many_free_groups_and_every_public_page_follows(): void
+    {
+        $boss = User::factory()->create(['email' => 'boss@normchat.test']);
+        $this->actingAs($boss)->post(route('superadmin.free-groups.update'), ['free_groups_enabled' => '1', 'free_group_credits' => [100, 60, 30, null, 20], 'free_group_member_slots' => 1])
+            ->assertRedirect(route('superadmin.free-groups'));
+        $this->actingAs($boss)->get(route('superadmin.free-groups'))
+            ->assertSee('Tiga grup pertamamu gratis, dengan 100, 60, dan 30 Normkredit. Di tiap grup gratis, 1 teman pertama ikut tanpa biaya.')
+            ->assertSee('Saldo grup gratis ke-4 (NK)');
+        auth()->logout();
+
+        $this->get('/')->assertSee('Tiga grup pertamamu gratis, dengan 100, 60, dan 30 Normkredit.')->assertDontSee('70 dan 50');
+        $this->get('/home')->assertSee('Your first three groups are on us.')
+            ->assertSee('Your first group starts with 100 Normkredit, your second with 60, and your third with 30')
+            ->assertSee('From your fourth group, a group costs');
+        $this->get('/pricing')->assertSee('From your 4th group')->assertSee('100 / 60 / 30 Normkredit')->assertSee('Free groups (your 1st to 3rd)');
+
+        // Grup ke-1 s.d. ke-3 gratis dengan saldo masing-masing, ke-4 lewat pembayaran.
+        $user = User::factory()->create();
+        $free = app(FreeGroups::class);
+        $credits = [];
+        for ($i = 0; $i < 3; $i++) {
+            $credits[] = (float) $free->create($user, "Grup {$i}")->groupToken()->value('remaining_credits');
+        }
+        $this->assertSame([100.0, 60.0, 30.0], $credits);
+        $this->assertNull($free->create($user, 'Grup 4'));
+
+        // Semua dikosongkan: tanpa grup gratis, halaman publik tidak menawarkannya lagi (bukan kembali ke 70/50).
+        $this->actingAs($boss)->post(route('superadmin.free-groups.update'), ['free_groups_enabled' => '1', 'free_group_credits' => [null, null], 'free_group_member_slots' => 1]);
+        auth()->logout();
+        $this->assertSame([], app(\App\Services\NormkreditPricing::class)->freeGroupCredits());
+        $this->get('/')->assertDontSee('grup pertamamu gratis')->assertDontSee('70 dan 50');
+        $this->get('/pricing')->assertDontSee('Start your free group')->assertDontSee('Free groups (your');
+        $this->assertNull(app(FreeGroups::class)->ensureFirstGroup(User::factory()->create()));
     }
 
     public function test_free_credits_are_shown_as_gifts_not_revenue(): void

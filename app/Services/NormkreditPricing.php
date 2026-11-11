@@ -19,6 +19,9 @@ class NormkreditPricing
 {
     private const CACHE_KEY = 'normchat:pricing-settings';
 
+    /** Batas jumlah grup gratis per user yang bisa diatur superadmin. */
+    public const MAX_FREE_GROUPS = 10;
+
     private const RATE_CACHE_KEY = 'normchat:exchange-rate';
 
     /** Kurs yang dikunci untuk satu request AI (lihat locked()). */
@@ -39,8 +42,8 @@ class NormkreditPricing
         'card_margin_percent' => 'float',
         // Grup gratis (Superadmin › Grup gratis), lihat App\Services\FreeGroups.
         'free_groups_enabled' => 'bool',
-        'free_first_group_credits' => 'float',
-        'free_second_group_credits' => 'float',
+        // Saldo awal tiap grup gratis, urut grup ke-1, ke-2, …, dipisah koma (mis. "70,50"); jumlahnya = jumlah grup gratis.
+        'free_group_credits' => 'list',
         'free_group_member_slots' => 'int',
     ];
 
@@ -60,6 +63,7 @@ class NormkreditPricing
                 $settings[$key] = match (self::EDITABLE[$key]) {
                     'int' => (int) $value,
                     'bool' => $value === '1',
+                    'list' => (string) $value,
                     default => (float) $value,
                 };
             }
@@ -72,11 +76,53 @@ class NormkreditPricing
     {
         foreach (array_intersect_key($values, self::EDITABLE) as $key => $value) {
             // Bool disimpan '1'/'0': string kosong dianggap "tidak diatur" oleh settings().
-            $stored = self::EDITABLE[$key] === 'bool' ? ($value ? '1' : '0') : (string) $value;
+            $stored = match (self::EDITABLE[$key]) {
+                'bool' => $value ? '1' : '0',
+                // Daftar kosong disimpan "0" (tanpa grup gratis), bukan string kosong yang berarti "pakai bawaan".
+                'list' => implode(',', array_map(fn ($credit) => (string) (int) $credit, self::parseCreditList($value))) ?: '0',
+                default => (string) $value,
+            };
             AppSetting::updateOrCreate(['key' => $key], ['value' => $stored]);
         }
 
         Cache::forget(self::CACHE_KEY);
+    }
+
+    /**
+     * Saldo awal grup gratis ke-1, ke-2, … untuk tiap user (Superadmin › Grup gratis); kosong bila fitur dimatikan.
+     * Daftar berhenti di nominal 0 pertama.
+     *
+     * @return list<float>
+     */
+    public function freeGroupCredits(): array
+    {
+        $settings = $this->settings();
+        if (! ($settings['free_groups_enabled'] ?? false)) {
+            return [];
+        }
+
+        return self::parseCreditList($settings['free_group_credits'] ?? '');
+    }
+
+    /** @return list<float> */
+    public static function parseCreditList(mixed $value): array
+    {
+        $items = is_array($value) ? $value : explode(',', (string) $value);
+        $credits = [];
+        foreach ($items as $item) {
+            $credit = (float) trim((string) $item);
+            if ($credit <= 0) {
+                break;
+            }
+            $credits[] = $credit;
+        }
+
+        return array_slice($credits, 0, self::MAX_FREE_GROUPS);
+    }
+
+    public function freeOffer(): \App\Support\FreeOffer
+    {
+        return new \App\Support\FreeOffer($this->freeGroupCredits(), max(0, (int) ($this->settings()['free_group_member_slots'] ?? 0)));
     }
 
     public function get(string $key): int|float

@@ -25,7 +25,7 @@ final class CatchUpResponder implements AiResponder
 
     private const MAX_INPUT_TOKENS = 14_000;
 
-    private const MAX_OUTPUT_TOKENS = 1_400;
+    private const MAX_OUTPUT_TOKENS = 3_000;
 
     public const PROMPT = "MODE RINGKAS PESAN YANG TERLEWAT. {name} baru membuka grup dan belum membaca pesan di bawah."
         . " Ringkasan ini tampil di grup, tapi ditulis untuk {name}. Pakai Bahasa Indonesia yang santai dan jelas, paling banyak 8 poin,"
@@ -62,7 +62,7 @@ final class CatchUpResponder implements AiResponder
                 . "Pesan yang belum dibaca {$name} (" . $messages->count() . " pesan):\n\n" . $transcript],
         ];
 
-        $task->planChat($prompt, self::MAX_OUTPUT_TOKENS);
+        $task->planChat($prompt, self::MAX_OUTPUT_TOKENS, minOutputTokens: 800, feature: 'Ringkasan');
         [$completion, $model] = $task->complete($prompt, 90);
         if (! $completion->hasText()) {
             return AiReply::failed(self::KIND);

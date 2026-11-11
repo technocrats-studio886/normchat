@@ -78,7 +78,7 @@ final class FileResponder implements AiResponder
             $task->message
         ));
 
-        $task->planChat($messages, self::MAX_OUTPUT_TOKENS);
+        $task->planChat($messages, self::MAX_OUTPUT_TOKENS, minOutputTokens: 2000, feature: 'Buat file');
         [$completion, $model] = $task->complete($messages, 240, ['response_format' => ['type' => 'json_object']]);
         if (! $completion->hasText()) {
             return AiReply::failed(self::KIND);

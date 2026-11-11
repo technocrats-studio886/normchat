@@ -13,8 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Superadmin › Grup gratis (App\Services\FreeGroups): saldo awal grup gratis ke-1 dan ke-2 tiap user dan jumlah
- * anggota yang bergabung tanpa patungan. Nilai baru berlaku untuk grup yang dibuat sesudahnya.
+ * Superadmin › Grup gratis (App\Services\FreeGroups): berapa grup gratis tiap user, saldo awal tiap grup, dan jumlah
+ * anggota yang bergabung tanpa patungan. Nilai baru berlaku untuk grup yang dibuat sesudahnya dan langsung tampil
+ * di halaman publik (App\Support\FreeOffer).
  */
 class AdminFreeGroupController extends Controller
 {
@@ -28,6 +29,7 @@ class AdminFreeGroupController extends Controller
             'givenCredits' => (float) (clone $given)->sum('credit_amount'),
             'freeJoins' => (int) Group::withTrashed()->sum('free_joins_used'),
             'paidCredits' => $pricing->groupCreationCredits(),
+            'offerSentence' => $pricing->freeOffer()->idSentence(),
         ]);
     }
 
@@ -35,15 +37,15 @@ class AdminFreeGroupController extends Controller
     {
         $data = $request->validate([
             'free_groups_enabled' => ['nullable', 'boolean'],
-            'free_first_group_credits' => ['required', 'integer', 'min:0', 'max:10000'],
-            'free_second_group_credits' => ['required', 'integer', 'min:0', 'max:10000'],
+            'free_group_credits' => ['nullable', 'array', 'max:' . NormkreditPricing::MAX_FREE_GROUPS],
+            'free_group_credits.*' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'free_group_member_slots' => ['required', 'integer', 'min:0', 'max:50'],
         ]);
 
         $values = [
             'free_groups_enabled' => $request->boolean('free_groups_enabled'),
-            'free_first_group_credits' => (int) $data['free_first_group_credits'],
-            'free_second_group_credits' => (int) $data['free_second_group_credits'],
+            // Berhenti di isian kosong/0 pertama (NormkreditPricing::parseCreditList); kosong semua = tanpa grup gratis.
+            'free_group_credits' => NormkreditPricing::parseCreditList($data['free_group_credits'] ?? []),
             'free_group_member_slots' => (int) $data['free_group_member_slots'],
         ];
         $pricing->update($values);

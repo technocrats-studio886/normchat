@@ -176,7 +176,10 @@ class AiModesTest extends TestCase
         $this->runAi(['content' => '@normi buat canvas', 'ai_mode' => AiMode::Canvas]);
 
         $this->assertStringContainsString('Gagal membuat canvas', (string) Message::where('sender_type', 'ai')->value('content'));
-        $this->assertSame(0, AiUsageLog::count());
+        // Tidak memotong NK, tapi biaya OpenAI-nya tetap tercatat (perbaikan 11 Nov 2026).
+        $log = AiUsageLog::sole();
+        $this->assertSame(0.0, (float) $log->charged_credits);
+        $this->assertContains('discarded', array_column($log->breakdown_json['lines'], 'component'));
         $this->assertSame(300.0, $this->group->groupToken->fresh()->credits);
     }
 

@@ -52,7 +52,7 @@ final class TaskResponder implements AiResponder
             . "\nAnggota grup: {$members}.\nHari ini " . $today->translatedFormat('l, j F Y') . '.';
 
         $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation($system, $context, $task->message));
-        $task->planChat($messages, 1500);
+        $task->planChat($messages, 3000, minOutputTokens: 1000, feature: 'Tugas grup');
         [$completion, $model] = $task->complete($messages, 60, ['response_format' => ['type' => 'json_object']]);
         if (! $completion->hasText()) {
             return AiReply::failed(self::KIND);

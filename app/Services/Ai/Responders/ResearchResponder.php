@@ -42,6 +42,8 @@ final class ResearchResponder implements AiResponder
             self::MAX_OUTPUT_TOKENS,
             self::ESTIMATED_SEARCH_INPUT_TOKENS,
             self::ESTIMATED_SEARCH_CALLS * (float) config('normchat.web_search.usd_per_call', 0.01),
+            minOutputTokens: 2000,
+            feature: 'Deep Research',
         );
         $topic = AiActivity::topic(ContextUnderstanding::question($task->message));
         $task->progress(AiActivity::RESEARCH, $topic !== '' ? "sedang memulai riset tentang {$topic}" : 'sedang memulai riset');

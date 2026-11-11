@@ -8,14 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Grup gratis (docs/rancangan-grup-gratis-login.md): setiap user mendapat dua grup tanpa bayar. Grup ke-1 dibuat
- * otomatis saat login pertama, grup ke-2 lewat "Buat grup"; keduanya punya slot anggota yang bergabung tanpa
+ * Grup gratis (docs/rancangan-grup-gratis-login.md): jumlah grup tanpa bayar per user dan saldo awal tiap grup
+ * diatur di Superadmin › Grup gratis (NormkreditPricing::freeGroupCredits, mis. "70,50" = dua grup). Grup ke-1
+ * dibuat otomatis saat login pertama, berikutnya lewat "Buat grup"; semuanya punya slot anggota yang bergabung tanpa
  * patungan. Jatah dihitung dari semua grup yang pernah dibuat user (berbayar maupun yang sudah dihapus), jadi
- * menghapus grup tidak mengembalikan jatah. Grup ke-3 dst memakai alur bayar.
+ * menghapus grup tidak mengembalikan jatah. Grup sesudah jatah habis memakai alur bayar.
  */
 class FreeGroups
 {
-    public const QUOTA = 2;
 
     public function __construct(
         private readonly NormkreditPricing $pricing,
@@ -31,6 +31,12 @@ class FreeGroups
         }
 
         return $this->creditsFor($this->used($user));
+    }
+
+    /** Jumlah grup gratis per user menurut setelan sekarang (0 = fitur mati). */
+    public function quota(): int
+    {
+        return count($this->pricing->freeGroupCredits());
     }
 
     /** Slot anggota gratis untuk grup gratis yang dibuat sekarang. */
@@ -91,17 +97,6 @@ class FreeGroups
 
     private function creditsFor(int $used): ?float
     {
-        $settings = $this->pricing->settings();
-        if (! ($settings['free_groups_enabled'] ?? false)) {
-            return null;
-        }
-
-        $credits = match ($used) {
-            0 => (float) ($settings['free_first_group_credits'] ?? 0),
-            1 => (float) ($settings['free_second_group_credits'] ?? 0),
-            default => 0.0,
-        };
-
-        return $credits > 0 ? $credits : null;
+        return $this->pricing->freeGroupCredits()[$used] ?? null;
     }
 }

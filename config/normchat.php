@@ -54,8 +54,8 @@ return [
         // Grup gratis per user (Superadmin › Grup gratis): grup ke-1 dan ke-2 tanpa bayar dengan saldo awal ini,
         // masing-masing dengan slot anggota yang bergabung tanpa patungan. Grup ke-3 dst berbayar.
         'free_groups_enabled' => true,
-        'free_first_group_credits' => 70,
-        'free_second_group_credits' => 50,
+        // Saldo awal grup gratis ke-1, ke-2, … tiap user (diatur di Superadmin › Grup gratis).
+        'free_group_credits' => '70,50',
         'free_group_member_slots' => 2,
         // Selisih kurs kartu & biaya bank di atas kurs pasar yang diisi superadmin (%).
         'card_margin_percent' => 2.0,
