@@ -18,6 +18,10 @@ final class AiReply
         public readonly bool $billable,
         public readonly ?AiModel $model = null,
         public readonly ?array $attachment = null,
+        /** Fitur Normi yang disarankan lewat tombol di bawah jawaban (App\Enums\AiMode value), mis. "image". */
+        public readonly ?string $suggestMode = null,
+        /** Data tambahan yang disimpan di system_meta jawaban, mis. ZIP proyek Canvas. */
+        public readonly array $meta = [],
     ) {
     }
 
@@ -46,6 +50,16 @@ final class AiReply
 
     public function withNote(string $note): self
     {
-        return new self($this->kind, trim(($this->text ?? '') . "\n\n---\n" . $note), $this->billable, $this->model, $this->attachment);
+        return new self($this->kind, trim(($this->text ?? '') . "\n\n---\n" . $note), $this->billable, $this->model, $this->attachment, $this->suggestMode, $this->meta);
+    }
+
+    public function withSuggestion(?string $mode): self
+    {
+        return new self($this->kind, $this->text, $this->billable, $this->model, $this->attachment, $mode, $this->meta);
+    }
+
+    public function withMeta(array $meta): self
+    {
+        return new self($this->kind, $this->text, $this->billable, $this->model, $this->attachment, $this->suggestMode, [...$this->meta, ...$meta]);
     }
 }

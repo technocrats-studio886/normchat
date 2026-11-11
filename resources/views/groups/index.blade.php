@@ -29,6 +29,9 @@
             @endif
         </div>
 
+        {{-- Ajakan menyalakan notifikasi (resources/js/push.js). --}}
+        <div data-push-prompt-slot></div>
+
         <h2 class="nc-section-title mt-6">Grup</h2>
 
         <form method="GET" action="" class="mt-3 flex items-center gap-2" data-join-by-id-form="{{ url('/join') }}">

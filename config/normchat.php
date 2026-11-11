@@ -144,6 +144,17 @@ return [
     ],
 
     // Transkripsi voice note; ditagih dengan media_multiplier.
+    // Web Push (App\Services\Push\WebPush). Kunci VAPID dibuat dengan `php artisan normchat:vapid-keys`.
+    'push' => [
+        'public_key' => env('NORMCHAT_VAPID_PUBLIC_KEY', ''),
+        'private_key' => env('NORMCHAT_VAPID_PRIVATE_KEY', ''),
+        'subject' => env('NORMCHAT_VAPID_SUBJECT', 'mailto:support@normi.chat'),
+        // Jeda sebelum notifikasi dikirim: pesan yang sudah dibaca di perangkat mana pun dalam jeda ini tidak dikirim.
+        'delay_seconds' => (int) env('NORMCHAT_PUSH_DELAY_SECONDS', 8),
+        // User dianggap sedang membuka Normi Chat (tanpa notifikasi) selama ini sejak sinyal aktif terakhir.
+        'active_window_seconds' => 70,
+    ],
+
     'transcription_model' => [
         'model' => env('NORMCHAT_TRANSCRIPTION_MODEL', 'gpt-4o-mini-transcribe'),
         'input_usd_per_mtok' => 1.25,

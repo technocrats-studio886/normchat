@@ -163,7 +163,7 @@ class NormiFeatureTagsTest extends TestCase
     public function test_feature_tags_are_suggested_and_stripped_from_the_question(): void
     {
         $suggestions = collect(app(MentionNotifier::class)->suggestionsFor($this->group, $this->owner));
-        $this->assertSame(['@normi', '@normi-learn', '@normi-image', '@normi-canvas', '@normi-research'],
+        $this->assertSame(['@normi', '@normi-learn', '@normi-image', '@normi-canvas', '@normi-research', '@normi-file'],
             $suggestions->where('type', 'ai')->pluck('insert')->all());
 
         $question = new Message(['content' => '@normi-research tren mobil listrik 2026']);

@@ -3,9 +3,12 @@
 namespace App\Services\Ai\Responders;
 
 use App\Models\Message;
+use App\Services\Ai\AiActivity;
 use App\Services\Ai\AiReply;
 use App\Services\Ai\AiTask;
 use App\Services\Ai\Context\ContextBundle;
+use App\Services\Ai\Context\ContextUnderstanding;
+use App\Services\Ai\Files\FileBuilder;
 use App\Services\Ai\ModePrompts;
 use App\Services\Ai\PromptBuilder;
 use App\Services\Files\StoredFiles;
@@ -27,13 +30,22 @@ final class CanvasResponder implements AiResponder
 
     public const MIME_DOCUMENT = 'text/markdown';
 
-    private const MAX_OUTPUT_TOKENS = 16_000;
+    private const MAX_OUTPUT_TOKENS = 24_000;
+
+    /** Permintaan program/aplikasi: status "sedang menulis program", bukan "sedang menyusun canvas". */
+    private const CODE_PATTERN = '/\b(aplikasi|app|apps|program|kode|code|coding|script|skrip|website|web|halaman|landing|game|gim|kalkulator|dashboard|react|vue|svelte|angular|next\.?js|nuxt|laravel|django|flask|express|node|flutter|kotlin|android|ios|html|css|javascript|typescript|python|php|java|api|crud|todo|form|ui|prototipe|prototype|simulasi|visualisasi|chart|grafik|animasi|kuis|quiz)\b/iu';
 
     private const MAX_PREVIOUS_CHARS = 60_000;
 
     public function activity(): string
     {
-        return 'canvas';
+        return AiActivity::CANVAS;
+    }
+
+    /** Teks status awal sesuai jenis permintaan. */
+    public static function startDetail(string $question): string
+    {
+        return preg_match(self::CODE_PATTERN, $question) === 1 ? 'sedang menulis program' : 'sedang menyusun canvas';
     }
 
     public function respond(AiTask $task): AiReply
@@ -54,8 +66,10 @@ final class CanvasResponder implements AiResponder
             ]]);
         }
 
+        $detail = self::startDetail(ContextUnderstanding::question($task->message));
+        $task->progress($detail === 'sedang menulis program' ? AiActivity::CODE : AiActivity::CANVAS, $detail);
         $task->planChat($messages, self::MAX_OUTPUT_TOKENS);
-        [$completion, $model] = $task->complete($messages, 240, ['response_format' => ['type' => 'json_object']]);
+        [$completion, $model] = $task->complete($messages, 300, ['response_format' => ['type' => 'json_object']]);
 
         if (! $completion->hasText()) {
             return AiReply::failed('canvas');
@@ -81,16 +95,49 @@ final class CanvasResponder implements AiResponder
 
         $task->recordChat('canvas', $model, $completion);
 
-        return AiReply::attachment('canvas', $canvas['summary'], [
+        $reply = AiReply::attachment('canvas', $canvas['summary'], [
             'message_type' => self::MESSAGE_TYPE,
             'path' => $path,
             'mime' => $isWeb ? self::MIME_WEB : self::MIME_DOCUMENT,
             'original_name' => (Str::slug($canvas['title']) ?: 'canvas') . ($isWeb ? '.html' : '.md'),
             'size' => strlen($canvas['content']),
         ], $model);
+
+        return $this->withProject($task, $reply, $canvas);
     }
 
-    /** @return array{kind: string, title: string, summary: string, content: string}|null */
+    /**
+     * Kode proyek asli (mis. Next.js, Laravel, Flutter) disimpan sebagai ZIP di samping canvas; kartu canvas
+     * menampilkan tombol unduhnya (ChatController::canvasProject).
+     */
+    private function withProject(AiTask $task, AiReply $reply, array $canvas): AiReply
+    {
+        $files = $canvas['project']['files'] ?? [];
+        if (! is_array($files) || $files === []) {
+            return $reply;
+        }
+
+        $task->progress(AiActivity::CODE, 'sedang mengemas proyek');
+        $name = trim((string) ($canvas['project']['name'] ?? '')) ?: $canvas['title'];
+        try {
+            $zip = app(FileBuilder::class)->build($files, null, $name, forceZip: true);
+            $path = sprintf('group-%d/%s/canvas-project-%s.zip', $task->group->id, now()->format('Y/m'), Str::uuid());
+            Storage::disk('normchat_attachments')->put($path, $zip['binary']);
+        } catch (Throwable $e) {
+            Log::warning('Canvas project zip failed.', ['error' => $e->getMessage()]);
+
+            return $reply;
+        }
+
+        return $reply->withMeta([
+            'canvas_project_path' => $path,
+            'canvas_project_name' => $zip['name'],
+            'canvas_project_size' => strlen($zip['binary']),
+            'canvas_project_files' => count($files),
+        ]);
+    }
+
+    /** @return array{kind: string, title: string, summary: string, content: string, project: ?array}|null */
     public static function parse(string $raw): ?array
     {
         $data = json_decode($raw, true);
@@ -116,6 +163,7 @@ final class CanvasResponder implements AiResponder
             'title' => Str::limit($title, 80, ''),
             'summary' => trim((string) ($data['summary'] ?? '')) ?: $title,
             'content' => $content,
+            'project' => is_array($data['project'] ?? null) ? $data['project'] : null,
         ];
     }
 

@@ -19,12 +19,20 @@ class GroupMember extends Model
         'last_read_message_id',
         'last_read_at',
         'history_from_message_id',
+        'muted_until',
     ];
 
     protected $casts = [
         'joined_at' => 'datetime',
         'last_read_at' => 'datetime',
+        'muted_until' => 'datetime',
     ];
+
+    /** Notifikasi grup ini sedang dibisukan. */
+    public function isMuted(): bool
+    {
+        return $this->muted_until !== null && $this->muted_until->isFuture();
+    }
 
     public function scopeActive(Builder $query): Builder
     {

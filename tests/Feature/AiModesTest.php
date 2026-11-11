@@ -182,11 +182,13 @@ class AiModesTest extends TestCase
 
     public function test_deep_research_uses_web_search_and_bills_each_search(): void
     {
-        Http::fake(['api.openai.com/v1/responses' => Http::response([
+        // Mode stream (server-sent events): status grup mengikuti kueri yang sedang dicari.
+        $final = [
+            'id' => 'resp_1',
             'status' => 'completed',
             'output' => [
-                ['type' => 'web_search_call', 'status' => 'completed'],
-                ['type' => 'web_search_call', 'status' => 'completed'],
+                ['type' => 'web_search_call', 'status' => 'completed', 'action' => ['type' => 'search', 'query' => 'inflasi Indonesia 2026']],
+                ['type' => 'web_search_call', 'status' => 'completed', 'action' => ['type' => 'search', 'query' => 'BPS inflasi Oktober 2026']],
                 ['type' => 'message', 'content' => [[
                     'type' => 'output_text',
                     'text' => "## Ringkasan\n- Inflasi turun.",
@@ -194,12 +196,23 @@ class AiModesTest extends TestCase
                 ]]],
             ],
             'usage' => ['input_tokens' => 2000, 'output_tokens' => 1000],
-        ])]);
+        ];
+        $events = [
+            ['type' => 'response.created', 'response' => ['id' => 'resp_1', 'status' => 'in_progress']],
+            ['type' => 'response.output_item.added', 'item' => ['type' => 'web_search_call', 'status' => 'in_progress']],
+            ['type' => 'response.output_item.done', 'item' => $final['output'][0]],
+            ['type' => 'response.output_item.done', 'item' => $final['output'][1]],
+            ['type' => 'response.output_text.delta', 'delta' => '## Ringkasan'],
+            ['type' => 'response.completed', 'response' => $final],
+        ];
+        $body = implode('', array_map(fn (array $event) => 'event: ' . $event['type'] . "\ndata: " . json_encode($event) . "\n\n", $events));
+        Http::fake(['api.openai.com/v1/responses' => Http::response($body, 200, ['Content-Type' => 'text/event-stream'])]);
 
         $this->runAi(['content' => '@normi riset inflasi Indonesia 2026', 'ai_mode' => AiMode::DeepResearch]);
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/v1/responses')
             && $request['tools'] === [['type' => 'web_search']]
+            && $request['stream'] === true
             && str_contains((string) $request['instructions'], 'MODE DEEP RESEARCH')
             && $request['model'] === 'gpt-6-luna');
 
@@ -212,6 +225,17 @@ class AiModesTest extends TestCase
         $this->assertSame('research', $log->kind);
         $this->assertSame(6.1404, $log->charged_credits);
         $this->assertContains('web_search', array_column($log->breakdown_json['lines'], 'component'));
+
+        $details = [];
+        Event::assertDispatched(TypingStatus::class, function (TypingStatus $event) use (&$details) {
+            $details[] = $event->detail;
+
+            return true;
+        });
+        $this->assertContains('sedang memulai riset tentang inflasi Indonesia 2026', $details);
+        $this->assertContains('sedang mencari "inflasi Indonesia 2026"', $details);
+        $this->assertContains('sedang mencari "BPS inflasi Oktober 2026"', $details);
+        $this->assertContains('sedang menyusun laporan dari 2 pencarian', $details);
     }
 
     public function test_composer_choice_is_saved_only_for_messages_to_ai(): void

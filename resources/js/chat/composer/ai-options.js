@@ -7,6 +7,7 @@ import { chatFeed } from '../context.js';
 import { refreshSendVoiceToggle } from './attachment.js';
 import { isEditing } from './edit-mode.js';
 import { attachMenu, attachMenuButton, attachmentInput, chatForm, mentionInput, replyToInput } from './elements.js';
+import { clearReplyTarget, setReplyTarget } from './reply.js';
 
 const CHAT_TAG = '@normi';
 // Tag Normi pertama di teks: @normi atau @normi-<fitur>. Grup 2 = nama fitur (tanpa "@normi-").
@@ -18,6 +19,7 @@ const CONFIRM_QUESTIONS = {
 	image: 'Ingin membuat gambar lagi?',
 	canvas: 'Ingin memakai Canvas lagi?',
 	guided_learning: 'Ingin lanjut dengan Guided Learning?',
+	file: 'Ingin membuat file lagi?',
 };
 
 const modeInput = chatForm?.querySelector('[data-ai-mode-input]');
@@ -365,6 +367,28 @@ export const initAiOptions = () => {
 	mentionInput?.addEventListener('input', syncModeFromText);
 	// Draf yang dipulihkan (composer/draft.js, diinisialisasi setelah ini) bisa berisi tag fitur.
 	window.setTimeout(syncModeFromText, 0);
+
+	// Tombol saran fitur di bawah jawaban Normi (mis. "Edit dengan Buat gambar"): kolom ketik disiapkan dengan tag
+	// fitur, permintaan sebelumnya, dan balasan ke pesan berisi fotonya; user tinggal menekan kirim.
+	chatFeed?.addEventListener('click', (event) => {
+		const button = event.target instanceof Element ? event.target.closest('[data-suggest-mode]') : null;
+		const option = button ? modeOptionFor(button.getAttribute('data-suggest-mode') || '') : null;
+		if (!button || !option || !(mentionInput instanceof HTMLTextAreaElement) || isEditing()) {
+			return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+
+		const replyNode = chatFeed.querySelector(`[data-message-id="${Number(button.getAttribute('data-suggest-reply') || 0)}"]`);
+		if (replyNode instanceof HTMLElement) {
+			setReplyTarget(replyNode);
+		} else {
+			clearReplyTarget();
+		}
+		mentionInput.value = String(button.getAttribute('data-suggest-text') || '').trim();
+		closeConfirm();
+		setMode(option);
+	});
 
 	confirmCard?.querySelector('[data-ai-mode-confirm-yes]')?.addEventListener('click', () => answerConfirm(true));
 	confirmCard?.querySelector('[data-ai-mode-confirm-no]')?.addEventListener('click', () => answerConfirm(false));

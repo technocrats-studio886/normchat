@@ -92,6 +92,15 @@ final class AiTask
         }
     }
 
+    /**
+     * Laporkan tahap yang sedang dikerjakan ke grup (AiActivity), mis. progress('research', 'sedang mencari "…"').
+     * $detail null = teks bawaan aktivitas itu di browser.
+     */
+    public function progress(string $activity, ?string $detail = null): void
+    {
+        AiActivity::report((int) $this->group->id, $activity, $detail);
+    }
+
     /** Pemisah cache prompt per grup (akuntansi cache OpenAI; bukan isolasi riwayat). */
     public function cacheKey(): string
     {
@@ -221,11 +230,11 @@ final class AiTask
      *
      * @return array{0: ChatCompletion, 1: AiModel}
      */
-    public function research(array $messages, int $timeout = 300): array
+    public function research(array $messages, int $timeout = 300, ?\Closure $onEvent = null): array
     {
         $model = $this->model;
         $maxOutput = $this->budget?->maxOutputTokens ?? (int) $this->pricing->get('max_output_tokens');
-        $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout, $this->cacheKey());
+        $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout, $this->cacheKey(), $onEvent);
 
         $fallback = AiModel::defaultModel();
         if ($completion->looksLikeModelIssue() && $fallback && $fallback->model_id !== $model->model_id) {
@@ -236,7 +245,7 @@ final class AiTask
             ]);
 
             $model = $fallback;
-            $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout, $this->cacheKey());
+            $completion = $this->client->research($model->model_id, $messages, $maxOutput, $timeout, $this->cacheKey(), $onEvent);
         }
 
         if (! $completion->successful) {

@@ -43,6 +43,18 @@ class Message extends Model
         'system_meta' => 'array',
     ];
 
+    /** Pesan anggota dan Normi memicu notifikasi push setelah jeda singkat (App\Jobs\SendMessagePushJob). */
+    protected static function booted(): void
+    {
+        static::created(function (self $message) {
+            if (in_array($message->sender_type, ['user', 'ai'], true) && \App\Services\Push\WebPush::fromConfig() !== null) {
+                \App\Jobs\SendMessagePushJob::dispatch((int) $message->id)
+                    ->delay(now()->addSeconds((int) config('normchat.push.delay_seconds', 8)))
+                    ->afterCommit();
+            }
+        });
+    }
+
     /** Karakter kendali arah dibuang (lihat App\Support\Bidi). */
     protected function content(): Attribute
     {

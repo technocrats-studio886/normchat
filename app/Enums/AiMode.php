@@ -4,7 +4,7 @@ namespace App\Enums;
 
 /**
  * Mode jawaban yang dipilih anggota dari menu plus composer, atau lewat tag fiturnya
- * (@normi-image, @normi-canvas, @normi-research, @normi-learn). Chat biasa tetap @normi.
+ * (@normi-image, @normi-canvas, @normi-research, @normi-learn, @normi-file). Chat biasa tetap @normi.
  * Memilih mode dari menu menyisipkan tag yang sesuai ke pesan, jadi yang tampil di chat
  * selalu tag fiturnya.
  */
@@ -14,6 +14,7 @@ enum AiMode: string
     case Image = 'image';
     case Canvas = 'canvas';
     case DeepResearch = 'deep_research';
+    case File = 'file';
 
     /** Tag chat biasa (tanpa fitur). */
     public const CHAT_TAG = '@normi';
@@ -25,6 +26,7 @@ enum AiMode: string
             self::Image => 'Buat gambar',
             self::Canvas => 'Canvas',
             self::DeepResearch => 'Deep Research',
+            self::File => 'Buat file',
         };
     }
 
@@ -41,6 +43,7 @@ enum AiMode: string
             self::Image => 'image',
             self::Canvas => 'canvas',
             self::DeepResearch => 'research',
+            self::File => 'file',
         };
     }
 
@@ -84,6 +87,7 @@ enum AiMode: string
             'canvas' => self::Canvas,
             'research' => self::DeepResearch,
             'guided_learning' => self::GuidedLearning,
+            'document', 'file' => self::File,
             default => null,
         };
     }

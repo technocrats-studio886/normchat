@@ -71,6 +71,21 @@ class MentionNotifier
         }
     }
 
+    /** @return list<int> id user yang disebut di $content (owner atau anggota aktif) */
+    public function mentionedUserIds(Group $group, string $content): array
+    {
+        $handles = $this->handlesIn($content);
+        if ($handles === []) {
+            return [];
+        }
+
+        return $this->participants($group)
+            ->filter(fn (User $user) => array_intersect($this->handlesFor((string) $user->name), $handles) !== [])
+            ->map(fn (User $user) => (int) $user->id)
+            ->values()
+            ->all();
+    }
+
     /** Saran mention untuk composer: Normi AI lalu anggota lain. */
     public function suggestionsFor(Group $group, User $viewer): array
     {

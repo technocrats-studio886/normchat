@@ -228,6 +228,24 @@
         {{-- ── Tab Pengaturan ── --}}
         <div class="nc-info-pane" id="nc-info-pane-manage" role="tabpanel" aria-labelledby="nc-info-tab-manage" data-info-pane="manage">
             <div class="nc-info-list">
+                @if($viewerMember ?? null)
+                    @php($isMuted = $viewerMember->isMuted())
+                    <div data-info-expand-row data-group-mute="{{ route('groups.mute', $group) }}">
+                        <button type="button" class="nc-info-row w-full" data-info-expand aria-expanded="false">
+                            <x-info-icon :name="$isMuted ? 'bell-off' : 'bell'" class="h-5 w-5 text-ink-soft" />
+                            <span class="min-w-0 flex-1 text-left text-sm">Notifikasi grup</span>
+                            <span class="text-xs text-ink-soft" data-group-mute-label>{{ \App\Http\Controllers\PushController::muteLabel($viewerMember) }}</span>
+                            <x-info-icon name="chevron" class="h-4 w-4 text-ink-soft" />
+                        </button>
+                        <div class="nc-mute-options" hidden data-info-expand-body role="group" aria-label="Notifikasi grup">
+                            <button type="button" class="nc-mute-option" data-group-mute-option="off" aria-pressed="{{ $isMuted ? 'false' : 'true' }}">Nyala</button>
+                            <button type="button" class="nc-mute-option" data-group-mute-option="8h" aria-pressed="false">Bisukan 8 jam</button>
+                            <button type="button" class="nc-mute-option" data-group-mute-option="1w" aria-pressed="false">Bisukan 1 minggu</button>
+                            <button type="button" class="nc-mute-option" data-group-mute-option="always" aria-pressed="{{ $isMuted && $viewerMember->muted_until->year >= 2100 ? 'true' : 'false' }}">Bisukan selalu</button>
+                            <p class="nc-mute-note">Saat dibisukan, mention dan balasan untukmu tetap muncul.</p>
+                        </div>
+                    </div>
+                @endif
                 @if($canEditProfile)
                     <div data-info-expand-row>
                         <button type="button" class="nc-info-row w-full" data-info-expand aria-expanded="{{ $errors->has('password') ? 'true' : 'false' }}">

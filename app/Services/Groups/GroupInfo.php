@@ -59,6 +59,8 @@ class GroupInfo
             'creditBalance' => $this->wallet->balanceFor($group, $user),
             'aiModelLabel' => $group->resolvedAiModel()?->label,
             'infoView' => in_array($view, self::VIEWS, true) ? $view : null,
+            // Bisu notifikasi grup untuk user ini (App\Http\Controllers\PushController::mute).
+            'viewerMember' => $members->firstWhere('user_id', $user->id),
         ];
     }
 

@@ -48,10 +48,25 @@ final class ChatCompletion
     /** Responses API: teks dari item `message`, sumber dari anotasi url_citation. */
     public static function fromResponsesApi(Response $response): self
     {
+        return self::fromResponsesPayload(
+            (array) ($response->json() ?? []),
+            $response->status(),
+            $response->successful() ? '' : (string) $response->body(),
+        );
+    }
+
+    /**
+     * Objek respons Responses API (dari body JSON, atau event akhir mode stream).
+     *
+     * @param  array<string, mixed>  $json
+     */
+    public static function fromResponsesPayload(array $json, int $status, string $errorBody = ''): self
+    {
+        $successful = $status >= 200 && $status < 300;
         $text = '';
         $citations = [];
         $searchCalls = 0;
-        foreach ((array) $response->json('output', []) as $item) {
+        foreach ((array) ($json['output'] ?? []) as $item) {
             if (($item['type'] ?? '') === 'web_search_call') {
                 $searchCalls++;
                 continue;
@@ -73,23 +88,23 @@ final class ChatCompletion
             }
         }
 
-        $usage = (array) $response->json('usage', []);
-        $incomplete = $response->json('status') === 'incomplete';
+        $usage = (array) ($json['usage'] ?? []);
+        $incomplete = ($json['status'] ?? null) === 'incomplete';
 
         return new self(
-            $response->successful(),
+            $successful,
             $text !== '' ? $text : null,
-            $incomplete ? 'length' : ($response->successful() ? 'stop' : null),
+            $incomplete ? 'length' : ($successful ? 'stop' : null),
             [
                 'input_tokens' => (int) ($usage['input_tokens'] ?? 0),
                 'cached_input_tokens' => (int) data_get($usage, 'input_tokens_details.cached_tokens', 0),
                 'output_tokens' => (int) ($usage['output_tokens'] ?? 0),
             ],
-            $response->status(),
-            $response->successful() ? '' : (string) $response->body(),
+            $status,
+            $successful ? '' : $errorBody,
             array_values($citations),
             $searchCalls,
-            $response->json('id'),
+            isset($json['id']) ? (string) $json['id'] : null,
         );
     }
 

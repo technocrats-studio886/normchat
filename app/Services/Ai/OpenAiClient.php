@@ -42,8 +42,14 @@ class OpenAiClient
     /**
      * Responses API dengan alat web search. $messages memakai format chat completions
      * (system + riwayat + user) dan diubah ke format input Responses API di sini.
+     *
+     * $onEvent: bila diisi, respons dibaca sebagai stream (server-sent events) dan setiap event diteruskan
+     * sebagai ($type, $data), mis. kueri pencarian web yang sedang berjalan. Hasil akhirnya tetap respons
+     * lengkap (event response.completed), jadi penagihan sama dengan mode tanpa stream.
+     *
+     * @param  (\Closure(string, array): void)|null  $onEvent
      */
-    public function research(string $model, array $messages, int $maxOutputTokens, int $timeout = 300, ?string $cacheKey = null): ChatCompletion
+    public function research(string $model, array $messages, int $maxOutputTokens, int $timeout = 300, ?string $cacheKey = null, ?\Closure $onEvent = null): ChatCompletion
     {
         $instructions = [];
         $input = [];
@@ -55,20 +61,89 @@ class OpenAiClient
             $input[] = ['role' => $message['role'], 'content' => self::responsesContent($message['content'] ?? '', $message['role'])];
         }
 
+        $payload = [
+            'model' => $model,
+            'instructions' => implode("\n\n", $instructions),
+            'input' => $input,
+            'tools' => [['type' => 'web_search']],
+            'max_output_tokens' => $maxOutputTokens,
+            ...($cacheKey !== null ? ['prompt_cache_key' => $cacheKey] : []),
+        ];
+
         try {
-            return ChatCompletion::fromResponsesApi(Http::withToken($this->token)->timeout($timeout)->post(self::BASE_URL . '/responses', [
-                'model' => $model,
-                'instructions' => implode("\n\n", $instructions),
-                'input' => $input,
-                'tools' => [['type' => 'web_search']],
-                'max_output_tokens' => $maxOutputTokens,
-                ...($cacheKey !== null ? ['prompt_cache_key' => $cacheKey] : []),
-            ]));
+            if ($onEvent === null) {
+                return ChatCompletion::fromResponsesApi(Http::withToken($this->token)->timeout($timeout)->post(self::BASE_URL . '/responses', $payload));
+            }
+
+            $response = Http::withToken($this->token)
+                ->timeout($timeout)
+                ->withOptions(['stream' => true])
+                ->post(self::BASE_URL . '/responses', [...$payload, 'stream' => true]);
+
+            return $this->readResearchStream($response, $onEvent);
         } catch (Throwable $e) {
             Log::error('OpenAI research request failed.', ['model' => $model, 'error' => $e->getMessage()]);
 
             return ChatCompletion::failed($e->getMessage());
         }
+    }
+
+    /**
+     * Baca server-sent events Responses API sampai event akhir (completed / incomplete / failed).
+     *
+     * @param  \Closure(string, array): void  $onEvent
+     */
+    private function readResearchStream(\Illuminate\Http\Client\Response $response, \Closure $onEvent): ChatCompletion
+    {
+        $body = $response->toPsrResponse()->getBody();
+        if (! $response->successful()) {
+            return ChatCompletion::fromResponsesPayload([], $response->status(), (string) $body);
+        }
+
+        $buffer = '';
+        $final = null;
+        $handle = function (string $block) use (&$final, $onEvent): void {
+            $data = '';
+            foreach (preg_split('/\r?\n/', $block) ?: [] as $line) {
+                if (str_starts_with($line, 'data:')) {
+                    $data .= ltrim(substr($line, 5));
+                }
+            }
+            if ($data === '' || $data === '[DONE]') {
+                return;
+            }
+            $event = json_decode($data, true);
+            if (! is_array($event)) {
+                return;
+            }
+            $type = (string) ($event['type'] ?? '');
+            if (in_array($type, ['response.completed', 'response.incomplete', 'response.failed'], true)) {
+                $final = (array) ($event['response'] ?? []);
+            }
+            try {
+                $onEvent($type, $event);
+            } catch (Throwable $e) {
+                // Status ke grup gagal dikirim: riset tetap berjalan.
+                Log::warning('Research progress callback failed.', ['error' => $e->getMessage()]);
+            }
+        };
+
+        while (! $body->eof()) {
+            $buffer .= $body->read(8192);
+            while (preg_match('/\r?\n\r?\n/', $buffer, $match, PREG_OFFSET_CAPTURE) === 1) {
+                $handle(substr($buffer, 0, $match[0][1]));
+                $buffer = substr($buffer, $match[0][1] + strlen($match[0][0]));
+            }
+        }
+        if (trim($buffer) !== '') {
+            $handle($buffer);
+        }
+
+        if ($final === null) {
+            return ChatCompletion::failed('Stream riset berakhir tanpa respons akhir.');
+        }
+
+        return ChatCompletion::fromResponsesPayload($final, ($final['status'] ?? '') === 'failed' ? 500 : 200, ($final['status'] ?? '') === 'failed' ? json_encode($final['error'] ?? []) : '');
     }
 
     /** Bagian pesan chat completions (text / image_url) → Responses API (input_text / input_image). */

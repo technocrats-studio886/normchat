@@ -2,8 +2,10 @@
 
 namespace App\Services\Chat;
 
+use App\Enums\AiMode;
 use App\Models\GroupMember;
 use App\Models\Message;
+use App\Services\Ai\AiActivity;
 use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Links\LinkPreviews;
 
@@ -17,7 +19,7 @@ class MessagePresenter
         $isEdited = (int) ($message->versions_count ?? $message->versions()->count()) > 0;
         $isDeleted = $message->trashed();
 
-        return [
+        $presented = [
             'id' => $message->id,
             'message_type' => $message->message_type ?? 'text',
             'sender_type' => $message->sender_type,
@@ -44,6 +46,15 @@ class MessagePresenter
             'forwarded_from' => $isDeleted ? null : $message->forwarded_from_name,
             // Fitur Normi pesan ini: mode permintaan, atau fitur yang menghasilkan jawaban Normi.
             'ai_mode' => $isDeleted ? null : $this->aiModeOf($message),
+            // Tombol "pakai fitur" di bawah jawaban Normi (GroupAiAssistant::suggestionMeta).
+            'suggestion' => $isDeleted ? null : $this->suggestionOf($message),
+            // ZIP kode proyek asli di samping Canvas (Next.js, Laravel, Flutter, ...).
+            'canvas_project' => ! $isDeleted && $message->message_type === CanvasResponder::MESSAGE_TYPE && ! empty($message->system_meta['canvas_project_path'] ?? null) ? [
+                'url' => route('chat.canvas.project', ['group' => $message->group_id, 'message' => $message->id]),
+                'name' => (string) ($message->system_meta['canvas_project_name'] ?? 'proyek.zip'),
+                'size' => (int) ($message->system_meta['canvas_project_size'] ?? 0),
+                'files' => (int) ($message->system_meta['canvas_project_files'] ?? 0),
+            ] : null,
             'reply_to' => $replyTarget && ! $isDeleted ? [
                 'id' => (int) $replyTarget->id,
                 'sender_name' => $this->senderName($replyTarget),
@@ -66,6 +77,34 @@ class MessagePresenter
                 'history_pending' => $message->system_event === SystemMessages::MEMBER_JOINED && $this->historyPending($message),
             ] : null,
             ...$extra,
+        ];
+
+        // Pertanyaan yang masih dikerjakan Normi: status terakhirnya (AiActivity), untuk anggota yang baru membuka chat.
+        if (($presented['awaiting_ai'] ?? false) === true && ! array_key_exists('ai_activity', $presented)) {
+            $presented['ai_activity'] = AiActivity::current((int) $message->group_id);
+        }
+
+        return $presented;
+    }
+
+    /** @return array{mode: string, tag: string, label: string, reply_to: int, text: string}|null */
+    private function suggestionOf(Message $message): ?array
+    {
+        if ($message->sender_type !== 'ai') {
+            return null;
+        }
+        $meta = (array) ($message->system_meta ?? []);
+        $mode = AiMode::tryFrom((string) ($meta['suggest_mode'] ?? ''));
+        if ($mode === null) {
+            return null;
+        }
+
+        return [
+            'mode' => $mode->value,
+            'tag' => $mode->tag(),
+            'label' => $mode->label(),
+            'reply_to' => (int) ($meta['suggest_reply_to'] ?? $message->reply_to_message_id ?? 0),
+            'text' => (string) ($meta['suggest_text'] ?? ''),
         ];
     }
 

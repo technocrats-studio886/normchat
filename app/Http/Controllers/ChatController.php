@@ -393,6 +393,32 @@ class ChatController extends Controller
         ]);
     }
 
+    /** ZIP kode proyek asli dari sebuah Canvas (CanvasResponder::withProject). */
+    public function canvasProject(Group $group, Message $message, StoredFiles $files): StreamedResponse
+    {
+        $this->authorize('chat', $group);
+        abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless(Message::withTrashed()->whereKey($message->id)->visibleTo(request()->user())->exists() && ! $message->trashed(), 404);
+        $meta = (array) ($message->system_meta ?? []);
+        $path = (string) ($meta['canvas_project_path'] ?? '');
+        abort_unless($message->message_type === CanvasResponder::MESSAGE_TYPE && $path !== '', 404);
+
+        $disk = $message->attachment_disk ?: 'normchat_attachments';
+        $stream = $files->stream($disk, $path);
+        abort_unless(is_resource($stream), 404);
+        $name = (string) preg_replace('/[^\w.-]+/', '-', (string) ($meta['canvas_project_name'] ?? 'proyek.zip'));
+
+        return response()->stream(function () use ($stream) {
+            fpassthru($stream);
+            fclose($stream);
+        }, 200, [
+            'Content-Type' => 'application/zip',
+            'Content-Disposition' => 'attachment; filename="' . $name . '"',
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function attachment(Group $group, Message $message, StoredFiles $files): StreamedResponse
     {
         $this->authorize('chat', $group);

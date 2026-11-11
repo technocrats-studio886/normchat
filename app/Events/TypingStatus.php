@@ -19,8 +19,11 @@ class TypingStatus implements ShouldBroadcastNow
         public ?int $senderId,
         public string $senderName,
         public bool $isTyping,
-        // Yang sedang dikerjakan Normi: typing, image, research, canvas, document (AiResponder::activity()).
+        // Yang sedang dikerjakan Normi (App\Services\Ai\AiActivity): typing, reading, image, research, canvas,
+        // code, file, learning.
         public string $activity = 'typing',
+        // Rincian tahap untuk ditampilkan, mis. kueri yang sedang dicari Deep Research; null = teks bawaan aktivitas.
+        public ?string $detail = null,
     ) {}
 
     public function broadcastAs(): string
@@ -47,6 +50,7 @@ class TypingStatus implements ShouldBroadcastNow
             'sender_name' => $this->senderName,
             'is_typing' => $this->isTyping,
             'activity' => $this->activity,
+            'detail' => $this->detail,
         ];
     }
 }

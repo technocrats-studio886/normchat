@@ -8,6 +8,10 @@
         <meta name="auth-user-avatar" content="{{ auth()->user()->avatar_url }}">
         <meta name="auth-user-timezone" content="{{ auth()->user()->timezone }}" data-timezone-url="{{ route('profile.timezone.update') }}" data-timezone-mode="{{ auth()->user()->timezone_mode }}">
         <meta name="auth-user-notify-sound" content="{{ auth()->user()->notify_sound ? '1' : '0' }}">
+        {{-- Notifikasi push (resources/js/push.js); kosong bila kunci VAPID belum diisi atau untuk superadmin. --}}
+        @if (config('normchat.push.public_key') && ! auth()->user()->isSuperadmin())
+            <meta name="nc-push-key" content="{{ config('normchat.push.public_key') }}">
+        @endif
     @endauth
     <meta name="theme-color" content="{{ \App\Support\Themes::BROWSER[$uiMode] }}">
     @include('partials.brand-head')

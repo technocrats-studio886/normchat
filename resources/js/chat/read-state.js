@@ -1,6 +1,6 @@
 // Status baca, tombol scroll-ke-bawah, dan penanda pesan baru.
 
-import { chatFeed, chatReadUrlFromServer, feedState, hasReadBeforeFromServer, lastReadMessageIdFromServer, latestMessageIdFromServer, unreadCountFromServer } from './context.js';
+import { chatFeed, chatReadUrlFromServer, feedState, groupId, hasReadBeforeFromServer, lastReadMessageIdFromServer, latestMessageIdFromServer, unreadCountFromServer } from './context.js';
 import { highlightMessageInFeed } from './highlight.js';
 import { chatApiRequest, scrollChatToBottom } from './utils.js';
 
@@ -100,6 +100,8 @@ export const markGroupRead = async (targetMessageId = 0) => {
 		if (Number.isFinite(nextReadId) && nextReadId > 0) {
 			serverLastReadMessageId = Math.max(serverLastReadMessageId, nextReadId);
 		}
+		// Notifikasi push grup ini di perangkat ini ditutup (resources/js/push.js).
+		window.dispatchEvent(new CustomEvent('nc:group-read', { detail: { groupId: Number(groupId || 0) } }));
 	} catch {
 		// Gagal sinkron status baca tidak boleh mengganggu chat di jaringan yang putus-sambung.
 	} finally {

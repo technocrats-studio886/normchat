@@ -1,5 +1,6 @@
 // Highlight kutipan/pencarian dan lompat ke pesan.
 
+import { expandMessage } from './read-more.js';
 import { chatFeed } from './context.js';
 import { escapeHtml } from './utils.js';
 
@@ -197,6 +198,7 @@ const SEARCH_SKIP = '.nc-inline-time, .nc-msg-name, .nc-quote, .nc-forwarded, .n
  * format jawaban Normi tetap utuh. Mengembalikan <mark> yang dibuat (kosong bila tidak ada yang cocok).
  */
 export const highlightSearchInMessage = (messageNode, queryText) => {
+	expandMessage(messageNode);
 	const phrase = String(queryText || '').trim().replace(/\s+/g, ' ');
 	if (phrase === '' || !(messageNode instanceof HTMLElement)) {
 		return [];
@@ -273,6 +275,7 @@ export const highlightMessageInFeed = (messageId, replyQuote = '') => {
 
 	cancelPendingReplyVisual();
 	cancelScheduledQuoteHighlightClear();
+	expandMessage(target);
 	target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
 	pendingReplyVisualTimer = window.setTimeout(() => {
 		clearQuoteHighlightsInFeed();

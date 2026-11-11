@@ -20,6 +20,7 @@ use App\Http\Controllers\GroupExportController;
 use App\Http\Controllers\InterdotzAuthController;
 use App\Http\Controllers\MailboxController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PushController;
 use App\Http\Controllers\ProfileHistoryController;
 use App\Http\Controllers\ProfileSettingsController;
 use App\Http\Controllers\SettingsController;
@@ -96,6 +97,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/groups/{group}/messages/{message}/forward', [ChatController::class, 'forward'])->middleware('group.permission')->name('chat.forward');
     Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
     Route::get('/groups/{group}/messages/{message}/canvas', [ChatController::class, 'canvas'])->middleware('group.permission')->name('chat.canvas');
+    Route::get('/groups/{group}/messages/{message}/canvas/project', [ChatController::class, 'canvasProject'])->middleware('group.permission')->name('chat.canvas.project');
 
     // Settings (view for active members, write actions restricted by permission)
     Route::get('/groups/{group}/avatar', [GroupAvatarController::class, 'show'])->name('groups.avatar');
@@ -125,6 +127,13 @@ Route::middleware('auth')->group(function () {
     Route::put('/groups/{group}/draft', [\App\Http\Controllers\GroupDraftController::class, 'update'])->name('groups.draft.update');
     Route::post('/groups/{group}/draft', [\App\Http\Controllers\GroupDraftController::class, 'update'])->name('groups.draft.beacon');
     Route::post('/groups/{group}/leave', [GroupController::class, 'leave'])->middleware('group.permission')->name('groups.leave');
+
+    // Notifikasi push (resources/js/push.js)
+    Route::post('/push/subscriptions', [PushController::class, 'subscribe'])->middleware('throttle:20,1')->name('push.subscribe');
+    Route::delete('/push/subscriptions', [PushController::class, 'unsubscribe'])->middleware('throttle:20,1')->name('push.unsubscribe');
+    Route::post('/push/presence', [PushController::class, 'presence'])->middleware('throttle:30,1')->name('push.presence');
+    Route::post('/push/test', [PushController::class, 'test'])->middleware('throttle:5,1')->name('push.test');
+    Route::put('/groups/{group}/notifications', [PushController::class, 'mute'])->middleware('group.permission')->name('groups.mute');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
@@ -222,5 +231,6 @@ Route::get('/manifest.webmanifest', function () {
 })->name('pwa.manifest');
 
 Route::get('/sw.js', function () {
-    return response()->view('pwa.sw')->header('Content-Type', 'application/javascript');
+    // Selalu diperiksa ulang browser supaya perbaikan service worker langsung sampai ke semua perangkat.
+    return response()->view('pwa.sw')->header('Content-Type', 'application/javascript')->header('Cache-Control', 'no-cache');
 })->name('pwa.sw');

@@ -48,6 +48,9 @@
             </button>
         </div>
 
+        {{-- Ajakan menyalakan notifikasi (resources/js/push.js). --}}
+        <div class="lg:mx-auto lg:w-[calc(100%-2rem)] lg:max-w-[var(--nc-room-max)]" data-push-prompt-slot></div>
+
         {{-- Grup gratis: ajakan untuk pemilik selama slot anggota gratis masih ada. Tersembunyi sampai
              resources/js/ui/invite-card.js memastikan kartunya belum ditutup di perangkat ini. --}}
         @if($viewerIsOwner && $group->freeSlotsLeft() > 0 && ! $group->isFrozen())
@@ -173,8 +176,9 @@
                     $aiModes = [
                         ['value' => 'guided_learning', 'tag' => \App\Enums\AiMode::from('guided_learning')->tag(), 'label' => 'Guided Learning', 'hint' => 'Belajar bertahap', 'placeholder' => 'Mau belajar apa?', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.04A8.97 8.97 0 0 0 6 3.75c-1.05 0-2.06.18-3 .51v14.25A8.99 8.99 0 0 1 6 18c2.3 0 4.4.87 6 2.29m0-14.25a8.97 8.97 0 0 1 6-2.29c1.05 0 2.06.18 3 .51v14.25A8.99 8.99 0 0 0 18 18a8.97 8.97 0 0 0-6 2.29m0-14.25v14.25"/>'],
                         ['value' => 'image', 'tag' => \App\Enums\AiMode::from('image')->tag(), 'label' => 'Buat gambar', 'hint' => 'Dari deskripsimu', 'placeholder' => 'Gambar apa yang mau dibuat?', 'icon' => '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 15-5-5L5 21"/>'],
-                        ['value' => 'canvas', 'tag' => \App\Enums\AiMode::from('canvas')->tag(), 'label' => 'Canvas', 'hint' => 'Halaman web atau dokumen', 'placeholder' => 'Mau dibuatkan apa?', 'icon' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18M9 9v11"/>'],
+                        ['value' => 'canvas', 'tag' => \App\Enums\AiMode::from('canvas')->tag(), 'label' => 'Canvas', 'hint' => 'Aplikasi, web, game, dokumen', 'placeholder' => 'Mau dibuatkan apa?', 'icon' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18M9 9v11"/>'],
                         ['value' => 'deep_research', 'tag' => \App\Enums\AiMode::from('deep_research')->tag(), 'label' => 'Deep Research', 'hint' => 'Riset dengan sumber', 'placeholder' => 'Mau riset tentang apa?', 'icon' => '<circle cx="11" cy="11" r="7"/><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5M8 11h6M11 8v6"/>'],
+                        ['value' => 'file', 'tag' => \App\Enums\AiMode::from('file')->tag(), 'label' => 'Buat file', 'hint' => 'PDF, Word, Excel, PPT, kode', 'placeholder' => 'File apa yang mau dibuat?', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5M12 11v6m-3-3 3 3 3-3"/>'],
                     ];
                     $activeAiModel = $aiModels->firstWhere('model_id', $defaultAiModel) ?? $aiModels->first();
                 @endphp

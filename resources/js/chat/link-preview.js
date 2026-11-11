@@ -18,7 +18,7 @@ export const attachLinkPreview = (feed, messageId, card) => {
 	const node = feed?.querySelector(`[data-message-id="${Number(messageId)}"]`);
 	const bubble = node?.querySelector('[data-message-bubble]');
 	if (!bubble || bubble.querySelector('[data-link-card]') || !card) return;
-	const text = bubble.querySelector(':scope > .whitespace-pre-wrap');
+	const text = bubble.querySelector(':scope > [data-message-text]');
 	const holder = document.createElement('div');
 	holder.innerHTML = linkPreviewHtml(card);
 	const element = holder.firstElementChild;

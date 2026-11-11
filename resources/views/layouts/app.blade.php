@@ -94,15 +94,6 @@
         @endauth
     </div>
     </div>
-<script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-            registrations.forEach((registration) => registration.unregister());
-        }).catch(() => {});
-    });
-}
-
-</script>
+{{-- Service worker khusus notifikasi push didaftarkan resources/js/push.js; SW cache lama ikut tergantikan. --}}
 </body>
 </html>

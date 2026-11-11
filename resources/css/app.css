@@ -1683,6 +1683,11 @@
         border-radius: inherit;
         background: var(--nc-primary);
     }
+    /* Layar sempit (iPhone SE, 320px): placeholder tidak terbelah dua baris, tombol model lebih ramping. */
+    .composer-input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 360px) {
+        .composer-model-btn { padding-left: 6px; padding-right: 6px; gap: 0; }
+    }
     .composer-input::placeholder {
         color: var(--nc-chat-composer-soft, var(--color-navy-400));
     }
@@ -2898,6 +2903,161 @@
     .nc-share-qr { display: grid; gap: 12px; padding: 4px 16px 16px; }
     .nc-share-qr-canvas { justify-self: center; width: 240px; height: 240px; border-radius: 16px; background: #ffffff; }
     .nc-share-status { min-height: 20px; padding: 0 16px 12px; font-size: 13px; font-weight: 600; text-align: center; color: var(--nc-primary-text); }
+
+
+    /* ── Status Normi: "AI thinking states" transitions.dev (P28) ─────────────────────────────
+       Teks berkilau selama tahap berjalan; saat tahap berganti, teks lama keluar ke atas dan yang baru
+       masuk dari bawah dengan cross-blur (resources/js/chat/realtime.js). */
+    :root {
+        --nc-think-swap-dur: 150ms;
+        --nc-think-swap-distance: 8px;
+        --nc-think-swap-blur: 2px;
+        --nc-think-shimmer-dur: 2000ms;
+        --nc-think-band: 400%;
+    }
+    .nc-typing-lines { display: flex; min-width: 0; flex: 1 1 12rem; flex-direction: column; gap: 2px; }
+    .nc-think { position: relative; display: block; min-width: 0; max-width: 100%; }
+    .nc-think.hidden, .nc-typing-text.hidden { display: none; }
+    .nc-think-sizer { display: block; visibility: hidden; font-size: 12.5px; font-weight: 500; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nc-think-text {
+        position: absolute;
+        inset: 0 auto auto 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12.5px;
+        font-weight: 500;
+        line-height: 18px;
+        color: var(--nc-text-soft);
+        transform: translateY(0);
+        filter: blur(0);
+        opacity: 1;
+        transition: transform var(--nc-think-swap-dur) ease-in-out, filter var(--nc-think-swap-dur) ease-in-out, opacity var(--nc-think-swap-dur) ease-in-out;
+        will-change: transform, filter, opacity;
+    }
+    .nc-think-text::before {
+        content: attr(data-text);
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+        background-image: linear-gradient(90deg, transparent 0%, transparent 40%, var(--nc-text) 50%, transparent 60%, transparent 100%);
+        background-size: var(--nc-think-band) 100%;
+        background-repeat: no-repeat;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        animation: nc-think-shimmer var(--nc-think-shimmer-dur) linear infinite;
+    }
+    @keyframes nc-think-shimmer {
+        0% { background-position: 100% 0; }
+        100% { background-position: 0% 0; }
+    }
+    .nc-think-text.is-exit { transform: translateY(calc(var(--nc-think-swap-distance) * -1)); filter: blur(var(--nc-think-swap-blur)); opacity: 0; }
+    .nc-think-text.is-enter-start { transition: none; transform: translateY(var(--nc-think-swap-distance)); filter: blur(var(--nc-think-swap-blur)); opacity: 0; }
+    /* Gambar Normi masuk di tempat placeholder-nya: bidang skeleton persegi seukuran placeholder, tanpa lompatan. */
+    .nc-msg--ai .nc-media-frame:not(.is-revealed) { width: min(240px, 66vw); aspect-ratio: 1; }
+    @media (prefers-reduced-motion: reduce) {
+        .nc-think-text { transition: none; }
+        .nc-think-text::before { animation: none; background: none; }
+    }
+
+    /* ── Bubble panjang: dipotong ±15 baris, "Lihat selengkapnya" membuka di tempat ────────── */
+    .nc-msg-text.is-clamped {
+        max-height: var(--nc-clamp-height, 22rem);
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent);
+        mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent);
+    }
+    .nc-read-more {
+        display: inline-flex;
+        margin-top: 2px;
+        padding: 2px 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--nc-primary);
+        background: none;
+        border: 0;
+        cursor: pointer;
+    }
+    .bubble-mine .nc-read-more { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+    .nc-read-more:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+    /* ── Tag Normi di bubble (@normi, @normi-image, ...) ──────────────────────────────────── */
+    .nc-tag { font-weight: 600; color: var(--nc-ai-name, var(--nc-primary)); }
+    .bubble-mine .nc-tag { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+    /* ── Tombol saran fitur di bawah jawaban Normi ───────────────────────────────────────── */
+    .nc-suggest {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        padding: 7px 12px;
+        border-radius: 9999px;
+        border: 1px solid color-mix(in srgb, var(--nc-primary) 35%, transparent);
+        background: color-mix(in srgb, var(--nc-primary) 10%, transparent);
+        color: var(--nc-primary);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.2;
+        cursor: pointer;
+        transition: background-color 150ms ease-out;
+    }
+    .nc-suggest:hover { background: color-mix(in srgb, var(--nc-primary) 18%, transparent); }
+    .nc-suggest svg { width: 16px; height: 16px; flex: none; }
+    .nc-canvas-project {
+        display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; font-weight: 600;
+        color: var(--nc-primary); text-decoration: none;
+    }
+    .nc-canvas-project:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+    /* ── Ajakan menyalakan notifikasi push (resources/js/push.js) ────────────────────────── */
+    .nc-push-prompt {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+        margin: 12px 12px 0; padding: 12px 14px; border-radius: 16px;
+        border: 1px solid var(--nc-line); background: var(--nc-surface); color: var(--nc-text);
+        box-shadow: 0 6px 20px -14px rgba(0, 0, 0, 0.35);
+        animation: nc-push-in 250ms ease-out;
+    }
+    .page-shell .nc-push-prompt { margin: 16px 0 0; }
+    .nc-push-prompt.is-compact { margin: 8px 12px 0; padding: 8px 10px 8px 14px; gap: 8px; border-radius: 9999px; flex-wrap: nowrap; }
+    .nc-push-prompt.is-compact .nc-push-prompt-text { flex: 1 1 auto; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (min-width: 1024px) { .nc-push-prompt.is-compact { margin: 8px 0 0; } }
+    .nc-push-prompt-text { flex: 1 1 14rem; min-width: 0; font-size: 13.5px; line-height: 1.45; }
+    .nc-push-prompt-actions { display: flex; flex: none; gap: 8px; margin-left: auto; }
+    @keyframes nc-push-in { from { opacity: 0; transform: translateY(-4px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
+    @media (prefers-reduced-motion: reduce) { .nc-push-prompt { animation: none; } }
+
+    /* ── Bisu notifikasi grup (Info grup > Pengaturan) ───────────────────────────────────── */
+    .nc-mute-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
+    .nc-mute-option {
+        padding: 6px 12px; border-radius: 9999px; border: 1px solid var(--nc-line-strong, var(--nc-line));
+        background: var(--nc-surface); color: var(--nc-text); font-size: 13px; font-weight: 500;
+    }
+    .nc-mute-option[aria-pressed="true"] { border-color: var(--nc-primary); background: color-mix(in srgb, var(--nc-primary) 12%, transparent); color: var(--nc-primary); font-weight: 600; }
+    .nc-mute-option:disabled { opacity: 0.6; }
+    .nc-mute-note { flex-basis: 100%; font-size: 12px; color: var(--nc-text-soft); }
+
+    /* ── Safari iOS ──────────────────────────────────────────────────────────────────────────
+       Safari memperbesar halaman saat kolom berfont < 16px difokus; pada shell chat yang fixed, zoom itu
+       mendorong header keluar layar dan menutup kolom ketik (laporan user 11 Nov 2026). Di iOS semua kolom
+       isian memakai 16px. */
+    @supports (-webkit-touch-callout: none) {
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+        textarea,
+        select,
+        .composer-input,
+        .nc-search-input { font-size: 16px !important; }
+    }
+    /* Perangkat sentuh lain (iPad mode desktop, Android): kolom ketik chat juga 16px, nyaman dibaca dan tanpa zoom. */
+    @media (pointer: coarse) {
+        .composer-input,
+        .nc-search-input { font-size: 16px; }
+    }
 
 }
 

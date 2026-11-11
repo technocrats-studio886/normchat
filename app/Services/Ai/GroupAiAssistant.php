@@ -5,7 +5,6 @@ namespace App\Services\Ai;
 use App\Enums\AiMode;
 use App\Events\MessageSent;
 use App\Events\MessageUpdated;
-use App\Events\TypingStatus;
 use App\Exceptions\InsufficientBudgetException;
 use App\Exceptions\RequestTooLargeException;
 use App\Exceptions\SpendLimitReachedException;
@@ -18,13 +17,14 @@ use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\MessageVersion;
 use App\Models\User;
-use App\Services\AiDocumentGenerator;
 use App\Services\Ai\Context\ContextManager;
 use App\Services\Ai\Context\MemoryMaintenance;
 use App\Services\Ai\Responders\AiResponder;
 use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Ai\Responders\ChatResponder;
-use App\Services\Ai\Responders\DocumentResponder;
+use App\Services\Ai\Files\FileRequest;
+use App\Services\Ai\Responders\FileResponder;
+use App\Services\Ai\Responders\ImageEditSuggestionResponder;
 use App\Services\Ai\Responders\ImageResponder;
 use App\Services\Ai\Responders\ResearchResponder;
 use App\Services\Chat\MessagePresenter;
@@ -43,6 +43,9 @@ class GroupAiAssistant
 {
     private const BUSY_MESSAGE = 'Normi AI sedang sibuk. Coba lagi sebentar lagi.';
 
+    /** Saran fitur untuk jawaban yang sedang diposting (system_meta jawaban), lihat suggestionMeta(). */
+    private ?array $suggestion = null;
+
     public function __construct(
         private readonly NormkreditPricing $pricing,
         private readonly CreditWallet $wallet,
@@ -58,6 +61,7 @@ class GroupAiAssistant
     /** $replace: jawaban lama yang diganti (jawab ulang setelah pertanyaan diedit). */
     public function handle(Message $message, ?Message $replace = null): void
     {
+        $this->suggestion = null;
         $message->loadMissing('replyToMessage.sender:id,name');
         if (! $message->isAddressedToAi()) {
             return;
@@ -84,7 +88,7 @@ class GroupAiAssistant
         // dan dokumen punya status sendiri (laporan user 9 Nov 2026).
         $responder = $this->responderFor($message);
         $activity = $responder->activity();
-        event(new TypingStatus($group->id, 'ai', null, 'Normi AI', true, $activity));
+        AiActivity::report($group->id, $activity);
         try {
             $reply = $responder->respond($task);
         } catch (InsufficientBudgetException $e) {
@@ -103,9 +107,12 @@ class GroupAiAssistant
             $task->releaseHold();
             throw $e;
         } finally {
-            event(new TypingStatus($group->id, 'ai', null, 'Normi AI', false, $activity));
+            AiActivity::stop($group->id, $activity);
         }
 
+        if ($reply->suggestMode !== null) {
+            $this->suggestion = $this->suggestionMeta($message, $reply->suggestMode, $responder);
+        }
         [$reply, $creditsDue, $charged] = $this->bill($task, $reply);
         $replaced = $replace !== null && ! $replace->trashed() && ! $replace->replies()->exists();
         $aiMessage = $replaced ? $this->replaceReply($replace, $message, $reply) : $this->postReply($message, $reply);
@@ -177,20 +184,26 @@ class GroupAiAssistant
             AiMode::Canvas => new CanvasResponder(),
             AiMode::DeepResearch => new ResearchResponder(),
             AiMode::GuidedLearning => new ChatResponder(ModePrompts::GUIDED_LEARNING, 'guided_learning'),
+            AiMode::File => new FileResponder(),
             null => null,
         };
         if ($mode !== null) {
             return $mode;
         }
 
+        // @normi biasa: permintaan yang jelas milik sebuah fitur langsung dikerjakan fitur itu (file, gambar baru),
+        // kecuali edit foto yang diarahkan dulu ke fitur Buat gambar (keputusan user 11 Nov 2026).
         $content = (string) $message->content;
+        $file = FileRequest::detect($content);
+        if ($file !== null) {
+            return new FileResponder($file);
+        }
         if (ImageResponder::wantsImage($content)) {
             return new ImageResponder();
         }
+        $imageSource = ImageEditSuggestionResponder::wantsImageEdit($message);
 
-        $format = app(AiDocumentGenerator::class)->detectRequestedFormat($content);
-
-        return $format !== null ? new DocumentResponder($format) : new ChatResponder();
+        return $imageSource !== null ? new ImageEditSuggestionResponder($imageSource) : new ChatResponder();
     }
 
     /**
@@ -259,12 +272,46 @@ class GroupAiAssistant
             // Jawaban fitur (gambar, canvas, riset, guided learning) ditandai modenya: balasan ke jawaban
             // ini menanyakan dulu apakah fitur yang sama dipakai lagi (resources/js/chat/composer/ai-options.js).
             'ai_mode' => $reply->billable ? AiMode::fromReplyKind($reply->kind) : null,
+            // Tombol "pakai fitur" di bawah jawaban (resources/js/chat/messages.js).
+            'system_meta' => ($this->suggestion ?? []) + $reply->meta ?: null,
             'message_type' => $attachment['message_type'] ?? 'text',
             'attachment_disk' => $attachment ? 'normchat_attachments' : null,
             'attachment_path' => $attachment['path'] ?? null,
             'attachment_mime' => $attachment['mime'] ?? null,
             'attachment_original_name' => $attachment['original_name'] ?? null,
             'attachment_size' => $attachment['size'] ?? null,
+        ];
+    }
+
+    /**
+     * Data tombol saran fitur: mode, pesan yang dibalas saat tombol ditekan (pesan berisi foto untuk edit gambar,
+     * selain itu pertanyaannya), dan teks permintaan tanpa tag untuk mengisi kolom ketik.
+     *
+     * @return array{suggest_mode: string, suggest_reply_to: int, suggest_text: string}
+     */
+    private function suggestionMeta(Message $request, string $mode, AiResponder $responder): array
+    {
+        $replyTo = $responder instanceof ImageEditSuggestionResponder ? $responder->imageSource() : $request;
+        if ($mode === AiMode::Image->value && ! $replyTo->hasImageAttachment()) {
+            // "@normi" saja setelah mengirim foto (kasus 10 Nov 2026): foto terbaru si penanya yang dirujuk.
+            $replyTo = Message::query()
+                ->where('group_id', $request->group_id)
+                ->where('sender_id', $request->sender_id)
+                ->where('id', '<=', $request->id)
+                ->where('message_type', 'image')
+                ->latest('id')
+                ->first() ?? $replyTo;
+        }
+
+        $text = trim((string) preg_replace(AiMode::anyTagPattern(), '', (string) $request->content));
+        if ($text === '' && (int) $replyTo->id !== (int) $request->id) {
+            $text = trim((string) preg_replace(AiMode::anyTagPattern(), '', (string) $replyTo->content));
+        }
+
+        return [
+            'suggest_mode' => $mode,
+            'suggest_reply_to' => (int) $replyTo->id,
+            'suggest_text' => mb_substr((string) preg_replace('/\s+/u', ' ', $text), 0, 500),
         ];
     }
 
@@ -356,7 +403,7 @@ class GroupAiAssistant
         ]);
         $this->postNotice($request, $text);
         // Anggota lain sudah melihat status "Normi sedang …" sejak pertanyaan terkirim; hentikan.
-        event(new TypingStatus((int) $request->group_id, 'ai', null, 'Normi AI', false));
+        AiActivity::stop((int) $request->group_id);
     }
 
     /** Pemberitahuan (saldo habis, model terkunci, dll.) hanya untuk penanya, membalas pertanyaannya. */

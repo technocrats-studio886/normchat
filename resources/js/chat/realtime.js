@@ -70,26 +70,70 @@ export let groupChannel = null;
 export const typingIndicator = document.querySelector('[data-typing-indicator]');
 
 // ── Status mengetik / aktivitas Normi ─────────────────────────────
-// Normi hanya "sedang mengetik" untuk jawaban teks; gambar, riset, canvas, dan dokumen punya status
-// sendiri (App\Services\Ai\Responders\AiResponder::activity(), laporan user 9 Nov 2026).
+// Normi hanya "sedang mengetik" untuk jawaban teks; fitur lain menampilkan tahap yang sedang dikerjakan
+// (App\Services\Ai\AiActivity), mis. Deep Research "sedang mencari "harga cabai"" (laporan user 9 & 11 Nov 2026).
+// Status Normi memakai "AI thinking states" transitions.dev: teks berkilau (shimmer) selama tahap berjalan, lalu
+// bergeser naik + blur saat tahap berganti.
 const ACTIVITY_TEXT = {
 	typing: 'sedang mengetik',
+	reading: 'sedang membaca lampiran',
 	image: 'sedang membuat gambar',
 	research: 'sedang melakukan deep research',
 	canvas: 'sedang menyusun canvas',
-	document: 'sedang menyiapkan dokumen',
+	code: 'sedang menulis program',
+	file: 'sedang membuat file',
+	learning: 'sedang menyiapkan materi belajar',
+	// Pesan lama dari server sebelum pembaruan ini.
+	document: 'sedang membuat file',
 };
-// Mode pertanyaan (App\Enums\AiMode) → aktivitas yang akan dikerjakan Normi.
-const ACTIVITY_FOR_MODE = { image: 'image', deep_research: 'research', canvas: 'canvas' };
+// Mode pertanyaan (App\Enums\AiMode) → aktivitas yang diperkirakan sebelum server melapor.
+const ACTIVITY_FOR_MODE = { image: 'image', deep_research: 'research', canvas: 'canvas', file: 'file', guided_learning: 'learning' };
+const SWAP_MS = 150;
+const SWAP_GAP_MS = 50;
 
 const imageIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 15-5-5L5 21"/></svg>';
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const activeTypingUsers = new Map();
 let optimisticAiTimer = 0;
+let thinkLive = null;
 
 const joinNames = (names) => (names.length === 1
 	? names[0]
 	: (names.length === 2 ? `${names[0]} dan ${names[1]}` : `${names.slice(0, -1).join(', ')}, dan ${names[names.length - 1]}`));
+
+/** Kalimat status Normi: rincian dari server bila ada, selain itu teks bawaan aktivitasnya. */
+const aiStatusText = (person) => `${person.name} ${person.detail || ACTIVITY_TEXT[person.activity] || ACTIVITY_TEXT.typing}`;
+
+/** Baris status Normi; teks baru masuk dari bawah sementara yang lama keluar ke atas (P28 transitions.dev). */
+const swapThinkText = (box, text) => {
+	if (thinkLive && thinkLive.isConnected && thinkLive.parentNode === box && thinkLive.getAttribute('data-text') === text) {
+		return;
+	}
+	const next = document.createElement('span');
+	next.className = 'nc-think-text';
+	next.textContent = text;
+	next.setAttribute('data-text', text);
+	box.querySelector('.nc-think-sizer').textContent = text;
+
+	// Tahap berganti lagi sebelum animasi sebelumnya selesai: baris yang sedang keluar langsung dibuang.
+	box.querySelectorAll('.nc-think-text.is-exit').forEach((node) => node.remove());
+	const leaving = thinkLive && thinkLive.parentNode === box ? thinkLive : null;
+	thinkLive = next;
+	if (!leaving || reducedMotion()) {
+		leaving?.remove();
+		box.appendChild(next);
+		return;
+	}
+	leaving.classList.add('is-exit');
+	next.classList.add('is-enter-start');
+	box.appendChild(next);
+	window.setTimeout(() => {
+		void next.offsetWidth;
+		next.classList.remove('is-enter-start');
+	}, SWAP_GAP_MS);
+	window.setTimeout(() => leaving.remove(), SWAP_MS + SWAP_GAP_MS);
+};
 
 const renderTypingIndicator = () => {
 	if (!(typingIndicator instanceof HTMLElement)) {
@@ -99,25 +143,49 @@ const renderTypingIndicator = () => {
 	const people = Array.from(activeTypingUsers.values());
 	if (!people.length) {
 		typingIndicator.classList.add('hidden');
-		typingIndicator.innerHTML = '';
+		typingIndicator.replaceChildren();
+		thinkLive = null;
 		return;
 	}
 
-	// Foto profil bulat yang saling menumpuk (maks. 3) + kalimat per aktivitas:
-	// "A dan B sedang mengetik · Normi AI sedang membuat gambar".
-	const typingNames = people.filter((person) => (person.activity || 'typing') === 'typing').map((person) => person.name);
-	const segments = typingNames.length ? [`${joinNames(typingNames)} ${ACTIVITY_TEXT.typing}`] : [];
-	people.filter((person) => (person.activity || 'typing') !== 'typing').forEach((person) => {
-		segments.push(`${person.name} ${ACTIVITY_TEXT[person.activity] || ACTIVITY_TEXT.typing}`);
-	});
-	const avatars = people.slice(0, 3).map((person) => `<span class="nc-typing-avatar" style="--person: ${person.isAi ? 'var(--nc-ai-name)' : personColor(person.id)}">${avatarHtml({ sender_avatar_url: person.avatar }, person.isAi)}</span>`).join('');
-	// Normi sedang membuat gambar: placeholder gambar berdenyut (skeleton transitions.dev) di posisi gambarnya nanti.
-	const imagePending = people.some((person) => person.isAi && person.activity === 'image')
-		? `<div class="nc-ai-image-pending" aria-hidden="true"><span class="nc-ai-image-pending-icon">${imageIconSvg}</span></div>`
-		: '';
+	// Foto profil bulat yang saling menumpuk (maks. 3), lalu "A dan B sedang mengetik" dan status Normi.
+	const humans = people.filter((person) => !person.isAi);
+	const ai = people.find((person) => person.isAi) || null;
+	if (!typingIndicator.querySelector('.nc-typing-lines')) {
+		typingIndicator.innerHTML = '<span class="nc-typing-avatars" aria-hidden="true"></span><span class="nc-typing-lines"><span class="nc-typing-text hidden" data-typing-humans></span><span class="nc-think hidden" data-ai-think role="status" aria-live="polite"><span class="nc-think-sizer" aria-hidden="true"></span></span></span>';
+	}
+	typingIndicator.querySelector('.nc-typing-avatars').innerHTML = people.slice(0, 3).map((person) => `<span class="nc-typing-avatar" style="--person: ${person.isAi ? 'var(--nc-ai-name)' : personColor(person.id)}">${avatarHtml({ sender_avatar_url: person.avatar }, person.isAi)}</span>`).join('');
+
+	const humanLine = typingIndicator.querySelector('[data-typing-humans]');
+	humanLine.classList.toggle('hidden', humans.length === 0);
+	if (humans.length) {
+		humanLine.innerHTML = `${escapeHtml(`${joinNames(humans.map((person) => person.name))} ${ACTIVITY_TEXT.typing}`)}<span class="nc-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
+	}
+
+	const think = typingIndicator.querySelector('[data-ai-think]');
+	think.classList.toggle('hidden', ai === null);
+	if (ai) {
+		swapThinkText(think, aiStatusText(ai));
+	} else {
+		thinkLive = null;
+		think.querySelectorAll('.nc-think-text').forEach((node) => node.remove());
+	}
+
+	// Normi sedang membuat gambar: bidang gambar berdenyut (skeleton transitions.dev) seukuran gambar hasilnya,
+	// lalu jawaban Normi menggantikannya dengan cross-fade (chat/media-cache.js).
+	const wantsImage = ai?.activity === 'image';
+	let pending = typingIndicator.querySelector('.nc-ai-image-pending');
+	if (wantsImage && !pending) {
+		pending = document.createElement('div');
+		pending.className = 'nc-ai-image-pending';
+		pending.setAttribute('aria-hidden', 'true');
+		pending.innerHTML = `<span class="nc-ai-image-pending-icon">${imageIconSvg}</span>`;
+		typingIndicator.appendChild(pending);
+	} else if (!wantsImage) {
+		pending?.remove();
+	}
 	typingIndicator.classList.remove('hidden');
-	typingIndicator.classList.toggle('has-media', imagePending !== '');
-	typingIndicator.innerHTML = `<span class="nc-typing-avatars" aria-hidden="true">${avatars}</span><span class="nc-typing-text">${escapeHtml(segments.join(' · '))}<span class="nc-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></span>${imagePending}`;
+	typingIndicator.classList.toggle('has-media', wantsImage);
 };
 
 const updateTypingState = (key, person, isTyping) => {
@@ -134,12 +202,19 @@ const updateTypingState = (key, person, isTyping) => {
 	renderTypingIndicator();
 };
 
-const aiPerson = (name, activity) => ({ id: 0, name: String(name || 'Normi AI'), avatar: '', isAi: true, activity: ACTIVITY_TEXT[activity] ? activity : 'typing' });
+const aiPerson = (name, activity, detail = '') => ({
+	id: 0,
+	name: String(name || 'Normi AI'),
+	avatar: '',
+	isAi: true,
+	activity: ACTIVITY_TEXT[activity] ? activity : 'typing',
+	detail: String(detail || '').trim(),
+});
 
 /** Status Normi dari server (event typing.status): berlaku sampai server mengirim is_typing=false. */
-const setAiActivity = (name, activity, isTyping) => {
+const setAiActivity = (name, activity, isTyping, detail = '') => {
 	window.clearTimeout(optimisticAiTimer);
-	updateTypingState('ai', aiPerson(name, activity), isTyping);
+	updateTypingState('ai', aiPerson(name, activity, detail), isTyping);
 };
 
 /**
@@ -151,7 +226,10 @@ export const noteAwaitingAi = (message) => {
 	if (message?.awaiting_ai !== true || activeTypingUsers.has('ai')) {
 		return;
 	}
-	updateTypingState('ai', aiPerson('Normi AI', ACTIVITY_FOR_MODE[String(message?.ai_mode || '')] || 'typing'), true);
+	const current = message?.ai_activity;
+	updateTypingState('ai', current?.activity
+		? aiPerson('Normi AI', current.activity, current.detail)
+		: aiPerson('Normi AI', ACTIVITY_FOR_MODE[String(message?.ai_mode || '')] || 'typing'), true);
 	window.clearTimeout(optimisticAiTimer);
 	optimisticAiTimer = window.setTimeout(() => updateTypingState('ai', null, false), 45_000);
 };
@@ -209,7 +287,9 @@ const showPendingAiFromFeed = () => {
 	if (!(last instanceof HTMLElement) || activeTypingUsers.has('ai')) {
 		return;
 	}
-	updateTypingState('ai', aiPerson('Normi AI', ACTIVITY_FOR_MODE[last.dataset.messageAiMode || ''] || 'typing'), true);
+	updateTypingState('ai', last.dataset.messageAiActivity
+		? aiPerson('Normi AI', last.dataset.messageAiActivity, last.dataset.messageAiDetail)
+		: aiPerson('Normi AI', ACTIVITY_FOR_MODE[last.dataset.messageAiMode || ''] || 'typing'), true);
 	window.clearTimeout(optimisticAiTimer);
 	optimisticAiTimer = window.setTimeout(() => updateTypingState('ai', null, false), 5 * 60_000);
 };
@@ -404,7 +484,7 @@ export const initRealtime = () => {
 				return;
 			}
 
-			setAiActivity(payload?.sender_name, String(payload?.activity || 'typing'), Boolean(payload?.is_typing));
+			setAiActivity(payload?.sender_name, String(payload?.activity || 'typing'), Boolean(payload?.is_typing), String(payload?.detail || ''));
 		});
 
 		groupChannel.listen('.message.sent', onMessageSent);

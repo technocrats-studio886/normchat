@@ -33,9 +33,13 @@ export const avatarFallbackHtml = () => `<span class="nc-avatar-fallback">${user
  * Teks pesan anggota: teks biasa, kecuali blok ```bahasa … ``` yang tampil sebagai blok kode (bisa disalin
  * atau dimasukkan ke kolom ketik). Pesan tanpa pagar kode tetap satu span seperti sebelumnya.
  */
+/** Tag Normi (@normi, @normi-image, @normi-research, ...) di teks yang sudah di-escape tampil sebagai tag. */
+const NORMI_TAG_HTML = /(^|[\s(])(@normi(?:-[a-z]+)?)(?![\w-])/gi;
+export const highlightNormiTags = (escaped) => escaped.replace(NORMI_TAG_HTML, '$1<span class="nc-tag">$2</span>');
+
 const userTextHtml = (raw) => {
 	if (!raw.includes('```')) {
-		return `<span class="whitespace-pre-wrap">${escapeHtml(raw)}</span>`;
+		return `<span class="whitespace-pre-wrap">${highlightNormiTags(escapeHtml(raw))}</span>`;
 	}
 	const parts = [];
 	let text = [];
@@ -43,7 +47,7 @@ const userTextHtml = (raw) => {
 	let lang = '';
 	const flushText = () => {
 		const value = text.join('\n').replace(/^\n+|\n+$/g, '');
-		if (value.trim() !== '') parts.push(`<span class="whitespace-pre-wrap">${escapeHtml(value)}</span>`);
+		if (value.trim() !== '') parts.push(`<span class="whitespace-pre-wrap">${highlightNormiTags(escapeHtml(value))}</span>`);
 		text = [];
 	};
 	raw.split('\n').forEach((line) => {
@@ -97,6 +101,37 @@ const timeHtml = (message, createdAt) => {
 	return time || editedMark ? `<span class="nc-inline-time">${editedMark}${time}</span>` : '';
 };
 
+const sparkSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path stroke-linejoin="round" d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.5l-1.9-5.7-5.6-1.9L10.1 9z"/></svg>';
+const SUGGEST_LABELS = {
+	image: 'Edit dengan Buat gambar',
+	deep_research: 'Riset dengan Deep Research',
+	canvas: 'Buka di Canvas',
+	guided_learning: 'Belajar dengan Guided Learning',
+	file: 'Buat sebagai file',
+};
+
+/** Tombol fitur yang disarankan Normi (App\Services\Chat\MessagePresenter::suggestionOf); diproses composer/feed-clicks.js. */
+const suggestionHtml = (message) => {
+	const suggestion = message?.suggestion;
+	if (!suggestion?.mode || message?.is_deleted) {
+		return '';
+	}
+	const label = SUGGEST_LABELS[suggestion.mode] || `Pakai ${suggestion.label || 'fitur ini'}`;
+	return `<div><button type="button" class="nc-suggest" data-suggest-mode="${escapeAttr(suggestion.mode)}" data-suggest-tag="${escapeAttr(suggestion.tag || '')}" data-suggest-reply="${Number(suggestion.reply_to || 0)}" data-suggest-text="${escapeAttr(suggestion.text || '')}">${sparkSvg}${escapeHtml(label)}</button></div>`;
+};
+
+const zipSvg = '<svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>';
+
+/** Canvas dengan kode proyek asli (Next.js, Laravel, Flutter, ...): tautan unduh ZIP-nya. */
+const canvasProjectHtml = (message) => {
+	const project = message?.canvas_project;
+	if (!project?.url) {
+		return '';
+	}
+	const files = Number(project.files || 0);
+	return `<a class="nc-canvas-project" href="${escapeAttr(project.url)}" download="${escapeAttr(project.name || 'proyek.zip')}">${zipSvg}Unduh kode proyek${files > 0 ? ` (${files} file)` : ''}</a>`;
+};
+
 export const buildMessageNode = (message) => {
 	if (message?.sender_type === 'system') {
 		return buildSystemNode(message);
@@ -136,6 +171,9 @@ export const buildMessageNode = (message) => {
 		messageReplyTo: String(Number(message?.reply_to?.id || 0)),
 		// Fitur Normi: mode permintaan, atau fitur yang menghasilkan jawaban Normi (App\Enums\AiMode).
 		messageAiMode: String(message?.ai_mode || ''),
+		// Status Normi terakhir untuk pertanyaan yang masih dikerjakan (App\Services\Ai\AiActivity).
+		messageAiActivity: String(message?.ai_activity?.activity || ''),
+		messageAiDetail: String(message?.ai_activity?.detail || ''),
 	});
 	// Penanda untuk aturan aksi (actions/rules.js).
 	[
@@ -160,11 +198,12 @@ export const buildMessageNode = (message) => {
 	const attachmentHtml = renderAttachment(message);
 	const renderedMarkdown = isAi && rawContent && !pollData ? renderMarkdown(escapeHtml(rawContent)) : '';
 	const isWide = renderedMarkdown.includes('<table') || renderedMarkdown.includes('mermaid');
+	// Dibungkus nc-msg-text: teks yang terlalu panjang dipotong dengan "Lihat selengkapnya" (chat/read-more.js).
 	const textHtml = pollData || !rawContent
 		? ''
-		: (isAi
+		: `<div class="nc-msg-text" data-message-text>${isAi
 			? `<div class="ai-markdown">${renderedMarkdown}</div>`
-			: userTextHtml(rawContent));
+			: userTextHtml(rawContent)}</div>`;
 	const isMediaOnly = !textHtml && /nc-bubble-media/.test(attachmentHtml);
 
 	const forwardedHtml = message?.forwarded_from
@@ -177,7 +216,7 @@ export const buildMessageNode = (message) => {
 		? `<div class="nc-bubble bubble-${tone}" data-message-body="1" data-message-bubble>${nameHtml}${deletedHtml}${timeHtml({ ...message, is_edited: false }, createdAt)}</div>`
 		: (pollData
 			? renderPollCard({ poll: pollData, tone, messageId: message?.id, headerHtml: nameHtml + forwardedHtml + quoteHtml, inlineTimeHtml: timeHtml(message, createdAt) })
-			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${isAi ? '' : linkPreviewHtml(message?.link_preview)}${textHtml}${timeHtml(message, createdAt)}</div>`);
+			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${isAi ? canvasProjectHtml(message) : linkPreviewHtml(message?.link_preview)}${textHtml}${isAi ? suggestionHtml(message) : ''}${timeHtml(message, createdAt)}</div>`);
 	const pendingHtml = message?.is_pending === true ? '<p class="nc-msg-pending">Mengirim…</p>' : '';
 
 	wrapper.innerHTML = `${isMine ? '' : avatarHtml(message, isAi)}<div class="nc-msg-stack${isWide ? ' is-wide' : ''}">${bubble}${pendingHtml}</div>`;
