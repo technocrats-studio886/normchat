@@ -38,6 +38,10 @@ class Group extends Model
         'member_daily_credit_limit',
         'free_member_slots',
         'free_joins_used',
+        'weekly_recap_enabled',
+        'weekly_recap_day',
+        'weekly_recap_hour',
+        'weekly_recap_last_at',
     ];
 
     protected $casts = [
@@ -45,6 +49,10 @@ class Group extends Model
         'member_daily_credit_limit' => 'float',
         'free_member_slots' => 'integer',
         'free_joins_used' => 'integer',
+        'weekly_recap_enabled' => 'boolean',
+        'weekly_recap_day' => 'integer',
+        'weekly_recap_hour' => 'integer',
+        'weekly_recap_last_at' => 'datetime',
     ];
 
     /** Karakter kendali arah dibuang (lihat App\Support\Bidi). */

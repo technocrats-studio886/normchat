@@ -246,6 +246,41 @@
                         </div>
                     </div>
                 @endif
+                @if($isModerator ?? false)
+                    @php($recapDays = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu'])
+                    {{-- Rekap mingguan otomatis (docs/rancangan-fitur-produktivitas-nov.md bagian 8); resources/js/ui/weekly-recap.js. --}}
+                    <div data-info-expand-row>
+                        <button type="button" class="nc-info-row w-full" data-info-expand aria-expanded="false">
+                            <x-info-icon name="sparkle" class="h-5 w-5 text-ink-soft" />
+                            <span class="min-w-0 flex-1 text-left text-sm">Rekap mingguan</span>
+                            <span class="text-xs text-ink-soft" data-weekly-recap-label>{{ $group->weekly_recap_enabled ? $recapDays[$group->weekly_recap_day] . ', ' . sprintf('%02d.00', $group->weekly_recap_hour) : 'Mati' }}</span>
+                            <x-info-icon name="chevron" class="h-4 w-4 text-ink-soft" />
+                        </button>
+                        <form class="nc-recap-form" hidden data-info-expand-body data-weekly-recap="{{ route('groups.tools.weekly-recap', $group) }}">
+                            <p class="text-xs text-ink-soft">Normi merangkum obrolan seminggu terakhir (topik, keputusan, tugas, jadwal) dan mengirimnya ke grup. Tiap rekap memakai Normkredit grup. Grup yang sepi dalam seminggu dilewati.</p>
+                            <label class="nc-recap-toggle">
+                                <input type="checkbox" name="enabled" value="1" @checked($group->weekly_recap_enabled)>
+                                <span>Kirim rekap tiap minggu</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <select name="day" class="nc-input min-w-0 flex-1" aria-label="Hari rekap">
+                                    @foreach($recapDays as $number => $dayName)
+                                        <option value="{{ $number }}" @selected((int) $group->weekly_recap_day === $number)>{{ $dayName }}</option>
+                                    @endforeach
+                                </select>
+                                <select name="hour" class="nc-input w-28" aria-label="Jam rekap">
+                                    @foreach(range(0, 23) as $hour)
+                                        <option value="{{ $hour }}" @selected((int) $group->weekly_recap_hour === $hour)>{{ sprintf('%02d.00', $hour) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-end gap-2">
+                                <span class="text-xs text-ink-soft" data-weekly-recap-status role="status"></span>
+                                <button type="submit" class="btn-primary px-4 py-2">Simpan</button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
                 @if($canEditProfile)
                     <div data-info-expand-row>
                         <button type="button" class="nc-info-row w-full" data-info-expand aria-expanded="{{ $errors->has('password') ? 'true' : 'false' }}">

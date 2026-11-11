@@ -1,339 +1,259 @@
-// Anotasi di atas media: stiker emoji dan teks yang bisa digeser, beserta editor teksnya.
-
-import { showActionToast } from '../toast.js';
-import { bindPreviewMentionMenu } from './mention-menu.js';
+// Teks dan stiker emoji di atas foto. Teks diketik langsung di titik yang diketuk (kursor muncul di situ,
+// tanpa kolom isian terpisah; laporan user 11 Nov 2026). Posisi disimpan dalam persen terhadap foto, jadi
+// tetap pas saat layar berubah ukuran dan saat digabung ke foto beresolusi asli (media-editor/flatten.js).
 
 /**
  * @param {{ doodleEnabled: boolean, placementMode: string }} state status editor bersama
  * @param {() => void} refreshTools perbarui tampilan tombol alat
  */
-export const bindAnnotations = (el, state, mentionSuggestions, refreshTools) => {
-	const previewStage = el.querySelector('[data-attachment-preview-stage]');
-	const previewAnnotationLayer = el.querySelector('[data-attachment-preview-annotations]');
+export const bindAnnotations = (el, state, refreshTools) => {
+	const stage = el.querySelector('[data-attachment-preview-stage]');
+	const layer = el.querySelector('[data-attachment-preview-annotations]');
 	const stickerButtons = Array.from(el.querySelectorAll('[data-preview-sticker]'));
 	const stickerSizeButtons = Array.from(el.querySelectorAll('[data-preview-sticker-size]'));
-	const textEditor = el.querySelector('[data-preview-text-editor]');
-	const textInput = el.querySelector('[data-preview-text-input]');
-	const textApplyButton = el.querySelector('[data-preview-text-apply]');
-	const textCancelButton = el.querySelector('[data-preview-text-cancel]');
-	const textCloseButton = el.querySelector('[data-preview-text-close]');
 	const textSizeButtons = Array.from(el.querySelectorAll('[data-preview-text-size]'));
 	const textColorButtons = Array.from(el.querySelectorAll('[data-preview-text-color]'));
-	const previewTextMentionMenu = el.querySelector('[data-preview-text-mention-menu]');
-
-	bindPreviewMentionMenu(textInput, previewTextMentionMenu, mentionSuggestions);
+	const textBgButton = el.querySelector('[data-preview-text-bg]');
 
 	let selectedSticker = '😀';
-	let stickerSize = 42;
-	let textSize = 32;
+	let stickerSize = 48;
+	let textSize = 28;
 	let textColor = '#ffffff';
-	let selectedAnnotation = null;
-	let pendingTextPlacement = null;
+	let textBackground = true;
+	let selected = null;
 
-	const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+	const clamp = (value) => Math.min(100, Math.max(0, value));
+	const percentOf = (clientX, clientY) => {
+		const rect = stage.getBoundingClientRect();
+		return [clamp(((clientX - rect.left) / Math.max(1, rect.width)) * 100), clamp(((clientY - rect.top) / Math.max(1, rect.height)) * 100)];
+	};
+	const place = (node, [x, y]) => {
+		node.style.left = `${x}%`;
+		node.style.top = `${y}%`;
+		node.dataset.x = String(x);
+		node.dataset.y = String(y);
+	};
 
-	const selectAnnotation = (node) => {
-		if (selectedAnnotation && selectedAnnotation !== node) {
-			selectedAnnotation.classList.remove('ring-2', 'ring-navy-300', 'ring-offset-1', 'ring-offset-black/40');
-		}
+	const select = (node) => {
+		selected?.classList.remove('is-selected');
+		selected = node instanceof HTMLElement ? node : null;
+		selected?.classList.add('is-selected');
+	};
 
-		selectedAnnotation = node instanceof HTMLElement ? node : null;
-		if (selectedAnnotation) {
-			selectedAnnotation.classList.add('ring-2', 'ring-navy-300', 'ring-offset-1', 'ring-offset-black/40');
+	const styleText = (node) => {
+		node.style.fontSize = `${node.dataset.size}px`;
+		node.style.color = node.dataset.color;
+		node.classList.toggle('has-bg', node.dataset.bg === '1');
+	};
+
+	const placeCaretAtEnd = (node) => {
+		const range = document.createRange();
+		range.selectNodeContents(node);
+		range.collapse(false);
+		const selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+	};
+
+	const editText = (node) => {
+		select(node);
+		node.contentEditable = 'true';
+		node.classList.add('is-editing');
+		node.focus({ preventScroll: true });
+		placeCaretAtEnd(node);
+	};
+
+	const commitText = (node) => {
+		node.contentEditable = 'false';
+		node.classList.remove('is-editing');
+		if (node.innerText.trim() === '') {
+			if (selected === node) select(null);
+			node.remove();
 		}
 	};
 
-	const applyAnnotationSize = (node, nextSize) => {
-		if (!(node instanceof HTMLElement) || !Number.isFinite(nextSize) || nextSize <= 0) {
-			return;
-		}
+	const editingNode = () => layer?.querySelector('.nc-annot.is-editing') || null;
 
-		node.style.fontSize = `${nextSize}px`;
-		node.dataset.annotationSize = String(nextSize);
-	};
-
-	const makeAnnotationDraggable = (node) => {
-		if (!(node instanceof HTMLElement) || !(previewStage instanceof HTMLElement)) {
-			return;
-		}
-
-		node.classList.add('pointer-events-auto', 'cursor-move', 'touch-none', 'select-none');
-		let dragOffsetX = 0;
-		let dragOffsetY = 0;
-		let draggingAnnotation = false;
-
+	/** Geser anotasi; ketukan tanpa geseran pada teks (alat teks aktif) membukanya untuk diedit. */
+	const bindDrag = (node) => {
+		let start = null;
 		node.addEventListener('pointerdown', (event) => {
-			if (state.doodleEnabled) {
-				return;
-			}
-
+			if (state.doodleEnabled || node.classList.contains('is-editing')) return;
 			event.preventDefault();
 			event.stopPropagation();
-			selectAnnotation(node);
-			draggingAnnotation = true;
-			const rect = node.getBoundingClientRect();
-			dragOffsetX = event.clientX - (rect.left + (rect.width / 2));
-			dragOffsetY = event.clientY - (rect.top + (rect.height / 2));
-			node.setPointerCapture(event.pointerId);
+			select(node);
+			start = { x: event.clientX, y: event.clientY, moved: false };
+			node.setPointerCapture?.(event.pointerId);
 		});
-
 		node.addEventListener('pointermove', (event) => {
-			if (!draggingAnnotation) {
-				return;
-			}
-
-			event.preventDefault();
-			const stageRect = previewStage.getBoundingClientRect();
-			const x = clamp(event.clientX - stageRect.left - dragOffsetX, 0, stageRect.width);
-			const y = clamp(event.clientY - stageRect.top - dragOffsetY, 0, stageRect.height);
-			node.style.left = `${x}px`;
-			node.style.top = `${y}px`;
+			if (!start) return;
+			if (!start.moved && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 4) return;
+			start.moved = true;
+			place(node, percentOf(event.clientX, event.clientY));
 		});
-
-		const stopDragging = () => {
-			draggingAnnotation = false;
+		const end = () => {
+			if (start && !start.moved && node.dataset.type === 'text') editText(node);
+			start = null;
 		};
-
-		node.addEventListener('pointerup', stopDragging);
-		node.addEventListener('pointercancel', stopDragging);
+		node.addEventListener('pointerup', end);
+		node.addEventListener('pointercancel', () => { start = null; });
 	};
 
-	const createStickerAnnotation = (x, y) => {
-		if (!(previewAnnotationLayer instanceof HTMLElement)) {
-			return;
-		}
-
-		const stickerNode = document.createElement('span');
-		stickerNode.className = 'absolute -translate-x-1/2 -translate-y-1/2 drop-shadow';
-		stickerNode.style.left = `${x}px`;
-		stickerNode.style.top = `${y}px`;
-		stickerNode.style.lineHeight = '1';
-		stickerNode.textContent = selectedSticker;
-		stickerNode.dataset.annotationType = 'sticker';
-		applyAnnotationSize(stickerNode, stickerSize);
-		previewAnnotationLayer.appendChild(stickerNode);
-		makeAnnotationDraggable(stickerNode);
-		selectAnnotation(stickerNode);
-	};
-
-	const createTextAnnotation = (x, y, textValue) => {
-		if (!(previewAnnotationLayer instanceof HTMLElement)) {
-			return;
-		}
-
-		const textNode = document.createElement('span');
-		textNode.className = 'absolute max-w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-md bg-black/45 px-2 py-1 text-center font-semibold shadow';
-		textNode.style.left = `${x}px`;
-		textNode.style.top = `${y}px`;
-		textNode.style.wordBreak = 'break-word';
-		textNode.style.color = textColor;
-		textNode.textContent = textValue;
-		textNode.dataset.annotationType = 'text';
-		applyAnnotationSize(textNode, textSize);
-		previewAnnotationLayer.appendChild(textNode);
-		makeAnnotationDraggable(textNode);
-		selectAnnotation(textNode);
-	};
-
-	const openTextEditor = (x, y) => {
-		if (!(textEditor instanceof HTMLElement) || !(textInput instanceof HTMLInputElement)) {
-			return;
-		}
-
-		pendingTextPlacement = { x, y };
-		textEditor.classList.remove('hidden');
-		textEditor.classList.add('flex', 'flex-col');
-		textInput.value = '';
-		window.setTimeout(() => textInput.focus(), 30);
-	};
-
-	const closeTextEditor = () => {
-		if (!(textEditor instanceof HTMLElement)) {
-			return;
-		}
-
-		textEditor.classList.add('hidden');
-		textEditor.classList.remove('flex', 'flex-col');
-		pendingTextPlacement = null;
-	};
-
-	const updateStickerUi = () => {
-		stickerButtons.forEach((button) => {
-			const isActive = button.getAttribute('data-preview-sticker') === selectedSticker;
-			button.classList.toggle('bg-navy-500/85', isActive);
-			button.classList.toggle('bg-white/18', !isActive);
+	const createText = (point) => {
+		const node = document.createElement('span');
+		node.className = 'nc-annot nc-annot--text';
+		node.dataset.type = 'text';
+		node.dataset.size = String(textSize);
+		node.dataset.color = textColor;
+		node.dataset.bg = textBackground ? '1' : '0';
+		node.setAttribute('role', 'textbox');
+		node.setAttribute('aria-label', 'Teks di foto');
+		node.spellcheck = false;
+		styleText(node);
+		place(node, point);
+		node.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter' && !event.shiftKey) {
+				event.preventDefault();
+				node.blur();
+			} else if (event.key === 'Escape') {
+				node.blur();
+			}
+			event.stopPropagation();
 		});
+		node.addEventListener('blur', () => commitText(node));
+		bindDrag(node);
+		layer.appendChild(node);
+		editText(node);
+	};
 
+	const createSticker = (point) => {
+		const node = document.createElement('span');
+		node.className = 'nc-annot nc-annot--sticker';
+		node.dataset.type = 'sticker';
+		node.dataset.size = String(stickerSize);
+		node.textContent = selectedSticker;
+		node.style.fontSize = `${stickerSize}px`;
+		place(node, point);
+		bindDrag(node);
+		layer.appendChild(node);
+		select(node);
+	};
+
+	stage?.addEventListener('click', (event) => {
+		if (state.doodleEnabled || !state.placementMode || event.target.closest?.('.nc-annot')) return;
+		// Mengetuk di luar teks yang sedang diketik: teks itu selesai dulu.
+		const editing = editingNode();
+		if (editing) {
+			editing.blur();
+			return;
+		}
+		const point = percentOf(event.clientX, event.clientY);
+		if (state.placementMode === 'text') createText(point);
+		else if (state.placementMode === 'sticker') createSticker(point);
+	});
+
+	const syncUi = () => {
+		stickerButtons.forEach((button) => {
+			const active = button.getAttribute('data-preview-sticker') === selectedSticker;
+			button.classList.toggle('bg-white/45', active);
+			button.classList.toggle('bg-white/18', !active);
+		});
 		stickerSizeButtons.forEach((button) => {
-			const size = Number(button.getAttribute('data-preview-sticker-size') || 0);
-			const active = Math.abs(size - stickerSize) < 0.1;
-			button.classList.toggle('bg-navy-500/85', active);
+			const active = Number(button.getAttribute('data-preview-sticker-size')) === stickerSize;
+			button.classList.toggle('bg-white', active);
 			button.classList.toggle('text-navy-950', active);
 			button.classList.toggle('bg-white/25', !active);
 			button.classList.toggle('text-white', !active);
 		});
-	};
-
-	const updateTextEditorUi = () => {
 		textSizeButtons.forEach((button) => {
-			const size = Number(button.getAttribute('data-preview-text-size') || 0);
-			const active = Math.abs(size - textSize) < 0.1;
-			button.classList.toggle('bg-navy-500/85', active);
+			const active = Number(button.getAttribute('data-preview-text-size')) === textSize;
+			button.classList.toggle('bg-white', active);
 			button.classList.toggle('text-navy-950', active);
-			button.classList.toggle('bg-white/20', !active);
+			button.classList.toggle('bg-white/25', !active);
 			button.classList.toggle('text-white', !active);
 		});
-
 		textColorButtons.forEach((button) => {
-			const color = String(button.getAttribute('data-preview-text-color') || '#ffffff').toLowerCase();
-			const active = color === String(textColor).toLowerCase();
+			const active = button.getAttribute('data-preview-text-color') === textColor;
 			button.classList.toggle('ring-2', active);
-			button.classList.toggle('ring-navy-300', active);
-			button.classList.toggle('ring-offset-1', active);
-			button.classList.toggle('ring-offset-black/70', active);
+			button.classList.toggle('ring-white', active);
+			button.classList.toggle('ring-offset-2', active);
+			button.classList.toggle('ring-offset-navy-950', active);
 		});
+		if (textBgButton instanceof HTMLElement) {
+			textBgButton.setAttribute('aria-pressed', textBackground ? 'true' : 'false');
+			textBgButton.classList.toggle('bg-white', textBackground);
+			textBgButton.classList.toggle('text-navy-950', textBackground);
+			textBgButton.classList.toggle('bg-white/20', !textBackground);
+			textBgButton.classList.toggle('text-white', !textBackground);
+		}
 	};
 
-	if (previewStage instanceof HTMLElement) {
-		previewStage.addEventListener('click', (event) => {
-			if (!state.placementMode || state.doodleEnabled || !(previewAnnotationLayer instanceof HTMLElement)) {
-				return;
-			}
-
-			const rect = previewStage.getBoundingClientRect();
-			const x = event.clientX - rect.left;
-			const y = event.clientY - rect.top;
-
-			if (!Number.isFinite(x) || !Number.isFinite(y)) {
-				return;
-			}
-
-			if (state.placementMode === 'text') {
-				openTextEditor(x, y);
-				return;
-			}
-
-			if (state.placementMode === 'sticker') {
-				createStickerAnnotation(x, y);
-			}
-		});
-	}
-
-	if (previewAnnotationLayer instanceof HTMLElement) {
-		previewAnnotationLayer.addEventListener('click', (event) => {
-			const target = event.target.closest('[data-annotation-type]');
-			if (target instanceof HTMLElement) {
-				event.stopPropagation();
-				selectAnnotation(target);
-				return;
-			}
-
-			selectAnnotation(null);
-		}, true);
-	}
-
-	if (stickerButtons.length > 0) {
-		stickerButtons.forEach((button) => {
-			button.addEventListener('click', (event) => {
-				event.stopPropagation();
-				state.doodleEnabled = false;
-				selectedSticker = String(button.getAttribute('data-preview-sticker') || '😀');
-				updateStickerUi();
-				refreshTools();
-				if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'sticker') {
-					selectedAnnotation.textContent = selectedSticker;
-				}
-			});
-		});
-	}
-
-	if (stickerSizeButtons.length > 0) {
-		stickerSizeButtons.forEach((button) => {
-			button.addEventListener('click', (event) => {
-				event.stopPropagation();
-				state.doodleEnabled = false;
-				const nextSize = Number(button.getAttribute('data-preview-sticker-size') || stickerSize);
-				if (!Number.isFinite(nextSize) || nextSize <= 0) {
-					return;
-				}
-
-				stickerSize = nextSize;
-				updateStickerUi();
-				refreshTools();
-				if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'sticker') {
-					applyAnnotationSize(selectedAnnotation, stickerSize);
-				}
-			});
-		});
-	}
-
-	if (textSizeButtons.length > 0) {
-		textSizeButtons.forEach((button) => {
-			button.addEventListener('click', () => {
-				const nextSize = Number(button.getAttribute('data-preview-text-size') || textSize);
-				if (!Number.isFinite(nextSize) || nextSize <= 0) {
-					return;
-				}
-
-				textSize = nextSize;
-				updateTextEditorUi();
-				if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'text') {
-					applyAnnotationSize(selectedAnnotation, textSize);
-				}
-			});
-		});
-	}
-
-	if (textColorButtons.length > 0) {
-		textColorButtons.forEach((button) => {
-			button.addEventListener('click', () => {
-				textColor = String(button.getAttribute('data-preview-text-color') || '#ffffff');
-				updateTextEditorUi();
-				if (selectedAnnotation && selectedAnnotation.dataset.annotationType === 'text') {
-					selectedAnnotation.style.color = textColor;
-				}
-			});
-		});
-	}
-
-	const applyTextPlacement = () => {
-		if (!(textInput instanceof HTMLInputElement) || !pendingTextPlacement) {
-			closeTextEditor();
-			return;
+	/** Gaya teks berlaku ke teks yang sedang dipilih/diketik; fokus tetap di teks itu. */
+	const restyleSelectedText = () => {
+		if (selected?.dataset.type !== 'text') return;
+		selected.dataset.size = String(textSize);
+		selected.dataset.color = textColor;
+		selected.dataset.bg = textBackground ? '1' : '0';
+		styleText(selected);
+		if (selected.classList.contains('is-editing')) {
+			selected.focus({ preventScroll: true });
+			placeCaretAtEnd(selected);
 		}
-
-		const value = String(textInput.value || '').trim();
-		if (!value) {
-			showActionToast('Teks masih kosong');
-			textInput.focus();
-			return;
-		}
-
-		createTextAnnotation(pendingTextPlacement.x, pendingTextPlacement.y, value);
-		closeTextEditor();
-		showActionToast('Teks ditambahkan. Geser untuk memindahkan');
 	};
+	// Tombol gaya tidak mengambil fokus dari teks yang sedang diketik.
+	[...textSizeButtons, ...textColorButtons, textBgButton].forEach((button) => button?.addEventListener('pointerdown', (event) => event.preventDefault()));
+	textSizeButtons.forEach((button) => button.addEventListener('click', () => {
+		textSize = Number(button.getAttribute('data-preview-text-size')) || textSize;
+		restyleSelectedText();
+		syncUi();
+	}));
+	textColorButtons.forEach((button) => button.addEventListener('click', () => {
+		textColor = button.getAttribute('data-preview-text-color') || textColor;
+		restyleSelectedText();
+		syncUi();
+	}));
+	textBgButton?.addEventListener('click', () => {
+		textBackground = !textBackground;
+		restyleSelectedText();
+		syncUi();
+	});
+	stickerButtons.forEach((button) => button.addEventListener('click', (event) => {
+		event.stopPropagation();
+		selectedSticker = button.getAttribute('data-preview-sticker') || selectedSticker;
+		if (selected?.dataset.type === 'sticker') selected.textContent = selectedSticker;
+		syncUi();
+		refreshTools();
+	}));
+	stickerSizeButtons.forEach((button) => button.addEventListener('click', (event) => {
+		event.stopPropagation();
+		stickerSize = Number(button.getAttribute('data-preview-sticker-size')) || stickerSize;
+		if (selected?.dataset.type === 'sticker') {
+			selected.dataset.size = String(stickerSize);
+			selected.style.fontSize = `${stickerSize}px`;
+		}
+		syncUi();
+	}));
 
-	textApplyButton?.addEventListener('click', applyTextPlacement);
-	textCancelButton?.addEventListener('click', closeTextEditor);
-	textCloseButton?.addEventListener('click', closeTextEditor);
-	textInput?.addEventListener('keydown', (event) => {
-		if (event.key === 'Enter') {
-			event.preventDefault();
-			applyTextPlacement();
+	// Hapus anotasi terpilih dengan Delete/Backspace (desktop), kecuali saat sedang mengetik teks.
+	document.addEventListener('keydown', (event) => {
+		if (el.classList.contains('hidden') || !selected || selected.classList.contains('is-editing')) return;
+		if (event.key === 'Delete' || event.key === 'Backspace') {
+			if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+			selected.remove();
+			select(null);
 		}
 	});
 
-	updateStickerUi();
-	updateTextEditorUi();
+	syncUi();
 
-	const clear = () => {
-		if (previewAnnotationLayer instanceof HTMLElement) {
-			previewAnnotationLayer.innerHTML = '';
-		}
-		selectedAnnotation = null;
-		closeTextEditor();
+	return {
+		clear: () => {
+			if (layer) layer.innerHTML = '';
+			select(null);
+		},
+		/** Selesaikan teks yang masih diketik (sebelum foto digabung). */
+		commit: () => editingNode()?.blur(),
+		items: () => Array.from(layer?.querySelectorAll('.nc-annot') || []).filter((node) => node.innerText.trim() !== ''),
+		deselect: () => select(null),
 	};
-
-	return { clear };
 };

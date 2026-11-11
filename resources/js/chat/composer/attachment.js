@@ -128,6 +128,8 @@ export const refreshAttachmentLabel = () => {
 			previewVideo.classList.remove('hidden');
 		}
 
+		// Coretan, teks, dan stiker hanya untuk foto (video dikirim apa adanya).
+		mediaPreviewEl.querySelector('[data-attachment-preview-tools]')?.classList.toggle('invisible', !isImage || lowerMime === 'image/gif');
 		filePreviewEl.classList.add('hidden');
 		filePreviewEl.classList.remove('flex');
 		mediaPreviewEl.classList.remove('hidden');

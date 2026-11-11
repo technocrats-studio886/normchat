@@ -7,6 +7,7 @@ import { initReadState } from './chat/read-state.js';
 import { initReadMore } from './chat/read-more.js';
 import { initRealtime } from './chat/realtime.js';
 import { initComposer } from './chat/composer.js';
+import { initTools } from './chat/tools/index.js';
 import { initMentionMenu } from './chat/mention-menu.js';
 import { initGroupMenu } from './chat/group-menu.js';
 import { initMessageSearch } from './chat/message-search.js';
@@ -27,6 +28,7 @@ import { initAvatarPreview } from './ui/avatar-preview.js';
 import { initFormHelpers } from './ui/form-helpers.js';
 import { initGroupInfo } from './ui/group-info.js';
 import { initGroupMute } from './ui/group-mute.js';
+import { initWeeklyRecap } from './ui/weekly-recap.js';
 import { initGroupListLive } from './ui/group-list-live.js';
 import { initGroupSearch } from './ui/group-search.js';
 import { initInviteCard } from './ui/invite-card.js';
@@ -59,6 +61,7 @@ initThemePicker();
 initPush();
 initPushSettings();
 initGroupMute();
+initWeeklyRecap();
 
 // Urutan inisialisasi mengikuti urutan app.js sebelum dipecah.
 // Listener skeleton→reveal gambar dipasang sebelum feed dirender (chat/media-cache.js).
@@ -69,6 +72,7 @@ settleMedia();
 initReadState();
 initRealtime();
 initComposer();
+initTools();
 initMentionMenu();
 initGroupMenu();
 initMessageSearch();

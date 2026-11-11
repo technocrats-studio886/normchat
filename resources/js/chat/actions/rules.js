@@ -2,12 +2,14 @@
 // Server memeriksa ulang setiap aksi (App\Services\Chat\MessageActions).
 
 import { chatFeed } from '../context.js';
+import { isPinned } from '../tools/pins.js';
 
 const viewerIsModerator = () => chatFeed?.getAttribute('data-viewer-is-moderator') === '1';
 const groupIsFrozen = () => chatFeed?.getAttribute('data-group-frozen') === '1';
 
 /** Grup dibekukan: hanya aksi yang tidak menulis ke grup. */
-const READ_ONLY = ['copy', 'versions', 'select', 'link', 'delete'];
+const READ_ONLY = ['copy', 'versions', 'select', 'link', 'delete', 'translate'];
+const toolsOn = () => chatFeed?.hasAttribute('data-tools-base') === true;
 
 const flag = (node, key) => node.dataset[key] === '1';
 
@@ -36,7 +38,7 @@ export const canDeleteForAll = (facts) => facts.id > 0 && !facts.isDeleted && !f
 
 /**
  * Daftar aksi untuk pesan, berurutan. Pesan pending (id lokal) tidak punya aksi.
- * @returns {string[]} reply, copy, forward, edit, versions, selectText, select, link, delete
+ * @returns {string[]} reply, copy, forward, edit, versions, pin/unpin, translate, askNormi, task, remind, selectText, select, link, delete
  */
 export const actionsFor = (node) => {
 	const actions = allActionsFor(node);
@@ -62,6 +64,12 @@ const allActionsFor = (node) => {
 		canEdit(facts) ? 'edit' : null,
 		facts.isEdited && !facts.isAi ? 'versions' : null,
 		facts.isEdited && facts.isAnswer ? 'versions' : null,
+		// Fitur produktivitas grup (chat/tools/).
+		toolsOn() ? (isPinned(facts.id) ? 'unpin' : 'pin') : null,
+		toolsOn() && facts.hasText && !facts.isPoll ? 'translate' : null,
+		toolsOn() && facts.type === 'file' ? 'askNormi' : null,
+		toolsOn() && facts.hasText && !facts.isPoll ? 'task' : null,
+		toolsOn() && facts.hasText && !facts.isPoll ? 'remind' : null,
 		facts.hasText ? 'selectText' : null,
 		'select',
 		'link',

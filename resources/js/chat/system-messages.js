@@ -23,6 +23,8 @@ export const systemText = (message) => {
 		case 'photo_changed': return `${actor} mengganti foto grup.`;
 		case 'photo_removed': return `${actor} menghapus foto grup.`;
 		case 'description_changed': return String(meta.after || '').trim() ? `${actor} mengubah deskripsi grup.` : `${actor} menghapus deskripsi grup.`;
+		case 'message_pinned': return `${actor} menyematkan pesan.`;
+		case 'reminder_created': return `${actor} membuat pengingat untuk ${String(meta.when || 'nanti')}.`;
 		default: return String(system.text || message?.content || '');
 	}
 };
@@ -44,9 +46,12 @@ export const buildSystemNode = (message) => {
 		details = `${before ? `<span class="nc-system-detail is-before">${escapeHtml(before)}</span>` : ''}${after ? `<span class="nc-system-detail">${escapeHtml(after)}</span>` : ''}`;
 	}
 	const viewerIsOwner = chatFeed?.dataset.viewerIsOwner === '1';
-	const action = system.event === 'member_joined' && system.history_pending && viewerIsOwner && Number(meta.actor_id || 0) !== authUserId
+	const jump = system.event === 'message_pinned' && Number(meta.message_id || 0) > 0
+		? ` <button type="button" class="nc-system-action" data-jump-message="${Number(meta.message_id)}">Lihat</button>`
+		: (system.event === 'reminder_created' ? ' <button type="button" class="nc-system-action" data-open-reminders>Lihat pengingat</button>' : '');
+	const action = jump || (system.event === 'member_joined' && system.history_pending && viewerIsOwner && Number(meta.actor_id || 0) !== authUserId
 		? ` <button type="button" class="nc-system-action" data-share-history="${Number(meta.actor_id || 0)}" data-share-history-name="${escapeHtml(meta.actor_name || 'anggota')}">Kirim riwayat pesan</button>`
-		: '';
+		: '');
 	node.innerHTML = `<p class="nc-system-pill">${escapeHtml(systemText(message))}${action}${details}</p>`;
 	return node;
 };

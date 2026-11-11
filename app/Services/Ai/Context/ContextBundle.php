@@ -35,6 +35,8 @@ final class ContextBundle
         public readonly bool $trimmed = false,
         public readonly bool $refersToPast = false,
         ?int $found = null,
+        /** Bagian dokumen grup yang relevan (App\Services\Ai\Documents\DocumentSearch). */
+        public readonly array $documents = [],
     ) {
         $this->found = $found ?? count($retrieved);
     }
@@ -54,6 +56,7 @@ final class ContextBundle
             // tapi tidak ada pesan lama yang ketemu. Pertanyaan umum yang tidak ketemu tidak dihitung.
             'recall_failed' => $this->ambiguous || ($this->refersToPast && $this->searched && $this->found === 0),
             'trimmed' => $this->trimmed,
+            'documents' => count($this->documents),
             // Id pesan lama yang dipakai jawaban ini (bukan isinya); ikut lagi di pertanyaan lanjutan.
             'sources' => array_values(array_map(fn (Message $message) => (int) $message->id, $this->retrieved)),
         ];
@@ -67,7 +70,7 @@ final class ContextBundle
 
     public function hasExtra(): bool
     {
-        return $this->topics !== [] || $this->retrieved !== [] || $this->intent !== null || $this->ambiguous;
+        return $this->topics !== [] || $this->retrieved !== [] || $this->intent !== null || $this->ambiguous || $this->documents !== [];
     }
 
     /**
@@ -81,10 +84,13 @@ final class ContextBundle
         $topics = $this->topics;
         $window = $this->window;
         $summary = $this->summary;
+        $documents = $this->documents;
         $removed = 0;
 
         while ($removed < max(1, $tokens)) {
-            if ($retrieved !== []) {
+            if ($documents !== []) {
+                $removed += Tokens::text((string) array_pop($documents)['content']) + 20;
+            } elseif ($retrieved !== []) {
                 $removed += ContextManager::messageTokens(array_shift($retrieved));
             } elseif ($topics !== []) {
                 $topic = array_pop($topics);
@@ -115,6 +121,26 @@ final class ContextBundle
             trimmed: true,
             refersToPast: $this->refersToPast,
             found: $this->found,
+            documents: $documents,
+        );
+    }
+
+    /** Salinan dengan bagian dokumen grup. */
+    public function withDocuments(array $documents): self
+    {
+        return new self(
+            summary: $this->summary,
+            window: $this->window,
+            topics: $this->topics,
+            retrieved: $this->retrieved,
+            intent: $this->intent,
+            ambiguous: $this->ambiguous,
+            understandingCalled: $this->understandingCalled,
+            searched: $this->searched,
+            trimmed: $this->trimmed,
+            refersToPast: $this->refersToPast,
+            found: $this->found,
+            documents: $documents,
         );
     }
 }

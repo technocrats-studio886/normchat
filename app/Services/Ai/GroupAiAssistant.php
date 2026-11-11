@@ -21,7 +21,10 @@ use App\Services\Ai\Context\ContextManager;
 use App\Services\Ai\Context\MemoryMaintenance;
 use App\Services\Ai\Responders\AiResponder;
 use App\Services\Ai\Responders\CanvasResponder;
+use App\Services\Ai\Responders\CatchUpResponder;
 use App\Services\Ai\Responders\ChatResponder;
+use App\Services\Ai\Responders\ReminderResponder;
+use App\Services\Ai\Responders\TaskResponder;
 use App\Services\Ai\Files\FileRequest;
 use App\Services\Ai\Responders\FileResponder;
 use App\Services\Ai\Responders\ImageEditSuggestionResponder;
@@ -88,7 +91,9 @@ class GroupAiAssistant
         // dan dokumen punya status sendiri (laporan user 9 Nov 2026).
         $responder = $this->responderFor($message);
         $activity = $responder->activity();
-        AiActivity::report($group->id, $activity);
+        // Permintaan privat (ringkasan pesan belum dibaca): status dan jawabannya hanya untuk peminta.
+        $privateFor = $message->visible_to_user_id ? (int) $message->visible_to_user_id : null;
+        AiActivity::report($group->id, $activity, null, $privateFor);
         try {
             $reply = $responder->respond($task);
         } catch (InsufficientBudgetException $e) {
@@ -107,7 +112,7 @@ class GroupAiAssistant
             $task->releaseHold();
             throw $e;
         } finally {
-            AiActivity::stop($group->id, $activity);
+            AiActivity::stop($group->id, $activity, $privateFor);
         }
 
         if ($reply->suggestMode !== null) {
@@ -178,6 +183,12 @@ class GroupAiAssistant
 
     private function responderFor(Message $message): AiResponder
     {
+        // Ringkasan pesan yang belum dibaca (tombol di pembatas "pesan belum dibaca"); jawabannya untuk grup
+        // (keputusan user 11 Nov 2026). Rentangnya hanya diisi server (ChatController::catchUp).
+        if ($message->sender_type === 'user' && is_array($message->system_meta['catch_up'] ?? null)) {
+            return new CatchUpResponder();
+        }
+
         // Pesan lama tanpa ai_mode tetap bisa memakai fitur lewat tag (@normi-image, dst.).
         $mode = match ($message->ai_mode ?? AiMode::fromContent($message->content)) {
             AiMode::Image => new ImageResponder(),
@@ -194,6 +205,12 @@ class GroupAiAssistant
         // @normi biasa: permintaan yang jelas milik sebuah fitur langsung dikerjakan fitur itu (file, gambar baru),
         // kecuali edit foto yang diarahkan dulu ke fitur Buat gambar (keputusan user 11 Nov 2026).
         $content = (string) $message->content;
+        if (ReminderResponder::wants($content)) {
+            return new ReminderResponder();
+        }
+        if (TaskResponder::wants($content)) {
+            return new TaskResponder();
+        }
         $file = FileRequest::detect($content);
         if ($file !== null) {
             return new FileResponder($file);
@@ -243,6 +260,7 @@ class GroupAiAssistant
             'sender_id' => null,
             'reply_to_message_id' => $request->id,
             'reply_quote_text' => $quote !== '' ? $quote : null,
+            'visible_to_user_id' => $request->visible_to_user_id,
             ...$this->replyContent($reply),
         ]);
     }
@@ -389,6 +407,11 @@ class GroupAiAssistant
             'group_credits_remaining' => $groupCredits,
         ]);
 
+        if ($aiMessage->visible_to_user_id !== null) {
+            event(new MessageSent($aiMessage->group_id, $payload, (int) $aiMessage->visible_to_user_id));
+
+            return;
+        }
         event($replaced ? new MessageUpdated($aiMessage->group_id, $payload) : new MessageSent($aiMessage->group_id, $payload));
     }
 
@@ -403,7 +426,7 @@ class GroupAiAssistant
         ]);
         $this->postNotice($request, $text);
         // Anggota lain sudah melihat status "Normi sedang …" sejak pertanyaan terkirim; hentikan.
-        AiActivity::stop((int) $request->group_id);
+        AiActivity::stop((int) $request->group_id, AiActivity::TYPING, $request->visible_to_user_id ? (int) $request->visible_to_user_id : null);
     }
 
     /** Pemberitahuan (saldo habis, model terkunci, dll.) hanya untuk penanya, membalas pertanyaannya. */

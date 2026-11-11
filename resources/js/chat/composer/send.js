@@ -10,6 +10,7 @@ import { noteAwaitingAi, typingIndicator } from '../realtime.js';
 import { chatApiRequest, scrollChatToBottom } from '../utils.js';
 import { initVoicePlayers } from '../voice-player.js';
 import { refreshAttachmentLabel } from './attachment.js';
+import { applyMediaEdits } from './media-editor.js';
 import { isEditing, submitEdit } from './edit-mode.js';
 import { attachmentInput, cameraInput, chatForm, detectAttachmentMessageType, emojiPanel, mentionInput, replyQuoteInput, replyToInput, sendButton } from './elements.js';
 import { clearReplyTarget, normalizeReplyQuote } from './reply.js';
@@ -151,6 +152,16 @@ export const initSend = () => {
 		const actionUrl = chatForm.getAttribute('action') || '';
 		if (!actionUrl) {
 			return;
+		}
+
+		// Coretan, teks, dan stiker di pratinjau foto digabung ke fotonya dulu.
+		chatSubmitInFlight = true;
+		try {
+			await applyMediaEdits();
+		} catch {
+			// Gagal menggabung (browser lama): foto asli tetap terkirim.
+		} finally {
+			chatSubmitInFlight = false;
 		}
 
 		const contentText = mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement

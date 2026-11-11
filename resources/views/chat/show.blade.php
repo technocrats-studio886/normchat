@@ -51,6 +51,20 @@
         {{-- Ajakan menyalakan notifikasi (resources/js/push.js). --}}
         <div class="lg:mx-auto lg:w-[calc(100%-2rem)] lg:max-w-[var(--nc-room-max)]" data-push-prompt-slot></div>
 
+        {{-- Pesan disematkan (resources/js/chat/tools/pins.js). --}}
+        <div class="nc-pin-bar {{ empty($pins) ? 'hidden' : '' }} lg:mx-auto lg:w-[calc(100%-2rem)] lg:max-w-[var(--nc-room-max)]" data-pin-bar role="region" aria-label="Pesan disematkan">
+            <button type="button" class="nc-pin-bar-main" data-pin-bar-jump>
+                <span class="nc-pin-bar-index" data-pin-bar-index aria-hidden="true"></span>
+                <span class="min-w-0 flex-1 text-left">
+                    <span class="nc-pin-bar-label" data-pin-bar-label>Pesan disematkan</span>
+                    <span class="nc-pin-bar-text" data-pin-bar-text></span>
+                </span>
+            </button>
+            <button type="button" class="nc-pin-bar-list" data-pin-bar-list aria-label="Semua pesan disematkan" title="Semua pesan disematkan">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm0 5.25h.007v.008H3.75V12Zm0 5.25h.007v.008H3.75v-.008Z"/></svg>
+            </button>
+        </div>
+
         {{-- Grup gratis: ajakan untuk pemilik selama slot anggota gratis masih ada. Tersembunyi sampai
              resources/js/ui/invite-card.js memastikan kartunya belum ditutup di perangkat ini. --}}
         @if($viewerIsOwner && $group->freeSlotsLeft() > 0 && ! $group->isFrozen())
@@ -114,6 +128,9 @@
             data-history-from="{{ $historyFromMessageId }}"
             data-messages-url="{{ route('chat.store', $group) }}"
             data-group-frozen="{{ $group->isFrozen() ? '1' : '0' }}"
+            data-tools-base="{{ url('/groups/'.$group->id) }}"
+            data-scheduled-count="{{ $scheduledCount }}"
+            data-initial-pins="{{ json_encode($pins) }}"
         >
             @if($showCreatedCard)
                 {{-- Kartu "grup dibuat" (docs/rancangan-alur-chat-wa.md poin 5) --}}
@@ -195,6 +212,12 @@
                     </div>
                 </div>
 
+                {{-- Pesan terjadwal milikku di grup ini (resources/js/chat/tools/scheduled.js). --}}
+                <button type="button" class="nc-scheduled-pill {{ $scheduledCount > 0 ? '' : 'hidden' }}" data-scheduled-pill>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                    <span data-scheduled-pill-text>{{ $scheduledCount }} pesan terjadwal</span>
+                </button>
+
                 {{-- Ala WhatsApp: pill (+, teks, model) dan tombol kirim/mic bulat di sebelahnya. --}}
                 <div class="composer-row" data-composer-main="1">
                 <div class="composer-pill relative">
@@ -232,6 +255,14 @@
                         <button type="button" class="composer-menu-item" data-attach-poll role="menuitem">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h4m-4 6h10M3 6h14M17 14l2 2 4-4"/></svg>
                             <span>Buat polling</span>
+                        </button>
+                        <button type="button" class="composer-menu-item" data-new-reminder role="menuitem">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
+                            <span>Buat pengingat</span>
+                        </button>
+                        <button type="button" class="composer-menu-item" data-open-schedule role="menuitem">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                            <span>Jadwalkan pesan</span>
                         </button>
                         <div class="my-1 border-t" style="border-color: var(--nc-chat-composer-line, #E4E9F0);"></div>
                         @foreach($aiModes as $mode)
@@ -341,6 +372,18 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"/></svg>
                 </span>
                 <span>Cari pesan</span>
+            </button>
+            <button type="button" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-white/10" data-open-tasks role="menuitem">
+                <span class="inline-flex h-5 w-5 items-center justify-center text-white/90">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                </span>
+                <span>Tugas grup</span>
+            </button>
+            <button type="button" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-white/10" data-open-reminders role="menuitem">
+                <span class="inline-flex h-5 w-5 items-center justify-center text-white/90">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
+                </span>
+                <span>Pengingat</span>
             </button>
             <a href="{{ route('settings.history', $group) }}" class="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-white/10" role="menuitem">
                 <span class="inline-flex h-5 w-5 items-center justify-center text-white/90">

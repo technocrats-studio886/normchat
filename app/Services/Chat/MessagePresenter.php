@@ -55,6 +55,10 @@ class MessagePresenter
                 'size' => (int) ($message->system_meta['canvas_project_size'] ?? 0),
                 'files' => (int) ($message->system_meta['canvas_project_files'] ?? 0),
             ] : null,
+            // Pengingat yang dibuat jawaban Normi ini (tombol Batalkan selama masih menunggu).
+            'reminder' => $isDeleted ? null : $this->reminderOf($message),
+            // Jawaban Normi yang menambahkan tugas: tombol "Buka Tugas grup".
+            'tasks_added' => ! $isDeleted && $message->sender_type === 'ai' ? (int) ($message->system_meta['tasks_added'] ?? 0) : 0,
             'reply_to' => $replyTarget && ! $isDeleted ? [
                 'id' => (int) $replyTarget->id,
                 'sender_name' => $this->senderName($replyTarget),
@@ -85,6 +89,27 @@ class MessagePresenter
         }
 
         return $presented;
+    }
+
+    /** @return array{id: int, status: string, when: string, created_by: ?int, personal: bool}|null */
+    private function reminderOf(Message $message): ?array
+    {
+        $id = (int) ($message->system_meta['reminder_id'] ?? 0);
+        if ($message->sender_type !== 'ai' || $id <= 0 || ! empty($message->system_meta['reminder_fired'] ?? null)) {
+            return null;
+        }
+        $reminder = \App\Models\Reminder::find($id);
+        if (! $reminder || (int) $reminder->group_id !== (int) $message->group_id) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $reminder->id,
+            'status' => (string) $reminder->status,
+            'when' => Reminders::whenLabel($reminder, $reminder->creator),
+            'created_by' => $reminder->created_by ? (int) $reminder->created_by : null,
+            'personal' => $reminder->isPersonal(),
+        ];
     }
 
     /** @return array{mode: string, tag: string, label: string, reply_to: int, text: string}|null */

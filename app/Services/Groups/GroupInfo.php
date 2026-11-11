@@ -51,6 +51,8 @@ class GroupInfo
             'fileCount' => $this->archive($group, $user, false)->whereNotIn('message_type', ['image', 'voice'])->count(),
             'linkCount' => $links->count(),
             'isOwner' => $group->isOwnedBy($user),
+            // Rekap mingguan otomatis diatur pemilik/admin (App\Http\Controllers\GroupToolsController::weeklyRecap).
+            'isModerator' => $group->isModerator($user),
             'canEditProfile' => $user->can('editGroupProfile', $group),
             'canManageBilling' => $user->can('manageBilling', $group),
             'canManageAiPersona' => $user->can('manageAiPersona', $group),

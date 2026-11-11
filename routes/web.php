@@ -15,6 +15,7 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GroupBackupController;
 use App\Http\Controllers\GroupAvatarController;
 use App\Http\Controllers\GroupController;
+use App\Http\Controllers\GroupToolsController;
 use App\Http\Controllers\GroupCreditController;
 use App\Http\Controllers\GroupExportController;
 use App\Http\Controllers\InterdotzAuthController;
@@ -98,6 +99,27 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups/{group}/messages/{message}/attachment', [ChatController::class, 'attachment'])->middleware('group.permission')->name('chat.attachment');
     Route::get('/groups/{group}/messages/{message}/canvas', [ChatController::class, 'canvas'])->middleware('group.permission')->name('chat.canvas');
     Route::get('/groups/{group}/messages/{message}/canvas/project', [ChatController::class, 'canvasProject'])->middleware('group.permission')->name('chat.canvas.project');
+
+    // Fitur produktivitas grup (docs/rancangan-fitur-produktivitas-nov.md)
+    Route::middleware('group.permission')->prefix('/groups/{group}')->name('groups.tools.')->group(function () {
+        Route::post('/catch-up', [GroupToolsController::class, 'catchUp'])->middleware('throttle:6,1')->name('catch-up');
+        Route::get('/pins', [GroupToolsController::class, 'pins'])->name('pins');
+        Route::post('/messages/{message}/pin', [GroupToolsController::class, 'pin'])->middleware('throttle:30,1')->name('pin');
+        Route::delete('/messages/{message}/pin', [GroupToolsController::class, 'unpin'])->whereNumber('message')->middleware('throttle:30,1')->name('unpin');
+        Route::post('/messages/{message}/translate', [GroupToolsController::class, 'translate'])->middleware('throttle:20,1')->name('translate');
+        Route::get('/tasks', [GroupToolsController::class, 'tasks'])->name('tasks');
+        Route::post('/tasks', [GroupToolsController::class, 'storeTask'])->middleware('throttle:60,1')->name('tasks.store');
+        Route::patch('/tasks/{task}', [GroupToolsController::class, 'updateTask'])->middleware('throttle:120,1')->name('tasks.update');
+        Route::delete('/tasks/{task}', [GroupToolsController::class, 'destroyTask'])->middleware('throttle:60,1')->name('tasks.destroy');
+        Route::get('/reminders', [GroupToolsController::class, 'reminders'])->name('reminders');
+        Route::post('/reminders', [GroupToolsController::class, 'storeReminder'])->middleware('throttle:20,1')->name('reminders.store');
+        Route::delete('/reminders/{reminder}', [GroupToolsController::class, 'cancelReminder'])->middleware('throttle:30,1')->name('reminders.cancel');
+        Route::get('/scheduled', [GroupToolsController::class, 'scheduled'])->name('scheduled');
+        Route::post('/scheduled', [GroupToolsController::class, 'storeScheduled'])->middleware('throttle:20,1')->name('scheduled.store');
+        Route::delete('/scheduled/{scheduledMessage}', [GroupToolsController::class, 'cancelScheduled'])->middleware('throttle:30,1')->name('scheduled.cancel');
+        Route::post('/scheduled/{scheduledMessage}/send', [GroupToolsController::class, 'sendScheduledNow'])->middleware('throttle:20,1')->name('scheduled.send');
+        Route::put('/weekly-recap', [GroupToolsController::class, 'weeklyRecap'])->name('weekly-recap');
+    });
 
     // Settings (view for active members, write actions restricted by permission)
     Route::get('/groups/{group}/avatar', [GroupAvatarController::class, 'show'])->name('groups.avatar');

@@ -187,7 +187,9 @@ const placeUnreadSeparator = () => {
 	separator.className = 'nc-unread-sep';
 	separator.setAttribute('role', 'separator');
 	separator.setAttribute('data-unread-separator', '');
-	separator.innerHTML = `<span>${unreadCountFromServer} pesan belum dibaca</span>`;
+	// Banyak pesan terlewat: Normi bisa meringkasnya (chat/tools/index.js, App\Http\Controllers\GroupToolsController::catchUp).
+	const canCatchUp = unreadCountFromServer >= 5 && chatFeed.getAttribute('data-group-frozen') !== '1' && chatFeed.hasAttribute('data-tools-base');
+	separator.innerHTML = `<span>${unreadCountFromServer} pesan belum dibaca${canCatchUp ? ` <button type="button" class="nc-catch-up" data-catch-up="${serverLastReadMessageId}">Ringkas dengan Normi</button>` : ''}</span>`;
 	chatFeed.insertBefore(separator, first);
 	return separator;
 };

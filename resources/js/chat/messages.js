@@ -12,6 +12,7 @@ import { carryOverMedia } from './media-cache.js';
 import { parsePollContent, refreshPollCardsFromFeed, renderPollCard } from './polls.js';
 import { escapeAttr, escapeHtml } from './utils.js';
 import { initVoicePlayers } from './voice-player.js';
+import { reminderBubbleHtml } from './tools/reminders.js';
 
 /** Pesan berselang lebih dari ini tidak digabung dalam satu rangkaian. */
 const RUN_GAP_MS = 10 * 60 * 1000;
@@ -122,6 +123,11 @@ const suggestionHtml = (message) => {
 
 const zipSvg = '<svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>';
 
+/** Jawaban Normi yang menambahkan tugas: tombol membuka Tugas grup (chat/tools/tasks.js). */
+const tasksButtonHtml = (message) => Number(message?.tasks_added || 0) > 0
+	? '<div><button type="button" class="nc-suggest" data-open-tasks>Buka Tugas grup</button></div>'
+	: '';
+
 /** Canvas dengan kode proyek asli (Next.js, Laravel, Flutter, ...): tautan unduh ZIP-nya. */
 const canvasProjectHtml = (message) => {
 	const project = message?.canvas_project;
@@ -201,7 +207,7 @@ export const buildMessageNode = (message) => {
 	// Dibungkus nc-msg-text: teks yang terlalu panjang dipotong dengan "Lihat selengkapnya" (chat/read-more.js).
 	const textHtml = pollData || !rawContent
 		? ''
-		: `<div class="nc-msg-text" data-message-text>${isAi
+		: `<div class="nc-msg-text" data-msg-body-text>${isAi
 			? `<div class="ai-markdown">${renderedMarkdown}</div>`
 			: userTextHtml(rawContent)}</div>`;
 	const isMediaOnly = !textHtml && /nc-bubble-media/.test(attachmentHtml);
@@ -216,7 +222,7 @@ export const buildMessageNode = (message) => {
 		? `<div class="nc-bubble bubble-${tone}" data-message-body="1" data-message-bubble>${nameHtml}${deletedHtml}${timeHtml({ ...message, is_edited: false }, createdAt)}</div>`
 		: (pollData
 			? renderPollCard({ poll: pollData, tone, messageId: message?.id, headerHtml: nameHtml + forwardedHtml + quoteHtml, inlineTimeHtml: timeHtml(message, createdAt) })
-			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${isAi ? canvasProjectHtml(message) : linkPreviewHtml(message?.link_preview)}${textHtml}${isAi ? suggestionHtml(message) : ''}${timeHtml(message, createdAt)}</div>`);
+			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${isAi ? canvasProjectHtml(message) : linkPreviewHtml(message?.link_preview)}${textHtml}${isAi ? suggestionHtml(message) + reminderBubbleHtml(message) + tasksButtonHtml(message) : ''}${timeHtml(message, createdAt)}</div>`);
 	const pendingHtml = message?.is_pending === true ? '<p class="nc-msg-pending">Mengirim…</p>' : '';
 
 	wrapper.innerHTML = `${isMine ? '' : avatarHtml(message, isAi)}<div class="nc-msg-stack${isWide ? ' is-wide' : ''}">${bubble}${pendingHtml}</div>`;

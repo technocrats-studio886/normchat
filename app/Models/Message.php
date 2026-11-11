@@ -36,11 +36,13 @@ class Message extends Model
         'visible_to_user_id',
         'forwarded_from_name',
         'forwarded_from_message_id',
+        'doc_indexed_at',
     ];
 
     protected $casts = [
         'ai_mode' => AiMode::class,
         'system_meta' => 'array',
+        'doc_indexed_at' => 'datetime',
     ];
 
     /** Pesan anggota dan Normi memicu notifikasi push setelah jeda singkat (App\Jobs\SendMessagePushJob). */

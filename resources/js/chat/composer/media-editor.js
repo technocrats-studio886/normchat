@@ -5,8 +5,15 @@ import { showActionToast } from './toast.js';
 import { bindAnnotations } from './media-editor/annotations.js';
 import { bindCaption } from './media-editor/caption.js';
 import { bindDoodle } from './media-editor/doodle.js';
+import { flattenImage } from './media-editor/flatten.js';
 import { loadPreviewMentionSuggestions } from './media-editor/mention-menu.js';
 import { mediaPreviewTemplate } from './media-editor/template.js';
+
+/** Diisi saat editor dibuat: menggabungkan hasil edit ke foto terpilih (dipanggil send.js sebelum mengirim). */
+let applyEdits = async () => undefined;
+
+/** Coretan, teks, dan stiker digabung ke foto di kolom lampiran; tanpa edit, foto tidak diubah. */
+export const applyMediaEdits = () => applyEdits();
 
 export const ensureMediaAttachmentPreviewEl = (onClear) => {
 	let el = document.querySelector('[data-attachment-preview-media]');
@@ -16,7 +23,9 @@ export const ensureMediaAttachmentPreviewEl = (onClear) => {
 
 	el = document.createElement('div');
 	el.setAttribute('data-attachment-preview-media', '1');
-	el.className = 'fixed inset-0 left-1/2 z-[55] hidden w-full max-w-md -translate-x-1/2 bg-navy-950/95';
+	// Menutupi seluruh layar di HP maupun desktop; isinya dibatasi lebarnya di tengah (laporan user 11 Nov 2026:
+	// di desktop dulu hanya kolom selebar HP di tengah chat).
+	el.className = 'nc-media-preview fixed inset-0 z-[80] hidden';
 	el.innerHTML = mediaPreviewTemplate;
 
 	el.querySelector('[data-attachment-preview-media-clear]')?.addEventListener('click', onClear);
@@ -25,6 +34,8 @@ export const ensureMediaAttachmentPreviewEl = (onClear) => {
 	const previewMediaImg = el.querySelector('[data-attachment-preview-media-img]');
 	const previewMediaVideo = el.querySelector('[data-attachment-preview-media-video]');
 	const penSizeGroup = el.querySelector('[data-preview-pen-sizes]');
+	const textControls = el.querySelector('[data-preview-text-controls]');
+	const previewStage = el.querySelector('[data-attachment-preview-stage]');
 	const stickerControls = el.querySelector('[data-preview-sticker-controls]');
 	const toolButtons = Array.from(el.querySelectorAll('[data-preview-tool-button="1"]'));
 
@@ -52,11 +63,33 @@ export const ensureMediaAttachmentPreviewEl = (onClear) => {
 			const showStickerControls = !state.doodleEnabled && state.placementMode === 'sticker';
 			stickerControls.classList.toggle('hidden', !showStickerControls);
 		}
+		if (textControls instanceof HTMLElement) {
+			const showTextControls = !state.doodleEnabled && state.placementMode === 'text';
+			textControls.classList.toggle('hidden', !showTextControls);
+			textControls.classList.toggle('flex', showTextControls);
+		}
 	};
 
 	bindCaption(el, mentionSuggestions);
 	const doodle = bindDoodle(el, state);
-	const annotations = bindAnnotations(el, state, mentionSuggestions, updateToolButtonState);
+	const annotations = bindAnnotations(el, state, updateToolButtonState);
+
+	applyEdits = async () => {
+		const input = document.querySelector('[data-chat-attachment]');
+		const file = input?.files?.[0];
+		annotations.commit();
+		const items = annotations.items();
+		if (!(file instanceof File) || !file.type.startsWith('image/') || file.type === 'image/gif'
+			|| !(previewMediaImg instanceof HTMLImageElement) || !previewMediaImg.complete || !(previewStage instanceof HTMLElement)
+			|| (!doodle.hasStrokes() && items.length === 0)) {
+			return;
+		}
+		annotations.deselect();
+		const edited = await flattenImage({ img: previewMediaImg, stage: previewStage, file, paintDoodle: doodle.paint, items });
+		const transfer = new DataTransfer();
+		transfer.items.add(edited);
+		input.files = transfer.files;
+	};
 
 	const togglePlacementMode = (mode, hint) => {
 		doodle.setEnabled(false);
@@ -75,25 +108,20 @@ export const ensureMediaAttachmentPreviewEl = (onClear) => {
 
 		const tool = String(toolButton.getAttribute('data-preview-tool') || '');
 		if (tool === 'sticker') {
-			togglePlacementMode('sticker', 'Tap media untuk menaruh emoji, lalu drag untuk geser');
+			togglePlacementMode('sticker', 'Ketuk foto untuk menaruh emoji, lalu geser untuk memindahkannya');
 			return;
 		}
 
 		if (tool === 'text') {
-			togglePlacementMode('text', 'Tap media untuk menaruh teks');
+			togglePlacementMode('text', 'Ketuk foto di tempat teks mau ditulis');
 			return;
 		}
 
 		if (tool === 'doodle' && doodle.available) {
+			annotations.commit();
 			doodle.setEnabled(!state.doodleEnabled);
 			state.placementMode = '';
 			updateToolButtonState();
-			if (state.doodleEnabled) {
-				doodle.resize();
-				showActionToast('Coretan aktif');
-			} else {
-				showActionToast('Coretan mati');
-			}
 		}
 	});
 

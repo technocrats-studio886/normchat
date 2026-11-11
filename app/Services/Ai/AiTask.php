@@ -98,7 +98,7 @@ final class AiTask
      */
     public function progress(string $activity, ?string $detail = null): void
     {
-        AiActivity::report((int) $this->group->id, $activity, $detail);
+        AiActivity::report((int) $this->group->id, $activity, $detail, $this->message->visible_to_user_id ? (int) $this->message->visible_to_user_id : null);
     }
 
     /** Pemisah cache prompt per grup (akuntansi cache OpenAI; bukan isolasi riwayat). */

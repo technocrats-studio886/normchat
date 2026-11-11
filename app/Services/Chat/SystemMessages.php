@@ -23,6 +23,8 @@ class SystemMessages
     public const PHOTO_CHANGED = 'photo_changed';
     public const PHOTO_REMOVED = 'photo_removed';
     public const DESCRIPTION_CHANGED = 'description_changed';
+    public const MESSAGE_PINNED = 'message_pinned';
+    public const REMINDER_CREATED = 'reminder_created';
 
     public function __construct(private readonly MessagePresenter $presenter)
     {
@@ -67,6 +69,8 @@ class SystemMessages
             self::PHOTO_CHANGED => "{$actor} mengganti foto grup.",
             self::PHOTO_REMOVED => "{$actor} menghapus foto grup.",
             self::DESCRIPTION_CHANGED => filled($meta['after'] ?? null) ? "{$actor} mengubah deskripsi grup." : "{$actor} menghapus deskripsi grup.",
+            self::MESSAGE_PINNED => "{$actor} menyematkan pesan.",
+            self::REMINDER_CREATED => "{$actor} membuat pengingat untuk " . ($meta['when'] ?? 'nanti') . '.',
             default => '',
         };
     }

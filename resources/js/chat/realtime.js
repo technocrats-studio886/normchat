@@ -417,6 +417,16 @@ const onMessageSent = (payload) => {
 	refreshPollCardsFromFeed();
 };
 
+/** Tampilkan pesan dari respons server (mis. permintaan ringkasan) tanpa menunggu realtime; duplikat diabaikan. */
+export const insertMessagePayload = (message) => onMessageSent({ group_id: groupId, message });
+
+/** Daftar milik grup berubah (sematan, tugas, pengingat, pesan terjadwal): chat/tools/index.js memuat ulang. */
+const onGroupDataChanged = (payload) => {
+	if (Number(payload?.group_id || 0) === Number(groupId || 0)) {
+		window.dispatchEvent(new CustomEvent('nc:group-data', { detail: { kind: String(payload?.kind || '') } }));
+	}
+};
+
 export const initRealtime = () => {
 	resumeAfterBackForwardCache();
 	showPendingAiFromFeed();
@@ -433,6 +443,7 @@ export const initRealtime = () => {
 		const userChannel = window.Echo.private(`App.Models.User.${authUserId}`);
 		// Pemberitahuan Normi yang hanya untuk user ini (saldo habis, model terkunci, dll.).
 		userChannel.listen('.message.sent', onMessageSent);
+		userChannel.listen('.group.data.changed', onGroupDataChanged);
 		userChannel.listen('.mention.tagged', (payload) => {
 			if (!payload) {
 				return;
@@ -488,6 +499,7 @@ export const initRealtime = () => {
 		});
 
 		groupChannel.listen('.message.sent', onMessageSent);
+		groupChannel.listen('.group.data.changed', onGroupDataChanged);
 		// Pratinjau tautan selesai dibaca di antrean: pasang kartunya di bubble.
 		groupChannel.listen('.link.preview.ready', (payload) => attachLinkPreview(chatFeed, payload?.message_id, payload?.link_preview));
 

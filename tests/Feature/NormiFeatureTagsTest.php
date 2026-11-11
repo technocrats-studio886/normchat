@@ -160,11 +160,11 @@ class NormiFeatureTagsTest extends TestCase
         Event::assertDispatched(TypingStatus::class, fn (TypingStatus $event) => $event->isTyping && $event->activity === 'typing');
     }
 
-    public function test_feature_tags_are_suggested_and_stripped_from_the_question(): void
+    public function test_only_chat_tag_is_suggested_and_feature_tags_are_stripped_from_the_question(): void
     {
         $suggestions = collect(app(MentionNotifier::class)->suggestionsFor($this->group, $this->owner));
-        $this->assertSame(['@normi', '@normi-learn', '@normi-image', '@normi-canvas', '@normi-research', '@normi-file'],
-            $suggestions->where('type', 'ai')->pluck('insert')->all());
+        // Menu @ hanya menawarkan @normi; tag fitur muncul dari menu + (keputusan user 11 Nov 2026).
+        $this->assertSame(['@normi'], $suggestions->where('type', 'ai')->pluck('insert')->all());
 
         $question = new Message(['content' => '@normi-research tren mobil listrik 2026']);
         $this->assertSame('tren mobil listrik 2026', ContextUnderstanding::question($question));

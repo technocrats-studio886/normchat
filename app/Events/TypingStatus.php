@@ -24,6 +24,8 @@ class TypingStatus implements ShouldBroadcastNow
         public string $activity = 'typing',
         // Rincian tahap untuk ditampilkan, mis. kueri yang sedang dicari Deep Research; null = teks bawaan aktivitas.
         public ?string $detail = null,
+        // Permintaan privat (mis. ringkasan pesan belum dibaca): status hanya untuk peminta.
+        public ?int $onlyUserId = null,
     ) {}
 
     public function broadcastAs(): string
@@ -37,7 +39,9 @@ class TypingStatus implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('group.'.$this->groupId),
+            $this->onlyUserId !== null
+                ? new PrivateChannel('App.Models.User.'.$this->onlyUserId)
+                : new PrivateChannel('group.'.$this->groupId),
         ];
     }
 

@@ -142,7 +142,9 @@ export const initMentionMenu = () => {
 
 		mentionInput.addEventListener('input', () => {
 			const mention = getMentionQuery();
-			if (!mention) {
+			// Pratinjau foto/video sedang terbuka: kolom keterangannya punya menu @ sendiri, menu kolom ketik
+			// di belakangnya tidak ikut muncul (laporan user 11 Nov 2026).
+			if (!mention || document.querySelector('[data-attachment-preview-media]:not(.hidden)')) {
 				hideMentionMenu();
 				return;
 			}

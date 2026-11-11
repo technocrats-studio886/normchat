@@ -112,8 +112,10 @@ class MessagePush
             return false;
         }
         $repliesToMe = (int) ($message->replyToMessage?->sender_id ?? 0) === $userId && $message->replyToMessage?->sender_type === 'user';
+        // Pengingat yang jatuh waktunya sengaja dipasang anggota: diperlakukan seperti mention.
+        $isReminder = ! empty($message->system_meta['reminder_fired'] ?? null);
 
-        return $isMentioned || $repliesToMe || $message->visible_to_user_id !== null;
+        return $isMentioned || $repliesToMe || $isReminder || $message->visible_to_user_id !== null;
     }
 
     /** @return array<string, mixed> */

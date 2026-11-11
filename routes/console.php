@@ -95,3 +95,8 @@ Schedule::command('normchat:release-stale-holds')->everyFiveMinutes()->withoutOv
 Schedule::command('normchat:check-exchange-rate')->hourly()->withoutOverlapping();
 Schedule::command('normchat:reconcile-openai-costs')->hourly()->between('07:00', '23:00')->timezone(\App\Support\UserTime::DEFAULT_ZONE)->withoutOverlapping();
 Schedule::command('normchat:embed-new-messages')->everyMinute()->withoutOverlapping();
+// Fitur produktivitas grup (docs/rancangan-fitur-produktivitas-nov.md).
+Schedule::command('normchat:send-reminders')->everyMinute()->withoutOverlapping();
+Schedule::command('normchat:send-scheduled')->everyMinute()->withoutOverlapping();
+Schedule::command('normchat:index-documents')->everyMinute()->withoutOverlapping();
+Schedule::command('normchat:weekly-recaps')->hourlyAt(0)->withoutOverlapping();

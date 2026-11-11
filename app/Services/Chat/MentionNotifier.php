@@ -100,11 +100,9 @@ class MentionNotifier
             ->values()
             ->all();
 
-        // Normi: chat biasa (@normi) lalu tag tiap fitur (@normi-image, @normi-research, ...).
+        // Hanya @normi. Tag fitur (@normi-image, ...) disisipkan otomatis saat fiturnya dipilih dari tombol +,
+        // dan tetap berlaku bila diketik manual (keputusan user 11 Nov 2026: menu @ jangan penuh tag fitur).
         $normi = [['type' => 'ai', 'label' => 'Normi AI', 'insert' => AiMode::CHAT_TAG]];
-        foreach (AiMode::cases() as $mode) {
-            $normi[] = ['type' => 'ai', 'label' => 'Normi · ' . $mode->label(), 'insert' => $mode->tag(), 'mode' => $mode->value];
-        }
 
         return [...$normi, ...$users];
     }

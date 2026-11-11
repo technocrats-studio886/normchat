@@ -15,12 +15,18 @@ const LABELS = {
 	forward: 'Bagikan',
 	edit: 'Edit',
 	versions: 'Lihat versi',
+	pin: 'Sematkan',
+	unpin: 'Lepas sematan',
+	translate: 'Terjemahkan',
+	askNormi: 'Tanya Normi tentang file ini',
+	task: 'Jadikan tugas',
+	remind: 'Ingatkan',
 	selectText: 'Pilih teks',
 	select: 'Pilih pesan',
 	link: 'Salin tautan',
 	delete: 'Hapus',
 };
-const ICONS = { ...Object.fromEntries(Object.keys(LABELS).map((key) => [key, key])), delete: 'trash' };
+const ICONS = { ...Object.fromEntries(Object.keys(LABELS).map((key) => [key, key])), delete: 'trash', unpin: 'pin' };
 const TOOLBAR_MAIN = ['reply', 'copy', 'forward', 'edit', 'versions', 'delete'];
 
 const canHover = window.matchMedia('(hover: hover) and (pointer: fine)');

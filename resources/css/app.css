@@ -862,6 +862,9 @@
     .nc-msg.is-pressed [data-message-bubble] { visibility: hidden; }
     .nc-press-menu:focus { outline: none; }
     .nc-press-menu {
+        max-height: 62vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
         min-width: 200px;
         padding: 4px;
         border-radius: 14px;
@@ -2966,6 +2969,45 @@
     }
 
     /* ── Bubble panjang: dipotong ±15 baris, "Lihat selengkapnya" membuka di tempat ────────── */
+    /* Pratinjau foto/video sebelum dikirim (composer/media-editor.js): foto memakai tinggi layar yang tersisa
+       di HP maupun desktop, di bawah bilah alat dan di atas kolom keterangan. */
+    .nc-media-preview { background: #0b111b; }
+    .nc-media-preview-img { max-height: calc(100vh - 230px); max-height: calc(100svh - 230px); }
+    /* Teks dan stiker di atas foto (composer/media-editor/annotations.js); digambar ulang sama persis oleh flatten.js. */
+    .nc-annot {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+        cursor: move;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        max-width: 80%;
+        line-height: 1.2;
+        text-align: center;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .nc-annot--text {
+        min-width: 0.6em;
+        padding: 0.15em 0.35em;
+        border-radius: 0.3em;
+        font-weight: 700;
+        outline: none;
+        caret-color: currentColor;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    }
+    .nc-annot--text.has-bg { background: rgba(0, 0, 0, 0.45); text-shadow: none; }
+    .nc-annot--text.is-editing {
+        cursor: text;
+        user-select: text;
+        -webkit-user-select: text;
+        outline: 2px dashed rgba(255, 255, 255, 0.75);
+        outline-offset: 2px;
+    }
+    .nc-annot--sticker { line-height: 1; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
+    .nc-annot.is-selected:not(.is-editing) { outline: 2px solid rgba(255, 255, 255, 0.8); outline-offset: 3px; border-radius: 0.3em; }
+
     .nc-msg-text.is-clamped {
         max-height: var(--nc-clamp-height, 22rem);
         overflow: hidden;
@@ -3031,6 +3073,115 @@
     .nc-push-prompt-actions { display: flex; flex: none; gap: 8px; margin-left: auto; }
     @keyframes nc-push-in { from { opacity: 0; transform: translateY(-4px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
     @media (prefers-reduced-motion: reduce) { .nc-push-prompt { animation: none; } }
+
+    /* ── Fitur produktivitas grup (resources/js/chat/tools/) ── */
+    /* Bilah pesan disematkan di bawah header. */
+    .nc-pin-bar {
+        display: flex; align-items: stretch; gap: 4px;
+        margin: 8px 12px 0; border-radius: 16px;
+        border: 1px solid var(--nc-line); background: var(--nc-surface); color: var(--nc-text);
+        box-shadow: 0 6px 20px -16px rgba(0, 0, 0, 0.35);
+    }
+    .nc-pin-bar.hidden { display: none; }
+    @media (min-width: 1024px) { .nc-pin-bar { margin: 8px auto 0; } }
+    .nc-pin-bar-main { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 10px; padding: 7px 4px 7px 12px; border-radius: 16px; text-align: left; }
+    .nc-pin-bar-main:hover { background: var(--nc-surface-2); }
+    .nc-pin-bar-index { display: flex; flex-direction: column; gap: 2px; align-self: stretch; justify-content: center; }
+    .nc-pin-bar-index span { width: 3px; flex: 1 1 0; max-height: 14px; min-height: 4px; border-radius: 3px; background: var(--nc-line-strong); }
+    .nc-pin-bar-index span.is-active { background: var(--nc-primary); }
+    .nc-pin-bar-label { display: block; font-size: 11.5px; font-weight: 700; color: var(--nc-primary); }
+    .nc-pin-bar-text { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: var(--nc-text-soft); }
+    .nc-pin-bar-list { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 40px; border-radius: 14px; color: var(--nc-text-soft); }
+    .nc-pin-bar-list:hover { background: var(--nc-surface-2); color: var(--nc-text); }
+
+    /* Pil "N pesan terjadwal" di atas kolom ketik. */
+    .nc-scheduled-pill {
+        display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 6px; padding: 5px 12px;
+        border-radius: 9999px; border: 1px solid var(--nc-primary-line); background: var(--nc-primary-light);
+        color: var(--nc-primary-text); font-size: 12.5px; font-weight: 600;
+    }
+    .nc-scheduled-pill.hidden { display: none; }
+
+    /* Tombol "Ringkas dengan Normi" di pembatas pesan belum dibaca. */
+    .nc-catch-up {
+        margin-left: 6px; padding: 1px 10px; border-radius: 9999px;
+        background: var(--nc-primary); color: #fff; font-size: 11.5px; font-weight: 700;
+    }
+    .nc-catch-up:disabled { opacity: 0.7; }
+    .nc-bubble-note { margin-top: 6px; font-size: 12px; font-style: italic; opacity: 0.75; }
+
+    /* Terjemahan di bawah teks asli. */
+    .nc-translation { margin-top: 8px; padding: 8px 10px; border-radius: 10px; border-left: 3px solid var(--nc-primary); background: color-mix(in srgb, var(--nc-primary) 8%, transparent); }
+    .nc-translation.is-loading { opacity: 0.7; }
+    .nc-translation-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 11.5px; font-weight: 700; opacity: 0.8; }
+    .nc-translation-label button { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+    /* Lembar alat: bottom sheet di HP, jendela di tengah di desktop. */
+    .nc-sheet-overlay {
+        position: fixed; inset: 0; z-index: 85; display: flex; align-items: flex-end; justify-content: center;
+        background: rgba(10, 15, 22, 0.45); animation: ncFadeIn 120ms ease;
+    }
+    .nc-sheet {
+        display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: 88vh; max-height: 88svh;
+        border-radius: 22px 22px 0 0; background: var(--nc-surface); color: var(--nc-text);
+        box-shadow: 0 -12px 40px -16px rgba(0, 0, 0, 0.45); animation: ncSlideUp 180ms ease;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    @media (min-width: 640px) {
+        .nc-sheet-overlay { align-items: center; padding: 24px; }
+        .nc-sheet { border-radius: 22px; max-height: 80vh; }
+    }
+    .nc-sheet-head { display: flex; align-items: center; gap: 8px; padding: 16px 16px 8px 20px; }
+    .nc-sheet-title { flex: 1; font-size: 16px; font-weight: 700; }
+    .nc-sheet-close { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9999px; color: var(--nc-text-soft); }
+    .nc-sheet-close:hover { background: var(--nc-surface-2); }
+    .nc-sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px 20px; }
+    .nc-sheet-empty { padding: 18px 4px; text-align: center; font-size: 13.5px; color: var(--nc-text-soft); }
+    .nc-sheet-list { display: flex; flex-direction: column; }
+    .nc-sheet-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--nc-line); }
+    .nc-sheet-item:last-child { border-bottom: 0; }
+    .nc-sheet-item-title { display: block; font-size: 14px; font-weight: 600; }
+    .nc-sheet-item-text { display: block; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .nc-sheet-item-meta { display: block; margin-top: 2px; font-size: 12px; color: var(--nc-text-soft); }
+    .nc-sheet-link { flex: none; font-size: 12.5px; font-weight: 600; color: var(--nc-primary); }
+    .nc-sheet-link.is-danger { color: var(--nc-danger-text); }
+    .nc-tool-form { display: flex; flex-direction: column; gap: 12px; }
+    .nc-tool-label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-tool-hint { font-size: 12px; color: var(--nc-text-soft); }
+    .nc-tool-subtitle { margin: 18px 0 2px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--nc-text-soft); }
+    .nc-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .nc-chip { padding: 5px 12px; border-radius: 9999px; border: 1px solid var(--nc-line-strong); font-size: 12.5px; font-weight: 600; }
+    .nc-chip:hover { border-color: var(--nc-primary); color: var(--nc-primary); }
+
+    /* Tugas grup. */
+    .nc-task-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+    /* HP: penanggung jawab satu baris penuh, lalu tenggat + Tambah. Layar lebar: satu baris. */
+    .nc-task-form-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+    .nc-task-assignee { grid-column: 1 / -1; min-width: 0; }
+    .nc-task-due { display: flex; min-width: 0; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--nc-text-soft); }
+    .nc-task-due .nc-input { min-width: 0; flex: 1; min-height: 40px; }
+    @media (min-width: 560px) {
+        .nc-task-form-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+        .nc-task-assignee { grid-column: auto; }
+    }
+    .nc-task-list { display: flex; flex-direction: column; }
+    .nc-task { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--nc-line); }
+    .nc-task:last-child { border-bottom: 0; }
+    .nc-task-check input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--nc-primary); cursor: pointer; }
+    .nc-task-title { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+    .nc-task.is-done .nc-task-title { text-decoration: line-through; color: var(--nc-text-soft); }
+    .nc-task-meta { margin-top: 2px; font-size: 12px; color: var(--nc-text-soft); }
+    .nc-task-meta:empty { display: none; }
+    .nc-task-meta .is-overdue { color: var(--nc-danger-text); font-weight: 600; }
+    .nc-task-delete { flex: none; padding: 4px; border-radius: 8px; color: var(--nc-text-soft); }
+    .nc-task-delete:hover { background: var(--nc-surface-2); color: var(--nc-danger-text); }
+    .nc-task-done-toggle { margin-top: 14px; font-size: 13px; font-weight: 600; color: var(--nc-text-soft); }
+
+    /* Rekap mingguan di Info grup. */
+    .nc-recap-form { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 14px; }
+    .nc-recap-form[hidden] { display: none; }
+    .nc-recap-toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .nc-recap-toggle input { width: 18px; height: 18px; accent-color: var(--nc-primary); }
 
     /* ── Bisu notifikasi grup (Info grup > Pengaturan) ───────────────────────────────────── */
     .nc-mute-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }

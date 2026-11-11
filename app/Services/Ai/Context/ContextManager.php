@@ -8,6 +8,7 @@ use App\Models\GroupMember;
 use App\Models\GroupContextSummary;
 use App\Models\GroupContextTopic;
 use App\Models\Message;
+use App\Services\Ai\Documents\DocumentSearch;
 use App\Services\Ai\Tokens;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -37,6 +38,7 @@ class ContextManager
         private readonly ContextUnderstanding $understanding,
         private readonly HistorySearch $search,
         private readonly MaintenanceAi $ai,
+        private readonly DocumentSearch $documents,
     ) {
     }
 
@@ -44,7 +46,7 @@ class ContextManager
     {
         $floor = $this->historyFloor($group, $request);
         if ($floor !== null) {
-            return $this->buildWithinVisibleHistory($group, $request, $floor);
+            return $this->withDocuments($group, $request, $this->buildWithinVisibleHistory($group, $request, $floor), null);
         }
 
         $state = GroupContextSummary::query()->where('group_id', $group->id)->first();
@@ -88,7 +90,7 @@ class ContextManager
             )
             : [];
 
-        return new ContextBundle(
+        return $this->withDocuments($group, $request, new ContextBundle(
             summary: $summary !== null ? self::limitTokens($summary, (int) config('normchat.context.summary_tokens', 600)) : null,
             window: $window,
             topics: $picked,
@@ -98,7 +100,24 @@ class ContextManager
             understandingCalled: $understanding->usedModel,
             searched: $understanding->needsSearch,
             refersToPast: $understanding->refersToPast,
-        );
+        ), $queryVector);
+    }
+
+    /**
+     * Pertanyaan yang menyebut dokumen ("menurut modul", "slide kemarin", nama filenya): bagian dokumen grup yang
+     * relevan ikut ke prompt. Membalas langsung pesan file tidak perlu, karena isi file itu sudah dikirim utuh.
+     */
+    private function withDocuments(Group $group, Message $request, ContextBundle $context, ?array $queryVector): ContextBundle
+    {
+        $question = ContextUnderstanding::question($request);
+        $replyTarget = $request->replyToMessage;
+        if ($question === '' || ($replyTarget && $replyTarget->message_type === 'file' && $replyTarget->attachment_path)
+            || ! DocumentSearch::refersToDocuments($question)) {
+            return $context;
+        }
+        $documents = $this->documents->find($group, $request, $question, $queryVector);
+
+        return $documents === [] ? $context : $context->withDocuments($documents);
     }
 
     /**

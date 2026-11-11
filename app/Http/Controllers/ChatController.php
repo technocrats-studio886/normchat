@@ -26,6 +26,7 @@ use App\Services\Ai\Responders\CanvasResponder;
 use App\Services\Chat\AttachmentStorage;
 use App\Services\Chat\MentionNotifier;
 use App\Services\Chat\MessageActions;
+use App\Services\Chat\MessageSender;
 use App\Services\Chat\MessagePresenter;
 use App\Services\Credits\ModelAccess;
 use App\Services\Files\StoredFiles;
@@ -111,6 +112,9 @@ class ChatController extends Controller
                 'floor' => $access->floor($aiModel),
             ]]),
             'groupCredits' => (float) ($token?->credits ?? 0),
+            // Fitur produktivitas grup (docs/rancangan-fitur-produktivitas-nov.md): sematan tampil langsung tanpa menunggu.
+            'pins' => app(\App\Services\Chat\GroupPins::class)->listFor($group, $viewer),
+            'scheduledCount' => app(\App\Services\Chat\ScheduledMessages::class)->pendingCount($group, $viewer),
             'defaultAiModel' => $group->resolvedAiModel()?->model_id,
         ]);
     }
@@ -257,22 +261,8 @@ class ChatController extends Controller
             return back()->withErrors(['content' => 'Gagal mengirim. Coba lagi.']);
         }
 
-        $message->loadCount('versions');
-        if ($message->isAddressedToAi()) {
-            ProcessGroupChatQueueJob::dispatch($group->id);
-        }
-
-        $payload = $this->presenter->present($message, $user->name, [
-            'group_credits_remaining' => $group->groupToken?->credits ?? 0,
-            'awaiting_ai' => $message->isAddressedToAi(),
-        ]);
-        event(new MessageSent($group->id, $payload));
-        // Pratinjau tautan dibaca di antrean; kartunya menyusul lewat event link.preview.ready.
-        app(LinkPreviews::class)->forNewMessage($message);
-
-        if ($content !== '') {
-            $this->mentions->notify($group, $message, $user, $content);
-        }
+        // Antrean Normi, realtime, pratinjau tautan, dan mention (sama dengan pesan terjadwal).
+        $payload = app(MessageSender::class)->afterCreate($group, $message, $user);
 
         return $request->expectsJson()
             ? response()->json(['ok' => true, 'message' => $payload], 201)

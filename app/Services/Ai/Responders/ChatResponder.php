@@ -77,6 +77,13 @@ final class ChatResponder implements AiResponder
     /** Sebelum menjawab: status sesuai lampiran yang sedang dibaca (dokumen, gambar, pesan suara). */
     private function reportReading(AiTask $task): void
     {
+        $documents = $task->context->documents;
+        if ($documents !== []) {
+            $names = array_values(array_unique(array_column($documents, 'name')));
+            $task->progress(AiActivity::READING, count($names) === 1 ? 'sedang membaca ' . $names[0] : 'sedang membaca ' . count($names) . ' dokumen grup');
+
+            return;
+        }
         $message = $task->message;
         foreach ([$message, $message->replyToMessage] as $source) {
             if (! $source?->attachment_path) {

@@ -51,7 +51,11 @@ class PromptBuilder
         . "\n- Canvas (@normi-canvas): membuat halaman web, aplikasi kecil, game, kalkulator, prototipe UI, atau dokumen panjang yang bisa dipratinjau dan direvisi."
         . "\n- Guided Learning (@normi-learn): belajar bertahap seperti tutor."
         . "\n- Buat file (@normi-file): membuat file apa pun lalu mengirimnya ke grup, mis. PDF, Word, Excel, PowerPoint, CSV, JSON, kode program, ZIP proyek, termasuk mengubah foto jadi PDF."
-        . "\n- Lainnya: polling (tombol +), cari pesan, unduh riwayat chat (PDF/DOCX) di Info grup, dan voice note yang bisa kamu dengarkan."
+        . "\n- Pengingat: \"@normi ingatkan grup Jumat jam 7 bawa laptop\" (atau tombol + > Buat pengingat); pengingat terkirim ke grup dan sebagai notifikasi."
+        . "\n- Tugas grup: \"@normi buat checklist dari pembahasan tadi\", aksi pesan Jadikan tugas, atau menu ⋮ > Tugas grup."
+        . "\n- Lainnya: jadwalkan pesan (tombol +), sematkan pesan, terjemahkan pesan (tahan/arahkan kursor ke pesan), ringkas pesan yang belum dibaca"
+        . " (tombol di pembatas \"pesan belum dibaca\"), rekap mingguan otomatis (Info grup), tanya isi dokumen yang pernah dikirim ke grup,"
+        . " polling (tombol +), cari pesan, unduh riwayat chat (PDF/DOCX) di Info grup, dan voice note yang bisa kamu dengarkan."
         . "\nBila diminta sesuatu yang dikerjakan salah satu fitur itu, arahkan anggota ke fitur Normi Chat tersebut. Jangan pernah menyarankan aplikasi atau situs lain"
         . " (Canva, Photoshop, ChatGPT, Gemini, Google Docs, iLovePDF, dll.) untuk hal yang bisa dikerjakan fitur Normi Chat."
         . " Jangan bilang kamu tidak bisa membuat file atau gambar; katakan fitur mana yang mengerjakannya.";
@@ -140,6 +144,13 @@ class PromptBuilder
                 fn (Message $message) => $this->contextLine($message, withSender: true),
                 $context->retrieved
             ));
+        }
+        if ($context->documents !== []) {
+            $parts[] = "Potongan dokumen yang pernah dikirim ke grup ini (sebut nama filenya saat memakai isinya; bila jawabannya tidak ada di potongan ini, katakan terus terang):\n"
+                . implode("\n\n", array_map(
+                    fn (array $chunk) => '[' . $chunk['name'] . ', dikirim ' . $chunk['sender'] . ' ' . UserTime::format($chunk['sent_at'], 'j M Y') . ', bagian ' . ($chunk['chunk_index'] + 1) . "]\n" . $chunk['content'],
+                    $context->documents
+                ));
         }
         if ($context->intent !== null) {
             $parts[] = 'Maksud pertanyaan menurut konteks: ' . $context->intent;

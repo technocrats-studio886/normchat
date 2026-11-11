@@ -11,6 +11,11 @@ import { icon } from './icons.js';
 import { messageFacts } from './rules.js';
 import { enterSelectMode } from './select-mode.js';
 import { openVersions } from './versions.js';
+import { mentionInput } from '../composer/elements.js';
+import { pinMessage, unpinMessage } from '../tools/pins.js';
+import { openReminderForm } from '../tools/reminders.js';
+import { taskFromMessage } from '../tools/tasks.js';
+import { translateMessage } from '../tools/translate.js';
 
 /** navigator.clipboard hanya ada di HTTPS; di luar itu memakai salinan lewat textarea sementara. */
 export const writeClipboard = async (text) => {
@@ -85,6 +90,31 @@ export const runAction = (action, node, { button = null } = {}) => {
 			break;
 		case 'delete':
 			deleteMessages([node]);
+			break;
+		case 'pin':
+			pinMessage(facts.id);
+			break;
+		case 'unpin':
+			unpinMessage(facts.id);
+			break;
+		case 'translate':
+			translateMessage(node);
+			break;
+		case 'task':
+			taskFromMessage(node);
+			break;
+		case 'remind':
+			openReminderForm({ text: String(node.dataset.messageText || '').trim().slice(0, 480), sourceId: facts.id });
+			break;
+		case 'askNormi':
+			// Membalas file itu dengan @normi: isi file dikirim utuh ke Normi (PromptBuilder::replyContext).
+			setReplyTarget(node);
+			if (mentionInput instanceof HTMLTextAreaElement) {
+				mentionInput.value = '@normi ';
+				mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+				mentionInput.focus();
+				mentionInput.setSelectionRange(mentionInput.value.length, mentionInput.value.length);
+			}
 			break;
 		default:
 			break;

@@ -1,181 +1,169 @@
-// Mode coretan di atas media: kanvas, ukuran pena, dan gambar garis halus dari pointer.
-
-import { showActionToast } from '../toast.js';
+// Coretan di atas foto: warna, ukuran pena, dan urungkan. Tiap goresan disimpan dengan koordinat relatif
+// terhadap foto (0..1), jadi bisa digambar ulang saat ukuran layar berubah dan digabung ke foto beresolusi asli
+// saat dikirim (media-editor/flatten.js).
 
 /** @param {{ doodleEnabled: boolean }} state status editor bersama */
 export const bindDoodle = (el, state) => {
-	const previewDoodleCanvas = el.querySelector('[data-attachment-preview-doodle]');
-	const previewStage = el.querySelector('[data-attachment-preview-stage]');
-	const penSizeButtons = Array.from(el.querySelectorAll('[data-preview-pen-size]'));
+	const canvas = el.querySelector('[data-attachment-preview-doodle]');
+	const stage = el.querySelector('[data-attachment-preview-stage]');
+	const sizeButtons = Array.from(el.querySelectorAll('[data-preview-pen-size]'));
+	const colorButtons = Array.from(el.querySelectorAll('[data-preview-pen-color]'));
+	const undoButton = el.querySelector('[data-preview-doodle-undo]');
 
-	let drawing = false;
-	let penSize = 4;
-	let lastX = 0;
-	let lastY = 0;
+	/** @type {Array<{ color: string, width: number, points: Array<[number, number]> }>} lebar relatif terhadap lebar foto */
+	const strokes = [];
+	let current = null;
+	let penSize = 6;
+	let penColor = '#ef4444';
 
-	/** Tampilkan/sembunyikan kanvas; saat aktif, sentuhan di media dipakai untuk menggambar. */
-	const setEnabled = (enabled) => {
-		state.doodleEnabled = enabled;
-		if (previewDoodleCanvas instanceof HTMLCanvasElement) {
-			previewDoodleCanvas.classList.toggle('hidden', !enabled);
-			previewDoodleCanvas.classList.toggle('pointer-events-none', !enabled);
-			previewDoodleCanvas.classList.toggle('pointer-events-auto', enabled);
-			previewDoodleCanvas.style.touchAction = enabled ? 'none' : '';
+	const stageSize = () => ({
+		width: Math.max(1, stage instanceof HTMLElement ? stage.clientWidth : 1),
+		height: Math.max(1, stage instanceof HTMLElement ? stage.clientHeight : 1),
+	});
+
+	const drawStroke = (ctx, stroke, width, height) => {
+		if (!stroke.points.length) return;
+		ctx.strokeStyle = stroke.color;
+		ctx.fillStyle = stroke.color;
+		ctx.lineWidth = stroke.width * width;
+		ctx.lineCap = 'round';
+		ctx.lineJoin = 'round';
+		if (stroke.points.length === 1) {
+			const [x, y] = stroke.points[0];
+			ctx.beginPath();
+			ctx.arc(x * width, y * height, (stroke.width * width) / 2, 0, Math.PI * 2);
+			ctx.fill();
+			return;
 		}
-		if (previewStage instanceof HTMLElement) {
-			previewStage.style.touchAction = enabled ? 'none' : '';
+		ctx.beginPath();
+		ctx.moveTo(stroke.points[0][0] * width, stroke.points[0][1] * height);
+		// Kurva halus lewat titik tengah antar titik.
+		for (let i = 1; i < stroke.points.length - 1; i += 1) {
+			const [x, y] = stroke.points[i];
+			const [nx, ny] = stroke.points[i + 1];
+			ctx.quadraticCurveTo(x * width, y * height, ((x + nx) / 2) * width, ((y + ny) / 2) * height);
 		}
+		const last = stroke.points[stroke.points.length - 1];
+		ctx.lineTo(last[0] * width, last[1] * height);
+		ctx.stroke();
 	};
 
-	const clear = () => {
-		if (previewDoodleCanvas instanceof HTMLCanvasElement) {
-			const ctx = previewDoodleCanvas.getContext('2d');
-			if (ctx) {
-				ctx.clearRect(0, 0, previewDoodleCanvas.width, previewDoodleCanvas.height);
-			}
-		}
+	const redraw = () => {
+		if (!(canvas instanceof HTMLCanvasElement)) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		const { width, height } = stageSize();
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		const ratio = canvas.width / width;
+		ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+		strokes.forEach((stroke) => drawStroke(ctx, stroke, width, height));
+		if (current) drawStroke(ctx, current, width, height);
 	};
 
-	const updatePenSizeUi = () => {
-		penSizeButtons.forEach((button) => {
-			const size = Number(button.getAttribute('data-preview-pen-size') || 0);
-			const active = Math.abs(size - penSize) < 0.1;
-			button.classList.toggle('bg-navy-500/80', active);
+	const resize = () => {
+		if (!(canvas instanceof HTMLCanvasElement)) return;
+		const { width, height } = stageSize();
+		const ratio = Math.max(1, window.devicePixelRatio || 1);
+		canvas.width = Math.floor(width * ratio);
+		canvas.height = Math.floor(height * ratio);
+		redraw();
+	};
+
+	const syncUi = () => {
+		sizeButtons.forEach((button) => {
+			const active = Number(button.getAttribute('data-preview-pen-size')) === penSize;
+			button.classList.toggle('bg-white', active);
 			button.classList.toggle('text-navy-950', active);
 			button.classList.toggle('bg-white/25', !active);
 			button.classList.toggle('text-white', !active);
 		});
-	};
-
-	const resizeDoodleCanvas = () => {
-		if (!(previewDoodleCanvas instanceof HTMLCanvasElement) || !(previewStage instanceof HTMLElement)) {
-			return;
-		}
-		const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
-		const width = Math.max(1, Math.floor(previewStage.clientWidth));
-		const height = Math.max(1, Math.floor(previewStage.clientHeight));
-		previewDoodleCanvas.width = Math.floor(width * pixelRatio);
-		previewDoodleCanvas.height = Math.floor(height * pixelRatio);
-		previewDoodleCanvas.style.width = `${width}px`;
-		previewDoodleCanvas.style.height = `${height}px`;
-		const ctx = previewDoodleCanvas.getContext('2d');
-		if (!ctx) {
-			return;
-		}
-		ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-		ctx.imageSmoothingEnabled = true;
-		ctx.lineCap = 'round';
-		ctx.lineJoin = 'round';
-		ctx.lineWidth = penSize;
-		ctx.strokeStyle = '#F3F5F8';
-		ctx.globalCompositeOperation = 'source-over';
-	};
-
-	const getCanvasPoint = (event) => {
-		if (!(previewDoodleCanvas instanceof HTMLCanvasElement)) {
-			return null;
-		}
-		const rect = previewDoodleCanvas.getBoundingClientRect();
-		return {
-			x: event.clientX - rect.left,
-			y: event.clientY - rect.top,
-		};
-	};
-
-	const drawLine = (x1, y1, x2, y2) => {
-		if (!(previewDoodleCanvas instanceof HTMLCanvasElement)) {
-			return;
-		}
-		const ctx = previewDoodleCanvas.getContext('2d');
-		if (!ctx) {
-			return;
-		}
-		const distance = Math.hypot(x2 - x1, y2 - y1);
-		const steps = Math.max(1, Math.ceil(distance / 0.45));
-		ctx.beginPath();
-		ctx.moveTo(x1, y1);
-		for (let i = 1; i <= steps; i++) {
-			const t = i / steps;
-			ctx.lineTo(x1 + ((x2 - x1) * t), y1 + ((y2 - y1) * t));
-		}
-		ctx.stroke();
-	};
-
-	if (previewDoodleCanvas instanceof HTMLCanvasElement) {
-		previewDoodleCanvas.addEventListener('pointerdown', (event) => {
-			if (!state.doodleEnabled) {
-				return;
-			}
-			event.preventDefault();
-			const point = getCanvasPoint(event);
-			if (!point) {
-				return;
-			}
-			drawing = true;
-			lastX = point.x;
-			lastY = point.y;
-			const ctx = previewDoodleCanvas.getContext('2d');
-			if (ctx) {
-				ctx.beginPath();
-				ctx.fillStyle = '#F3F5F8';
-				ctx.arc(point.x, point.y, penSize / 2, 0, Math.PI * 2);
-				ctx.fill();
-			}
-			previewDoodleCanvas.setPointerCapture(event.pointerId);
+		colorButtons.forEach((button) => {
+			const active = button.getAttribute('data-preview-pen-color') === penColor;
+			button.classList.toggle('ring-2', active);
+			button.classList.toggle('ring-white', active);
+			button.classList.toggle('ring-offset-2', active);
+			button.classList.toggle('ring-offset-navy-950', active);
 		});
+		if (undoButton instanceof HTMLButtonElement) undoButton.disabled = strokes.length === 0;
+	};
 
-		const handleDoodlePointerMove = (event) => {
-			if (!state.doodleEnabled || !drawing) {
-				return;
-			}
+	const setEnabled = (enabled) => {
+		state.doodleEnabled = enabled;
+		if (canvas instanceof HTMLCanvasElement) {
+			// Coretan yang sudah ada tetap terlihat walau mode coretan dimatikan.
+			canvas.classList.toggle('hidden', !enabled && strokes.length === 0);
+			canvas.classList.toggle('pointer-events-none', !enabled);
+			canvas.classList.toggle('pointer-events-auto', enabled);
+			canvas.style.cursor = enabled ? 'crosshair' : '';
+		}
+		if (enabled) resize();
+	};
+
+	const pointOf = (event) => {
+		const rect = canvas.getBoundingClientRect();
+		return [
+			Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width))),
+			Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(1, rect.height))),
+		];
+	};
+
+	if (canvas instanceof HTMLCanvasElement) {
+		canvas.addEventListener('pointerdown', (event) => {
+			if (!state.doodleEnabled) return;
 			event.preventDefault();
-			const coalesced = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
-			coalesced.forEach((pointerEvent) => {
-				const point = getCanvasPoint(pointerEvent);
-				if (!point) {
-					return;
-				}
-				drawLine(lastX, lastY, point.x, point.y);
-				lastX = point.x;
-				lastY = point.y;
-			});
+			canvas.setPointerCapture?.(event.pointerId);
+			current = { color: penColor, width: penSize / stageSize().width, points: [pointOf(event)] };
+			redraw();
+		});
+		canvas.addEventListener('pointermove', (event) => {
+			if (!current) return;
+			event.preventDefault();
+			const events = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
+			(events.length ? events : [event]).forEach((pointerEvent) => current.points.push(pointOf(pointerEvent)));
+			redraw();
+		});
+		const finish = () => {
+			if (!current) return;
+			strokes.push(current);
+			current = null;
+			redraw();
+			syncUi();
 		};
-
-		previewDoodleCanvas.addEventListener('pointermove', handleDoodlePointerMove);
-		previewDoodleCanvas.addEventListener('pointerrawupdate', handleDoodlePointerMove);
-
-		const stopDrawing = () => {
-			drawing = false;
-		};
-		previewDoodleCanvas.addEventListener('pointerup', stopDrawing);
-		previewDoodleCanvas.addEventListener('pointercancel', stopDrawing);
+		canvas.addEventListener('pointerup', finish);
+		canvas.addEventListener('pointercancel', finish);
+		canvas.addEventListener('lostpointercapture', finish);
 	}
 
-	if (penSizeButtons.length > 0) {
-		penSizeButtons.forEach((button) => {
-			button.addEventListener('click', () => {
-				const nextSize = Number(button.getAttribute('data-preview-pen-size') || penSize);
-				if (!Number.isFinite(nextSize) || nextSize <= 0) {
-					return;
-				}
-				penSize = nextSize;
-				updatePenSizeUi();
-				if (previewDoodleCanvas instanceof HTMLCanvasElement) {
-					const ctx = previewDoodleCanvas.getContext('2d');
-					if (ctx) {
-						ctx.lineWidth = penSize;
-					}
-				}
-				showActionToast(`Ukuran pena: ${penSize}`);
-			});
-		});
-		updatePenSizeUi();
-	}
+	sizeButtons.forEach((button) => button.addEventListener('click', () => {
+		penSize = Number(button.getAttribute('data-preview-pen-size')) || penSize;
+		syncUi();
+	}));
+	colorButtons.forEach((button) => button.addEventListener('click', () => {
+		penColor = button.getAttribute('data-preview-pen-color') || penColor;
+		syncUi();
+	}));
+	undoButton?.addEventListener('click', () => {
+		strokes.pop();
+		redraw();
+		syncUi();
+	});
+
+	const clear = () => {
+		strokes.length = 0;
+		current = null;
+		redraw();
+		syncUi();
+	};
+	syncUi();
 
 	return {
-		available: previewDoodleCanvas instanceof HTMLCanvasElement,
+		available: canvas instanceof HTMLCanvasElement,
 		setEnabled,
 		clear,
-		resize: resizeDoodleCanvas,
+		resize,
+		hasStrokes: () => strokes.length > 0,
+		/** Gambar semua goresan ke $ctx berukuran $width × $height (foto beresolusi asli). */
+		paint: (ctx, width, height) => strokes.forEach((stroke) => drawStroke(ctx, stroke, width, height)),
 	};
 };

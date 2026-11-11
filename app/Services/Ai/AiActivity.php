@@ -40,7 +40,8 @@ final class AiActivity
     /** @var array<int, string> tanda status terakhir per grup, agar status yang sama tidak dikirim berulang */
     private static array $last = [];
 
-    public static function report(int $groupId, string $activity, ?string $detail = null): void
+    /** $onlyUserId: permintaan privat, statusnya hanya dikirim ke peminta dan tidak disimpan untuk anggota lain. */
+    public static function report(int $groupId, string $activity, ?string $detail = null, ?int $onlyUserId = null): void
     {
         $detail = $detail !== null ? self::clean($detail) : null;
         $signature = $activity . '|' . $detail;
@@ -57,15 +58,17 @@ final class AiActivity
         event(new TypingStatus($groupId, 'ai', null, 'Normi AI', true, $activity, $detail));
     }
 
-    public static function stop(int $groupId, string $activity = self::TYPING): void
+    public static function stop(int $groupId, string $activity = self::TYPING, ?int $onlyUserId = null): void
     {
         unset(self::$last[$groupId]);
-        try {
-            Cache::forget(self::key($groupId));
-        } catch (Throwable) {
-            // Lihat report().
+        if ($onlyUserId === null) {
+            try {
+                Cache::forget(self::key($groupId));
+            } catch (Throwable) {
+                // Lihat report().
+            }
         }
-        event(new TypingStatus($groupId, 'ai', null, 'Normi AI', false, $activity));
+        event(new TypingStatus($groupId, 'ai', null, 'Normi AI', false, $activity, null, $onlyUserId));
     }
 
     /** @return array{activity: string, detail: ?string}|null status yang sedang berjalan di grup ini */
