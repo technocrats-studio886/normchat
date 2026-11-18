@@ -122,7 +122,7 @@
                 @endif
                 <a href="{{ route('settings.transactions', $group) }}" class="font-semibold underline-offset-2 hover:underline">Riwayat patungan</a>
             </p>
-            @if($group->isFree())
+            @if($group->free_member_slots > 0)
                 <p class="nc-info-balance-note" data-free-slots>{{ $group->free_joins_used }} dari {{ $group->free_member_slots }} slot anggota gratis sudah terpakai. Setelah itu, yang bergabung ikut patungan.</p>
             @endif
         </div>

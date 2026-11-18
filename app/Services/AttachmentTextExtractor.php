@@ -34,7 +34,7 @@ class AttachmentTextExtractor
             $text = app(StoredFiles::class)->withLocalCopy(
                 $message->attachment_disk,
                 $message->attachment_path,
-                fn (string $path) => $this->extractByType($path, $extension, $mime),
+                fn (string $path) => $this->extractByType($path, $extension, $mime, $maxChars ?? self::MAX_OUTPUT_CHARS),
                 self::MAX_BYTES
             );
             if ($text === null || trim($text) === '') {
@@ -50,6 +50,20 @@ class AttachmentTextExtractor
             ]);
 
             return null;
+        }
+    }
+
+    /** Read a rendered revision before publishing it to chat storage. */
+    public function rendered(array $file, int $limit): ?string
+    {
+        if (strlen($file['binary']) > self::MAX_BYTES || !$this->isDocumentLike($file['ext'], $file['mime'])) return null;
+        $temp = tempnam(sys_get_temp_dir(), 'nc-review-');
+        try {
+            file_put_contents($temp, $file['binary']);
+            $text = $this->extractByType($temp, $file['ext'], $file['mime'], $limit);
+            return $text !== null && mb_strlen($text) <= $limit ? $text : null;
+        } finally {
+            @unlink($temp);
         }
     }
 
@@ -79,7 +93,7 @@ class AttachmentTextExtractor
         return false;
     }
 
-    private function extractByType(string $absolutePath, string $extension, string $mime): ?string
+    private function extractByType(string $absolutePath, string $extension, string $mime, int $limit = self::MAX_OUTPUT_CHARS): ?string
     {
         if ($extension === 'pdf' || $mime === 'application/pdf') {
             return $this->extractPdf($absolutePath);
@@ -90,7 +104,7 @@ class AttachmentTextExtractor
         }
 
         if ($extension === 'pptx' || $extension === 'xlsx') {
-            return $extension === 'pptx' ? $this->extractPptx($absolutePath) : $this->extractXlsx($absolutePath);
+            return $extension === 'pptx' ? $this->extractPptx($absolutePath) : app(\App\Services\Files\SpreadsheetText::class)->read($absolutePath, $limit);
         }
 
         // Plain text & friendly formats
@@ -154,6 +168,18 @@ class AttachmentTextExtractor
 
     private function collectDocxText($element, array &$lines): void
     {
+        if ($element instanceof \PhpOffice\PhpWord\Element\Table) {
+            foreach ($element->getRows() as $row) {
+                $cells = [];
+                foreach ($row->getCells() as $cell) {
+                    $parts = [];
+                    $this->collectDocxText($cell, $parts);
+                    $cells[] = implode(' ', $parts);
+                }
+                $lines[] = implode(' | ', $cells);
+            }
+            return;
+        }
         if (method_exists($element, 'getText')) {
             $value = $element->getText();
             if (is_string($value) && $value !== '') {
@@ -209,59 +235,6 @@ class AttachmentTextExtractor
         $zip->close();
         ksort($slides);
         $text = implode("\n\n", array_map(fn (int $number, array $lines) => "Slide {$number}\n" . implode("\n", $lines), array_keys($slides), $slides));
-
-        return trim($text) !== '' ? $text : null;
-    }
-
-    /** Isi sel tiap sheet Excel sebagai baris teks dipisah " | ". */
-    private function extractXlsx(string $absolutePath): ?string
-    {
-        $zip = new \ZipArchive();
-        if ($zip->open($absolutePath) !== true) {
-            return null;
-        }
-        $shared = [];
-        $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
-        if (is_string($sharedXml)) {
-            preg_match_all('#<si>(.*?)</si>#s', $sharedXml, $items);
-            foreach ($items[1] as $item) {
-                preg_match_all('#<t[^>]*>(.*?)</t>#s', $item, $texts);
-                $shared[] = html_entity_decode(implode('', $texts[1]), ENT_QUOTES | ENT_XML1, 'UTF-8');
-            }
-        }
-        $sheets = [];
-        for ($i = 0; $i < $zip->numFiles; $i++) {
-            $name = (string) $zip->getNameIndex($i);
-            if (preg_match('#^xl/worksheets/sheet(\d+)\.xml$#', $name, $match) !== 1) {
-                continue;
-            }
-            $rows = [];
-            preg_match_all('#<row\b[^>]*>(.*?)</row>#s', (string) $zip->getFromIndex($i), $rowBlocks);
-            foreach (array_slice($rowBlocks[1], 0, 2000) as $rowXml) {
-                $cells = [];
-                preg_match_all('#<c\b([^>]*?)(?:/>|>(.*?)</c>)#s', $rowXml, $cellBlocks, PREG_SET_ORDER);
-                foreach ($cellBlocks as $cell) {
-                    $attrs = $cell[1];
-                    $inner = $cell[2] ?? '';
-                    $value = '';
-                    if (str_contains($attrs, 't="s"') && preg_match('#<v>(\d+)</v>#', $inner, $v) === 1) {
-                        $value = $shared[(int) $v[1]] ?? '';
-                    } elseif (preg_match('#<t[^>]*>(.*?)</t>#s', $inner, $t) === 1) {
-                        $value = html_entity_decode($t[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
-                    } elseif (preg_match('#<v>(.*?)</v>#s', $inner, $v) === 1) {
-                        $value = $v[1];
-                    }
-                    $cells[] = trim($value);
-                }
-                if (array_filter($cells, fn ($cell) => $cell !== '') !== []) {
-                    $rows[] = implode(' | ', $cells);
-                }
-            }
-            $sheets[(int) $match[1]] = "Sheet {$match[1]}\n" . implode("\n", $rows);
-        }
-        $zip->close();
-        ksort($sheets);
-        $text = implode("\n\n", $sheets);
 
         return trim($text) !== '' ? $text : null;
     }

@@ -21,7 +21,7 @@
             <h2>3. Normkredit and payments</h2>
             <p>Normkredit is a prepaid balance that a group uses for Normi's answers. The balance belongs to the group, so a member who leaves cannot take a contribution with them. Normkredit cannot be exchanged for cash or moved to another group.</p>
             <ul>
-                <li>Prices, free groups, and the amount each new member contributes are listed on the <a href="{{ $page('/pricing') }}">Prices</a> page.</li>
+                <li>Prices, promotional bonuses, and the amount each new member contributes are listed on the <a href="{{ $page('/pricing') }}">Prices</a> page.</li>
                 <li>Payments are made with QRIS through our payment provider.</li>
                 <li>Payments are final, except where the law requires a refund or when we charged you in error.</li>
                 <li>We may change prices. A change applies to payments made after it takes effect.</li>

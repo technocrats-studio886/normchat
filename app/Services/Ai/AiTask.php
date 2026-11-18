@@ -136,7 +136,7 @@ final class AiTask
         $usable = max(0.0, min($balance->usable(), $balance->groupTotal - $floor));
         $inputTokens = self::estimateInputTokens($messages) + $extraInputTokens;
         try {
-            $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling, $minOutputTokens, $feature);
+            $this->budget = RequestBudget::plan($this->model, $inputTokens, $usable, $this->pricing, $outputCeiling, $minOutputTokens, $feature, $extraUsd);
         } catch (InsufficientBudgetException $e) {
             if ($floor > 0 && $usable < $balance->usable()) {
                 throw new InsufficientBudgetException($this->access->floorMessage($this->model, $balance->groupTotal));
@@ -147,7 +147,7 @@ final class AiTask
             }
             throw $e;
         }
-        $this->reserve($this->budget->holdCredits, $this->budget->providerUsd + $extraUsd);
+        $this->reserve($this->budget->holdCredits, $this->budget->providerUsd);
 
         return $this->budget;
     }
@@ -172,6 +172,10 @@ final class AiTask
      */
     public function reserve(float $credits, float $providerUsd): void
     {
+        $cap = (float) $this->pricing->get('max_credits_per_request');
+        if ($cap > 0 && $credits > $cap + 0.00001) {
+            throw new InsufficientBudgetException('Permintaan ini melebihi batas Normkredit per permintaan. Persingkat permintaan atau pilih model lain.');
+        }
         $this->spendHold = $this->spend->reserve('chat', $providerUsd, (int) $this->group->id);
         try {
             $this->hold = $this->wallet->hold($this->group, $this->requester, $credits, $this->model, [
@@ -308,7 +312,7 @@ final class AiTask
                 continue;
             }
             $this->meter->add('discarded', $model->model_id,
-                $model->costUsd($usage['input_tokens'], $usage['cached_input_tokens'], $usage['output_tokens']),
+                $model->costForUsage($usage),
                 $model->multiplier, $usage);
             $this->recordWebSearch((int) ($completion->webSearchCalls ?? 0));
         }
@@ -342,7 +346,7 @@ final class AiTask
         $this->meter->add(
             $component,
             $model->model_id,
-            $model->costUsd($usage['input_tokens'], $usage['cached_input_tokens'], $usage['output_tokens']),
+            $model->costForUsage($usage),
             $model->multiplier,
             $usage,
         );

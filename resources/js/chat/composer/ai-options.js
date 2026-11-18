@@ -135,6 +135,7 @@ const setMode = (option, { syncText = true, focus = true } = {}) => {
 
 	const value = option?.getAttribute('data-ai-mode-option') || '';
 	modeInput.value = value;
+	chatForm.querySelector('[data-file-photo]')?.classList.toggle('hidden', value !== 'file');
 	markChecked(attachMenu, 'data-ai-mode-option', value);
 	chipRow?.classList.toggle('hidden', value === '');
 
@@ -364,6 +365,13 @@ export const initAiOptions = () => {
 
 	chatForm?.querySelector('[data-ai-mode-clear]')?.addEventListener('click', () => setMode(null));
 
+	chatForm?.querySelector('[data-file-photo]')?.addEventListener('click', () => attachMenu?.querySelector('[data-attach-photo]')?.click());
+	document.addEventListener('click', (event) => {
+		const button = event.target.closest?.('[data-preview-make-file]');
+		if (!button) return;
+		setMode(button.getAttribute('aria-pressed') === 'true' ? null : modeOptionFor('file'), { focus: false });
+		document.querySelector('[data-attachment-preview-media]')?.dispatchEvent(new Event('preview:sync-caption'));
+	});
 	mentionInput?.addEventListener('input', syncModeFromText);
 	// Draf yang dipulihkan (composer/draft.js, diinisialisasi setelah ini) bisa berisi tag fitur.
 	window.setTimeout(syncModeFromText, 0);

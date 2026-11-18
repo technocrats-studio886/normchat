@@ -38,6 +38,7 @@ class Group extends Model
         'member_daily_credit_limit',
         'free_member_slots',
         'free_joins_used',
+        'created_free',
         'weekly_recap_enabled',
         'weekly_recap_day',
         'weekly_recap_hour',
@@ -49,6 +50,7 @@ class Group extends Model
         'member_daily_credit_limit' => 'float',
         'free_member_slots' => 'integer',
         'free_joins_used' => 'integer',
+        'created_free' => 'boolean',
         'weekly_recap_enabled' => 'boolean',
         'weekly_recap_day' => 'integer',
         'weekly_recap_hour' => 'integer',
@@ -81,7 +83,7 @@ class Group extends Model
     /** Grup gratis: dibuat tanpa bayar dan punya slot anggota gratis (App\Services\FreeGroups). */
     public function isFree(): bool
     {
-        return (int) $this->free_member_slots > 0;
+        return (bool) $this->created_free;
     }
 
     /** Sisa anggota yang masih bisa bergabung tanpa patungan. */

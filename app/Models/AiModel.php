@@ -76,4 +76,16 @@ class AiModel extends Model
             + $cached * $cachedRate
             + max(0, $outputTokens) * $this->output_usd_per_mtok) / 1_000_000;
     }
+
+    /** Usage API: reasoning sudah termasuk output; cache write memakai tarif pengganti, bukan biaya ganda. */
+    public function costForUsage(array $usage): float
+    {
+        $input = max(0, (int) ($usage['input_tokens'] ?? 0));
+        $cached = min($input, max(0, (int) ($usage['cached_input_tokens'] ?? 0)));
+        $written = min($input - $cached, max(0, (int) ($usage['cache_write_tokens'] ?? 0)));
+        $long = min($written, max(0, (int) ($usage['cache_write_12h_tokens'] ?? 0)));
+
+        return $this->costUsd($input, $cached, (int) ($usage['output_tokens'] ?? 0))
+            + ($written * 0.25 + $long * 1.25) * $this->input_usd_per_mtok / 1_000_000;
+    }
 }

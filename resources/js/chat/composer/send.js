@@ -21,6 +21,22 @@ let pendingLocalMessageCounter = 0;
 let chatSubmitInFlight = false;
 
 export const initSend = () => {
+	let retry = null;
+	let uploadVersion = 0;
+	for (const picker of [attachmentInput, cameraInput]) picker?.addEventListener('change', () => { uploadVersion++; });
+	const showSendError = (message) => {
+		for (const box of document.querySelectorAll('[data-send-error], [data-preview-send-error]')) {
+			const label = box.querySelector('[data-send-error-text]');
+			if (label) label.textContent = message;
+			box.hidden = !message;
+			const replace = box.querySelector('[data-upload-replace]');
+			if (replace) replace.hidden = !attachmentInput.files?.length;
+		}
+	};
+	document.addEventListener('click', (event) => {
+		if (event.target.closest?.('[data-upload-retry]')) chatForm.requestSubmit();
+		if (event.target.closest?.('[data-upload-replace]')) chatForm.querySelector('[data-attach-file]')?.click();
+	});
 	const setSendingUi = (isSending) => {
 		if (sendButton instanceof HTMLButtonElement) {
 			sendButton.disabled = isSending;
@@ -219,20 +235,15 @@ export const initSend = () => {
 		}
 
 		const formData = new FormData(chatForm);
+		const signature = JSON.stringify([...formData].filter(([name]) => name !== '_token').map(([name, value]) => [name, value instanceof File ? [uploadVersion, value.name] : value]));
+		if (!retry || retry.signature !== signature) {
+			retry = {signature, key: crypto.randomUUID()};
+		}
+		if (retry.failedNode) retry.failedNode.remove();
+		formData.set('client_message_id', retry.key);
+		showSendError('');
 		const localId = appendPendingMessageNode(contentText, selectedFile, pendingReplyContext);
 
-		if (mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement) {
-			mentionInput.value = '';
-			mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
-		}
-		attachmentInput.value = '';
-		if (cameraInput instanceof HTMLInputElement) {
-			cameraInput.value = '';
-		}
-		refreshAttachmentLabel();
-		emojiPanel?.classList.add('hidden');
-		clearReplyTarget();
-		whisperTyping(false);
 
 		setSendingUi(true);
 		chatSubmitInFlight = true;
@@ -248,17 +259,39 @@ export const initSend = () => {
 			});
 
 			if (!response.ok) {
-				throw new Error('send_failed');
+				const problem = await response.json().catch(() => ({}));
+				const reason = Object.values(problem.errors || {}).flat()[0] || problem.message;
+				throw new Error(reason || (response.status === 413 ? 'Ukuran lampiran terlalu besar.' : 'Pesan belum terkirim.'));
 			}
 
 			const result = await response.json();
+			if (!result?.message?.id) throw new Error('Penerimaan pesan belum terkonfirmasi.');
+			retry = null;
+			if (mentionInput.value.trim() === contentText && (attachmentInput.files?.[0] || null) === selectedFile) {
+				if (mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement) {
+					mentionInput.value = '';
+					mentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+				}
+				attachmentInput.value = '';
+				if (cameraInput instanceof HTMLInputElement) {
+					cameraInput.value = '';
+				}
+				refreshAttachmentLabel();
+				emojiPanel?.classList.add('hidden');
+				clearReplyTarget();
+				whisperTyping(false);
+
+			}
 			if (localId && result?.message) {
 				replacePendingMessage(localId, result.message);
 			}
 			// Pertanyaan ke Normi diterima: tampilkan langsung status yang sesuai (mengetik / membuat gambar / ...).
 			noteAwaitingAi(result?.message);
-		} catch {
+		} catch (error) {
+			const reason = error instanceof TypeError ? 'Koneksi terputus.' : error.message;
+			showSendError(reason + ' Draf tersedia. Perbaiki lampiran jika perlu, lalu tekan Kirim lagi.');
 			if (localId) {
+				if (retry) retry.failedNode = pendingMessagesByLocalId.get(localId)?.node;
 				markPendingMessageFailed(localId);
 			}
 		} finally {

@@ -2,9 +2,10 @@
 
 {{-- Copy: docs/rancangan-copy-marketing.md (revisi 3, anti-slop). Angka dari setelan ($n, view composer marketing). --}}
 @section('title', 'Normi Chat | One AI for the whole group')
-@section('description', 'Mention @normi in your group chat and the whole group gets the same answer, paid from one shared balance.' . ($n['free'] ? ' ' . $n['offer']->enGroups() . ($n['offer']->count() === 1 ? ' is free.' : ' are free.') : ''))
+@section('description', 'Mention @normi in your group chat. Pay once to create your group and share one AI balance.')
 
 @section('content')
+
 
     {{-- Hero: judul, dua CTA, lalu penjelasan memenuhi bagian atas; di bawahnya demo chat hidup (kiri, partials/live-demo-script)
          dan empat manfaat (kanan). --}}
@@ -16,12 +17,11 @@
                 <a href="#how" class="btn btn-ghost">See how it works</a>
             </div>
             <p class="hero-lead">Stop copying AI answers into your group chat. Just mention <span class="mention">@normi</span>, and everyone gets the same answer, right where the conversation happens. All powered by one shared balance.</p>
+            <div class="prose">@include('marketing.partials.group-offer')</div>
             <p class="chat-note">
-                @if ($n['free'])
-                    {{ $n['freeFirst'] }} Normkredit included{{ $n['freeSlots'] > 0 ? ", and your first {$n['freeSlots']} friends join free" : '' }}.
-                @else
+
                     Sign in with Google and pay with QRIS.
-                @endif
+
             </p>
         </div>
         <div class="wrap hero-body">
@@ -41,11 +41,9 @@
                 <li><h3>Decide sooner</h3><p>The whole group reads one answer, so you can agree and move on.</p></li>
                 <li><h3>Keep the group in the loop</h3><p>Members who join late scroll up and see what Normi said.</p></li>
                 <li><h3>Split the cost</h3><p>Your group shares one balance instead of paying for an AI subscription per person.</p></li>
-                @if ($n['free'])
-                    <li><h3>Start for free</h3><p>Your first group{{ $n['freeSlots'] > 0 ? " and the first {$n['freeSlots']} friends who join" : '' }} cost nothing.</p></li>
-                @else
+
                     <li><h3>Skip the subscription</h3><p>You pay once to start and top up when your group needs more.</p></li>
-                @endif
+
             </ul>
         </div>
     </section>
@@ -69,16 +67,14 @@
                 <div class="card">
                     <svg class="icon" aria-hidden="true"><use href="#i-users-three"/></svg>
                     <h3>1. Start your group</h3>
-                    @if ($n['free'])
-                        <p>Sign in with Google, and your first group is ready with {{ $n['freeFirst'] }} Normkredit for free.{{ $n['offer']->count() > 1 ? ' ' . ($n['offer']->count() === 2 ? 'Your second group is free too, with ' . $n['offer']->amounts()[1] . ' Normkredit.' : 'Your next ' . ($n['offer']->count() - 1) . ' groups are free too.') : '' }}</p>
-                    @else
+
                         <p>Sign in with Google and pay {{ $n['groupPrice'] }} with QRIS. Your group starts with {{ $n['groupCredits'] }} Normkredit.</p>
-                    @endif
+
                 </div>
                 <div class="card">
                     <svg class="icon" aria-hidden="true"><use href="#i-link-simple"/></svg>
                     <h3>2. Invite your friends</h3>
-                    @if ($n['free'] && $n['freeSlots'] > 0)
+                    @if ($n['freeSlots'] > 0)
                         <p>Share the group code. Your first {{ $n['freeSlots'] }} friends join free, and each additional member makes a one-time contribution to the group's shared balance before joining.</p>
                     @else
                         <p>Share the group code. Each new member makes a one-time contribution to the group's shared balance before joining.</p>
@@ -203,18 +199,13 @@
     {{-- Pricing teaser --}}
     <section class="alt">
         <div class="wrap">
-            @if ($n['free'])
-                <h2>{{ $n['offer']->enGroups() }} {{ $n['offer']->count() === 1 ? 'is' : 'are' }} on us.</h2>
-                <div class="prose">
-                    <p>{{ $n['offer']->enPerGroup('starts') }}{{ $n['freeSlots'] > 0 ? ", and the first {$n['freeSlots']} friends in each one join free" : '' }}. Each additional member makes a one-time contribution before joining, and any member can top up later. There is no monthly subscription.</p>
-                    <p>{{ $n['offer']->enPaidFrom() }}, a group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
-                </div>
-            @else
+
                 <h2>Your group pays once and tops up together.</h2>
                 <div class="prose">
-                    <p>A group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit. Each new member makes a one-time contribution before joining, and any member can top up later. There is no monthly subscription.</p>
+                    @include('marketing.partials.group-offer')
+                    <p>After the free spots are taken, new members contribute once to join. Any member can top up later. There is no monthly subscription.</p>
                 </div>
-            @endif
+
             <div class="btn-row">
                 <a href="{{ $page('/pricing') }}" class="btn btn-ghost">See prices</a>
             </div>

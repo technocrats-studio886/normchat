@@ -9,7 +9,7 @@ namespace App\Services\Ai\Files;
  */
 final class FileRequest
 {
-    private const VERBS = '/\b(buat(?:kan|in)?|bikin(?:in|kan)?|generate|create|make|export|ekspor|render|ubah(?:kan)?|jadi(?:kan|in)?|convert|konversi(?:kan)?|simpan(?:kan)?|kirim(?:kan|in)?|unduh(?:an)?|download|susun(?:kan)?|tulis(?:kan)?|siapkan|save|compile|cetak|print)\b/u';
+    private const VERBS = '/\b(buat(?:kan|in)?|bikin(?:in|kan)?|generate|create|make|export|ekspor|render|ubah(?:kan)?|jadi(?:kan|in)?|convert|konversi(?:kan)?|simpan(?:kan)?|kirim(?:kan|in)?|unduh(?:an)?|download|susun(?:kan)?|tulis(?:kan)?|siapkan|save|tambah(?:kan|in)?|masuk(?:kan|in)|sisip(?:kan|in)?|pasang(?:kan)?|tempel(?:kan)?|revisi|edit|ganti|rename|compile|cetak|print)\b/u';
 
     /** Format yang cukup disebut namanya ("buatkan excel anggaran"). Format lain perlu kata "file"/ekstensi. */
     private const STRONG = ['pdf', 'docx', 'xlsx', 'pptx', 'csv', 'zip'];
@@ -21,8 +21,7 @@ final class FileRequest
     private function __construct(
         public readonly array $formats,
         public readonly bool $isConversion,
-    ) {
-    }
+    ) {}
 
     /** Format pertama yang diminta; null = biarkan Normi memilih (tag @normi-file tanpa format). */
     public function format(): ?string
@@ -62,7 +61,7 @@ final class FileRequest
         }
 
         foreach (FileFormats::ALIASES as $alias => $ext) {
-            $pattern = '/(?<![\p{L}\p{N}._-])' . preg_quote($alias, '/') . '(?![\p{L}\p{N}_-])/u';
+            $pattern = '/(?<![\p{L}\p{N}._-])'.preg_quote($alias, '/').'(?![\p{L}\p{N}_-])/u';
             if (preg_match($pattern, $text, $match, PREG_OFFSET_CAPTURE) !== 1) {
                 continue;
             }
@@ -92,7 +91,7 @@ final class FileRequest
             return null;
         }
 
-        $isConversion = preg_match('/\b(ubah(?:kan)?|jadi(?:kan|in)?|convert|konversi(?:kan)?|simpan(?:kan)?|export|ekspor|cetak|print)\b/u', $text) === 1;
+        $isConversion = preg_match('/^(?:(?:tolong|coba|boleh|bantu)\s+)*(?:ubah(?:kan)?|jadi(?:kan|in)?|convert|konversi(?:kan)?|simpan(?:kan)?|export|ekspor|cetak|print)\s+(?:(?:foto|gambar|image|screenshot|ini|itu|jadi|menjadi|sebagai|ke|dalam|format|file)\s+)*pdf(?:\s+(?:ya|dong))?[.!]?$/u', $text) === 1;
 
         return new self($formats, $isConversion);
     }

@@ -1,10 +1,8 @@
 @extends('marketing.layout', ['current' => 'pricing'])
 
 {{-- Copy: docs/rancangan-copy-marketing.md (revisi 3, anti-slop). Angka dari setelan ($n, view composer marketing). --}}
-@section('title', $n['free'] ? 'Prices | Normi Chat | ' . $n['offer']->enGroups() . ($n['offer']->count() === 1 ? ' is free' : ' are free') : "Prices | Normi Chat | From {$n['groupPrice']}")
-@section('description', $n['free']
-    ? $n['offer']->enGroups() . ($n['offer']->count() === 1 ? ' is free. ' : ' are free. ') . 'Members make a one-time contribution to join and top up one shared balance, with no monthly subscription.'
-    : "A group costs {$n['groupPrice']} and starts with {$n['groupCredits']} Normkredit. Members make a one-time contribution to join and top up together.")
+@section('title', "Prices | Normi Chat | From {$n['groupPrice']}")
+@section('description', "A group costs {$n['groupPrice']} and includes {$n['groupCredits']} Normkredit after payment. Promotional bonuses apply during the stated period.")
 
 @section('content')
 
@@ -21,81 +19,28 @@
         </div>
     </section>
 
-    {{-- Paying as a group --}}
     <section class="alt">
         <div class="wrap">
-            <h2>Paying as a group, step by step</h2>
-            <div class="grid grid-2">
-                @if ($n['free'])
-                    <div class="card">
-                        <span class="num">1</span>
-                        <h3>Start free</h3>
-                        <p>{{ $n['offer']->enPerGroup() }}.{{ $n['freeSlots'] > 0 ? " The first {$n['freeSlots']} friends who join each free group pay nothing." : '' }}</p>
-                    </div>
-                @endif
-                <div class="card">
-                    <span class="num">{{ $n['free'] ? 2 : 1 }}</span>
-                    <h3>Contribute once to join</h3>
-                    <p>{{ $n['free'] ? 'After the free spots are taken, and in groups you create later, each' : 'Each' }} new member makes a one-time contribution before joining, starting at {{ $n['packPrice'] }} for {{ $n['packCredits'] }} Normkredit. The contribution goes into the group's balance.</p>
-                </div>
-                <div class="card">
-                    <span class="num">{{ $n['free'] ? 3 : 2 }}</span>
-                    <h3>Top up when you need to</h3>
-                    <p>When the balance gets low, any member can add more Normkredit.</p>
-                </div>
-                <div class="card">
-                    <span class="num">{{ $n['free'] ? 4 : 3 }}</span>
-                    <h3>One balance for the group</h3>
-                    <p>Members use Normi from the same balance, so they don't need separate AI subscriptions.</p>
-                </div>
-            </div>
-
+            <h2>Pay once to start your group</h2>
+            @include('marketing.partials.group-offer')
             <div class="table-wrap">
                 <table class="table">
-                    <thead>
-                        <tr>
-                            <th scope="col"><span class="sr-only">Compare</span></th>
-                            @if ($n['free'])
-                                <th scope="col">Free groups (your {{ $n['offer']->enColumn() }})</th>
-                            @endif
-                            <th scope="col">{{ $n['free'] ? $n['offer']->enPaidFrom(short: true) : 'Each group' }}</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th scope="col">Each group</th><th scope="col">Included</th></tr></thead>
                     <tbody>
-                        <tr>
-                            <th scope="row">Create a group</th>
-                            @if ($n['free'])<td>Free</td>@endif
-                            <td>{{ $n['groupPrice'] }}</td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Starting balance</th>
-                            @if ($n['free'])<td>{{ $n['offer']->enCreditsCell() }} Normkredit</td>@endif
-                            <td>{{ $n['groupCredits'] }} Normkredit</td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Members who join free</th>
-                            @if ($n['free'])<td>{{ $n['freeSlots'] > 0 ? "The first {$n['freeSlots']}" : 'None' }}</td>@endif
-                            <td>None</td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Joining</th>
-                            @if ($n['free'])<td>{{ $n['freeSlots'] > 0 ? 'Later members contribute once' : 'Contribute once' }}, from {{ $n['packPrice'] }}</td>@endif
-                            <td>Contribute once, from {{ $n['packPrice'] }}</td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Top up</th>
-                            @if ($n['free'])<td>Any member</td>@endif
-                            <td>Any member, up to {{ $n['maxPacks'] }} packages per payment</td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Monthly fee</th>
-                            @if ($n['free'])<td>None</td>@endif
-                            <td>None</td>
-                        </tr>
+                        <tr><th scope="row">Create a group</th><td>{{ $n['groupPrice'] }}</td></tr>
+                        <tr><th scope="row">Starting balance after payment</th><td>{{ $n['groupCredits'] }} Normkredit</td></tr>
+                        @if($n['promotion']['active'])
+                            <tr><th scope="row">Promotion bonus</th><td>+{{ number_format($n['promotion']['bonus_credits'], 2, '.', ',') }} NC</td></tr>
+                            <tr><th scope="row">Total during promotion</th><td>{{ number_format($n['promotion']['total_credits'], 2, '.', ',') }} NC</td></tr>
+                        @endif
+                        <tr><th scope="row">Friends who join free</th><td>{{ $n['freeSlots'] }}</td></tr>
+                        <tr><th scope="row">Later members</th><td>Contribute once, from {{ $n['packPrice'] }} for {{ $n['packCredits'] }} Normkredit</td></tr>
+                        <tr><th scope="row">Top up</th><td>Any member, up to {{ $n['maxPacks'] }} packages per payment</td></tr>
+                        <tr><th scope="row">Monthly fee</th><td>None</td></tr>
                     </tbody>
                 </table>
             </div>
-            <p class="table-note">You pay with QRIS.</p>
+            <p class="table-note">You pay with QRIS. Any payment processing fee is shown at checkout.</p>
         </div>
     </section>
 
@@ -196,11 +141,9 @@
             <div class="faq">
                 <details>
                     <summary>Is there a free plan?</summary>
-                    @if ($n['free'])
-                        <p>Each account gets {{ $n['offer']->enAccountGets() }}. {{ $n['offer']->enPerGroup() }}{{ $n['freeSlots'] > 0 ? ", and the first {$n['freeSlots']} friends in each one join free" : '' }}. After that, a group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
-                    @else
+
                         <p>We don't have a free plan at the moment. A group costs {{ $n['groupPrice'] }} and starts with {{ $n['groupCredits'] }} Normkredit.</p>
-                    @endif
+
                 </details>
                 <details>
                     <summary>Do I pay each time I use Normi?</summary>
@@ -208,8 +151,8 @@
                 </details>
                 <details>
                     <summary>Do new members have to pay?</summary>
-                    @if ($n['free'] && $n['freeSlots'] > 0)
-                        <p>In a free group, the first {{ $n['freeSlots'] }} members join free. Each member after that makes a one-time contribution before joining, and it goes into the shared balance.</p>
+                    @if ($n['freeSlots'] > 0)
+                        <p>In each paid group, the first {{ $n['freeSlots'] }} members join free. Each member after that makes a one-time contribution before joining, and it goes into the shared balance.</p>
                     @else
                         <p>Each new member makes a one-time contribution before joining, and it goes into the shared balance.</p>
                     @endif

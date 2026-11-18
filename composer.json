@@ -13,8 +13,11 @@
         "laravel/socialite": "^5.25",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
+        "phpoffice/phpspreadsheet": "^5.11",
         "phpoffice/phpword": "^1.1",
         "predis/predis": "*",
+        "setasign/fpdf": "^1.8",
+        "setasign/fpdi": "^2.6",
         "smalot/pdfparser": "^2.12"
     },
     "require-dev": {

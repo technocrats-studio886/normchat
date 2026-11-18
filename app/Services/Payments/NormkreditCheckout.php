@@ -34,6 +34,9 @@ class NormkreditCheckout
         }
 
         $orderId = $this->uniqueOrderId($purpose->orderPrefix());
+        // Tawaran dikunci sebelum memanggil gateway, termasuk bila promo berakhir saat pembayaran berjalan.
+        $promotion = $purpose === PaymentPurpose::GroupCreate
+            ? app(\App\Services\GroupPromotion::class)->offer($quote) : null;
 
         // Halaman Normi Chat hanya menampilkan harga paket; biaya layanan QRIS baru muncul
         // sebagai baris tersendiri di halaman pembayaran Midtrans.
@@ -62,7 +65,10 @@ class NormkreditCheckout
                 'payment_method' => 'qris',
                 'gateway' => $this->gateway->name(),
                 'payment_id' => $session->paymentId,
-            ], $metadata),
+            ], $metadata, $promotion === null ? [] : [
+                'bonus_credits' => $promotion['bonus_credits'],
+                'promotion' => $promotion,
+            ]),
             'expires_at' => now()->addHour(),
         ]);
 

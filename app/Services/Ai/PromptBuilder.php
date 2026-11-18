@@ -34,6 +34,14 @@ class PromptBuilder
     /** @var array<int, true>|null id voice note riwayat yang boleh ditranskripsi; ditetapkan sekali per permintaan */
     private ?array $transcribable = null;
 
+    /** Prepared once per request for the pilot source, including explicit suppression of duplicates. */
+    private array $preparedDocuments = [];
+
+    public function prepareDocument(Message $message, ?string $content): void
+    {
+        $this->preparedDocuments[$message->id] = $content;
+    }
+
     public function __construct(
         private readonly OpenAiClient $client,
         private readonly UsageMeter $meter,
@@ -95,9 +103,11 @@ class PromptBuilder
     public function conversation(string $systemPrompt, ContextBundle $context, Message $request): array
     {
         $latestParts = [['type' => 'text', 'text' => $this->latestPromptText($request)]];
+        $seenImages = [];
         foreach ([$request, $request->replyToMessage] as $imageSource) {
             $dataUri = $this->imageDataUri($imageSource);
-            if ($dataUri !== null) {
+            if ($dataUri !== null && ! isset($seenImages[hash('sha256', $dataUri)])) {
+                $seenImages[hash('sha256', $dataUri)] = true;
                 $latestParts[] = ['type' => 'image_url', 'image_url' => ['url' => $dataUri]];
             }
         }
@@ -338,6 +348,9 @@ class PromptBuilder
         }
 
         $label = $row->attachment_original_name ?? 'lampiran';
+        if (array_key_exists($row->id, $this->preparedDocuments)) {
+            return "[Dokumen sebelumnya: {$label}]";
+        }
         $documentText = $this->documentText($row);
 
         return $documentText !== null
@@ -347,12 +360,17 @@ class PromptBuilder
 
     private function documentText(Message $message): ?string
     {
+        if (array_key_exists($message->id, $this->preparedDocuments)) {
+            return $this->preparedDocuments[$message->id];
+        }
         if (! $message->attachment_path || ! $message->attachment_disk
             || $message->hasImageAttachment() || $message->hasAudioAttachment()) {
             return null;
         }
 
-        return Cache::remember('msg-doc-text:' . $message->id, now()->addHours(12),
+        $ext = strtolower(pathinfo((string) ($message->attachment_original_name ?: $message->attachment_path), PATHINFO_EXTENSION));
+        $prefix = in_array($ext, ['docx', 'xlsx'], true) ? 'msg-doc-text:v2:' : 'msg-doc-text:';
+        return Cache::remember($prefix . $message->id, now()->addHours(12),
             fn () => app(AttachmentTextExtractor::class)->extract($message));
     }
 

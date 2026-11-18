@@ -36,13 +36,14 @@ final class RequestBudget
      *
      * @throws InsufficientBudgetException
      */
-    public static function plan(AiModel $model, int $inputTokens, float $usableCredits, NormkreditPricing $pricing, ?int $outputCeiling = null, int $minOutput = self::MIN_OUTPUT_TOKENS, ?string $feature = null): self
+    public static function plan(AiModel $model, int $inputTokens, float $usableCredits, NormkreditPricing $pricing, ?int $outputCeiling = null, int $minOutput = self::MIN_OUTPUT_TOKENS, ?string $feature = null, float $extraUsd = 0): self
     {
         $configuredMax = $outputCeiling ?? (int) $pricing->get('max_output_tokens');
         $maxPerRequest = (float) $pricing->get('max_credits_per_request');
         $affordable = $maxPerRequest > 0 ? min($usableCredits, $maxPerRequest) : $usableCredits;
 
-        $inputCredits = $pricing->creditsForCost($model->costUsd($inputTokens, 0, 0), $model->multiplier);
+        $toolCredits = $pricing->creditsForCost($extraUsd, $pricing->mediaMultiplier());
+        $inputCredits = $pricing->creditsForCost($model->costUsd($inputTokens, 0, 0), $model->multiplier) + $toolCredits;
         $creditsPerOutputToken = $model->output_usd_per_mtok / 1_000_000 * $model->multiplier
             * $pricing->usdToIdr() / $pricing->rupiahPerCredit();
 
@@ -57,10 +58,10 @@ final class RequestBudget
         }
 
         $providerUsd = $model->costUsd($inputTokens, 0, $maxOutput);
-        $hold = min($affordable, $pricing->creditsForCost($providerUsd, $model->multiplier));
+        $hold = min($affordable, $pricing->creditsForCost($providerUsd * $model->multiplier + $extraUsd * $pricing->mediaMultiplier()));
 
         // Dibulatkan ke bawah (0,0001 NC) agar tahanan tidak pernah melebihi kredit yang boleh dipakai.
-        return new self($maxOutput, floor(round($hold * 10000, 6)) / 10000, $maxOutput < $configuredMax, $providerUsd);
+        return new self($maxOutput, floor(round($hold * 10000, 6)) / 10000, $maxOutput < $configuredMax, $providerUsd + $extraUsd);
     }
 
     private static function refusal(AiModel $model, int $inputTokens, float $usable, float $maxPerRequest, NormkreditPricing $pricing, int $minOutput = self::MIN_OUTPUT_TOKENS, ?string $feature = null): string

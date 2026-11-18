@@ -90,7 +90,7 @@ log "Build aset frontend (Vite) ke public/build"
 docker run --rm -v "$PROJECT_DIR":/app -w /app node:22-alpine node node_modules/vite/bin/vite.js build --configLoader runner
 
 log "Build + jalankan semua service"
-"${COMPOSE[@]}" up -d --build --remove-orphans postgres redis app queue scheduler reverb nginx
+"${COMPOSE[@]}" up -d --build --remove-orphans
 
 log "Jalankan migrasi + optimize cache Laravel"
 "${COMPOSE[@]}" exec -T app php artisan migrate --force

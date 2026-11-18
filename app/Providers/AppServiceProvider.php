@@ -5,7 +5,6 @@ namespace App\Providers;
 use App\Models\AiModel;
 use App\Models\Group;
 use App\Models\User;
-use App\Services\FreeGroups;
 use App\Policies\GroupPolicy;
 use App\Services\Payments\MidtransGateway;
 use App\Services\NormkreditPricing;
@@ -48,21 +47,6 @@ class AppServiceProvider extends ServiceProvider
                     request()->session()->put('tour_due', true);
                 }
             }
-            // Grup gratis pertama (App\Services\FreeGroups); /groups lalu membuka chat-nya, kecuali user datang
-            // untuk tujuan lain (mis. tautan gabung grup teman).
-            // Gagal membuat grup tidak boleh menggagalkan login; /groups mencoba lagi.
-            try {
-                $first = $event->user instanceof User ? app(FreeGroups::class)->ensureFirstGroup($event->user) : null;
-            } catch (\Throwable $e) {
-                report($e);
-                $first = null;
-            }
-            if ($first && request()->hasSession()) {
-                $intended = request()->session()->get('url.intended');
-                if (! $intended || $intended === route('groups.index')) {
-                    request()->session()->put('welcome_group_id', $first->id);
-                }
-            }
         });
         Event::listen(Logout::class, function () {
             if (request()->hasSession()) {
@@ -79,7 +63,7 @@ class AppServiceProvider extends ServiceProvider
             $idr = fn (int|float $n) => 'Rp'.number_format($n, 0, '.', ',');
             $count = fn (int|float $n) => number_format($n, 0, '.', ',');
             // Grup gratis dari Superadmin › Grup gratis: jumlah grup dan saldo tiap grup (App\Support\FreeOffer).
-            $offer = app(NormkreditPricing::class)->freeOffer();
+            $offer = new \App\Support\FreeOffer([], 0);
             $free = $offer->active();
             // Kategori terkunci (Advanced): terbuka saat saldo grup mencapai ambang ini (App\Services\Credits\ModelAccess).
             $advancedAt = AiModel::query()->where('is_active', true)->where('unlock_multiple', '>', 0)->min('unlock_multiple');
@@ -101,7 +85,8 @@ class AppServiceProvider extends ServiceProvider
                     'maxPacks' => (int) $pricing['max_packages_per_payment'],
                     'free' => $free,
                     'freeFirst' => $offer->first(),
-                    'freeSlots' => $offer->memberSlots,
+                    'freeSlots' => app(\App\Services\GroupPromotion::class)->offer()['free_member_slots'],
+                    'promotion' => app(\App\Services\GroupPromotion::class)->offer(),
                     'offer' => $offer,
                     'advancedAt' => $advancedAt ? $count((float) $advancedAt * $pricing['group_creation_credits']) : null,
                 ],

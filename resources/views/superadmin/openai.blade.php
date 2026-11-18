@@ -3,6 +3,7 @@
 @section('heading', 'Biaya OpenAI')
 
 @section('content')
+    @include('superadmin._cost-diagnostics')
     @php
         $usd = fn ($value, $decimals = 2) => '$' . number_format((float) $value, $decimals, ',', '.');
         $rp = fn ($value) => 'Rp' . number_format((float) $value, 2, ',', '.');

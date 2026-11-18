@@ -38,6 +38,7 @@ final class ChatCompletion
                 'input_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
                 'cached_input_tokens' => (int) data_get($usage, 'prompt_tokens_details.cached_tokens', 0),
                 'output_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+                ...self::details($usage, 'prompt_tokens_details', 'completion_tokens_details'),
             ],
             $response->status(),
             $response->successful() ? '' : (string) $response->body(),
@@ -99,6 +100,7 @@ final class ChatCompletion
                 'input_tokens' => (int) ($usage['input_tokens'] ?? 0),
                 'cached_input_tokens' => (int) data_get($usage, 'input_tokens_details.cached_tokens', 0),
                 'output_tokens' => (int) ($usage['output_tokens'] ?? 0),
+                ...self::details($usage, 'input_tokens_details', 'output_tokens_details'),
             ],
             $status,
             $successful ? '' : $errorBody,
@@ -106,6 +108,20 @@ final class ChatCompletion
             $searchCalls,
             isset($json['id']) ? (string) $json['id'] : null,
         );
+    }
+
+    /** Simpan metrik angka saja agar biaya reasoning dan penulisan cache bisa diaudit. */
+    private static function details(array $usage, string $inputKey, string $outputKey): array
+    {
+        $input = (array) ($usage[$inputKey] ?? []);
+        $write = (array) ($input['cache_write_tokens_details'] ?? []);
+
+        return [
+            'reasoning_tokens' => (int) data_get($usage, $outputKey . '.reasoning_tokens', 0),
+            'cache_write_tokens' => (int) ($input['cache_write_tokens'] ?? 0),
+            'cache_write_30m_tokens' => (int) ($write['ttl_30m_tokens'] ?? 0),
+            'cache_write_12h_tokens' => (int) ($write['ttl_12h_tokens'] ?? 0),
+        ];
     }
 
     public static function failed(string $error): self

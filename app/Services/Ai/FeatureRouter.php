@@ -6,6 +6,8 @@ use App\Enums\AiMode;
 use App\Models\Group;
 use App\Models\Message;
 use App\Services\Ai\Context\MaintenanceAi;
+use App\Services\Ai\Files\FileEdit;
+use App\Services\Ai\Files\PilotDocument;
 use App\Services\Ai\Files\FileRequest;
 use App\Services\Ai\Responders\ImageResponder;
 
@@ -42,17 +44,15 @@ final class FeatureRouter
     private const FEATURE_WORDS = '(?<![\p{L}])(?:gambar|foto|ilustrasi|logo|poster|desain|kartun|stiker|website|web|situs|aplikasi|app|game|kalkulator|dashboard|html|jurnal|paper|riset|research|referensi|sumber|data\s+terbaru|berita|harga\s+terbaru|ajari|ajarin|belajar|pdf|word|excel|ppt|slide|presentasi|file|dokumen|kode|program|coding|script)(?![\p{L}])';
 
     private const ROUTER_PROMPT = "Tentukan fitur Normi Chat yang paling tepat untuk pesan anggota grup ini. Balas HANYA JSON {\"feature\": \"...\"}.\n"
-        . "- image: minta dibuatkan gambar/ilustrasi/logo/poster, atau mengedit foto (ganti warna, latar, hapus objek, ubah gaya).\n"
-        . "- canvas: minta dibuatkan halaman web, aplikasi kecil, game, kalkulator, dashboard, prototipe UI, atau dokumen panjang yang bisa dipratinjau.\n"
-        . "- deep_research: minta dicarikan/diriset informasi dari internet: jurnal, referensi, data/statistik/berita/harga terbaru, perbandingan dengan sumber.\n"
-        . "- guided_learning: minta diajari suatu topik secara bertahap seperti tutor.\n"
-        . "- file: minta dibuatkan file untuk diunduh (PDF, Word, Excel, PowerPoint, CSV, kode).\n"
-        . "- chat: selain itu, termasuk pertanyaan tentang CARA membuat sesuatu, minta penjelasan, opini, atau obrolan biasa.\n"
-        . "Pilih fitur hanya bila anggota memang meminta hasil itu dikerjakan sekarang.";
+        ."- image: minta dibuatkan gambar/ilustrasi/logo/poster, atau mengedit foto (ganti warna, latar, hapus objek, ubah gaya).\n"
+        ."- canvas: minta dibuatkan halaman web, aplikasi kecil, game, kalkulator, dashboard, prototipe UI, atau dokumen panjang yang bisa dipratinjau.\n"
+        ."- deep_research: minta dicarikan/diriset informasi dari internet: jurnal, referensi, data/statistik/berita/harga terbaru, perbandingan dengan sumber.\n"
+        ."- guided_learning: minta diajari suatu topik secara bertahap seperti tutor.\n"
+        ."- file: minta dibuatkan file untuk diunduh (PDF, Word, Excel, PowerPoint, CSV, kode).\n"
+        ."- chat: selain itu, termasuk pertanyaan tentang CARA membuat sesuatu, minta penjelasan, opini, atau obrolan biasa.\n"
+        .'Pilih fitur hanya bila anggota memang meminta hasil itu dikerjakan sekarang.';
 
-    public function __construct(private readonly MaintenanceAi $ai)
-    {
-    }
+    public function __construct(private readonly MaintenanceAi $ai) {}
 
     /**
      * Fitur untuk pesan @normi biasa, atau null (jawab dengan chat biasa).
@@ -66,6 +66,21 @@ final class FeatureRouter
             return null;
         }
 
+        if (PilotDocument::enabled($group->id)) {
+            if ($message->replyToMessage?->sender_type === 'ai' && isset($message->replyToMessage->system_meta['pilot_chat_origin'])) {
+                return null;
+            }
+            if ((PilotDocument::supports($message) || PilotDocument::supports($message->replyToMessage))
+                && preg_match('/\b(?:revisi|edit|ganti|ubah|koreksi|naikkan|turunkan)\b/iu', (string) $message->content)
+                && !preg_match('/\b(?:cara|bagaimana)\b/iu', (string) $message->content)) {
+                return ['mode' => AiMode::File];
+            }
+        }
+        if (FileEdit::pending($message) || (FileEdit::wantsImage($text)
+            && ($message->replyToMessage?->message_type === 'file' || preg_match('/\b(?:dokumen|file|berkas|rab)\b/iu', $text)))
+            || (FileEdit::filename($text) && ($message->replyToMessage?->message_type === 'file' || preg_match('/\b(?:ganti|ubah|rename)\b/iu', $text)))) {
+            return ['mode' => AiMode::File];
+        }
         $file = FileRequest::detect($text);
         if ($file !== null) {
             return ['mode' => AiMode::File, 'file' => $file];
@@ -81,10 +96,10 @@ final class FeatureRouter
 
         $isQuestion = self::matches(self::QUESTION, $text);
         if (! $isQuestion) {
-            if (self::matches(self::MAKE . '\s+(?:\S+\s+){0,4}?' . self::CANVAS_THING, $text)) {
+            if (self::matches(self::MAKE.'\s+(?:\S+\s+){0,4}?'.self::CANVAS_THING, $text)) {
                 return ['mode' => AiMode::Canvas];
             }
-            if (self::matches(self::RESEARCH, $text) || self::matches(self::SEARCH_VERB . '\s+(?:\S+\s+){0,3}?' . self::SOURCE_THING, $text)) {
+            if (self::matches(self::RESEARCH, $text) || self::matches(self::SEARCH_VERB.'\s+(?:\S+\s+){0,3}?'.self::SOURCE_THING, $text)) {
                 return ['mode' => AiMode::DeepResearch];
             }
             if (self::matches(self::LEARN, $text)) {
@@ -119,7 +134,7 @@ final class FeatureRouter
         if ($target && $target->sender_type === 'user' && ! $target->trashed()) {
             $pointer = preg_match('/^(?:(?:tolong|coba|dong|ya|yah|dulu|dl|ini|itu|nih|tuh|kak|bang|bro|sis)\s*)*(?:jawab(?:kan|in|kn)?|kerja(?:kan|in)|bantu(?:in)?|buat(?:kan|in)?|bikin(?:in)?|lanjut(?:kan|in)?|proses|eksekusi|gas|bisa|ini|itu)\b/iu', $text) === 1;
             if ($text === '' || ($pointer && str_word_count($text) <= 6)) {
-                $text = trim($text . ' ' . self::clean((string) $target->content));
+                $text = trim($text.' '.self::clean((string) $target->content));
             }
         }
 
@@ -173,7 +188,7 @@ final class FeatureRouter
     {
         $result = $this->ai->json(self::KIND, $group, [
             ['role' => 'system', 'content' => self::ROUTER_PROMPT],
-            ['role' => 'user', 'content' => ($hasPhoto ? "(Pesan ini menyertakan/membalas foto.)\n" : '') . mb_substr($text, 0, 1200)],
+            ['role' => 'user', 'content' => ($hasPhoto ? "(Pesan ini menyertakan/membalas foto.)\n" : '').mb_substr($text, 0, 1200)],
         ], 400, 8);
         $feature = (string) ($result['data']['feature'] ?? 'chat');
         $mode = AiMode::tryFrom($feature);
@@ -188,6 +203,6 @@ final class FeatureRouter
 
     private static function matches(string $pattern, string $text): bool
     {
-        return preg_match('/' . $pattern . '/iu', $text) === 1;
+        return preg_match('/'.$pattern.'/iu', $text) === 1;
     }
 }

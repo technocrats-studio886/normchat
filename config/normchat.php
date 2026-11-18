@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'documents_all_groups' => env('NORMCHAT_DOCUMENTS_ALL_GROUPS', false),
+    'document_pilot_groups' => array_filter(array_map('trim', explode(',', (string) env('NORMCHAT_DOCUMENT_PILOT_GROUPS', ''))), 'ctype_digit'),
+
     // Sesi login berakhir setelah sekian hari tanpa aksi user (App\Http\Middleware\EndIdleSession).
     'session_idle_days' => (int) env('NORMCHAT_SESSION_IDLE_DAYS', 5),
 
@@ -53,10 +56,17 @@ return [
         'daily_group_credit_limit' => 0,
         // Grup gratis per user (Superadmin › Grup gratis): grup ke-1 dan ke-2 tanpa bayar dengan saldo awal ini,
         // masing-masing dengan slot anggota yang bergabung tanpa patungan. Grup ke-3 dst berbayar.
-        'free_groups_enabled' => true,
+        'free_groups_enabled' => false,
         // Saldo awal grup gratis ke-1, ke-2, … tiap user (diatur di Superadmin › Grup gratis).
         'free_group_credits' => '70,50',
         'free_group_member_slots' => 2,
+        // Grup baru selalu berbayar. Promo hanya diberikan sesudah pembayaran terverifikasi.
+        'paid_group_member_slots' => 2,
+        'group_promo_enabled' => false,
+        'group_promo_type' => 'fixed',
+        'group_promo_value' => 50,
+        'group_promo_starts_at' => '',
+        'group_promo_ends_at' => '',
         // Selisih kurs kartu & biaya bank di atas kurs pasar yang diisi superadmin (%).
         'card_margin_percent' => 2.0,
     ],

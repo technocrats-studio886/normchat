@@ -76,6 +76,7 @@ class FreeGroups
                 'ai_provider' => 'openai',
                 'status' => 'active',
                 'free_member_slots' => $this->memberSlots(),
+                'created_free' => true,
             ]);
             $this->membership->activateFreeGroup($group, $owner, $credits);
 

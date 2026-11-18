@@ -182,8 +182,10 @@ Route::middleware('auth')->group(function () {
 
     // Superadmin: ringkasan, grup, user, keuangan & AI, biaya OpenAI, grup gratis, pengumuman, log audit, pengaturan
     Route::middleware('superadmin')->prefix('superadmin')->name('superadmin.')->group(function () {
-        Route::get('/grup-gratis', [AdminFreeGroupController::class, 'index'])->name('free-groups');
-        Route::post('/grup-gratis', [AdminFreeGroupController::class, 'update'])->name('free-groups.update');
+        Route::get('/promo', [\App\Http\Controllers\Admin\AdminPromotionController::class, 'index'])->name('promotions');
+        Route::post('/promo', [\App\Http\Controllers\Admin\AdminPromotionController::class, 'update'])->name('promotions.update');
+        Route::redirect('/grup-gratis', '/superadmin/promo')->name('free-groups');
+        Route::post('/grup-gratis', fn () => abort(410, 'Gunakan pengaturan Promo.'))->name('free-groups.update');
         Route::get('/pengumuman', [AdminAnnouncementController::class, 'index'])->name('announcements.index');
         Route::get('/pengumuman/baru', [AdminAnnouncementController::class, 'create'])->name('announcements.create');
         Route::post('/pengumuman', [AdminAnnouncementController::class, 'store'])->name('announcements.store');

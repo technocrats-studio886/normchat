@@ -1,4 +1,26 @@
 services:
+  docling:
+    profiles: ["document-pilot"]
+    image: ghcr.io/docling-project/docling-serve-cpu@sha256:7a480a1604fa3b42efeddc7db9527690d9f9bc903226136013e2bfe6b1a4dfb0
+    entrypoint: ["/opt/app-root/bin/python", "/worker.py"]
+    volumes:
+      - ./docker/document-pilot/worker.py:/worker.py:ro
+    environment:
+      HF_HUB_OFFLINE: "1"
+      OMP_NUM_THREADS: "2"
+    cpus: 1.5
+    mem_limit: 2350m
+    networks: [document_pilot]
+    restart: unless-stopped
+
+  ppt-converter:
+    profiles: ["document-pilot"]
+    build: ./docker/document-pilot
+    cpus: 1
+    mem_limit: 512m
+    networks: [document_pilot]
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.27-alpine
     container_name: normchat-nginx
@@ -25,6 +47,7 @@ services:
       retries: 3
 
   app:
+    networks: [default, document_pilot]
     build:
       context: .
       dockerfile: Dockerfile
@@ -97,6 +120,7 @@ services:
       "
 
   queue:
+    networks: [default, document_pilot]
     build:
       context: .
       dockerfile: Dockerfile
@@ -260,6 +284,8 @@ services:
       retries: 20
 
 networks:
+  document_pilot:
+    internal: true
   # Dibuat oleh stack Caddy edge Unocoffee, bukan oleh compose ini.
   edge:
     external: true

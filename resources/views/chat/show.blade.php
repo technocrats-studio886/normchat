@@ -212,6 +212,11 @@
                     </div>
                 </div>
 
+                <div hidden data-send-error role="alert" class="text-sm text-danger-ink">
+                    <span data-send-error-text></span>
+                    <button type="button" data-upload-retry class="ml-2 underline">Kirim ulang</button>
+                    <button type="button" data-upload-replace class="ml-2 underline">Ganti file</button>
+                </div>
                 {{-- Pesan terjadwal milikku di grup ini (resources/js/chat/tools/scheduled.js). --}}
                 <button type="button" class="nc-scheduled-pill {{ $scheduledCount > 0 ? '' : 'hidden' }}" data-scheduled-pill>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
@@ -225,6 +230,7 @@
                         <span class="composer-mode-chip">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" data-ai-mode-chip-icon="1"></svg>
                             <span data-ai-mode-chip-label="1"></span>
+                            <button type="button" class="hidden underline" data-file-photo>Unggah gambar</button>
                             <button type="button" class="-mr-1 rounded-full p-0.5 hover:bg-black/10" data-ai-mode-clear="1" aria-label="Hapus mode">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>
                             </button>
@@ -248,6 +254,7 @@
 
                     {{-- Menu plus: lampiran, polling, dan mode AI --}}
                     <div class="composer-popover left-0 w-72 hidden" data-attach-menu="1" role="menu">
+                        <button type="button" class="composer-menu-item" data-attach-photo role="menuitem">Unggah gambar</button>
                         <button type="button" class="composer-menu-item" data-attach-file role="menuitem">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 1 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48"/></svg>
                             <span>Unggah file</span>

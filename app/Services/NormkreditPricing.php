@@ -45,6 +45,12 @@ class NormkreditPricing
         // Saldo awal tiap grup gratis, urut grup ke-1, ke-2, …, dipisah koma (mis. "70,50"); jumlahnya = jumlah grup gratis.
         'free_group_credits' => 'list',
         'free_group_member_slots' => 'int',
+        'paid_group_member_slots' => 'int',
+        'group_promo_enabled' => 'bool',
+        'group_promo_type' => 'string',
+        'group_promo_value' => 'float',
+        'group_promo_starts_at' => 'string',
+        'group_promo_ends_at' => 'string',
     ];
 
     public function settings(): array
@@ -64,6 +70,7 @@ class NormkreditPricing
                     'int' => (int) $value,
                     'bool' => $value === '1',
                     'list' => (string) $value,
+                    'string' => (string) $value,
                     default => (float) $value,
                 };
             }

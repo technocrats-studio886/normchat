@@ -77,9 +77,11 @@ export const mediaPreviewTemplate = `
 				<canvas data-attachment-preview-doodle class="pointer-events-none absolute inset-0 z-[5] hidden h-full w-full rounded-2xl touch-none"></canvas>
 			</div>
 		</div>
+		<div hidden data-preview-send-error class="px-3 text-center text-sm text-white" role="alert"><span data-send-error-text></span> <button type="button" class="underline" data-upload-replace>Ganti gambar</button></div>
 		<p class="mt-2 hidden px-3 text-center text-xs text-white/80" data-attachment-preview-media-caption></p>
 		<div class="relative px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-2">
 			<div class="flex items-center gap-2 rounded-2xl bg-white/12 px-3 py-2.5 backdrop-blur">
+				<button type="button" data-preview-make-file class="rounded-full bg-white/14 px-2 py-1 text-xs text-white">Buat file</button>
 				<input type="text" class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60" data-attachment-preview-caption-input placeholder="Tambah keterangan" />
 				<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-navy-50 text-navy-950 hover:bg-navy-100" data-attachment-preview-caption-send aria-label="Kirim lampiran">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 3.105a.75.75 0 0 1 .818-.164l12 5.25a.75.75 0 0 1 0 1.374l-12 5.25A.75.75 0 0 1 2.9 14.18l1.2-4.18a.75.75 0 0 0 0-.4l-1.2-4.18a.75.75 0 0 1 .205-.815Z" /></svg>

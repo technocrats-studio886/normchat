@@ -29,7 +29,7 @@ class AuthController extends Controller
         // Tawaran grup gratis dari Superadmin › Grup gratis (App\Support\FreeOffer); kosong bila fiturnya mati.
         return view('auth.landing', [
             'interdotzEnabled' => (bool) config('services.interdotz.enabled'),
-            'freeOffer' => app(NormkreditPricing::class)->freeOffer(),
+            'promotionSentence' => app(\App\Services\GroupPromotion::class)->sentence(),
         ]);
     }
 

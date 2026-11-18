@@ -31,6 +31,7 @@ class AdminOpenAiController extends Controller
     public function index(SpendGuard $spend, NormkreditPricing $pricing, PricingVersions $versions, CostReconciliation $reconciliation): View
     {
         return view('superadmin.openai', [
+            'costDiagnostics' => app(\App\Services\Ai\CostDiagnostics::class)->lastThirtyDays(),
             'status' => $spend->status(),
             'rate' => $pricing->rate(),
             'usdToIdr' => $pricing->usdToIdr(),

@@ -230,39 +230,50 @@ class ChatController extends Controller
         try {
             // Dikunci per grup agar urutan pesan dan antrean AI tetap berurutan.
             $message = Cache::lock('group-chat-submit:' . $group->id, 10)->block(3, function () use ($request, $group, $user, $content, $attachments) {
-                $replyTarget = Message::where('group_id', $group->id)->find((int) $request->input('reply_to_message_id'));
-                $quote = $request->replyQuoteText();
+                return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $group, $user, $content, $attachments) {
+                    $key = $request->validated('client_message_id');
+                    if ($key) {
+                        Group::whereKey($group->id)->lockForUpdate()->value('id');
+                        $stored = Message::withTrashed()->where('group_id', $group->id)->where('sender_id', $user->id)->where('client_message_id', $key)->first();
+                        if ($stored) return $stored;
+                    }
+                    $replyTarget = Message::where('group_id', $group->id)->find((int) $request->input('reply_to_message_id'));
+                    $quote = $request->replyQuoteText();
 
-                $message = Message::create([
-                    'group_id' => $group->id,
-                    'message_type' => 'text',
-                    'sender_type' => 'user',
-                    'sender_id' => $user->id,
-                    'reply_to_message_id' => $replyTarget?->id,
-                    'reply_quote_text' => $replyTarget && $quote !== '' ? $quote : null,
-                    'content' => $content !== '' ? $content : null,
-                    ...($request->hasFile('attachment') ? $attachments->store($request->file('attachment'), $group) : []),
-                ]);
+                    $message = Message::create([
+                        'group_id' => $group->id,
+                        'message_type' => 'text',
+                        'sender_type' => 'user',
+                        'sender_id' => $user->id,
+                        ...($key ? ['client_message_id' => $key] : []),
+                        'reply_to_message_id' => $replyTarget?->id,
+                        'reply_quote_text' => $replyTarget && $quote !== '' ? $quote : null,
+                        'content' => $content !== '' ? $content : null,
+                        ...($request->hasFile('attachment') ? $attachments->store($request->file('attachment'), $group) : []),
+                    ]);
 
-                if (Message::isAiPrompt($content, $replyTarget)) {
-                    // Pilihan composer hanya berarti bagi pesan yang memang ditujukan ke AI.
-                    // Mode dari menu fitur, atau dari tag fiturnya (@normi-image, @normi-research, ...).
-                    $message->update(['ai_model' => $request->aiModel(), 'ai_mode' => $request->aiMode() ?? AiMode::fromContent($content)]);
-                    ChatMessageQueue::enqueue($message);
-                }
+                    if (Message::isAiPrompt($content, $replyTarget)) {
+                        // Pilihan composer hanya berarti bagi pesan yang memang ditujukan ke AI.
+                        // Mode dari menu fitur, atau dari tag fiturnya (@normi-image, @normi-research, ...).
+                        $message->update(['ai_model' => $request->aiModel(), 'ai_mode' => $request->aiMode() ?? AiMode::fromContent($content)]);
+                        ChatMessageQueue::enqueue($message);
+                    }
 
-                AuditLog::record('chat.send_message', $user->id, $message, [], $group->id);
-                // Pesan terkirim: draf grup ini selesai di semua perangkat.
-                GroupDraft::where(['group_id' => $group->id, 'user_id' => $user->id])->delete();
+                    AuditLog::record('chat.send_message', $user->id, $message, [], $group->id);
+                    // Pesan terkirim: draf grup ini selesai di semua perangkat.
+                    GroupDraft::where(['group_id' => $group->id, 'user_id' => $user->id])->delete();
 
-                return $message;
+                    return $message;
+                });
             });
         } catch (LockTimeoutException) {
-            return back()->withErrors(['content' => 'Gagal mengirim. Coba lagi.']);
+            return $request->expectsJson() ? response()->json(['message' => 'Grup sedang sibuk. Coba kirim ulang.'], 503) : back()->withErrors(['content' => 'Gagal mengirim. Coba lagi.']);
         }
 
         // Antrean Normi, realtime, pratinjau tautan, dan mention (sama dengan pesan terjadwal).
-        $payload = app(MessageSender::class)->afterCreate($group, $message, $user);
+        $payload = $message->wasRecentlyCreated
+            ? app(MessageSender::class)->afterCreate($group, $message, $user)
+            : $this->presenter->present($message, $user->name);
 
         return $request->expectsJson()
             ? response()->json(['ok' => true, 'message' => $payload], 201)

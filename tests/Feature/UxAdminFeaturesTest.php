@@ -56,7 +56,7 @@ class UxAdminFeaturesTest extends TestCase
     public function test_superadmin_pages_use_the_admin_console_without_any_group_ui(): void
     {
         $pages = ['superadmin.index', 'superadmin.groups.index', 'superadmin.users.index', 'superadmin.finance', 'superadmin.openai',
-            'superadmin.free-groups', 'superadmin.announcements.index', 'superadmin.announcements.create', 'superadmin.audit', 'superadmin.settings', 'profile.show'];
+            'superadmin.promotions', 'superadmin.announcements.index', 'superadmin.announcements.create', 'superadmin.audit', 'superadmin.settings', 'profile.show'];
 
         foreach ($pages as $route) {
             $html = $this->actingAs($this->boss)->get(route($route))->assertOk()->getContent();
@@ -201,7 +201,7 @@ class UxAdminFeaturesTest extends TestCase
 
     // ── Bonus buat grup (B1, dicabut 4 Nov 2026: diganti grup gratis) ──
 
-    public function test_checkouts_no_longer_carry_a_bonus_but_one_started_before_the_change_is_still_honored(): void
+    public function test_disabled_promotion_grants_no_bonus_and_legacy_checkout_bonus_is_still_honored(): void
     {
         app(NormkreditPricing::class)->update(['free_groups_enabled' => false]);
         $this->actingAs($this->noel)->get(route('groups.create'))->assertDontSee('Bonus', false);
@@ -209,10 +209,10 @@ class UxAdminFeaturesTest extends TestCase
         Http::fake(['app.sandbox.midtrans.com/snap/v1/transactions' => Http::response(['token' => 't', 'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v4/redirection/t'], 201)]);
         $this->actingAs($this->noel)->post('/groups', ['name' => 'Panitia', 'password' => '1234']);
         $pending = PendingPayment::firstOrFail();
-        $this->assertArrayNotHasKey('bonus_credits', $pending->metadata_json);
+        $this->assertSame(0.0, (float) $pending->metadata_json['bonus_credits']);
 
         // Checkout yang dimulai sebelum promo dicabut membawa bonusnya sendiri.
-        $pending->update(['metadata_json' => $pending->metadata_json + ['bonus_credits' => 20]]);
+        $pending->update(['metadata_json' => array_merge($pending->metadata_json, ['bonus_credits' => 20])]);
         $this->postJson('/api/webhooks/midtrans', $this->notification($pending))->assertOk();
 
         $group = Group::firstOrFail();

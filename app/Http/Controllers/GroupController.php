@@ -12,7 +12,6 @@ use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\Role;
 use App\Services\Chat\SystemMessages;
-use App\Services\FreeGroups;
 use App\Services\GroupMembership;
 use App\Services\NormkreditPricing;
 use App\Services\Payments\NormkreditCheckout;
@@ -29,7 +28,6 @@ class GroupController extends Controller
         private readonly NormkreditPricing $pricing,
         private readonly GroupMembership $membership,
         private readonly NormkreditCheckout $checkout,
-        private readonly FreeGroups $freeGroups,
         private readonly SystemMessages $systemMessages,
     ) {
     }
@@ -37,10 +35,6 @@ class GroupController extends Controller
     public function index(Request $request): View|RedirectResponse
     {
         $user = $request->user();
-        // Grup gratis pertama juga untuk user yang sesinya sudah ada sebelum fitur ini (listener Login tidak jalan).
-        if ($first = $this->freeGroups->ensureFirstGroup($user)) {
-            $request->session()->put('welcome_group_id', $first->id);
-        }
         // Setelah grup pertama dibuat, langsung ke chat-nya (sekali).
         if ($welcome = $request->session()->pull('welcome_group_id')) {
             $group = Group::query()->visibleTo($user)->find($welcome);
@@ -57,9 +51,7 @@ class GroupController extends Controller
     {
         return view('groups.create', [
             'quote' => $this->pricing->quoteGroupCreation(),
-            'freeCredits' => $this->freeGroups->nextCredits($request->user()),
-            'freeLeft' => max(0, $this->freeGroups->quota() - $this->freeGroups->used($request->user())),
-            'freeSlots' => $this->freeGroups->memberSlots(),
+            'promotion' => app(\App\Services\GroupPromotion::class)->offer(),
         ]);
     }
 
@@ -67,16 +59,8 @@ class GroupController extends Controller
     {
         $user = $request->user();
 
-        // Jatah grup gratis masih ada: grup langsung aktif tanpa checkout.
-        $freeCredits = $this->freeGroups->nextCredits($user);
-        $free = $freeCredits === null ? null
-            : $this->freeGroups->create($user, $request->validated('name'), $request->validated('password'), $request->validated('description'));
-        if ($free) {
-            return redirect()->route('chat.show', $free)
-                ->with('success', 'Grup gratis dibuat dengan saldo ' . number_format($freeCredits, 0, ',', '.') . ' Normkredit.');
-        }
-
         $quote = $this->pricing->quoteGroupCreation();
+        $promotion = app(\App\Services\GroupPromotion::class)->offer($quote);
         $group = Group::create([
             'name' => $request->validated('name'),
             'description' => $request->validated('description'),
@@ -84,6 +68,7 @@ class GroupController extends Controller
             'password_hash' => Hash::make($request->validated('password')),
             'ai_provider' => 'openai',
             'status' => 'pending_payment',
+            'free_member_slots' => $promotion['free_member_slots'],
         ]);
 
         try {

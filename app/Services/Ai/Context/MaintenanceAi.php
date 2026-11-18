@@ -75,7 +75,7 @@ class MaintenanceAi
         }
 
         $usage = $completion->usage;
-        $cost = $model->costUsd($usage['input_tokens'], $usage['cached_input_tokens'], $usage['output_tokens']);
+        $cost = $model->costForUsage($usage);
         $this->spend->settle($hold, $cost);
         $this->log($kind, $group, $model->model_id, $usage, $cost, $completion);
 

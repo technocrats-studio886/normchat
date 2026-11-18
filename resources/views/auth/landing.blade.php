@@ -7,9 +7,7 @@
     $uiTheme = \App\Support\Themes::for(null);
     $uiMode = $uiTheme['mode'] === 'dark' ? 'dark' : 'light';
     $title = 'Normi Chat | Grup chat dengan AI';
-    // Sama dengan /home dan /pricing: jumlah grup gratis dan saldonya dari Superadmin › Grup gratis (App\Support\FreeOffer).
-    $credits = $freeOffer->active() ? $freeOffer->first('.') : null;
-    $offer = $freeOffer->idSentence();
+    $offer = $promotionSentence;
 @endphp
 <!DOCTYPE html>
 <html lang="id" data-theme-mode="{{ $uiTheme['mode'] }}" data-mode="{{ $uiMode }}" data-accent="{{ $uiTheme['accent'] }}">
@@ -17,7 +15,7 @@
     @include('partials.app-head')
     {{-- Font pemasaran (sama dengan situs marketing): judul Bricolage Grotesque, isi Hanken Grotesk. --}}
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
-    <meta name="description" content="Ajak teman ke satu grup dan tanya @normi bareng.{{ $credits ? ' Mulai gratis dengan ' . $credits . ' Normkredit.' : '' }}">
+    <meta name="description" content="{{ $promotionSentence }}">
 </head>
 <body class="nc-login antialiased">
     <main class="nc-login-single">

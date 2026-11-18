@@ -38,14 +38,14 @@ class MarketingPagesTest extends TestCase
     }
 
     /** docs/rancangan-copy-marketing.md: manfaat dulu, angka dari setelan, klaim gratis hanya selama grup gratis aktif. */
-    public function test_copy_follows_the_free_group_settings_and_compares_ai_levels(): void
+    public function test_copy_explains_paid_groups_and_compares_ai_levels(): void
     {
-        $this->get('/home')->assertSee('Start your free group')->assertSee('70 Normkredit included, and your first 2 friends join free')->assertSee('data-live-demo', false)
-            ->assertSee('One balance for the whole group')->assertSee('before joining')->assertSee('Start free')->assertSee(route('home'), false);
+        $this->get('/home')->assertSee('Create your group')->assertSee('Your first 2 friends join free')->assertSee('data-live-demo', false)
+            ->assertSee('One balance for the whole group')->assertSee('before joining')->assertDontSee('Start free')->assertSee(route('home'), false);
         // Empat mode Normi dari menu + (App\Enums\AiMode), masing-masing dengan kegunaannya.
         $this->get('/home')->assertSeeInOrder(['Guided Learning', 'Learn a topic step by step', 'Use it when', 'Create image', 'Turn an idea into a picture', 'Use it for', 'Canvas', 'Get a finished document or web page', 'Use it when', 'Deep Research', 'Research with sources you can check', 'Use it before'])
             ->assertSee('#i-book-open', false)->assertSee('id="i-magnifying-glass-plus"', false);
-        $this->get('/pricing')->assertSee('Pay for Normi together, with no monthly subscription.')->assertSee('Free groups (your 1st and 2nd)')->assertSee('70 / 50 Normkredit')
+        $this->get('/pricing')->assertSee('Pay for Normi together, with no monthly subscription.')->assertSee('Each group')->assertSee('250 Normkredit')->assertDontSee('Free groups')
             ->assertSeeInOrder(['Fast', 'Smart', 'Advanced'])->assertSee('Our most capable level')->assertDontSee('On par')
             ->assertSee('When the group balance reaches 500 Normkredit')->assertDontSee('gpt-6');
         $this->get('/about')->assertDontSee('normies')->assertSee('Anyone in the group can ask.')->assertSee('Twenti Studio')->assertDontSee('Sysnavia');

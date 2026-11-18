@@ -3,6 +3,7 @@
 namespace App\Services\Ai\Files;
 
 use App\Services\AiDocumentGenerator;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use RuntimeException;
 use ZipArchive;
@@ -24,16 +25,24 @@ final class FileBuilder
      * @param  string|null  $preferred  format yang diminta user, dipakai bila nama file tidak berekstensi
      * @return array{binary: string, mime: string, name: string, ext: string}
      */
-    public function build(array $files, ?string $preferred, string $title, bool $forceZip = false): array
+    public function build(array $files, ?string $preferred, string $title, bool $forceZip = false, bool $split = false, ?array $image = null): array
     {
-        $files = array_values(array_filter(array_slice($files, 0, self::MAX_FILES), 'is_array'));
+        if (! $split && count($files) > self::MAX_FILES) {
+            throw new ExportOverflow(count($files).' file melebihi batas '.self::MAX_FILES.'.');
+        }
+        $files = array_values(array_filter($files, 'is_array'));
         if ($files === []) {
             throw new RuntimeException('Tidak ada file untuk dibuat.');
         }
 
         $built = [];
         foreach ($files as $index => $file) {
-            $built[] = $this->one($file, count($files) === 1 ? $preferred : null, $title, $index);
+            $ext = FileFormats::extensionOf($file['name'] ?? '') ?: ($preferred ?: $this->guessExtension($file));
+            $parts = $split ? $this->parts($file, $ext) : [$file];
+            foreach ($parts as $part) {
+                $output = $this->one($part, $ext, $title, $index, $split);
+                $built[] = $image ? DocumentStamp::apply($output, $image) : $output;
+            }
         }
 
         if (count($built) === 1 && ! $forceZip && $built[0]['ext'] !== 'zip') {
@@ -48,14 +57,14 @@ final class FileBuilder
     {
         $pages = [];
         foreach ($images as $image) {
-            $pages[] = '<div class="page"><img src="data:' . e($image['mime']) . ';base64,' . base64_encode($image['binary']) . '"></div>';
+            $pages[] = '<div class="page"><img src="data:'.e($image['mime']).';base64,'.base64_encode($image['binary']).'"></div>';
         }
         $html = '<!doctype html><html><head><meta charset="utf-8"><style>@page{margin:24px}body{margin:0}'
-            . '.page{page-break-after:always;text-align:center}.page:last-child{page-break-after:auto}'
-            . 'img{max-width:100%;max-height:1060px}</style></head><body>' . implode('', $pages) . '</body></html>';
+            .'.page{page-break-after:always;text-align:center}.page:last-child{page-break-after:auto}'
+            .'img{max-width:100%;max-height:1060px}</style></head><body>'.implode('', $pages).'</body></html>';
 
         return [
-            'binary' => (string) \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->setPaper('a4')->setOption('isFontSubsettingEnabled', true)->output(),
+            'binary' => (string) Pdf::loadHTML($html)->setPaper('a4')->setOption('isFontSubsettingEnabled', true)->output(),
             'mime' => 'application/pdf',
             'name' => $this->fileName($title, 'pdf'),
             'ext' => 'pdf',
@@ -63,7 +72,7 @@ final class FileBuilder
     }
 
     /** @return array{binary: string, mime: string, name: string, ext: string} */
-    private function one(array $file, ?string $preferred, string $title, int $index): array
+    private function one(array $file, ?string $preferred, string $title, int $index, bool $split = false): array
     {
         $name = trim((string) ($file['name'] ?? ''));
         $ext = FileFormats::extensionOf($name) ?: ($preferred ?? '') ?: $this->guessExtension($file);
@@ -71,10 +80,28 @@ final class FileBuilder
         $content = $file['content'] ?? '';
         $content = is_string($content) ? $content : json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
+        if (in_array($ext, ['pdf', 'docx'], true)) {
+            // Consecutive headings at the beginning sometimes repeat the same title.
+            $content = preg_replace('/\A(\s*#{1,6}\s+([^\n]+?))[ \t]*\n\s*#{1,6}\s+\2[ \t]*(?=\n|$)/iu', '$1', $content);
+            $body = preg_replace('/^\s*#{1,6}\s+[^\n]+$/mu', '', $content);
+            if (trim($body) === '') {
+                throw new RuntimeException('Dokumen belum memiliki isi.');
+            }
+        } elseif (in_array($ext, ['xlsx', 'csv', 'tsv'], true)) {
+            $values = array_column($this->sheets($file, $content), 'rows');
+            if (! collect($values)->flatten()->contains(fn ($v) => is_scalar($v) && trim((string) $v) !== '' || is_bool($v))) {
+                throw new RuntimeException('Tidak ada sel yang berisi data.');
+            }
+        } elseif ($ext === 'pptx') {
+            if (! collect($this->slides($file, $content))->contains(fn ($s) => trim((string) ($s['subtitle'] ?? '')) !== '' || collect($s['bullets'] ?? [])->contains(fn ($b) => trim((string) (is_array($b) ? ($b['text'] ?? '') : $b)) !== ''))) {
+                throw new RuntimeException('Slide belum memiliki isi.');
+            }
+        }
+
         $binary = match ($ext) {
             'pdf' => $this->pdf($this->docTitle($content, $title), $content),
             'docx' => app(AiDocumentGenerator::class)->renderDocxBinary($this->docTitle($content, $title), $content),
-            'xlsx' => XlsxWriter::write($this->sheets($file, $content)),
+            'xlsx' => XlsxWriter::write($this->sheets($file, $content), $split),
             'pptx' => PptxWriter::write($this->docTitle($content, $title), $this->slides($file, $content)),
             'csv', 'tsv' => $this->delimited($file, $content, $ext === 'tsv' ? "\t" : ','),
             default => $this->text($content, $ext),
@@ -85,6 +112,61 @@ final class FileBuilder
         }
 
         return ['binary' => $binary, 'mime' => FileFormats::mime($ext), 'name' => $name, 'ext' => $ext];
+    }
+
+    private function parts(array $file, string $ext): array
+    {
+        $content = is_string($file['content'] ?? null) ? $file['content'] : '';
+        $name = pathinfo($file['name'] ?? 'dokumen', PATHINFO_FILENAME);
+        $parts = [];
+        if ($ext === 'xlsx') {
+            $sheets = $this->sheets($file, $content);
+            // Cell references between rows/sheets must survive splitting. Keep formula workbooks whole.
+            foreach ($sheets as $sheet) {
+                foreach ($sheet['rows'] as $row) {
+                    foreach ($row as $value) {
+                        if (is_string($value) && str_starts_with($value, '=')) {
+                            return [$file];
+                        }
+                    }
+                }
+            }
+            foreach ($sheets as $sheet) {
+                foreach (array_chunk($sheet['rows'], XlsxWriter::MAX_ROWS) as $rows) {
+                    $width = max(1, ...array_map('count', $rows));
+                    for ($col = 0; $col < $width; $col += XlsxWriter::MAX_COLUMNS) {
+                        $parts[] = ['sheets' => [['name' => $sheet['name'], 'rows' => array_map(fn ($r) => array_slice($r, $col, XlsxWriter::MAX_COLUMNS), $rows)]]];
+                    }
+                }
+                if (! $sheet['rows']) {
+                    $parts[] = ['sheets' => [$sheet]];
+                }
+            }
+        } elseif ($ext === 'pptx') {
+            $slides = [];
+            foreach ($this->slides($file, $content) as $slide) {
+                $chunks = array_chunk($slide['bullets'] ?? [], PptxWriter::MAX_BULLETS);
+                foreach ($chunks ?: [[]] as $i => $chunk) {
+                    $slides[] = [...$slide, 'title' => ($slide['title'] ?? '').($i ? ' (lanjutan)' : ''), 'bullets' => $chunk];
+                }
+            }
+            foreach (array_chunk($slides, PptxWriter::MAX_SLIDES) as $batch) {
+                $parts[] = ['slides' => $batch];
+            }
+        } elseif (strlen($content) > self::MAX_TEXT_BYTES) {
+            while ($content !== '') {
+                $chunk = mb_strcut($content, 0, self::MAX_TEXT_BYTES);
+                $parts[] = ['content' => $chunk];
+                $content = substr($content, strlen($chunk));
+            }
+        } else {
+            return [$file];
+        }
+        foreach ($parts as $i => &$part) {
+            $part['name'] = $name.'-bagian-'.($i + 1).'.'.$ext;
+        }
+
+        return $parts;
     }
 
     private function guessExtension(array $file): string
@@ -99,12 +181,12 @@ final class FileBuilder
             $content = (string) preg_replace('/^\s*```[\w+#.-]*\s*\n|\n```\s*$/u', '', $content);
         }
         if (strlen($content) > self::MAX_TEXT_BYTES) {
-            $content = mb_strcut($content, 0, self::MAX_TEXT_BYTES);
+            throw new ExportOverflow('Berkas teks melebihi batas 2 MB.');
         }
-        $content = rtrim($content) . "\n";
+        $content = rtrim($content)."\n";
 
         // CSV/teks dibuka Excel/Notepad Windows dengan benar bila diawali BOM UTF-8.
-        return in_array($ext, ['csv', 'tsv'], true) ? "\xEF\xBB\xBF" . $content : $content;
+        return in_array($ext, ['csv', 'tsv'], true) ? "\xEF\xBB\xBF".$content : $content;
     }
 
     private function delimited(array $file, string $content, string $separator): string
@@ -120,7 +202,7 @@ final class FileBuilder
         }
         rewind($stream);
 
-        return "\xEF\xBB\xBF" . stream_get_contents($stream);
+        return "\xEF\xBB\xBF".stream_get_contents($stream);
     }
 
     /** @return list<array{name: string, rows: list<list<mixed>>}> */
@@ -172,7 +254,7 @@ final class FileBuilder
                 if (isset($current['bullets'])) {
                     $current['bullets'][] = $line;
                 } else {
-                    $current['subtitle'] = trim(($current['subtitle'] ?? '') . ' ' . trim($line));
+                    $current['subtitle'] = trim(($current['subtitle'] ?? '').' '.trim($line));
                 }
             }
         }
@@ -187,20 +269,27 @@ final class FileBuilder
     {
         $markdown = trim((string) preg_replace('/^\s*```(?:markdown|md)?\s*\n|\n```\s*$/u', '', $markdown));
         $body = Str::markdown($markdown, ['html_input' => 'escape', 'allow_unsafe_links' => false]);
-        if (! preg_match('/^\s*#\s/u', $markdown)) {
-            $body = '<h1>' . e($title) . '</h1>' . $body;
+        if ($title !== '' && ! preg_match('/^\s*#\s/u', $markdown)) {
+            $body = '<h1>'.e($title).'</h1>'.$body;
         }
 
-        $css = '@page{margin:56px 52px}body{font-family:DejaVu Sans,sans-serif;font-size:11.5px;color:#1f2933;line-height:1.55}'
-            . 'h1{font-size:21px;margin:0 0 14px;color:#111}h2{font-size:16px;margin:20px 0 8px;color:#111}h3{font-size:13.5px;margin:16px 0 6px}'
-            . 'p{margin:0 0 9px}ul,ol{margin:0 0 9px 18px;padding:0}li{margin:0 0 3px}'
-            . 'table{border-collapse:collapse;width:100%;margin:8px 0 12px}th,td{border:1px solid #cfd6de;padding:5px 7px;text-align:left;vertical-align:top}'
-            . 'th{background:#eef2f6}code{font-family:DejaVu Sans Mono,monospace;background:#f2f4f7;padding:1px 3px;font-size:10.5px}'
-            . 'pre{background:#f2f4f7;padding:9px;white-space:pre-wrap;font-size:10px}pre code{background:none;padding:0}'
-            . 'blockquote{margin:0 0 9px;padding:4px 10px;border-left:3px solid #cfd6de;color:#4b5563}a{color:#1d5aa0}';
+        // Keep short tables (payment details, totals) together; long tables can paginate.
+        $body = preg_replace_callback('~<table>.*?</table>~s', static function ($match) {
+            $table = $match[0];
 
-        return (string) \Barryvdh\DomPDF\Facade\Pdf::loadHTML('<!doctype html><html><head><meta charset="utf-8"><title>' . e($title)
-            . '</title><style>' . $css . '</style></head><body>' . $body . '</body></html>')->setPaper('a4')->setOption('isFontSubsettingEnabled', true)->output();
+            return substr_count($table, '<tr>') <= 6 && mb_strlen(strip_tags($table)) < 850
+                ? '<div style="page-break-inside:avoid">'.$table.'</div>' : $table;
+        }, $body);
+        $css = '@page{margin:40px 44px}body{font-family:DejaVu Sans,sans-serif;font-size:11.5px;color:#1f2933;line-height:1.4}'
+            .'h1{font-size:21px;margin:0 0 14px;color:#111}h2{font-size:16px;margin:14px 0 6px;color:#111}h3{font-size:13.5px;margin:16px 0 6px}'
+            .'p{margin:0 0 9px}ul,ol{margin:0 0 9px 18px;padding:0}li{margin:0 0 3px}'
+            .'table{border-collapse:collapse;width:100%;margin:8px 0 12px}th,td{border:1px solid #cfd6de;padding:4px 6px;text-align:left;vertical-align:top}'
+            .'h1,h2,h3,thead{page-break-after:avoid}thead{display:table-header-group}tr{page-break-inside:avoid}th{background:#eef2f6}code{font-family:DejaVu Sans Mono,monospace;background:#f2f4f7;padding:1px 3px;font-size:10.5px}'
+            .'pre{background:#f2f4f7;padding:9px;white-space:pre-wrap;font-size:10px}pre code{background:none;padding:0}'
+            .'blockquote{margin:0 0 9px;padding:4px 10px;border-left:3px solid #cfd6de;color:#4b5563}a{color:#1d5aa0}';
+
+        return (string) Pdf::loadHTML('<!doctype html><html><head><meta charset="utf-8"><title>'.e($title)
+            .'</title><style>'.$css.'</style></head><body>'.$body.'</body></html>')->setPaper('a4')->setOption('isFontSubsettingEnabled', true)->output();
     }
 
     private function docTitle(string $content, string $fallback): string
@@ -217,7 +306,7 @@ final class FileBuilder
         }
 
         try {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             $zip->open($tmp, ZipArchive::OVERWRITE);
             $used = [];
             foreach ($built as $file) {
@@ -249,7 +338,7 @@ final class FileBuilder
 
         $base = array_pop($parts);
         if (FileFormats::extensionOf($base) === '' && ! str_contains($base, '.')) {
-            $base .= '.' . $ext;
+            $base .= '.'.$ext;
         }
 
         return implode('/', [...array_map(fn ($p) => mb_substr($p, 0, 60), $parts), mb_substr($base, 0, 100)]);
@@ -257,6 +346,6 @@ final class FileBuilder
 
     private function fileName(string $title, string $ext): string
     {
-        return (Str::slug(Str::limit($title, 60, '')) ?: 'normi-file') . '.' . $ext;
+        return (Str::slug(Str::limit($title, 60, '')) ?: 'normi-file').'.'.$ext;
     }
 }

@@ -8,7 +8,12 @@ export const bindCaption = (el, mentionSuggestions) => {
 	const previewCaptionSend = el.querySelector('[data-attachment-preview-caption-send]');
 	const previewCaptionMentionMenu = el.querySelector('[data-preview-caption-mention-menu]');
 
+	const fileButton = el.querySelector('[data-preview-make-file]');
+	let fileMode = false;
 	const syncComposerCaption = (text) => {
+		if (fileMode && !/(^|\s)@normi(?:-[a-z]+)?(?![\w-])/i.test(text)) {
+			text = '@normi-file ' + text;
+		}
 		if (!(mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement)) {
 			return;
 		}
@@ -42,7 +47,12 @@ export const bindCaption = (el, mentionSuggestions) => {
 		const composerValue = mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement
 			? mentionInput.value
 			: '';
-		previewCaptionInput.value = composerValue;
+		fileMode = /(^|\s)@normi-file(?![\w-])/i.test(composerValue);
+		fileButton?.setAttribute('aria-pressed', String(fileMode));
+		if (fileButton) fileButton.textContent = fileMode ? '✓ Buat file' : 'Buat file';
+		previewCaptionInput.value = fileMode
+			? composerValue.replace(/(^|\s)@normi-file(?![\w-])\s*/i, '$1').trimStart()
+			: composerValue;
 	};
 	el.addEventListener('preview:sync-caption', syncCaptionFromComposer);
 };

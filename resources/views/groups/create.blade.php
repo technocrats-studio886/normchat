@@ -40,30 +40,19 @@
                 </div>
             </div>
 
-            @if($freeCredits)
-                {{-- Jatah grup gratis (App\Services\FreeGroups): langsung aktif tanpa pembayaran. --}}
-                <div class="panel-card px-4 py-3" data-group-free>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Normkredit Awal</p>
-                    <p class="mt-1 text-sm text-slate-700"><strong>{{ number_format($freeCredits, 0, ',', '.') }} Normkredit</strong> · Gratis</p>
-                    @if($freeSlots > 0)
-                        <p class="mt-1 text-sm font-semibold text-primary-ink">{{ $freeSlots }} teman pertama bergabung tanpa biaya.</p>
-                    @endif
-                    <p class="mt-1 text-xs text-slate-500">Dipakai semua anggota untuk Normi AI.</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ $freeLeft <= 1 ? 'Ini grup gratis terakhirmu.' : 'Kamu punya ' . $freeLeft . ' jatah grup gratis.' }} Setelah itu, grup dibuat dengan {{ number_format($quote->credits, 0, ',', '.') }} Normkredit seharga Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}.</p>
-                </div>
-
-                <button type="submit" class="btn-cta">Buat grup gratis</button>
-            @else
-                <div class="panel-card px-4 py-3">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Normkredit Awal</p>
-                    <p class="mt-1 text-sm text-slate-700"><strong>{{ number_format($quote->credits, 0, ',', '.') }} Normkredit</strong> · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</p>
-                    <p class="mt-1 text-xs text-slate-500">Dipakai semua anggota untuk Normi AI.</p>
-                </div>
-
-                @include('partials.payment-total', ['quote' => $quote])
-
-                <button type="submit" class="btn-cta">Buat Grup · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</button>
-            @endif
+            <div class="panel-card px-4 py-3">
+                <p class="text-xs font-semibold uppercase tracking-wide text-primary-ink">Saldo awal setelah pembayaran</p>
+                <p class="mt-2 text-sm text-slate-700"><strong>{{ number_format($quote->credits, 0, ',', '.') }} Normkredit</strong> · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</p>
+                @if($promotion['active'])
+                    <p class="mt-1 text-sm font-semibold text-primary-ink">Bonus +{{ number_format($promotion['bonus_credits'], 2, ',', '.') }} NC selama promo berlaku. Total {{ number_format($promotion['total_credits'], 2, ',', '.') }} NC.</p>
+                @endif
+                <p class="mt-1 text-xs text-slate-500">Saldo dan bonus masuk setelah pembayaran berhasil. Dipakai semua anggota untuk Normi AI.</p>
+                @if($promotion['free_member_slots'] > 0)
+                    <p class="mt-1 text-xs text-slate-500">{{ $promotion['free_member_slots'] }} teman pertama bergabung gratis. Anggota berikutnya ikut patungan.</p>
+                @endif
+            </div>
+            @include('partials.payment-total', ['quote' => $quote])
+            <button type="submit" class="btn-cta">Buat Grup · Rp{{ number_format($quote->baseAmount, 0, ',', '.') }}</button>
             @error('payment')
                 <p class="px-1 text-xs text-danger-ink">{{ $message }}</p>
             @enderror

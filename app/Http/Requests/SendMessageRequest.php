@@ -13,6 +13,7 @@ class SendMessageRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'client_message_id' => ['nullable', 'uuid'],
             'content' => ['nullable', 'string', 'max:3000'],
             'attachment' => AttachmentRules::validation(),
             'reply_to_message_id' => ['nullable', 'integer'],

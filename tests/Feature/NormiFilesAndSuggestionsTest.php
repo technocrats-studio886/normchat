@@ -13,7 +13,13 @@ use App\Models\GroupMember;
 use App\Models\Message;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Ai\AiActivity;
+use App\Services\Ai\Context\MaintenanceAi;
+use App\Services\Ai\Files\DocumentStamp;
+use App\Services\Ai\Files\ExportOverflow;
+use App\Services\Ai\Files\FileBuilder;
 use App\Services\Ai\Files\FileRequest;
+use App\Services\AttachmentTextExtractor;
 use App\Services\Chat\MessagePresenter;
 use App\Services\Credits\CreditWallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,7 +27,10 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Smalot\PdfParser\Parser;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -250,7 +259,7 @@ class NormiFilesAndSuggestionsTest extends TestCase
         $response->assertOk()->assertHeader('Content-Type', 'application/zip');
         $path = tempnam(sys_get_temp_dir(), 'zip');
         file_put_contents($path, $response->streamedContent());
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($path);
         $this->assertStringContainsString('<main>Toko</main>', (string) $zip->getFromName('app/page.tsx'));
 
@@ -260,27 +269,359 @@ class NormiFilesAndSuggestionsTest extends TestCase
     public function test_awaiting_question_carries_current_normi_activity(): void
     {
         $question = Message::create(['group_id' => $this->group->id, 'sender_type' => 'user', 'sender_id' => $this->owner->id, 'content' => '@normi-research harga cabai']);
-        \App\Services\Ai\AiActivity::report((int) $this->group->id, 'research', 'sedang mencari "harga cabai November 2026"');
+        AiActivity::report((int) $this->group->id, 'research', 'sedang mencari "harga cabai November 2026"');
 
         $presented = app(MessagePresenter::class)->present($question, null, ['awaiting_ai' => true]);
 
         $this->assertSame(['activity' => 'research', 'detail' => 'sedang mencari "harga cabai November 2026"'], $presented['ai_activity']);
-        \App\Services\Ai\AiActivity::stop((int) $this->group->id);
+        AiActivity::stop((int) $this->group->id);
         $this->assertNull(app(MessagePresenter::class)->present($question, null, ['awaiting_ai' => true])['ai_activity']);
     }
 
     /** Pemeliharaan ingatan (embedding) boleh jalan; yang tidak boleh adalah panggilan model chat atau gambar. */
+    public function test_logo_revision_waits_for_position_then_preserves_the_original_rab(): void
+    {
+        config(['normchat.documents_all_groups' => true, 'normchat.document_pilot_groups' => []]);
+        $disk = Storage::disk('normchat_attachments');
+        $source = app(FileBuilder::class)->build([['name' => 'rab.pdf', 'content' => "# Rincian Biaya\n\nTotal Rp18.750.000"]], 'pdf', 'Rincian Biaya');
+        $disk->put('rab.pdf', $source['binary']);
+        Message::create(['group_id' => $this->group->id, 'sender_type' => 'ai', 'message_type' => 'file', 'content' => 'RAB siap.', 'attachment_disk' => 'normchat_attachments', 'attachment_path' => 'rab.pdf', 'attachment_original_name' => 'rab.pdf', 'attachment_mime' => 'application/pdf']);
+        $im = imagecreatetruecolor(50, 25);
+        ob_start();
+        imagepng($im);
+        $disk->put('logo.png', ob_get_clean());
+        $this->runAi(['content' => '@normi tambahkan logo ini ke PDF sebelumnya, nama file RAB Final Bang Faisal', 'message_type' => 'image', 'attachment_disk' => 'normchat_attachments', 'attachment_path' => 'logo.png', 'attachment_original_name' => 'logo.png', 'attachment_mime' => 'image/png']);
+        $question = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertStringContainsString('di mana', $question->content);
+        $this->assertNull($question->attachment_path);
+        $this->runAi(['reply_to_message_id' => $question->id, 'content' => 'Kanan atas']);
+        $result = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertSame('rab-final-bang-faisal.pdf', $result->attachment_original_name, $result->content);
+        $binary = $disk->get($result->attachment_path);
+        $this->assertMatchesRegularExpression('~/Subtype\s*/Image~', $binary);
+        $parser = new Parser;
+        $this->assertSame(trim($parser->parseContent($source['binary'])->getText()), trim($parser->parseContent($binary)->getText()));
+        $this->assertNoModelCall();
+    }
+
+    public function test_new_pdf_with_upload_keeps_filename_out_of_document(): void
+    {
+        config(['normchat.documents_all_groups' => true, 'normchat.document_pilot_groups' => []]);
+        $this->fakeChat(json_encode(['title' => 'RAB Final Bang Faisal', 'files' => [['name' => 'wrong.pdf', 'content' => "# RAB Final Bang Faisal\n\n## Rincian biaya\n\nTotal Rp123.456"]]]));
+        $image = imagecreatetruecolor(40, 20);
+        ob_start();
+        imagepng($image);
+        Storage::disk('normchat_attachments')->put('logo.png', ob_get_clean());
+        $this->runAi(['content' => '@normi-file buat PDF dengan logo di kanan atas, nama file RAB Final Bang Faisal', 'message_type' => 'image', 'attachment_disk' => 'normchat_attachments', 'attachment_path' => 'logo.png', 'attachment_original_name' => 'logo.png', 'attachment_mime' => 'image/png']);
+        $result = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertSame('rab-final-bang-faisal.pdf', $result->attachment_original_name, $result->content);
+        $binary = Storage::disk('normchat_attachments')->get($result->attachment_path);
+        $this->assertMatchesRegularExpression('~/Subtype\s*/Image~', $binary);
+        $text = (new Parser)->parseContent($binary)->getText();
+        $this->assertStringContainsString('Rp123.456', $text);
+        $this->assertStringNotContainsString('Faisal', $text);
+    }
+
+    public function test_empty_containers_are_not_delivered_as_completed_files(): void
+    {
+        foreach (['pdf' => ['content' => '# Judul'], 'docx' => ['content' => ' '], 'xlsx' => ['sheets' => [['name' => 'Sheet', 'rows' => [['']]]]], 'pptx' => ['slides' => [['title' => 'Judul']]]] as $ext => $spec) {
+            try {
+                app(FileBuilder::class)->build([['name' => 'empty.'.$ext, ...$spec]], $ext, 'Judul');
+                $this->fail("Empty $ext accepted");
+            } catch (\RuntimeException $e) {
+                $this->assertNotSame('', $e->getMessage());
+            }
+        }
+    }
+
+    public function test_office_exports_embed_uploaded_picture_and_keep_original_data(): void
+    {
+        $im = imagecreatetruecolor(20, 10);
+        ob_start();
+        imagepng($im);
+        $bytes = ob_get_clean();
+        foreach (['docx' => ['content' => "# RAB\n\nTotal 12345"], 'xlsx' => ['rows' => [['Total', 12345]]], 'pptx' => ['slides' => [['title' => 'RAB', 'subtitle' => 'Total 12345']]]] as $ext => $spec) {
+            $file = app(FileBuilder::class)->build([[...$spec, 'name' => 'rab.'.$ext]], $ext, 'RAB');
+            $file = DocumentStamp::apply($file, ['binary' => $bytes, 'position' => 'top', 'align' => 'right', 'width' => 100, 'height' => 50]);
+            $tmp = tempnam(sys_get_temp_dir(), 'normi');
+            file_put_contents($tmp, $file['binary']);
+            $zip = new ZipArchive;
+            $this->assertTrue($zip->open($tmp) === true);
+            $picture = $text = $link = false;
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $part = $zip->getNameIndex($i);
+                $value = $zip->getFromIndex($i);
+                if (str_ends_with($part, '.xml') || str_ends_with($part, '.rels')) {
+                    $this->assertNotFalse(simplexml_load_string($value), $part);
+                    $link = $link || str_contains($value, 'r:embed="nc');
+                    $text = $text || str_contains($value, '12345');
+                }
+                $picture = $picture || $bytes === $value;
+            }
+            $this->assertTrue($picture && $text && $link, $ext);
+            $zip->close();
+            unlink($tmp);
+        }
+    }
+
+    public function test_docx_table_and_sheet_cells_are_read_for_followup_questions(): void
+    {
+        $builder = app(FileBuilder::class);
+        foreach ([
+            'docx' => ['content' => "# Daftar\n\n| Barang | Nilai |\n|---|---|\n| Kursi | 12345 |"],
+            'xlsx' => ['rows' => [['Item', 'Nilai'], ['A', 100], ['B', 200], ['Total', '=SUM(B2:B3)'], ['DP', '=B4/2+5'], ['Lain', '=INDIRECT("B2")']]],
+        ] as $ext => $spec) {
+            $file = $builder->build([['name' => 'uji.'.$ext, ...$spec]], $ext, 'Uji');
+            Storage::disk('normchat_attachments')->put($file['name'], $file['binary']);
+            $text = app(AttachmentTextExtractor::class)->extract(new Message(['attachment_original_name' => $file['name'], 'attachment_disk' => 'normchat_attachments', 'attachment_path' => $file['name']]));
+            foreach ($ext === 'docx' ? ['Kursi | 12345'] : ['B4: =SUM(B2:B3) → 300', 'B5: =B4/2+5 → 155', 'B6: =INDIRECT("B2") → belum bisa dihitung'] as $expected) {
+                $this->assertStringContainsString($expected, $text);
+            }
+        }
+    }
+
+    public function test_repeat_submission_returns_one_message_and_one_queue_item(): void
+    {
+        Queue::fake();
+        $data = ['client_message_id' => (string) Str::uuid(), 'content' => '@normi uji kirim ulang'];
+        $url = route('chat.store', $this->group);
+        $first = $this->actingAs($this->owner)->postJson($url, $data)->assertCreated()->json('message.id');
+        $this->actingAs($this->owner)->postJson($url, $data)->assertCreated()->assertJsonPath('message.id', $first);
+        $this->assertSame(1, Message::where('client_message_id', $data['client_message_id'])->count());
+        $this->assertSame(1, ChatMessageQueue::where('message_id', $first)->count());
+        Queue::assertPushed(ProcessGroupChatQueueJob::class, 1);
+    }
+
+    public function test_split_requires_consent_and_keeps_last_slide_without_regeneration(): void
+    {
+        $slides = array_map(fn ($i) => ['title' => 'Slide '.$i, 'bullets' => ['Materi '.$i]], range(1, 61));
+        $this->fakeChat(json_encode(['title' => 'Materi', 'files' => [['name' => 'materi.pptx', 'slides' => $slides]]]));
+        $this->runAi(['content' => '@normi-file buat presentasi materi dalam pptx']);
+        $question = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertStringContainsString('61 slide', $question->content);
+        $this->assertNull($question->attachment_path);
+        $this->runAi(['content' => 'bagi', 'reply_to_message_id' => $question->id]);
+        $result = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $zip = $this->openZip($result);
+        $this->assertSame(2, $zip->numFiles);
+        $tmp = tempnam(sys_get_temp_dir(), 'ppt');
+        file_put_contents($tmp, $zip->getFromIndex(1));
+        $part = new ZipArchive;
+        $part->open($tmp);
+        $this->assertStringContainsString('Materi 61', $part->getFromName('ppt/slides/slide1.xml'));
+        $part->close();
+        unlink($tmp);
+    }
+
+    public function test_split_workbook_retains_last_row_and_formulas(): void
+    {
+        $rows = array_fill(0, 5000, ['A', 1]);
+        $rows[] = ['TOTAL_AKHIR', 5000];
+        $builder = app(FileBuilder::class);
+        foreach ([false, true] as $formula) {
+            if ($formula) {
+                $rows[5000][1] = '=SUM(B1:B5000)';
+            }
+            $files = [['name' => 'data.xlsx', 'rows' => $rows]];
+            try {
+                $builder->build($files, 'xlsx', 'Data');
+                $this->fail('Ekspor melebihi batas tanpa konfirmasi.');
+            } catch (ExportOverflow $e) {
+                $this->assertStringContainsString('5001', $e->getMessage());
+            }
+            $out = $builder->build($files, 'xlsx', 'Data', forceZip: true, split: true);
+            $tmp = tempnam(sys_get_temp_dir(), 'zip');
+            file_put_contents($tmp, $out['binary']);
+            $archive = new ZipArchive;
+            $archive->open($tmp);
+            $this->assertSame($formula ? 1 : 2, $archive->numFiles);
+            $last = $archive->getFromIndex($archive->numFiles - 1);
+            $archive->close();
+            file_put_contents($tmp, $last);
+            $archive->open($tmp);
+            $xml = $archive->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertStringContainsString('TOTAL_AKHIR', $xml);
+            if ($formula) {
+                $this->assertStringContainsString('SUM(B1:B5000)', $xml);
+            }
+            $archive->close();
+            unlink($tmp);
+        }
+    }
+
+    public function test_combined_revision_checks_shipping_and_stamps_real_image(): void
+    {
+        $spec = ['content' => "# RAB\n\nOngkir Rp20.000"];
+        $file = app(FileBuilder::class)->build([['name' => 'rab.pdf', ...$spec]], 'pdf', 'RAB');
+        $disk = Storage::disk('normchat_attachments');
+        $disk->put('rab.pdf', $file['binary']);
+        $source = Message::create(['group_id' => $this->group->id, 'sender_type' => 'ai', 'message_type' => 'file', 'content' => 'RAB', 'attachment_disk' => 'normchat_attachments', 'attachment_path' => 'rab.pdf', 'attachment_original_name' => 'rab.pdf', 'attachment_mime' => 'application/pdf']);
+        $im = imagecreatetruecolor(20, 10);
+        ob_start();
+        imagepng($im);
+        $disk->put('logo.png', ob_get_clean());
+        $this->fakeChat(json_encode(['title' => 'RAB', 'files' => [['name' => 'rab.pdf', 'content' => "# RAB\n\nOngkir Rp50.000"]]]));
+        $this->mock(MaintenanceAi::class, function ($mock) {
+            $mock->shouldReceive('json')->withArgs(fn ($kind) => $kind === 'file_revision_check')->once()->andReturn(['data' => ['ok' => true, 'bukti' => ['Ongkir Rp50.000']]]);
+            $mock->shouldReceive('json')->zeroOrMoreTimes()->andReturn(null);
+            $mock->shouldReceive('embed')->zeroOrMoreTimes()->andReturn(null);
+        });
+        $this->runAi(['content' => '@normi pasang logo di kanan atas dan naikkan ongkir jadi Rp50.000', 'reply_to_message_id' => $source->id, 'message_type' => 'image', 'attachment_disk' => 'normchat_attachments', 'attachment_mime' => 'image/png', 'attachment_original_name' => 'logo.png', 'attachment_path' => 'logo.png']);
+        $result = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertNotNull($result->attachment_path, $result->content);
+        $bytes = $disk->get($result->attachment_path);
+        $this->assertMatchesRegularExpression('~/Subtype\s*/Image~', $bytes);
+        $text = (new Parser)->parseContent($bytes)->getText();
+        $this->assertStringContainsString('Ongkir Rp50.000', $text);
+        $this->assertStringNotContainsString('20.000', $text);
+    }
+
+    public function test_unverified_revision_is_withheld_and_reply_resumes_same_document(): void
+    {
+        $disk = Storage::disk('normchat_attachments');
+        $sourceFile = app(FileBuilder::class)->build([['name' => 'rab.pdf', 'content' => "# RAB\n\nOngkir Rp20.000"]], 'pdf', 'RAB');
+        $disk->put('rab.pdf', $sourceFile['binary']);
+        $source = Message::create(['group_id' => $this->group->id, 'sender_type' => 'ai', 'message_type' => 'file', 'content' => 'RAB', 'attachment_disk' => 'normchat_attachments', 'attachment_path' => 'rab.pdf', 'attachment_original_name' => 'rab.pdf', 'attachment_mime' => 'application/pdf']);
+        $attempt = 0;
+        Http::fake(['api.openai.com/v1/chat/completions' => function () use (&$attempt) {
+            $price = ++$attempt === 1 ? '20.000' : '50.000';
+
+            return Http::response(['choices' => [['message' => ['content' => json_encode(['title' => 'RAB', 'files' => [['name' => 'rab.pdf', 'content' => "# RAB\n\nOngkir Rp".$price]]])], 'finish_reason' => 'stop']], 'usage' => ['prompt_tokens' => 1000, 'completion_tokens' => 500]]);
+        }]);
+        $this->mock(MaintenanceAi::class, function ($mock) {
+            $mock->shouldReceive('json')->withArgs(fn ($kind) => $kind === 'file_revision_check')->once()->andReturn(['data' => ['ok' => true, 'bukti' => ['Ongkir Rp50.000']]]);
+            $mock->shouldReceive('json')->zeroOrMoreTimes()->andReturn(null);
+            $mock->shouldReceive('embed')->zeroOrMoreTimes()->andReturn(null);
+        });
+        $this->runAi(['content' => '@normi-file revisi PDF, ubah ongkir jadi Rp50.000', 'reply_to_message_id' => $source->id]);
+        $question = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertNull($question->attachment_path);
+        $this->assertSame('revision', $question->system_meta['file_stage']);
+        $this->runAi(['content' => 'Pada baris ongkir.', 'reply_to_message_id' => $question->id]);
+        $result = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertNotNull($result->attachment_path, $result->content);
+        $this->assertStringContainsString('Ongkir Rp50.000', (new Parser)->parseContent($disk->get($result->attachment_path))->getText());
+    }
+
     private function assertNoModelCall(): void
     {
         Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/chat/completions')
             || str_contains($request->url(), '/images/') || str_contains($request->url(), '/responses'));
     }
 
+    public function test_pilot_upload_edits_word_in_place_and_checks_the_rendered_result(): void
+    {
+        config(['normchat.document_pilot_groups' => [(string) $this->group->id]]);
+        $source = app(FileBuilder::class)->build([['name' => 'notulen.docx', 'content' => "# Notulen\n\nLokasi rapat Aula Timur\n\nPeserta tetap hadir."]], 'docx', 'Notulen');
+        Storage::disk('normchat_attachments')->put('notulen.docx', $source['binary']);
+        $sections = \App\Services\Ai\Files\OfficeSections::process($source['binary'], 'docx')['sections'];
+        $values = array_merge(...$sections);
+        $old = 'Lokasi rapat Aula Timur';
+        $id = array_search($old, $values, true);
+        $this->assertIsString($id);
+        $this->fakeChat(json_encode(['version' => substr(hash('sha256', $source['binary']), 0, 16), 'changes' => [
+            ['id' => $id, 'old' => $old, 'new' => 'Lokasi rapat Aula Barat'],
+        ]]));
+        $this->mock(MaintenanceAi::class, function ($mock) {
+            $mock->shouldReceive('json')->withArgs(fn ($kind) => $kind === 'file_revision_check')->once()
+                ->andReturn(['data' => ['ok' => true, 'bukti' => ['Lokasi rapat Aula Barat']]]);
+            $mock->shouldReceive('json')->zeroOrMoreTimes()->andReturn(null);
+            $mock->shouldReceive('embed')->zeroOrMoreTimes()->andReturn(null);
+        });
+        $this->runAi(['content' => '@normi-file revisi lokasi rapat ke Aula Barat', 'message_type' => 'file',
+            'attachment_disk' => 'normchat_attachments', 'attachment_path' => 'notulen.docx',
+            'attachment_original_name' => 'notulen.docx', 'attachment_mime' => $source['mime']]);
+        $reply = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertSame('notulen.docx', $reply->attachment_original_name, (string) $reply->content);
+        $updated = \App\Services\Ai\Files\OfficeSections::process(Storage::disk('normchat_attachments')->get($reply->attachment_path), 'docx')['sections'];
+        $values[$id] = 'Lokasi rapat Aula Barat';
+        $this->assertSame($values, array_merge(...$updated));
+    }
+
+    public function test_pilot_scan_requires_column_and_layout_confirmation_before_pdf_revision(): void
+    {
+        config(['normchat.documents_all_groups' => true, 'normchat.document_pilot_groups' => []]);
+        $source = app(FileBuilder::class)->build([['name' => 'rab.pdf', 'content' => "# RAB\n\nOngkir Rp20.000"]], 'pdf', 'RAB');
+        Storage::disk('normchat_attachments')->put('scan.pdf', $source['binary']);
+        Http::fake(['http://docling:8010/pdf' => Http::response(['text' => "RAB\nOngkir Rp20.000",
+            'tables' => [['table' => 1, 'rows' => [['Item', 'Nominal'], ['Ongkir', 'Rp20.000']]]]])]);
+        $this->fakeChat(json_encode(['version' => substr(hash('sha256', $source['binary']), 0, 16), 'changes' => [
+            ['id' => 'l2', 'old' => 'Ongkir Rp20.000', 'new' => 'Ongkir Rp50.000'],
+        ]]));
+        $this->mock(MaintenanceAi::class, function ($mock) {
+            $mock->shouldReceive('json')->withArgs(fn ($kind) => $kind === 'file_revision_check')->once()
+                ->andReturn(['data' => ['ok' => true, 'bukti' => ['Rp50.000']]]);
+            $mock->shouldReceive('json')->zeroOrMoreTimes()->andReturn(null);
+            $mock->shouldReceive('embed')->zeroOrMoreTimes()->andReturn(null);
+        });
+        $latest = fn () => Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->runAi(['content' => '@normi-file revisi ongkir jadi Rp50.000', 'message_type' => 'file',
+            'attachment_disk' => 'normchat_attachments', 'attachment_path' => 'scan.pdf', 'attachment_original_name' => 'rab.pdf', 'attachment_mime' => 'application/pdf']);
+        $this->assertStringContainsString('Item | Nominal', $latest()->content);
+        $this->runAi(['content' => 'belum', 'reply_to_message_id' => $latest()->id]);
+        $this->assertSame('pilot_table', $latest()->system_meta['file_stage']);
+        $this->runAi(['content' => 'kolom benar', 'reply_to_message_id' => $latest()->id]);
+        $this->assertSame('pilot_layout', $latest()->system_meta['file_stage']);
+        $this->runAi(['content' => 'susun ulang', 'reply_to_message_id' => $latest()->id]);
+        $this->assertSame('application/pdf', $latest()->attachment_mime, (string) $latest()->content);
+        $this->assertStringContainsString('Rp50.000', app(AttachmentTextExtractor::class)->extract($latest()));
+        $this->assertSame(1, Http::recorded(fn ($req) => str_contains($req->url(), 'docling:8010'))->count());
+    }
+
+    public function test_pilot_chat_reuses_confirmed_scan_and_sends_compact_json_once(): void
+    {
+        config(['normchat.document_pilot_groups' => [(string) $this->group->id]]);
+        $file = app(FileBuilder::class)->build([['name' => 'scan.pdf', 'content' => "# Total\n\nBiaya rapat"]], 'pdf', 'Biaya');
+        Storage::disk('normchat_attachments')->put('scan.pdf', $file['binary']);
+        Http::fake(['http://docling:8010/pdf' => Http::response(['text' => "Kegiatan\nSewa ruangan 75000", 'tables' => [
+            ['table' => 1, 'rows' => [['Keterangan', 'Nilai'], ['Sewa ruangan', '75000']]],
+        ]])]);
+        $this->fakeChat('Sewa ruangan Rp75.000.');
+        $this->runAi(['content' => '@normi berapa sewa ruangan?', 'message_type' => 'file', 'attachment_disk' => 'normchat_attachments',
+            'attachment_path' => 'scan.pdf', 'attachment_original_name' => 'scan.pdf', 'attachment_mime' => 'application/pdf']);
+        $question = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertStringContainsString('Keterangan | Nilai', $question->content);
+        $this->runAi(['content' => 'kolom benar', 'reply_to_message_id' => $question->id]);
+        $reply = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertSame('Sewa ruangan Rp75.000.', $reply->content);
+        Http::assertSent(function (Request $r) {
+            if (!str_ends_with($r->url(), '/chat/completions')) {
+                return false;
+            }
+            $parts = collect($r['messages'])->last()['content'];
+            return is_array($parts) && str_contains($parts[0]['text'], '"l2":"Sewa ruangan 75000"');
+        });
+    }
+
+    public function test_pilot_rejects_stale_or_unseen_edits_and_preserves_powerpoint_parts(): void
+    {
+        $file = app(FileBuilder::class)->build([['name' => 'materi.pptx', 'slides' => [
+            ['title' => 'Pelajaran', 'subtitle' => 'Kelas XI'], ['title' => 'Materi', 'bullets' => ['Biologi', 'Matematika']],
+        ]]], 'pptx', 'Pelajaran');
+        $sections = \App\Services\Ai\Files\OfficeSections::process($file['binary'], 'pptx')['sections'];
+        $id = array_search('Biologi', array_merge(...$sections), true);
+        $this->assertIsString($id);
+        $change = ['id' => $id, 'old' => 'Biologi', 'new' => 'Kimia'];
+        $view = ['version' => 'v1', 'sections' => $sections];
+        foreach ([['version' => 'v2', 'changes' => [$change]], ['version' => 'v1', 'changes' => [['id' => 'unknown']]]] as $bad) {
+            try {
+                \App\Services\Ai\Files\SectionRevision::validate($view, $bad, false);
+                $this->fail('Invalid patch was accepted.');
+            } catch (\RuntimeException $e) {
+                $this->assertNotEmpty($e->getMessage());
+            }
+        }
+        $result = \App\Services\Ai\Files\OfficeSections::process($file['binary'], 'pptx', [$id => $change]);
+        $updated = \App\Services\Ai\Files\OfficeSections::process($result['binary'], 'pptx')['sections'];
+        $this->assertSame('Kimia', array_merge(...$updated)[$id]);
+        $this->assertContains('Matematika', array_merge(...$updated));
+    }
+
     private function openZip(Message $message): ZipArchive
     {
         $path = tempnam(sys_get_temp_dir(), 'zip');
         file_put_contents($path, Storage::disk('normchat_attachments')->get($message->attachment_path));
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $this->assertTrue($zip->open($path) === true, 'Lampiran bukan ZIP yang valid.');
 
         return $zip;

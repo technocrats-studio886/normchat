@@ -348,7 +348,7 @@
             @foreach ($nav as $key => [$label, $path])
                 <a href="{{ $page($path) }}" class="nav-link hide-sm{{ $current === $key ? ' is-active' : '' }}" @if ($current === $key) aria-current="page" @endif>{{ $label }}</a>
             @endforeach
-            <a href="{{ $loginUrl }}" class="btn btn-sm" data-cta>{{ $n['free'] ? 'Start free' : 'Sign in' }}</a>
+            <a href="{{ $loginUrl }}" class="btn btn-sm" data-cta>Sign in</a>
         </nav>
     </div>
     <nav class="subnav wrap" aria-label="Pages">

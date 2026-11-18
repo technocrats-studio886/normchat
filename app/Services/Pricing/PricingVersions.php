@@ -77,6 +77,8 @@ class PricingVersions
             'transcription_model' => (array) config('normchat.transcription_model'),
             'web_search_usd_per_call' => (float) config('normchat.web_search.usd_per_call'),
             'embedding' => (array) config('normchat.embedding'),
+            'cache_write_multiplier_30m' => 1.25,
+            'cache_write_multiplier_12h' => 2.5,
         ];
     }
 

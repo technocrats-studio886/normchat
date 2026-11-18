@@ -31,7 +31,8 @@ class GroupInfoTest extends TestCase
         Storage::fake(GroupAvatars::DISK);
         $this->owner = User::factory()->create(['name' => 'Sari Wulan']);
         $this->member = User::factory()->create(['name' => 'Budi']);
-        $this->group = app(FreeGroups::class)->ensureFirstGroup($this->owner);
+        $this->group = Group::create(['name' => 'Grup lama', 'owner_id' => $this->owner->id, 'status' => 'active', 'free_member_slots' => 2, 'created_free' => true]);
+        app(\App\Services\GroupMembership::class)->activateFreeGroup($this->group, $this->owner, 70);
         GroupMember::create(['group_id' => $this->group->id, 'user_id' => $this->member->id, 'role_id' => Role::forKey(Role::MEMBER)->id, 'status' => 'active', 'joined_at' => now()]);
     }
 
