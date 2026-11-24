@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use App\Models\Message;
 use App\Services\Ai\Documents\DocumentIndex;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,7 +20,7 @@ class IndexDocumentJob implements ShouldQueue
 
     public function __construct(public int $messageId)
     {
-        $this->onQueue('default');
+        $this->onQueue(Queues::DOCUMENTS);
     }
 
     public function handle(DocumentIndex $index): void

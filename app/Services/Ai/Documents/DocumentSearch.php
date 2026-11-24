@@ -25,6 +25,14 @@ class DocumentSearch
 
     private const MAX_TOKENS = 3000;
 
+    /**
+     * Pertanyaan yang tidak menyebut dokumen, tapi ada dokumen di riwayat (keputusan user 24 Nov 2026: dokumen tanpa
+     * tag tetap jadi konteks saat dibutuhkan): hanya potongan yang sangat mirip, dengan jatah lebih kecil.
+     */
+    private const STRICT_DISTANCE = 0.45;
+
+    private const STRICT_TOKENS = 1200;
+
     /** Kata yang menandakan pertanyaan merujuk dokumen/lampiran grup. */
     private const DOCUMENT_WORDS = 'dokumen|file|berkas|pdf|docx?|word|pptx?|ppt|slide|slides|salindia|presentasi|materi|modul|makalah|jurnal|paper|laporan|lampiran|excel|xlsx|spreadsheet|sheet|tabel|silabus|rps|handout|catatan kuliah|bab|halaman|hal\.|buku|e-?book|proposal|skripsi|kontrak|surat|notulen|notula';
 
@@ -41,7 +49,7 @@ class DocumentSearch
      * @param  list<float>|null  $queryVector  embedding pertanyaan bila sudah ada
      * @return list<array{message_id: int, name: string, sender: string, sent_at: \Carbon\CarbonInterface, content: string}>
      */
-    public function find(Group $group, Message $request, string $question, ?array $queryVector = null): array
+    public function find(Group $group, Message $request, string $question, ?array $queryVector = null, bool $strict = false): array
     {
         $base = $this->eligible($group, $request);
         if (! (clone $base)->exists()) {
@@ -51,10 +59,11 @@ class DocumentSearch
         $named = $this->namedMessageIds($group, $request, $question);
 
         $scores = [];
-        $rankings = [$this->keywordIds($base, $question)];
+        // strict: pertanyaan tidak menyebut dokumen; hanya bagian yang sangat mirip maknanya, dengan anggaran lebih kecil.
+        $rankings = $strict ? [] : [$this->keywordIds($base, $question)];
         $queryVector ??= $this->ai->embed($group, [$question], (int) config('normchat.context.understanding_timeout', 8))[0] ?? null;
         if ($queryVector !== null) {
-            $rankings[] = $this->semanticIds($base, $queryVector);
+            $rankings[] = $this->semanticIds($base, $queryVector, $strict ? self::STRICT_DISTANCE : self::MAX_DISTANCE);
         }
         foreach ($rankings as $ranking) {
             foreach ($ranking as $rank => $id) {
@@ -94,7 +103,7 @@ class DocumentSearch
                 continue;
             }
             $cost = Tokens::text($row->content) + 20;
-            if ($used + $cost > self::MAX_TOKENS && $picked !== []) {
+            if ($used + $cost > ($strict ? self::STRICT_TOKENS : self::MAX_TOKENS) && $picked !== []) {
                 break;
             }
             $used += $cost;
@@ -111,6 +120,48 @@ class DocumentSearch
         usort($picked, fn (array $a, array $b) => [$a['message_id'], $a['chunk_index']] <=> [$b['message_id'], $b['chunk_index']]);
 
         return $picked;
+    }
+
+    /**
+     * Potongan paling relevan dari satu dokumen (DocumentProjection untuk dokumen besar), urut sesuai isi dokumen.
+     *
+     * @return list<string>
+     */
+    public function findIn(Message $document, string $question): array
+    {
+        $base = DB::table('document_chunks')->where('document_chunks.message_id', $document->id)
+            ->where('document_chunks.group_id', $document->group_id);
+        if (trim($question) === '' || ! (clone $base)->exists()) {
+            return [];
+        }
+        $group = Group::find($document->group_id);
+        $rankings = [$this->keywordIds($base, $question)];
+        $vector = $group ? ($this->ai->embed($group, [$question], (int) config('normchat.context.understanding_timeout', 8))[0] ?? null) : null;
+        if ($vector !== null) {
+            $rankings[] = $this->semanticIds($base, $vector);
+        }
+        $scores = [];
+        foreach ($rankings as $ranking) {
+            foreach ($ranking as $rank => $id) {
+                $scores[$id] = ($scores[$id] ?? 0) + 1 / (self::RRF_K + $rank + 1);
+            }
+        }
+        arsort($scores);
+        $rows = DB::table('document_chunks')->whereIn('id', array_keys($scores))->get(['id', 'chunk_index', 'content'])->keyBy('id');
+        $picked = [];
+        $used = 0;
+        foreach (array_keys($scores) as $id) {
+            $row = $rows->get($id);
+            $cost = $row ? Tokens::text($row->content) + 4 : 0;
+            if (! $row || ($used + $cost > self::MAX_TOKENS && $picked !== [])) {
+                continue;
+            }
+            $used += $cost;
+            $picked[(int) $row->chunk_index] = (string) $row->content;
+        }
+        ksort($picked);
+
+        return array_values($picked);
     }
 
     private function eligible(Group $group, Message $request)
@@ -149,14 +200,14 @@ class DocumentSearch
     }
 
     /** @return list<int> */
-    private function semanticIds($base, array $queryVector): array
+    private function semanticIds($base, array $queryVector, float $maxDistance = self::MAX_DISTANCE): array
     {
-        return DB::transaction(function () use ($base, $queryVector) {
+        return DB::transaction(function () use ($base, $queryVector, $maxDistance) {
             DB::statement("SET LOCAL hnsw.iterative_scan = 'strict_order'");
 
             return (clone $base)
                 ->whereNotNull('document_chunks.embedding')
-                ->whereVectorDistanceLessThan('document_chunks.embedding', $queryVector, self::MAX_DISTANCE)
+                ->whereVectorDistanceLessThan('document_chunks.embedding', $queryVector, $maxDistance)
                 ->orderByVectorDistance('document_chunks.embedding', $queryVector)
                 ->limit(self::CANDIDATES)
                 ->pluck('document_chunks.id')

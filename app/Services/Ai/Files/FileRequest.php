@@ -17,11 +17,38 @@ final class FileRequest
     /** Kata yang menandai format lemah benar-benar diminta sebagai file. */
     private const FILE_WORDS = '/\b(file|berkas|dokumen|unduh(?:an)?|download|lampiran|attachment|simpan(?:kan)?\s+sebagai|save\s+as)\b/u';
 
+    /** Pertanyaan tentang file, bukan permintaan membuatnya ("kenapa pdf yang dikirim rusak?", "cara bikin ppt"). */
+    private const QUESTION = '/^(?:gimana|bagaimana|kenapa|mengapa|apa(?:kah)?|jelaskan|jelasin|kapan|berapa|siapa|di\s*mana)\b/u';
+
+    /** Minta diajari caranya: selalu chat, walau menyebut format. */
+    private const HOW_TO = '/\b(?:cara(?:nya)?\s+(?:bikin|buat|membuat|mengubah|ubah|convert|export|ekspor|menyimpan|simpan)|gimana\s+cara|bagaimana\s+cara|tutorial|langkah-langkah)\b/u';
+
+    /** Bentuk hasil disebut jelas ("dalam bentuk pdf", "berupa file excel", "kirim dalam word"): permintaan file walau diawali "jelaskan". */
+    private const EXPLICIT_OUTPUT = '/\b(?:dalam\s+(?:bentuk|format)|berupa|sebagai\s+file|(?:kirim(?:kan|in)?|kasih)\s+(?:dalam\s+)?)\s*(?:file\s+)?(?:pdf|word|docx|excel|xlsx|ppt|pptx|powerpoint|csv)\b/u';
+
+    /** "butuh file excel", "mau pdf jadwal ronda", "minta dokumen word". */
+    private const WANTS = '/\b(?:butuh|perlu|minta|mau|pengen|pingin|ingin)\b(?:\s+\S+){0,3}?\s+(?:file|berkas|dokumen|pdf|excel|word|docx|xlsx|pptx|ppt|powerpoint|csv|slide)\b/u';
+
     /** @param  list<string>  $formats */
     private function __construct(
         public readonly array $formats,
         public readonly bool $isConversion,
     ) {}
+
+    /** Conversion of the selected text message, with no new writing or editing instructions. */
+    public static function exportsRepliedText(\App\Models\Message $request): bool
+    {
+        if (!$request->reply_to_message_id || $request->attachment_path || filled($request->reply_quote_text)
+            || !in_array($request->ai_mode, [null, \App\Enums\AiMode::File], true)) {
+            return false;
+        }
+        $target = $request->replyToMessage;
+        if (!$target || $target->message_type !== 'text' || $target->attachment_path || blank($target->content)
+            || $target->group_id != $request->group_id || $target->visible_to_user_id || $target->trashed()) {
+            return false;
+        }
+        return (bool) preg_match('/^(?:@normi(?:-file)?\s+)?(?:(?:tolong|coba|bantu)\s+)*(?:buat(?:kan|in)?|bikin(?:kan|in)?|ubah(?:kan)?|jadi(?:kan|in)?|simpan(?:kan)?|ekspor|export|cetak)(?:\s*lah)?\s+(?:(?:pesan|jawaban|teks)\s+)?(?:ini|itu|tadi)(?:\s+(?:menjadi|jadi|ke|sebagai|dalam))?(?:\s+(?:file|format))?\s+pdf(?:\s+(?:ya|dong))?[.! ]*$/iu', trim((string) $request->content));
+    }
 
     /** Format pertama yang diminta; null = biarkan Normi memilih (tag @normi-file tanpa format). */
     public function format(): ?string
@@ -37,10 +64,37 @@ final class FileRequest
         return $detected ?? new self([], false);
     }
 
+    /**
+     * Bentuk sehari-hari yang menutupi kata kunci (eval 23 Nov 2026: "kirim filenya" dijawab chat biasa):
+     * "filenya"/"pdf-nya" → "file"/"pdf", "dibikinin"/"dijadikan" → "bikinin"/"jadikan", "pdf-in"/"word-kan" → "jadikan pdf".
+     */
+    public static function normalize(string $text): string
+    {
+        $nouns = 'file|berkas|dokumen|pdf|excel|word|docx|xlsx|pptx|ppt|powerpoint|csv|slide|presentasi|laporan|surat|tabel|spreadsheet|zip';
+        $text = (string) preg_replace('/\b('.$nouns.')-?nya\b/iu', '$1', $text);
+        $text = (string) preg_replace('/\b(pdf|word|excel|ppt|pptx|docx|xlsx|csv|zip)-?(?:in|kan|kn)\b/iu', 'jadikan $1', $text);
+
+        return (string) preg_replace('/\bdi(buat|bikin|jadi|ubah|convert|konversi|ekspor|export|simpan|kirim|susun|tulis|cetak|print)(kan|in|kin)?\b/iu', '$1$2', $text);
+    }
+
+    private static function documentBeforeImage(string $text): bool
+    {
+        if (preg_match('/\b(gambar|foto|image|picture|ilustrasi|illustration|logo|poster)\b/u', $text, $image, PREG_OFFSET_CAPTURE) !== 1) {
+            return true;
+        }
+        preg_match('/\b(dokumen|file|berkas|laporan|report|surat|notulen|notula|invoice|faktur|kwitansi|kuitansi|nota|proposal|cv|rab|sertifikat|piagam)\b/u', $text, $doc, PREG_OFFSET_CAPTURE);
+
+        return isset($doc[0]) && $doc[0][1] < $image[0][1];
+    }
+
     public static function detect(string $content, bool $requireVerb = true): ?self
     {
-        $text = mb_strtolower(trim((string) preg_replace('/(?<![\w@])@[\w-]+/u', ' ', $content)));
-        if ($text === '' || ($requireVerb && preg_match(self::VERBS, $text) !== 1)) {
+        $text = self::normalize(mb_strtolower(trim((string) preg_replace('/(?<![\w@])@[\w-]+/u', ' ', $content))));
+        $explicit = preg_match(self::EXPLICIT_OUTPUT, $text) === 1;
+        if ($text === '' || ($requireVerb && ! $explicit && preg_match(self::VERBS, $text) !== 1 && preg_match(self::WANTS, $text) !== 1)) {
+            return null;
+        }
+        if ($requireVerb && (preg_match(self::HOW_TO, $text) === 1 || (preg_match(self::QUESTION, $text) === 1 && ! $explicit))) {
             return null;
         }
 
@@ -81,9 +135,12 @@ final class FileRequest
         $formats = array_values(array_unique($found));
 
         // "buatkan dokumen notulen rapat" tanpa format: PDF seperti sebelumnya (kecuali permintaan gambar).
-        if ($formats === [] && preg_match('/\b(dokumen|file|berkas|laporan|report|surat|notulen|notula)\b/u', $text) === 1
-            && preg_match('/\b(gambar|foto|image|picture|ilustrasi|illustration|logo|poster)\b/u', $text) !== 1
-            && ($requireVerb ? preg_match('/\b(buat(?:kan|in)?|bikin(?:in|kan)?|generate|create|export|ekspor|render|siapkan)\b/u', $text) === 1 : true)) {
+        // Jenis dokumen yang hampir selalu diminta sebagai berkas (eval 23 Nov 2026: "buat invoice …" dijawab chat).
+        if ($formats === [] && preg_match('/\b(dokumen|file|berkas|laporan|report|surat|notulen|notula|invoice|faktur|kwitansi|kuitansi|nota|proposal|cv|rab|sertifikat|piagam)\b/u', $text) === 1
+            // Permintaan gambar ("buatkan logo untuk laporan") bukan file, kecuali jenis dokumennya disebut lebih dulu
+            // ("buat invoice … jasa desain logo").
+            && self::documentBeforeImage($text)
+            && ($requireVerb ? preg_match('/\b(buat(?:kan|in)?|bikin(?:in|kan)?|generate|create|export|ekspor|render|siapkan|kirim(?:kan|in)?)\b/u', $text) === 1 || preg_match(self::WANTS, $text) === 1 : true)) {
             $formats = ['pdf'];
         }
 

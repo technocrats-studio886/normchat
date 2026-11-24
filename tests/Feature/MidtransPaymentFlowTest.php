@@ -130,7 +130,7 @@ class MidtransPaymentFlowTest extends TestCase
         $this->assertSame(300.0, $group->fresh()->groupToken->credits);
     }
 
-    public function test_callback_with_expired_status_deletes_pending_group(): void
+    public function test_expired_checkout_recovers_on_late_settlement_and_stays_paid_on_replayed_notifications(): void
     {
         $user = User::factory()->create();
         [$group, $pending] = $this->pendingGroupCreation($user, 300);
@@ -141,7 +141,15 @@ class MidtransPaymentFlowTest extends TestCase
             ->assertRedirect(route('groups.index'));
 
         $this->assertSame('failed', $pending->fresh()->status);
-        $this->assertNull(Group::withTrashed()->find($group->id));
+        $this->assertSoftDeleted($group);
+        $url = '/api/webhooks/midtrans';
+        $this->postJson($url, $this->notification($pending, 'settlement'))->assertJsonPath('status', 'paid');
+        $confirmed = $pending->fresh()->metadata_json;
+        $this->postJson($url, $this->notification($pending, 'expire'))->assertJsonPath('status', 'paid');
+        $this->postJson($url, $this->notification($pending, 'settlement'))->assertJsonPath('status', 'paid');
+        $this->assertSame($confirmed, $pending->fresh()->metadata_json);
+        $this->assertSame('active', $group->fresh()->status);
+        $this->assertSame(300.0, $group->fresh()->groupToken->credits);
     }
 
     public function test_callback_ignores_orders_of_other_users(): void

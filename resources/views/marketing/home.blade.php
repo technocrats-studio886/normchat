@@ -2,59 +2,34 @@
 
 {{-- Copy: docs/rancangan-copy-marketing.md (revisi 3, anti-slop). Angka dari setelan ($n, view composer marketing). --}}
 @section('title', 'Normi Chat | One AI for the whole group')
-@section('description', 'Mention @normi in your group chat. Pay once to create your group and share one AI balance.')
+@section('description', 'Meet Normi, the AI your group can ask for a recap, a first draft, or a hand with the next decision.')
 
 @section('content')
 
 
-    {{-- Hero: judul, dua CTA, lalu penjelasan memenuhi bagian atas; di bawahnya demo chat hidup (kiri, partials/live-demo-script)
-         dan empat manfaat (kanan). --}}
-    <section class="hero">
-        <div class="wrap hero-head">
-            <h1>One AI for the whole group.</h1>
-            <div class="btn-row">
-                @include('marketing.partials.cta')
-                <a href="#how" class="btn btn-ghost">See how it works</a>
-            </div>
-            <p class="hero-lead">Stop copying AI answers into your group chat. Just mention <span class="mention">@normi</span>, and everyone gets the same answer, right where the conversation happens. All powered by one shared balance.</p>
-            <div class="prose">@include('marketing.partials.group-offer')</div>
-            <p class="chat-note">
-
-                    Sign in with Google and pay with QRIS.
-
-            </p>
-        </div>
-        <div class="wrap hero-body">
-            <div class="demo-wrap">
-                <div class="chat" data-live-demo role="img" aria-label="Example group chat where Normi summarizes the budget discussion for the whole group">
-                    <div class="chat-head"><span>Group chat</span><span class="live-badge"><i></i>Live demo</span></div>
-                    <div data-demo-body>
-                        <div class="msg" data-demo-step><b>Rina</b><span>Have we agreed on the proposal structure yet?</span></div>
-                        <div class="msg" data-demo-step><b>Dimas</b><span>Not yet. The budget section is still empty.</span></div>
-                        <div class="msg mine" data-demo-step data-demo-pause="1300"><b>You</b><span><span class="mention" data-demo-mention>@normi</span> summarize the budget points from the chat above.</span></div>
-                        <div class="msg normi typing" data-demo-typing><b>Normi</b><span class="dots"><i></i><i></i><i></i><em>Thinking</em></span></div>
-                        <div class="msg normi" data-demo-step><b>Normi</b><span data-demo-answer>The group agreed on a spending cap per person and a shared fund for printing costs.</span></div>
-                    </div>
+    <section class="hero home-hero">
+        <div class="wrap home-intro">
+            <div class="hero-copy">
+                <h1>One AI for the whole group.</h1>
+                <p class="hero-lead">Mention <span class="mention">@normi</span> to recap a long discussion or turn an idea into a first draft. Everyone can pick up the conversation from there.</p>
+                <div class="btn-row">
+                    @include('marketing.partials.cta')
+                    <a href="#demo" class="btn btn-ghost">See how it works</a>
                 </div>
             </div>
-            <ul class="benefit-list">
-                <li><h3>Decide sooner</h3><p>The whole group reads one answer, so you can agree and move on.</p></li>
-                <li><h3>Keep the group in the loop</h3><p>Members who join late scroll up and see what Normi said.</p></li>
-                <li><h3>Split the cost</h3><p>Your group shares one balance instead of paying for an AI subscription per person.</p></li>
-
-                    <li><h3>Skip the subscription</h3><p>You pay once to start and top up when your group needs more.</p></li>
-
-            </ul>
         </div>
-    </section>
-
-    {{-- Problem --}}
-    <section class="alt">
-        <div class="wrap">
-            <h2>Your group already uses AI, each person in their own chat.</h2>
-            <div class="prose">
-                <p>One friend asks AI for a summary while another pays for a subscription the rest of the group can't use. Then the screenshots start, and the group asks the same question several times.</p>
-                <p>Normi Chat puts one AI inside your group chat, so you ask once and the whole group reads the same answer.</p>
+        <div class="wrap home-demo" id="demo">
+            <div class="demo-wrap">
+                <div class="chat" data-live-demo role="group" aria-label="Example of Normi drafting a workshop reminder">
+                    <div class="chat-head"><span>Workshop planning</span><span class="live-badge"><i></i>Live demo</span></div>
+                    <div data-demo-body>
+                        <div class="msg" data-demo-step><b>Rina</b><span>The workshop is Friday at 2.</span></div>
+                        <div class="msg" data-demo-step><b>Dimas</b><span>I booked Room 4. Everyone needs a laptop.</span></div>
+                        <div class="msg mine" data-demo-step data-demo-pause="1300"><b>You</b><span><span class="mention" data-demo-mention>@normi</span> draft a reminder for the group.</span></div>
+                        <div class="msg normi typing" data-demo-typing><b>Normi</b><span class="dots"><i></i><i></i><i></i><em>Thinking</em></span></div>
+                        <div class="msg normi" data-demo-step><b>Normi</b><span data-demo-answer>See you in Room 4 on Friday at 2 for the workshop. Bring your laptop!</span></div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -62,28 +37,24 @@
     {{-- How it works --}}
     <section id="how">
         <div class="wrap">
-            <h2>You can start in about a minute.</h2>
+            <h2>How to bring Normi into your group</h2>
             <div class="grid grid-3">
                 <div class="card">
                     <svg class="icon" aria-hidden="true"><use href="#i-users-three"/></svg>
                     <h3>1. Start your group</h3>
 
-                        <p>Sign in with Google and pay {{ $n['groupPrice'] }} with QRIS. Your group starts with {{ $n['groupCredits'] }} Normkredit.</p>
+                        <p>Sign in with Google and give your group a name.</p>
 
                 </div>
                 <div class="card">
                     <svg class="icon" aria-hidden="true"><use href="#i-link-simple"/></svg>
                     <h3>2. Invite your friends</h3>
-                    @if ($n['freeSlots'] > 0)
-                        <p>Share the group code. Your first {{ $n['freeSlots'] }} friends join free, and each additional member makes a one-time contribution to the group's shared balance before joining.</p>
-                    @else
-                        <p>Share the group code. Each new member makes a one-time contribution to the group's shared balance before joining.</p>
-                    @endif
+                    <p>Send your friends the group code so they can join the conversation.</p>
                 </div>
                 <div class="card">
                     <svg class="icon" aria-hidden="true"><use href="#i-at"/></svg>
                     <h3>3. Ask @normi</h3>
-                    <p>Type <span class="mention">@normi</span> in the chat. Normi replies in the group, and you continue the discussion from its answer.</p>
+                    <p>Ask <span class="mention">@normi</span> a question in the chat. Anyone in the group can follow up.</p>
                 </div>
             </div>
             <div class="btn-row">
@@ -200,12 +171,17 @@
     <section class="alt">
         <div class="wrap">
 
-                <h2>Your group pays once and tops up together.</h2>
-                <div class="prose">
-                    @include('marketing.partials.group-offer')
-                    <p>After the free spots are taken, new members contribute once to join. Any member can top up later. There is no monthly subscription.</p>
-                </div>
-
+            <h2>One shared balance for {{ $n['groupPrice'] }}</h2>
+            <div class="prose" data-paid-group-offer>
+                <p>Your group starts with {{ $n['groupCredits'] }} Normkredit.
+                    @if ($n['promotion']['active'])
+                        Get {{ rtrim(rtrim(number_format($n['promotion']['bonus_credits'], 2, '.', ','), '0'), '.') }} bonus NC when you start a group during the promotion.
+                    @endif
+                    Top up whenever you need more.</p>
+                @if ($n['freeSlots'] > 0)
+                    <p>Your first {{ $n['freeSlots'] }} {{ $n['freeSlots'] === 1 ? 'friend joins' : 'friends join' }} free.</p>
+                @endif
+            </div>
             <div class="btn-row">
                 <a href="{{ $page('/pricing') }}" class="btn btn-ghost">See prices</a>
             </div>
@@ -216,8 +192,8 @@
     <section class="cta">
         <div class="wrap">
             <div class="prose">
-                <h2>Bring your group together with one shared AI.</h2>
-                <p>Sign in with Google and {{ $n['free'] ? 'start your free group' : 'create your group' }} in about a minute.</p>
+                <h2>What’s your group working on?</h2>
+
                 <div class="btn-row">
                     @include('marketing.partials.cta')
                 </div>

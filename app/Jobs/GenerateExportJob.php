@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use App\Models\Export;
 use App\Models\Group;
 use App\Models\User;
@@ -27,7 +28,7 @@ class GenerateExportJob implements ShouldQueue
 
     public function __construct(public int $exportId)
     {
-        $this->onQueue('default');
+        $this->onQueue(Queues::DOCUMENTS);
     }
 
     public function handle(ChatExportBuilder $builder): void

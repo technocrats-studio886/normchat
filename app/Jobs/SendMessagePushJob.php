@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use App\Models\Message;
 use App\Services\Push\MessagePush;
 use Illuminate\Bus\Queueable;
@@ -23,6 +24,7 @@ class SendMessagePushJob implements ShouldQueue
 
     public function __construct(public int $messageId)
     {
+        $this->onQueue(Queues::NOTIFY);
     }
 
     public function handle(MessagePush $push): void

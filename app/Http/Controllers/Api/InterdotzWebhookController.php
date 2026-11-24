@@ -50,7 +50,7 @@ class InterdotzWebhookController extends Controller
                 $this->field($request, ['paid_at'], null),
             ));
 
-            return response()->json(['message' => 'processed', 'status' => $state]);
+            return response()->json(['message' => 'processed', 'status' => $pending->status]);
         }
 
         return response()->json(['message' => 'ignored', 'status' => $status]);

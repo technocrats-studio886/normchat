@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
@@ -15,6 +16,7 @@ class SendAdminAlertMail implements ShouldQueue
 
     public function __construct(public string $subject, public string $body)
     {
+        $this->onQueue(Queues::NOTIFY);
     }
 
     public function handle(): void

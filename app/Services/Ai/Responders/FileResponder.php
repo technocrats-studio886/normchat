@@ -16,6 +16,7 @@ use App\Services\Ai\Files\FileFormats;
 use App\Services\Ai\Files\FileRequest;
 use App\Services\Ai\Files\RevisionCheck;
 use App\Services\Ai\Files\PilotDocument;
+use App\Services\Ai\Files\DocumentReview;
 use App\Services\Ai\Files\SectionRevision;
 use App\Services\Ai\PromptBuilder;
 use App\Services\AttachmentTextExtractor;
@@ -66,6 +67,21 @@ final class FileResponder implements AiResponder
     public function respond(AiTask $task): AiReply
     {
         $message = $task->message;
+        if (FileRequest::exportsRepliedText($message)) {
+            $source = FileEdit::visible($task, $message->reply_to_message_id);
+            if (!$source) {
+                return AiReply::notice(self::KIND, 'Pesan sumber tidak tersedia.');
+            }
+            $task->progress(AiActivity::FILE, 'sedang mengekspor pesan ke PDF');
+            $name = 'pesan-'.$source->id.'.pdf';
+            try {
+                $file = app(FileBuilder::class)->build([['name' => $name, 'content' => $source->content]], 'pdf', '');
+                return $this->store($task, $file, 'Ini PDF dari pesan yang kamu pilih.', $task->model);
+            } catch (Throwable $error) {
+                report($error);
+                return AiReply::notice(self::KIND, 'PDF belum berhasil dibuat. Pesan aslinya masih tersedia.')->withMeta(['temporary_failure' => true]);
+            }
+        }
         $pending = FileEdit::pending($message);
         $origin = $pending ? FileEdit::visible($task, (int) $pending->system_meta['file_position_request']) : $message;
         if (! $origin || ($pending && $origin->sender_id != $task->requester->id)) {
@@ -98,7 +114,9 @@ final class FileResponder implements AiResponder
             && in_array($format, [null, 'pdf', 'docx', 'xlsx', 'pptx'], true)
             && ! preg_match('/\b(?:referensi|contoh|baca\w*|analisis|analisa|ekstrak|salin|transkrip|tanpa|jangan)\b/iu', $text));
         $filename = FileEdit::filename($text);
-        $revision = preg_match('/\b(?:revisi|rename)\b|\b(?:file|dokumen|berkas|rab|pdf|word|excel|powerpoint|docx|xlsx|pptx)(?:\s+\w+){0,2}\s+(?:sebelumnya|tadi|terakhir|kemarin)\b/iu', $text)
+        // "revisi" sebagai isi dokumen ("biaya revisi 2x" di invoice) bukan permintaan merevisi file (eval 23 Nov 2026).
+        $plain = trim((string) preg_replace(AiMode::anyTagPattern(), '', $text));
+        $revision = preg_match('/^(?:(?:tolong|coba|bantu|mohon)\s+)*(?:revisi|rename)\b|\b(?:revisi|rename)\s+(?:(?:isi|nama)\s+)?(?:file|dokumen|berkas|rab|pdf|word|excel|powerpoint|docx|xlsx|pptx|ppt|proposal|surat|laporan|invoice|cv|presentasi|slide)\b|\b(?:file|dokumen|berkas|rab|pdf|word|excel|powerpoint|docx|xlsx|pptx)(?:\s+\w+){0,2}\s+(?:sebelumnya|tadi|terakhir|kemarin)\b/iu', $plain)
             || ($embed && preg_match('/\b(?:ke|di|pada|dalam)\s+(?:file\s+)?(?:pdf|dokumen|file|rab)\s*(?:itu|tersebut)\b/iu', $text))
             || ($filename && preg_match('/\b(?:ganti|ubah)\b/iu', $text));
         $source = PilotDocument::supports($origin) ? $origin : FileEdit::source($task, $origin, $format, (bool) $revision);
@@ -131,6 +149,7 @@ final class FileResponder implements AiResponder
         }
 
         $sourceText = '';
+        $scopeNote = '';
         $pilot = PilotDocument::supports($source);
         $contentEdit = (bool) preg_match('/\b(?:revisi|edit|ubah|ganti|koreksi|perbarui|naikkan|turunkan|tambahkan|hapus)\b/iu', (string) $origin->content);
         if ($pilot && preg_match('/\b(?:menjadi|jadi|sebagai|ke|format)\s+(?:file\s+)?(pdf|docx|word|pptx|ppt|powerpoint|xlsx|excel)\b/iu', (string) $origin->content, $targetFormat)) {
@@ -161,24 +180,20 @@ final class FileResponder implements AiResponder
                 }
             }
             if ($pilot) {
-                try {
-                    $doc = PilotDocument::read($source);
-                } catch (\RuntimeException $error) {
-                    return AiReply::notice(self::KIND, $error->getMessage());
-                }
                 $meta = $pending?->system_meta ?? [];
+                $doc = DocumentReview::read($source, (string) $message->content, $meta, $resume, self::KIND);
+                if ($doc instanceof AiReply) {
+                    return $doc;
+                }
+                if ($doc['pages']) {
+                    $scopeNote = ' Hasil ini menggunakan halaman '.$doc['pages'].' dari PDF sumber.';
+                    $text .= $scopeNote;
+                }
                 $current = $meta['pilot_version'] ?? null;
-                $resume['pilot_version'] = $doc['version'];
                 $reply = preg_replace('/^@normi(?:-file)?\s+/iu', '', mb_strtolower(trim($message->content, " .!\t\r\n")));
-                foreach (['table', 'layout', 'full', 'rebuild'] as $approval) {
+                foreach (['layout', 'full', 'rebuild'] as $approval) {
                     $key = 'pilot_'.$approval;
                     $resume[$key] = $current === $doc['version'] && !empty($meta[$key]);
-                }
-                if ($doc['tables'] && !$resume['pilot_table']) {
-                    if ($current !== $doc['version'] || $stage !== 'pilot_table' || $reply !== 'kolom benar') {
-                        return AiReply::notice(self::KIND, PilotDocument::tableQuestion($doc))->withMeta([...$resume, 'file_stage' => 'pilot_table']);
-                    }
-                    $resume['pilot_table'] = true;
                 }
                 if ($current === $doc['version'] && isset($meta['pilot_draft'])) {
                     $resume['pilot_draft'] = $meta['pilot_draft'];
@@ -201,12 +216,13 @@ final class FileResponder implements AiResponder
                     if ($result instanceof AiReply) {
                         return $result;
                     }
-                    return $this->store($task, $result[0], 'Revisi sudah diterapkan pada '.$result[0]['name'].'.', $result[1]);
+                    return $this->store($task, $result[0], 'Revisi sudah diterapkan pada '.$result[0]['name'].'.'.$scopeNote, $result[1]);
                 }
                 $task->prompts->prepareDocument($source, null);
-                $sourceText = PilotDocument::json(PilotDocument::view($doc, $text, false));
+                // Disusun ulang utuh: semua bagian, dalam bentuk ringkas (baris bernomor + tabel TSV).
+                $sourceText = \App\Services\Ai\Documents\DocumentProjection::compact($doc['sections'], $doc['tables'] ?? []);
             } else {
-                $sourceText = app(AttachmentTextExtractor::class)->extract($source, 30000);
+                $sourceText = $this->sourceText($source);
             }
             if (! $sourceText || str_contains($sourceText, '[…dipotong:')) {
                 return AiReply::notice(self::KIND, 'Isi lengkap file sumber belum bisa dibaca. Kirim bagian yang ingin direvisi.');
@@ -225,11 +241,12 @@ final class FileResponder implements AiResponder
                 $file['name'] = $filename.'.zip';
             }
 
-            return $this->store($task, $file, 'Hasil lengkap tersedia di arsip ZIP.', $task->model);
+            return $this->store($task, $file, 'Hasil tersedia di arsip ZIP.'.$scopeNote, $task->model);
         }
         $instruction = $format !== null
             ? 'Format yang diminta: '.FileFormats::label($format)." (.{$format})".'.'
             : ($embed ? 'Gunakan PDF kecuali format dokumen lain diminta.' : 'Pilih format file yang paling sesuai dengan permintaan.');
+        $instruction .= $scopeNote;
         $instruction .= ' Nama unduhan hanya di files[].name. Judul dan isi berasal dari materi dokumen. Jangan ulang judul atau masukkan label versi/nama penerima dari nama unduhan. Gunakan bagian, tabel dan rincian yang relevan; jangan mengarang data. Jika gambar disisipkan server, jangan buat placeholder atau tautan gambar.';
         if ($source) {
             $instruction .= ' Terapkan semua perubahan yang jelas. Jika data kurang, sertakan "clarification" (pertanyaan untuk bagian itu) bersama draf files. Jaga data lain dan perbarui total terkait.';
@@ -318,8 +335,25 @@ final class FileResponder implements AiResponder
             return AiReply::notice(self::KIND, 'Isi atau format dokumen belum bisa dirender. Coba ulang dengan satu file dan rincian yang ingin dimasukkan.');
         }
 
-        return $this->store($task, $file, $spec['summary'], $model);
+        return $this->store($task, $file, $spec['summary'].$scopeNote, $model);
 
+    }
+
+    /** Isi berkas sumber untuk revisi: dokumen kanonik bila ada, pembaca teks lama bila belum bisa dikonversi. */
+    private function sourceText(\App\Models\Message $source): ?string
+    {
+        if (\App\Services\Ai\Documents\DocumentStore::supports($source)) {
+            try {
+                $document = app(\App\Services\Ai\Documents\DocumentStore::class)->ensure($source);
+                $text = \App\Services\Ai\Documents\DocumentProjection::compact($document['sections'], $document['tables'] ?? []);
+
+                return mb_strlen($text) <= 30000 ? $text : $text."\n[…dipotong: file lebih panjang dari batas yang dibaca AI]";
+            } catch (\RuntimeException) {
+                // Pembaca teks lama di bawah.
+            }
+        }
+
+        return app(AttachmentTextExtractor::class)->extract($source, 30000);
     }
 
     private function saveDraft(array $spec, array $resume, string $stage, string $question): AiReply
@@ -363,7 +397,7 @@ final class FileResponder implements AiResponder
     {
         $path = sprintf('group-%d/%s/ai-file-%s.%s', $task->group->id, now()->format('Y/m'), Str::uuid(), $file['ext']);
         if (! Storage::disk('normchat_attachments')->put($path, $file['binary'])) {
-            return AiReply::notice(self::KIND, 'File belum berhasil disimpan. Coba lagi.');
+            return AiReply::notice(self::KIND, 'File belum berhasil disimpan. Coba lagi.')->withMeta(['temporary_failure' => true]);
         }
 
         return AiReply::attachment(self::KIND, $summary !== '' ? $summary : 'File '.$file['name'].' sudah siap.', [
@@ -386,7 +420,7 @@ final class FileResponder implements AiResponder
         } catch (Throwable $e) {
             Log::error('Image to PDF failed.', ['error' => $e->getMessage()]);
 
-            return AiReply::notice(self::KIND, 'Gagal mengubah gambar ke PDF. Coba lagi.');
+            return AiReply::notice(self::KIND, 'Gagal mengubah gambar ke PDF. Coba lagi.')->withMeta(['temporary_failure' => true]);
         }
 
         return $this->store($task, $file, 'Gambarnya sudah kuubah jadi PDF.', $task->model);

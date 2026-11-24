@@ -79,7 +79,6 @@ class ChatController extends Controller
         $viewer = $request->user();
         $messages = $this->recentMessages($group, $viewer);
         // Pertanyaan yang masih menunggu jawaban Normi tidak bisa diedit dulu.
-        $awaitingAi = ChatMessageQueue::whereIn('message_id', $messages->pluck('id'))->whereIn('status', ['queued', 'processing'])->pluck('message_id')->flip();
 
         $lastReadMessageId = (int) ($this->membership($group, $request)?->last_read_message_id ?? 0);
         $latestMessageId = (int) Message::where('group_id', $group->id)->max('id');
@@ -95,7 +94,7 @@ class ChatController extends Controller
             // Kartu "grup dibuat" di paling atas bila feed sudah sampai awal yang boleh dilihat user.
             'showCreatedCard' => $messages->count() < self::VISIBLE_MESSAGES || $historyFrom > 0,
             // Dirender di browser oleh resources/js/chat/messages.js, sama dengan pesan realtime.
-            'messages' => $messages->map(fn (Message $message) => $this->presenter->present($message, null, ['awaiting_ai' => $awaitingAi->has($message->id)]))->all(),
+            'messages' => $this->presentFeed($messages, $viewer),
             // Tujuan "Bagikan": grup lain tempat user bisa mengirim pesan.
             'forwardTargets' => Group::query()->visibleTo($viewer)->where('status', 'active')->whereKeyNot($group->id)->orderBy('name')->get(['id', 'name'])
                 ->map(fn (Group $target) => ['id' => $target->id, 'name' => $target->name])->all(),
@@ -130,6 +129,20 @@ class ChatController extends Controller
             ->withCount('versions');
     }
 
+    private function presentFeed(Collection $messages, User $viewer): array
+    {
+        $latest = ChatMessageQueue::whereIn('message_id', $messages->pluck('id'))->orderByDesc('id')
+            ->get(['message_id', 'status'])->unique('message_id')->keyBy('message_id');
+
+        return $messages->map(function (Message $message) use ($latest, $viewer) {
+            $status = $latest->get($message->id)?->status;
+            return $this->presenter->present($message, null, [
+                'awaiting_ai' => in_array($status, ['queued', 'processing'], true),
+                'ai_request_failed' => $status === 'failed' && (int) $message->sender_id === (int) $viewer->id,
+            ]);
+        })->all();
+    }
+
     /** Pesan terakhir yang dimuat saat chat dibuka, urut lama ke baru. */
     private function recentMessages(Group $group, User $viewer): Collection
     {
@@ -147,12 +160,11 @@ class ChatController extends Controller
         $this->authorize('chat', $group);
         $viewer = $request->user();
         $messages = $this->recentMessages($group, $viewer);
-        $awaitingAi = ChatMessageQueue::whereIn('message_id', $messages->pluck('id'))->whereIn('status', ['queued', 'processing'])->pluck('message_id')->flip();
         $historyFrom = (int) ($this->membership($group, $request)?->history_from_message_id ?? 0);
 
         return response()->json([
             'show_created_card' => $messages->count() < self::VISIBLE_MESSAGES || $historyFrom > 0,
-            'messages' => $messages->map(fn (Message $message) => $this->presenter->present($message, null, ['awaiting_ai' => $awaitingAi->has($message->id)]))->all(),
+            'messages' => $this->presentFeed($messages, $viewer),
         ]);
     }
 
@@ -183,13 +195,12 @@ class ChatController extends Controller
         $hasNewer = $newer->count() > self::AROUND_SPAN;
 
         $chunk = $older->take(self::AROUND_SPAN)->reverse()->push($target)->merge($newer->take(self::AROUND_SPAN))->values();
-        $awaitingAi = ChatMessageQueue::whereIn('message_id', $chunk->pluck('id'))->whereIn('status', ['queued', 'processing'])->pluck('message_id')->flip();
 
         return response()->json([
             'target_id' => $target->id,
             'has_older' => $hasOlder,
             'has_newer' => $hasNewer,
-            'messages' => $chunk->map(fn (Message $item) => $this->presenter->present($item, null, ['awaiting_ai' => $awaitingAi->has($item->id)]))->all(),
+            'messages' => $this->presentFeed($chunk, $viewer),
         ]);
     }
 
@@ -227,17 +238,40 @@ class ChatController extends Controller
         $user = $request->user();
         $content = $request->content();
 
+        $file = $request->file('attachment');
+        $preTarget = Message::where('group_id', $group->id)->visibleTo($user)->find((int) $request->input('reply_to_message_id'));
+        if ($file && \App\Services\Ai\Files\PilotDocument::enabled($group->id)
+            && Message::isAiPrompt($content, $preTarget)
+            && in_array(strtolower($file->getClientOriginalExtension()), \App\Services\Ai\Files\PilotDocument::READABLE_EXTENSIONS, true)
+            && $file->getSize() > \App\Services\Ai\Files\PilotDocument::MAX_BYTES) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['attachment' => 'Normi membaca dokumen hingga 8 MB. Kecilkan file atau kirim bagian yang diperlukan.']);
+        }
+        // Lampiran diunggah ke S3 sebelum kunci grup diambil: unggahan besar tidak lagi membuat anggota lain di grup yang
+        // sama mendapat "Grup sedang sibuk" (audit 23 Nov 2026). Bila pesan duplikat atau gagal tersimpan, berkasnya dihapus.
+        $stored = $file ? $attachments->store($file, $group) : [];
+        $discardUpload = function () use (&$stored) {
+            if (($stored['attachment_path'] ?? null) !== null) {
+                \Illuminate\Support\Facades\Storage::disk($stored['attachment_disk'])->delete($stored['attachment_path']);
+                $stored = [];
+            }
+        };
+
         try {
             // Dikunci per grup agar urutan pesan dan antrean AI tetap berurutan.
-            $message = Cache::lock('group-chat-submit:' . $group->id, 10)->block(3, function () use ($request, $group, $user, $content, $attachments) {
-                return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $group, $user, $content, $attachments) {
+            $message = Cache::lock('group-chat-submit:' . $group->id, 10)->block(3, function () use ($request, $group, $user, $content, &$stored, $discardUpload) {
+                return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $group, $user, $content, &$stored, $discardUpload) {
                     $key = $request->validated('client_message_id');
                     if ($key) {
                         Group::whereKey($group->id)->lockForUpdate()->value('id');
-                        $stored = Message::withTrashed()->where('group_id', $group->id)->where('sender_id', $user->id)->where('client_message_id', $key)->first();
-                        if ($stored) return $stored;
+                        $existing = Message::withTrashed()->where('group_id', $group->id)->where('sender_id', $user->id)->where('client_message_id', $key)->first();
+                        if ($existing) {
+                            $discardUpload();
+
+                            return $existing;
+                        }
                     }
-                    $replyTarget = Message::where('group_id', $group->id)->find((int) $request->input('reply_to_message_id'));
+                    // Pesan yang tidak boleh dilihat pengirim tidak bisa dibalas (kutipannya akan tampil di bubble dan dibaca Normi).
+                    $replyTarget = Message::where('group_id', $group->id)->visibleTo($user)->find((int) $request->input('reply_to_message_id'));
                     $quote = $request->replyQuoteText();
 
                     $message = Message::create([
@@ -249,7 +283,7 @@ class ChatController extends Controller
                         'reply_to_message_id' => $replyTarget?->id,
                         'reply_quote_text' => $replyTarget && $quote !== '' ? $quote : null,
                         'content' => $content !== '' ? $content : null,
-                        ...($request->hasFile('attachment') ? $attachments->store($request->file('attachment'), $group) : []),
+                        ...$stored,
                     ]);
 
                     if (Message::isAiPrompt($content, $replyTarget)) {
@@ -267,7 +301,12 @@ class ChatController extends Controller
                 });
             });
         } catch (LockTimeoutException) {
+            $discardUpload();
+
             return $request->expectsJson() ? response()->json(['message' => 'Grup sedang sibuk. Coba kirim ulang.'], 503) : back()->withErrors(['content' => 'Gagal mengirim. Coba lagi.']);
+        } catch (\Throwable $error) {
+            $discardUpload();
+            throw $error;
         }
 
         // Antrean Normi, realtime, pratinjau tautan, dan mention (sama dengan pesan terjadwal).
@@ -287,13 +326,15 @@ class ChatController extends Controller
         $this->ensureNotFrozen($group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
         abort_if($message->isSystem(), 403);
+        abort_unless($message->isVisibleTo($request->user()), 404);
         abort_unless($actions->canEdit($request->user(), $message), 403);
 
+        $request->merge(['content' => \App\Support\MessageRules::normalizeNewlines($request->input('content'))]);
         $validated = $request->validate([
-            'content' => ['required', 'string', 'max:3000'],
+            'content' => ['required', 'string', 'max:'.\App\Support\MessageRules::MAX_CONTENT],
             'regenerate' => ['sometimes', 'boolean'],
             'ai_model' => ['nullable', 'string', 'max:80'],
-        ]);
+        ], ['content.max' => \App\Support\MessageRules::tooLongMessage()]);
         $content = trim($validated['content']);
         if ($content === '') {
             return response()->json(['ok' => false, 'message' => 'Pesan tidak boleh kosong.'], 422);
@@ -316,10 +357,11 @@ class ChatController extends Controller
     }
 
     /** Semua versi pesan beserta jawaban Normi di tiap versi (popup "Version"). */
-    public function versions(Group $group, Message $message, MessageActions $actions): JsonResponse
+    public function versions(Request $request, Group $group, Message $message, MessageActions $actions): JsonResponse
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless($message->isVisibleTo($request->user()), 404);
 
         return response()->json(['ok' => true, 'versions' => $actions->versions($message)]);
     }
@@ -330,6 +372,7 @@ class ChatController extends Controller
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
         abort_if($message->isSystem(), 403);
+        abort_unless($message->isVisibleTo($request->user()), 404);
         abort_unless($actions->canDeleteForAll($request->user(), $group, $message), 403);
         $this->ensureNotFrozen($group);
 
@@ -357,6 +400,7 @@ class ChatController extends Controller
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless($message->isVisibleTo($request->user()), 404);
         abort_if($message->isNotice() || $message->isSystem(), 403);
 
         $ids = $request->validate([
@@ -374,10 +418,11 @@ class ChatController extends Controller
      * canvas akan diblokir), jadi canvas disajikan sendiri: sandbox tanpa allow-same-origin membuat
      * skripnya berjalan di origin terpisah yang tidak bisa menyentuh sesi atau halaman normi.chat.
      */
-    public function canvas(Group $group, Message $message, StoredFiles $files): Response
+    public function canvas(Request $request, Group $group, Message $message, StoredFiles $files): Response
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless($message->isVisibleTo($request->user()), 404);
         abort_unless($message->message_type === CanvasResponder::MESSAGE_TYPE
             && $message->attachment_mime === CanvasResponder::MIME_WEB
             && $message->attachment_path && $message->attachment_disk, 404);
@@ -399,7 +444,7 @@ class ChatController extends Controller
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
-        abort_unless(Message::withTrashed()->whereKey($message->id)->visibleTo(request()->user())->exists() && ! $message->trashed(), 404);
+        abort_unless($message->isVisibleTo(request()->user()) && ! $message->trashed(), 404);
         $meta = (array) ($message->system_meta ?? []);
         $path = (string) ($meta['canvas_project_path'] ?? '');
         abort_unless($message->message_type === CanvasResponder::MESSAGE_TYPE && $path !== '', 404);
@@ -426,7 +471,7 @@ class ChatController extends Controller
         abort_unless((int) $message->group_id === (int) $group->id, 404);
         abort_if(! $message->attachment_path || ! $message->attachment_disk, 404);
         // Lampiran sebelum anggota baru bergabung tertutup sampai pemilik mengirim riwayat pesan.
-        abort_unless(Message::withTrashed()->whereKey($message->id)->visibleTo(request()->user())->exists(), 404);
+        abort_unless($message->isVisibleTo(request()->user()), 404);
 
         // URL berversi (MessagePresenter::attachmentUrl) tidak pernah berganti isi: simpan di cache browser
         // selamanya. Tanpa versi yang cocok tetap 1 jam. ETag membuat muat ulang cukup dijawab 304.

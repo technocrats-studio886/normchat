@@ -22,6 +22,12 @@ class AiDocumentGenerator
         }
 
         $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $phpWord->setDefaultFontName('Calibri');
+        $phpWord->setDefaultFontSize(11);
+        // Tanpa gaya judul, addTitle() menulis paragraf biasa: judul tampil seperti teks isi di Word (eval 23 Nov 2026).
+        foreach ([1 => 18, 2 => 14, 3 => 12.5, 4 => 11.5, 5 => 11, 6 => 11] as $level => $size) {
+            $phpWord->addTitleStyle($level, ['size' => $size, 'bold' => true, 'color' => '111111'], ['spaceBefore' => $level === 1 ? 0 : 240, 'spaceAfter' => 120, 'keepNext' => true]);
+        }
         $section = $phpWord->addSection();
 
         if ($title !== '') {
@@ -126,10 +132,64 @@ class AiDocumentGenerator
         }
     }
 
+    /**
+     * Blok Markdown dipisah per jenis, bukan hanya per baris kosong: "## Petunjuk" yang langsung diikuti teks,
+     * atau paragraf yang langsung diikuti daftar/tabel, sah di Markdown dan sering ditulis model
+     * (eval 23 Nov 2026: judul tampil sebagai "## Petunjuk" mentah di Word). Isi code fence tidak disentuh.
+     */
     private function splitParagraphs(string $markdown): array
     {
         $normalized = preg_replace("/\r\n?/", "\n", $markdown) ?? $markdown;
-        $paragraphs = preg_split("/\n{2,}/", $normalized) ?: [];
-        return array_values(array_filter(array_map('trim', $paragraphs), fn ($p) => $p !== ''));
+        $blocks = [];
+        $current = [];
+        $kind = null;
+        $fence = false;
+        $flush = function () use (&$blocks, &$current, &$kind) {
+            if ($current !== []) {
+                $blocks[] = implode("\n", $current);
+            }
+            $current = [];
+            $kind = null;
+        };
+        foreach (explode("\n", $normalized) as $line) {
+            $trimmed = trim($line);
+            if ($fence) {
+                $current[] = $line;
+                if (str_starts_with($trimmed, '```')) {
+                    $fence = false;
+                    $flush();
+                }
+                continue;
+            }
+            if ($trimmed === '') {
+                $flush();
+                continue;
+            }
+            if (str_starts_with($trimmed, '```')) {
+                $flush();
+                $current[] = $line;
+                $fence = true;
+                continue;
+            }
+            $lineKind = match (true) {
+                (bool) preg_match('/^#{1,6}\s+\S/u', $trimmed) => 'heading',
+                str_starts_with($trimmed, '|') => 'table',
+                (bool) preg_match('/^(?:-|\*|\d+\.)\s+/u', $trimmed) => 'list',
+                // Pilihan "a. …" atau baris menjorok di bawah butir daftar tetap bagian daftarnya (soal pilihan ganda).
+                $kind === 'list' && (preg_match('/^\s/', $line) === 1 || preg_match('/^[a-eA-E][.)]\s/u', $trimmed) === 1) => 'list',
+                default => 'text',
+            };
+            if ($lineKind === 'heading' || ($kind !== null && $kind !== $lineKind)) {
+                $flush();
+            }
+            $current[] = $line;
+            $kind = $lineKind;
+            if ($lineKind === 'heading') {
+                $flush();
+            }
+        }
+        $flush();
+
+        return array_values(array_filter(array_map('trim', $blocks), fn ($p) => $p !== ''));
     }
 }

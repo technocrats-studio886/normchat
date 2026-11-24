@@ -8,6 +8,7 @@ use App\Events\MessageUpdated;
 use App\Exceptions\InsufficientBudgetException;
 use App\Exceptions\RequestTooLargeException;
 use App\Exceptions\SpendLimitReachedException;
+use App\Models\ChatMessageQueue;
 use App\Models\AiModel;
 use App\Models\AiRequestRefusal;
 use App\Models\AiUsageLog;
@@ -17,7 +18,9 @@ use App\Models\GroupToken;
 use App\Models\Message;
 use App\Models\MessageVersion;
 use App\Models\User;
+use App\Services\Ai\Context\ContextBundle;
 use App\Services\Ai\Context\ContextManager;
+use App\Services\Ai\Files\FileRequest;
 use App\Services\Ai\Context\MemoryMaintenance;
 use App\Services\Ai\Responders\AiResponder;
 use App\Services\Ai\Responders\CanvasResponder;
@@ -33,6 +36,7 @@ use App\Services\Credits\CreditWallet;
 use App\Services\Credits\ModelAccess;
 use App\Services\NormkreditPricing;
 use App\Services\Pricing\PricingVersions;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -60,21 +64,21 @@ class GroupAiAssistant
     }
 
     /** $replace: jawaban lama yang diganti (jawab ulang setelah pertanyaan diedit). */
-    public function handle(Message $message, ?Message $replace = null): void
+    public function handle(Message $message, ?Message $replace = null, ?ChatMessageQueue $queueItem = null): bool
     {
         $this->suggestion = null;
         $message->loadMissing('replyToMessage.sender:id,name');
         if (! $message->isAddressedToAi()) {
-            return;
+            return true;
         }
 
         $group = Group::with('groupToken')->find($message->group_id);
         if ($group?->isFrozen()) {
-            return;
+            return true;
         }
         $requester = $message->sender_id ? User::find($message->sender_id) : null;
         if (! $group || ! $requester) {
-            return;
+            return true;
         }
 
         $task = $this->prepareTask($group, $requester, $message);
@@ -82,13 +86,17 @@ class GroupAiAssistant
             [$reason, $text, $model] = $task;
             $this->refuse($message, $reason, $model, $text);
 
-            return;
+            return true;
         }
 
         // Status sesuai pekerjaannya: "sedang mengetik" hanya untuk jawaban teks; gambar, riset, canvas,
         // dan dokumen punya status sendiri (laporan user 9 Nov 2026).
         $responder = $this->responderFor($group, $message);
         $activity = $responder->activity();
+        $queueItem?->update([
+            'activity' => $activity,
+            'retry_allowed' => ! $replace && ! ($responder instanceof TaskResponder || $responder instanceof ReminderResponder),
+        ]);
         // Permintaan privat (ringkasan pesan belum dibaca): status dan jawabannya hanya untuk peminta.
         $privateFor = $message->visible_to_user_id ? (int) $message->visible_to_user_id : null;
         AiActivity::report($group->id, $activity, null, $privateFor);
@@ -97,15 +105,15 @@ class GroupAiAssistant
         } catch (InsufficientBudgetException $e) {
             $this->refuseTask($task, 'credits', $e->getMessage());
 
-            return;
+            return true;
         } catch (SpendLimitReachedException $e) {
             $this->refuseTask($task, 'spend_guard', $e->getMessage());
 
-            return;
+            return true;
         } catch (RequestTooLargeException $e) {
             $this->refuseTask($task, 'too_long', $e->getMessage());
 
-            return;
+            return true;
         } catch (Throwable $e) {
             $task->releaseHold();
             throw $e;
@@ -113,12 +121,27 @@ class GroupAiAssistant
             AiActivity::stop($group->id, $activity, $privateFor);
         }
 
+        $emptyResponse = $reply->text === null && $reply->attachment === null && ! $task->stoppedAtTokenLimit();
+        if ($queueItem?->retry_allowed && ($emptyResponse || ($reply->meta['temporary_failure'] ?? false))) {
+            $task->releaseHold();
+            if ($task->meter->providerCostUsd() > 0) {
+                $this->logUsage($task, $reply->kind, $reply->model, null, 0, 0, GroupToken::forGroup($group->id)->remaining_credits);
+            }
+
+            return false;
+        }
+
         if ($reply->suggestMode !== null) {
             $this->suggestion = $this->suggestionMeta($message, $reply->suggestMode, $responder);
         }
-        [$reply, $creditsDue, $charged] = $this->bill($task, $reply);
-        $replaced = $replace !== null && ! $replace->trashed() && ! $replace->replies()->exists();
-        $aiMessage = $replaced ? $this->replaceReply($replace, $message, $reply) : $this->postReply($message, $reply);
+        // Tagihan dan jawaban harus tersimpan bersama jika worker terputus.
+        [$reply, $creditsDue, $charged, $aiMessage, $replaced] = DB::transaction(function () use ($task, $reply, $message, $replace) {
+            [$reply, $creditsDue, $charged] = $this->bill($task, $reply);
+            $replaced = $replace !== null && ! $replace->trashed() && ! $replace->replies()->exists();
+            $answer = $replaced ? $this->replaceReply($replace, $message, $reply) : $this->postReply($message, $reply);
+
+            return [$reply, $creditsDue, $charged, $answer, $replaced];
+        });
         if ($replaced) {
             // Isi jawaban lama yang mungkin sudah diringkas/di-embed diganti: perlakukan seperti pesan diedit.
             $this->memory->messageChanged($aiMessage, deleted: false);
@@ -132,6 +155,8 @@ class GroupAiAssistant
 
         $this->broadcast($aiMessage, $reply->billable ? $charged : null, $groupToken->credits, $replaced);
         $this->memory->afterAnswer($group);
+
+        return true;
     }
 
     /** @return AiTask|array{0: string, 1: string, 2: ?AiModel} task siap jalan, atau [alasan, pesan penolakan, model] */
@@ -168,7 +193,7 @@ class GroupAiAssistant
             $group,
             $requester,
             $message,
-            $this->contexts->build($group, $message),
+            FileRequest::exportsRepliedText($message) ? new ContextBundle() : $this->contexts->build($group, $message),
             $model,
             $client,
             $this->pricing->locked(),
@@ -185,6 +210,10 @@ class GroupAiAssistant
         // (keputusan user 11 Nov 2026). Rentangnya hanya diisi server (ChatController::catchUp).
         if ($message->sender_type === 'user' && is_array($message->system_meta['catch_up'] ?? null)) {
             return new CatchUpResponder();
+        }
+
+        if (FileRequest::exportsRepliedText($message)) {
+            return new FileResponder();
         }
 
         // Pesan lama tanpa ai_mode tetap bisa memakai fitur lewat tag (@normi-image, dst.).

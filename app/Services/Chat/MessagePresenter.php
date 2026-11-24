@@ -58,6 +58,12 @@ class MessagePresenter
             // Pengingat yang dibuat jawaban Normi ini (tombol Batalkan selama masih menunggu).
             'reminder' => $isDeleted ? null : $this->reminderOf($message),
             // Jawaban Normi yang menambahkan tugas: tombol "Buka Tugas grup".
+            'document_review' => !$isDeleted && $message->sender_type === 'ai' && isset($message->system_meta['doc_step']) ? [
+                'step' => $message->system_meta['doc_step'],
+                'user' => (int) ($message->system_meta['file_position_user'] ?? $message->system_meta['pilot_user'] ?? 0),
+                'labels' => $message->system_meta['doc_labels'] ?? [],
+                'pages' => (int) ($message->system_meta['doc_count'] ?? 0),
+            ] : null,
             'tasks_added' => ! $isDeleted && $message->sender_type === 'ai' ? (int) ($message->system_meta['tasks_added'] ?? 0) : 0,
             'reply_to' => $replyTarget && ! $isDeleted ? [
                 'id' => (int) $replyTarget->id,

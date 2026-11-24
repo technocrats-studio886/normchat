@@ -112,6 +112,19 @@ const SUGGEST_LABELS = {
 };
 
 /** Tombol fitur yang disarankan Normi (App\Services\Chat\MessagePresenter::suggestionOf); diproses composer/feed-clicks.js. */
+const documentReviewHtml = (message) => {
+    const review = message.document_review;
+    if (Number(review?.user) !== authUserId || !review || message.is_deleted) return '';
+    if (review.step === 'pages') {
+        return `<div data-doc-review><label>Halaman <input data-doc-range aria-label="Rentang halaman" value="1-${Math.min(10, review.pages)}" size="10"></label> <button type="button" class="nc-suggest" data-doc-action="pages">Baca halaman ini</button></div>`;
+    }
+    if (review.step !== 'table') return '';
+    const tables = review.labels.map((labels, i) => `<option value="${i+1}" data-names="${escapeAttr(labels.join(' | '))}">Tabel ${i+1}</option>`).join('');
+    return `<div data-doc-review><button type="button" class="nc-suggest" data-doc-action="confirm">Kolom sudah benar</button>
+        <details><summary>Koreksi kolom</summary><label>Tabel <select data-doc-table>${tables}</select></label>
+        <label>Nama kolom, pisahkan dengan | <input data-doc-names maxlength="1200" value="${escapeAttr((review.labels[0] || []).join(' | '))}"></label>
+        <button type="button" class="nc-suggest" data-doc-action="edit">Periksa koreksi</button></details></div>`;
+};
 const suggestionHtml = (message) => {
 	const suggestion = message?.suggestion;
 	if (!suggestion?.mode || message?.is_deleted) {
@@ -222,10 +235,13 @@ export const buildMessageNode = (message) => {
 		? `<div class="nc-bubble bubble-${tone}" data-message-body="1" data-message-bubble>${nameHtml}${deletedHtml}${timeHtml({ ...message, is_edited: false }, createdAt)}</div>`
 		: (pollData
 			? renderPollCard({ poll: pollData, tone, messageId: message?.id, headerHtml: nameHtml + forwardedHtml + quoteHtml, inlineTimeHtml: timeHtml(message, createdAt) })
-			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${isAi ? canvasProjectHtml(message) : linkPreviewHtml(message?.link_preview)}${textHtml}${isAi ? suggestionHtml(message) + reminderBubbleHtml(message) + tasksButtonHtml(message) : ''}${timeHtml(message, createdAt)}</div>`);
+			: `<div class="nc-bubble bubble-${tone}${isMediaOnly ? ' is-media-only' : ''}" data-message-body="1" data-message-bubble>${nameHtml}${noticeHtml}${forwardedHtml}${quoteHtml}${attachmentHtml}${isAi ? canvasProjectHtml(message) : linkPreviewHtml(message?.link_preview)}${textHtml}${isAi ? documentReviewHtml(message) + suggestionHtml(message) + reminderBubbleHtml(message) + tasksButtonHtml(message) : ''}${timeHtml(message, createdAt)}</div>`);
 	const pendingHtml = message?.is_pending === true ? '<p class="nc-msg-pending">Mengirim…</p>' : '';
 
-	wrapper.innerHTML = `${isMine ? '' : avatarHtml(message, isAi)}<div class="nc-msg-stack${isWide ? ' is-wide' : ''}">${bubble}${pendingHtml}</div>`;
+	const requestStatus = isMine && !isDeleted && (message.awaiting_ai || message.ai_request_failed)
+        ? '<p class="nc-msg-pending" data-request-status="watch" role="status">' + (message.ai_request_failed ? 'Memeriksa status permintaan…' : 'Menunggu status Normi…') + '</p>' : '';
+
+	wrapper.innerHTML = `${isMine ? '' : avatarHtml(message, isAi)}<div class="nc-msg-stack${isWide ? ' is-wide' : ''}">${bubble}${pendingHtml}${requestStatus}</div>`;
 	// Bubble bisa difokus dengan Tab agar aksi pesan (actions/menu.js) terjangkau keyboard.
 	wrapper.querySelector('[data-message-bubble]')?.setAttribute('tabindex', '0');
 	return wrapper;

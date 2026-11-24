@@ -12,8 +12,10 @@ use App\Models\PricingVersion;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\FreeGroups;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -72,6 +74,30 @@ class FreeGroupsTest extends TestCase
         $this->assertSame('group_join_midtrans', PendingPayment::sole()->payment_type);
 
         $this->actingAs($ani)->post(route('groups.join.submit', $group->share_id))->assertSessionHasErrors('packages');
+    }
+
+    public function test_concurrent_submission_of_the_same_member_cannot_consume_two_slots(): void
+    {
+        $group = $this->legacyGroup(User::factory()->create());
+        $friend = User::factory()->create();
+        $joinedByFirstRequest = false;
+        DB::listen(function (QueryExecuted $query) use ($group, $friend, &$joinedByFirstRequest) {
+            if ($joinedByFirstRequest || ! str_contains($query->sql, 'from "groups"') || ! str_contains($query->sql, 'for update')) {
+                return;
+            }
+
+            // Simulasikan kiriman pertama selesai setelah cek keanggotaan awal pada kiriman kedua.
+            $joinedByFirstRequest = true;
+            $group->increment('free_joins_used');
+            app(\App\Services\GroupMembership::class)->joinFree($group, $friend);
+        });
+
+        $this->actingAs($friend)->post(route('groups.join.submit', $group->share_id))->assertRedirect(route('chat.show', $group));
+
+        $this->assertTrue($joinedByFirstRequest);
+        $this->assertSame(1, $group->fresh()->free_joins_used);
+        $this->assertSame(1, AuditLog::where('group_id', $group->id)->where('action', 'group.member_joined')->count());
+        $this->assertDatabaseCount('pending_payments', 0);
     }
 
     public function test_password_step_comes_before_the_bill_and_cannot_be_skipped(): void

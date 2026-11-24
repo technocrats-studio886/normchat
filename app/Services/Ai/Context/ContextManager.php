@@ -111,11 +111,16 @@ class ContextManager
     {
         $question = ContextUnderstanding::question($request);
         $replyTarget = $request->replyToMessage;
-        if ($question === '' || ($replyTarget && $replyTarget->message_type === 'file' && $replyTarget->attachment_path)
-            || ! DocumentSearch::refersToDocuments($question)) {
+        if ($question === '' || ($replyTarget && $replyTarget->message_type === 'file' && $replyTarget->attachment_path)) {
             return $context;
         }
-        $documents = $this->documents->find($group, $request, $question, $queryVector);
+        // Dokumen yang terkirim tanpa tag @normi tetap jadi konteks saat dibutuhkan (keputusan user 24 Nov 2026):
+        // bila riwayat berisi dokumen, bagian yang benar-benar mirip dengan pertanyaan ikut, dengan saringan lebih ketat.
+        $named = DocumentSearch::refersToDocuments($question);
+        if (! $named && ! collect($context->window)->contains(fn (Message $m) => $m->message_type === 'file' && $m->attachment_path)) {
+            return $context;
+        }
+        $documents = $this->documents->find($group, $request, $question, $queryVector, strict: ! $named);
 
         return $documents === [] ? $context : $context->withDocuments($documents);
     }

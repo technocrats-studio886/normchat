@@ -86,6 +86,10 @@ else
   log "Service postgres belum ada; skip backup."
 fi
 
+log "Pasang dependensi PHP sesuai composer.lock (tanpa paket dev)"
+# Lewat container app (image yang sama dengan produksi, sudah berisi composer) sebelum service dinyalakan ulang.
+"${COMPOSE[@]}" run --rm --no-deps -T app composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
 log "Build aset frontend (Vite) ke public/build"
 docker run --rm -v "$PROJECT_DIR":/app -w /app node:22-alpine node node_modules/vite/bin/vite.js build --configLoader runner
 
@@ -97,7 +101,8 @@ log "Jalankan migrasi + optimize cache Laravel"
 "${COMPOSE[@]}" exec -T app php artisan config:cache
 "${COMPOSE[@]}" exec -T app php artisan route:cache
 "${COMPOSE[@]}" exec -T app php artisan view:cache
-"${COMPOSE[@]}" exec -T app php artisan queue:restart || true
+# Horizon menyelesaikan job yang sedang berjalan lalu keluar; Docker menyalakannya lagi dengan kode baru.
+"${COMPOSE[@]}" exec -T queue php artisan horizon:terminate || true
 
 log "Health checks container"
 "${COMPOSE[@]}" ps

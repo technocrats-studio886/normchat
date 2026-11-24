@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use App\Events\LinkPreviewReady;
 use App\Models\LinkPreview;
 use App\Services\Links\LinkPreviewFetcher;
@@ -22,6 +23,7 @@ class FetchLinkPreviewJob implements ShouldQueue
 
     public function __construct(public string $url, public ?int $groupId = null, public ?int $messageId = null)
     {
+        $this->onQueue(Queues::NOTIFY);
     }
 
     public function handle(LinkPreviewFetcher $fetcher): void

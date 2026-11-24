@@ -304,6 +304,25 @@ class NormiFilesAndSuggestionsTest extends TestCase
         $this->assertNoModelCall();
     }
 
+    public function test_exporting_a_replied_text_to_pdf_uses_the_source_and_charges_no_credits(): void
+    {
+        $source = Message::create(['group_id' => $this->group->id, 'sender_type' => 'ai', 'message_type' => 'text',
+            'content' => "**Catatan rapat**\n\n1. Cetak materi.\n2. Siapkan ruang kelas."]);
+        $this->runAi(['content' => 'buatkan lah ini jadi pdf', 'reply_to_message_id' => $source->id]);
+        $reply = Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->assertSame('application/pdf', $reply->attachment_mime);
+        $text = (new Parser)->parseContent(Storage::disk('normchat_attachments')->get($reply->attachment_path))->getText();
+        $this->assertStringContainsString('Cetak materi.', $text);
+        $this->assertStringContainsString('Siapkan ruang kelas.', $text);
+        $usage = AiUsageLog::where('request_message_id', $reply->reply_to_message_id)->sole();
+        $this->assertEquals(0, $usage->charged_credits);
+        $this->assertEquals(0, $usage->output_tokens);
+        $this->assertNoModelCall();
+        $request = Message::findOrFail($reply->reply_to_message_id);
+        $request->content = 'ubah ini jadi pdf dan tambahkan ringkasan';
+        $this->assertFalse(FileRequest::exportsRepliedText($request));
+    }
+
     public function test_new_pdf_with_upload_keeps_filename_out_of_document(): void
     {
         config(['normchat.documents_all_groups' => true, 'normchat.document_pilot_groups' => []]);
@@ -543,10 +562,10 @@ class NormiFilesAndSuggestionsTest extends TestCase
         config(['normchat.documents_all_groups' => true, 'normchat.document_pilot_groups' => []]);
         $source = app(FileBuilder::class)->build([['name' => 'rab.pdf', 'content' => "# RAB\n\nOngkir Rp20.000"]], 'pdf', 'RAB');
         Storage::disk('normchat_attachments')->put('scan.pdf', $source['binary']);
-        Http::fake(['http://docling:8010/pdf' => Http::response(['text' => "RAB\nOngkir Rp20.000",
+        Http::fake(['http://docling:8010/pdf' => Http::response(['text' => "RAB\n| Item | Nominal |\n| --- | --- |\n| Ongkir | Rp20.000 |",
             'tables' => [['table' => 1, 'rows' => [['Item', 'Nominal'], ['Ongkir', 'Rp20.000']]]]])]);
         $this->fakeChat(json_encode(['version' => substr(hash('sha256', $source['binary']), 0, 16), 'changes' => [
-            ['id' => 'l2', 'old' => 'Ongkir Rp20.000', 'new' => 'Ongkir Rp50.000'],
+            ['id' => 'l4', 'old' => '| Ongkir | Rp20.000 |', 'new' => '| Ongkir | Rp50.000 |'],
         ]]));
         $this->mock(MaintenanceAi::class, function ($mock) {
             $mock->shouldReceive('json')->withArgs(fn ($kind) => $kind === 'file_revision_check')->once()
@@ -560,12 +579,17 @@ class NormiFilesAndSuggestionsTest extends TestCase
         $this->assertStringContainsString('Item | Nominal', $latest()->content);
         $this->runAi(['content' => 'belum', 'reply_to_message_id' => $latest()->id]);
         $this->assertSame('pilot_table', $latest()->system_meta['file_stage']);
+        $this->runAi(['content' => 'Koreksi tabel 1: Pengeluaran | Rupiah', 'reply_to_message_id' => $latest()->id]);
+        $this->assertStringContainsString('Pengeluaran | Rupiah', $latest()->content);
         $this->runAi(['content' => 'kolom benar', 'reply_to_message_id' => $latest()->id]);
         $this->assertSame('pilot_layout', $latest()->system_meta['file_stage']);
         $this->runAi(['content' => 'susun ulang', 'reply_to_message_id' => $latest()->id]);
         $this->assertSame('application/pdf', $latest()->attachment_mime, (string) $latest()->content);
         $this->assertStringContainsString('Rp50.000', app(AttachmentTextExtractor::class)->extract($latest()));
-        $this->assertSame(1, Http::recorded(fn ($req) => str_contains($req->url(), 'docling:8010'))->count());
+        $this->assertStringContainsString('Pengeluaran', app(AttachmentTextExtractor::class)->extract($latest()));
+        // Sekali untuk sumber (dokumen kanonik dipakai ulang di setiap langkah), sekali untuk PDF hasil revisi yang ikut
+        // dikonversi agar bisa direvisi lagi nanti.
+        $this->assertSame(2, Http::recorded(fn ($req) => str_contains($req->url(), 'docling:8010'))->count());
     }
 
     public function test_pilot_chat_reuses_confirmed_scan_and_sends_compact_json_once(): void
@@ -588,9 +612,35 @@ class NormiFilesAndSuggestionsTest extends TestCase
             if (!str_ends_with($r->url(), '/chat/completions')) {
                 return false;
             }
-            $parts = collect($r['messages'])->last()['content'];
-            return is_array($parts) && str_contains($parts[0]['text'], '"l2":"Sewa ruangan 75000"');
+            // Dokumen dikirim sekali, di blok dokumen setelah system prompt (cache prompt), sebagai baris bernomor.
+            $messages = json_encode($r['messages'], JSON_UNESCAPED_UNICODE);
+            return str_contains((string) $r['messages'][1]['content'], 'L2| Sewa ruangan 75000') && substr_count($messages, 'Sewa ruangan 75000') === 1;
         });
+    }
+
+    public function test_scan_page_selection_and_header_correction_resume_the_original_chat(): void
+    {
+        config(['normchat.documents_all_groups' => true]);
+        $file = app(FileBuilder::class)->build([['name' => 'scan.pdf', 'content' => "# Biaya\n\nTotal"]], 'pdf', 'Rapat');
+        Storage::disk('normchat_attachments')->put('pages.pdf', $file['binary']);
+        Http::fake(['http://docling:8010/pdf' => fn (Request $req) => $req->hasHeader('X-Document-Pages', '36-39')
+            ? Http::response(['text' => "| Salah | Nilai |\n| --- | --- |\n| Rapat | 5000 |", 'page_count' => 40,
+                'tables' => [['table' => 1, 'rows' => [['Salah', 'Nilai'], ['Rapat', '5000']]]]])
+            : Http::response(['pages' => 40], 409)]);
+        $this->fakeChat('Ringkasan halaman 36-39.');
+        $latest = fn () => Message::where('sender_type', 'ai')->latest('id')->firstOrFail();
+        $this->runAi(['content' => '@normi ringkas isinya', 'message_type' => 'file', 'attachment_disk' => 'normchat_attachments',
+            'attachment_path' => 'pages.pdf', 'attachment_original_name' => 'pages.pdf', 'attachment_mime' => 'application/pdf']);
+        $this->assertSame('pages', $latest()->system_meta['doc_step']);
+        foreach (['halaman 1-40', 'halaman 36-39', 'Koreksi tabel 1: Acara', 'Koreksi tabel 1: Acara | Biaya'] as $answer) {
+            $this->runAi(['content' => $answer, 'reply_to_message_id' => $latest()->id]);
+        }
+        $this->assertStringContainsString('Acara | Biaya', $latest()->content);
+        $this->runAi(['content' => 'kolom benar', 'reply_to_message_id' => $latest()->id]);
+        $this->assertSame('Ringkasan halaman 36-39.', $latest()->content);
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/chat/completions')
+            && str_contains(json_encode($r['messages']), 'Acara\\tBiaya')
+            && !str_contains(json_encode($r['messages']), 'Salah\\tNilai'));
     }
 
     public function test_pilot_rejects_stale_or_unseen_edits_and_preserves_powerpoint_parts(): void

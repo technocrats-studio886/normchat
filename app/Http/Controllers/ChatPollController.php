@@ -29,6 +29,9 @@ class ChatPollController extends Controller
             ->take(self::MAX_POLLS_PER_REQUEST)
             ->values()
             ->all();
+        if ($pollIds !== []) {
+            $pollIds = Message::query()->where('group_id', $group->id)->whereKey($pollIds)->visibleTo($request->user())->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
 
         return response()->json([
             'ok' => true,
@@ -40,6 +43,7 @@ class ChatPollController extends Controller
     {
         $this->authorize('chat', $group);
         abort_unless((int) $message->group_id === (int) $group->id, 404);
+        abort_unless($message->isVisibleTo($request->user()), 404);
         abort_if($group->isFrozen(), 423, 'Grup ini dibekukan oleh admin Normi Chat.');
 
         $optionNumber = (int) $request->validate(['option_number' => ['required', 'integer', 'min:1', 'max:20']])['option_number'];

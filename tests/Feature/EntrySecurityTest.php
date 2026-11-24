@@ -80,6 +80,16 @@ class EntrySecurityTest extends TestCase
         $this->assertStringNotContainsString('<script>alert(2)', $html);
     }
 
+    public function test_document_upload_limit_depends_on_whether_normi_is_addressed(): void
+    {
+        config(['normchat.documents_all_groups' => true]);
+        $file = fn () => UploadedFile::fake()->create('materi.pdf', 8193, 'application/pdf');
+        $this->actingAs($this->user)->postJson(route('chat.store', $this->group),
+            ['content' => '@normi baca PDF ini', 'attachment' => $file()])->assertUnprocessable()->assertJsonValidationErrors('attachment');
+        $this->actingAs($this->user)->postJson(route('chat.store', $this->group),
+            ['content' => 'Untuk peserta', 'attachment' => $file()])->assertCreated();
+    }
+
     public function test_fake_upload_type_is_not_trusted(): void
     {
         // Isi teks biasa (lolos pemeriksaan isi) yang diaku browser sebagai halaman HTML.

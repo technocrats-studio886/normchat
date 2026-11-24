@@ -128,6 +128,7 @@ class CreditWallet
                 'group_id' => $group->id,
                 'user_id' => $user->id,
                 'amount' => round($amount, 4),
+                'request_message_id' => $refs['request_message_id'] ?? null,
                 'status' => CreditHold::HELD,
                 'pricing_version_id' => $refs['pricing_version_id'] ?? null,
                 'exchange_rate_id' => $refs['exchange_rate_id'] ?? null,

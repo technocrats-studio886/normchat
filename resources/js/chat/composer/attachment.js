@@ -65,6 +65,7 @@ const ensureFileAttachmentPreviewEl = () => {
 };
 
 export const refreshAttachmentLabel = () => {
+    document.dispatchEvent(new Event('nc:attachment-updated'));
 	const file = attachmentInput.files?.[0];
 	const filePreviewEl = ensureFileAttachmentPreviewEl();
 	const mediaPreviewEl = ensureMediaAttachmentPreviewEl(clearSelectedAttachment);

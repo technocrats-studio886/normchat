@@ -10,5 +10,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
         \Illuminate\Support\Facades\Http::preventStrayRequests();
+        // Tes yang memalsukan error OpenAI tidak menunggu jeda percobaan ulang; OpenAiRetryTest menguji jalurnya.
+        config()->set('services.openai.retry_ms', []);
     }
 }

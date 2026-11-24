@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ChatRequestStatusController;
 use App\Http\Controllers\ChatPollController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\GroupBackupController;
@@ -89,6 +90,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/groups/{group}/polls/{message}/vote', [ChatPollController::class, 'vote'])->middleware('group.permission')->name('chat.polls.vote');
     Route::post('/groups/{group}/messages/read', [ChatController::class, 'markRead'])->middleware('group.permission')->name('chat.read');
     Route::get('/groups/{group}/messages/search', [ChatController::class, 'search'])->middleware('group.permission')->name('chat.search');
+    Route::get('/groups/{group}/messages/requests', [ChatRequestStatusController::class, 'index'])->middleware('group.permission')->name('chat.requests');
+    Route::post('/groups/{group}/messages/{message}/retry', [ChatRequestStatusController::class, 'retry'])->middleware('group.permission')->whereNumber('message')->name('chat.retry');
     Route::get('/groups/{group}/messages/recent', [ChatController::class, 'recent'])->middleware('group.permission')->name('chat.recent');
     Route::get('/groups/{group}/messages/around/{message}', [ChatController::class, 'around'])->middleware('group.permission')->whereNumber('message')->name('chat.around');
     Route::patch('/groups/{group}/messages/{message}', [ChatController::class, 'update'])->middleware('group.permission')->name('chat.update');
@@ -207,6 +210,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/keuangan', [AdminReportController::class, 'finance'])->name('finance');
         Route::get('/csv/{type}', [AdminReportController::class, 'csv'])->whereIn('type', ['grup', 'user', 'transaksi', 'ai'])->name('csv');
         Route::get('/audit', [AdminReportController::class, 'audit'])->name('audit');
+        Route::get('/antrean', [\App\Http\Controllers\Admin\AdminQueueController::class, 'index'])->name('queues');
         Route::get('/biaya-openai', [AdminOpenAiController::class, 'index'])->name('openai');
         Route::post('/biaya-openai/kurs', [AdminOpenAiController::class, 'updateRate'])->name('openai.rate');
         Route::post('/biaya-openai/anggaran', [AdminOpenAiController::class, 'updateBudget'])->name('openai.budget');

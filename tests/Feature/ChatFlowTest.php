@@ -76,6 +76,47 @@ class ChatFlowTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'chat.send_message', 'target_id' => $response->json('message.id')]);
     }
 
+    public function test_failed_ai_request_can_only_be_requeued_once_by_the_original_sender(): void
+    {
+        $id = $this->actingAs($this->member)->postJson($this->url('messages'), ['content' => '@normi buat PDF'])->json('message.id');
+        $item = ChatMessageQueue::where('message_id', $id)->sole();
+        $item->update(['status' => 'failed', 'retry_allowed' => true, 'error_message' => 'private_provider_error']);
+        $status = $this->url('messages/requests').'?ids[]='.$id;
+        $retry = $this->url("messages/{$id}/retry");
+        $body = ['queue_id' => $item->id, 'attempt' => 1];
+        $this->actingAs($this->owner)->getJson($status)->assertJsonCount(0, 'requests');
+        $this->postJson($retry, $body)->assertNotFound();
+        $this->actingAs($this->member)->getJson($status)->assertJsonPath('requests.0.can_retry', true)->assertDontSee('private_provider_error');
+        $this->postJson($retry, $body)->assertOk()->assertJsonPath('request.attempt', 2);
+        $this->postJson($retry, $body)->assertOk()->assertJsonPath('request.status', 'queued');
+        $item->refresh()->update(['status' => 'failed', 'retry_allowed' => true]);
+        $this->postJson($retry, $body)->assertOk()->assertJsonPath('request.status', 'failed');
+        $this->assertSame(1, ChatMessageQueue::count());
+        $this->assertSame(1, Message::count());
+        Queue::assertPushed(ProcessGroupChatQueueJob::class, 2); // Kiriman awal dan satu retry.
+    }
+
+    public function test_retry_checks_holds_answers_and_the_group_state_each_time(): void
+    {
+        $id = $this->actingAs($this->member)->postJson($this->url('messages'), ['content' => '@normi tes'])->json('message.id');
+        $item = ChatMessageQueue::where('message_id', $id)->sole();
+        $item->update(['status' => 'failed', 'retry_allowed' => true]);
+        $body = ['queue_id' => $item->id, 'attempt' => 1];
+        $retry = $this->url("messages/{$id}/retry");
+        $hold = \App\Models\CreditHold::create(['group_id' => $this->group->id, 'user_id' => $this->member->id,
+            'request_message_id' => $id, 'amount' => 1, 'status' => 'held']);
+        $this->postJson($retry, $body)->assertJsonPath('request.status', 'checking')->assertJsonPath('request.can_retry', false);
+        $hold->update(['status' => 'settled']);
+        $this->postJson($retry, $body)->assertJsonPath('request.can_retry', false);
+        $hold->update(['status' => 'released']);
+        $this->group->update(['status' => Group::STATUS_FROZEN]);
+        $this->postJson($retry, $body)->assertJsonPath('request.can_retry', false);
+        $this->group->update(['status' => 'active']);
+        Message::create(['group_id' => $this->group->id, 'reply_to_message_id' => $id, 'sender_type' => 'ai', 'content' => 'Selesai']);
+        $this->postJson($retry, $body)->assertJsonPath('request.status', 'processed')->assertJsonPath('request.can_retry', false);
+        Queue::assertPushed(ProcessGroupChatQueueJob::class, 1);
+    }
+
     public function test_empty_message_is_rejected(): void
     {
         $this->actingAs($this->member)->post($this->url('messages'), ['content' => '  '])->assertSessionHasErrors('content');

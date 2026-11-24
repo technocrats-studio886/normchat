@@ -61,7 +61,7 @@ const markChecked = (container, attribute, value) => {
 // Kategori yang dikunci saldo grup (App\Services\Credits\ModelAccess) tidak bisa dipilih.
 const isLocked = (option) => option?.getAttribute('data-ai-model-locked') === '1';
 
-const selectModel = (modelId, persist = true) => {
+export const selectModel = (modelId, persist = true) => {
 	const option = modelMenu?.querySelector(`[data-ai-model-option="${CSS.escape(modelId)}"]`);
 	if (!(modelInput instanceof HTMLInputElement) || !option || isLocked(option)) {
 		return false;

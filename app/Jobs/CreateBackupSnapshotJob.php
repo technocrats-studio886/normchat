@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use App\Models\GroupBackup;
 use App\Services\GroupBackups;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,7 +18,7 @@ class CreateBackupSnapshotJob implements ShouldQueue
 
     public function __construct(public int $backupId)
     {
-        $this->onQueue('default');
+        $this->onQueue(Queues::DOCUMENTS);
     }
 
     public function handle(GroupBackups $backups): void

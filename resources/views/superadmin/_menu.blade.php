@@ -17,6 +17,7 @@
             ['superadmin.announcements.index', 'Pengumuman', 'M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1zm12-2a5 5 0 0 1 0 8'],
         ],
         'Sistem' => [
+            ['superadmin.queues', 'Antrean', 'M4 6h16M4 12h10M4 18h6m10-4v6m0 0-3-3m3 3 3-3'],
             ['superadmin.audit', 'Log audit', 'M9 5h10M9 12h10M9 19h10M5 5h.01M5 12h.01M5 19h.01'],
             ['superadmin.settings', 'Pengaturan', 'M10.3 4.3a2 2 0 0 1 3.4 0l.4.8a2 2 0 0 0 2.2 1l.9-.2a2 2 0 0 1 2.4 2.4l-.2.9a2 2 0 0 0 1 2.2l.8.4a2 2 0 0 1 0 3.4l-.8.4a2 2 0 0 0-1 2.2l.2.9a2 2 0 0 1-2.4 2.4l-.9-.2a2 2 0 0 0-2.2 1l-.4.8a2 2 0 0 1-3.4 0l-.4-.8a2 2 0 0 0-2.2-1l-.9.2a2 2 0 0 1-2.4-2.4l.2-.9a2 2 0 0 0-1-2.2l-.8-.4a2 2 0 0 1 0-3.4l.8-.4a2 2 0 0 0 1-2.2l-.2-.9A2 2 0 0 1 7.6 6.1l.9.2a2 2 0 0 0 2.2-1zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
         ],

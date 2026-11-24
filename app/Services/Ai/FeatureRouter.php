@@ -109,7 +109,7 @@ final class FeatureRouter
 
         // Ragu: ada kata fitur, atau foto yang dilampirkan/dibalas langsung, tapi aturan tidak yakin.
         $directPhoto = $photo !== null && ((int) $photo->id === (int) $message->id || (int) $photo->id === (int) $message->reply_to_message_id);
-        if (! self::matches(self::FEATURE_WORDS, $text) && ! $directPhoto) {
+        if (! self::matches(self::FEATURE_WORDS, FileRequest::normalize($text)) && ! $directPhoto) {
             return null;
         }
         $routed = $this->askRouter($group, $text, $directPhoto);

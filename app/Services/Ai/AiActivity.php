@@ -44,18 +44,20 @@ final class AiActivity
     public static function report(int $groupId, string $activity, ?string $detail = null, ?int $onlyUserId = null): void
     {
         $detail = $detail !== null ? self::clean($detail) : null;
-        $signature = $activity . '|' . $detail;
+        $signature = $onlyUserId . '|' . $activity . '|' . $detail;
         if ((self::$last[$groupId] ?? null) === $signature) {
             return;
         }
         self::$last[$groupId] = $signature;
 
-        try {
-            Cache::put(self::key($groupId), ['activity' => $activity, 'detail' => $detail], self::CACHE_TTL_SECONDS);
-        } catch (Throwable) {
-            // Cache tidak tersedia: status tetap dikirim lewat realtime.
+        if ($onlyUserId === null) {
+            try {
+                Cache::put(self::key($groupId), ['activity' => $activity, 'detail' => $detail], self::CACHE_TTL_SECONDS);
+            } catch (Throwable) {
+                // Cache tidak tersedia: status tetap dikirim lewat realtime.
+            }
         }
-        event(new TypingStatus($groupId, 'ai', null, 'Normi AI', true, $activity, $detail));
+        event(new TypingStatus($groupId, 'ai', null, 'Normi AI', true, $activity, $detail, $onlyUserId));
     }
 
     public static function stop(int $groupId, string $activity = self::TYPING, ?int $onlyUserId = null): void

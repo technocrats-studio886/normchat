@@ -2,16 +2,18 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ConvertDocumentJob;
 use App\Jobs\IndexDocumentJob;
-use App\Models\AiUsageLog;
+use App\Models\Message;
+use App\Models\MessageDocument;
 use App\Services\Ai\Documents\DocumentIndex;
+use App\Services\Ai\Documents\DocumentStore;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Antrekan pengindeksan dokumen lampiran (App\Services\Ai\Documents\DocumentIndex), termasuk dokumen lama, hanya
- * untuk grup yang memakai Normi dalam 30 hari terakhir (sama dengan embedding pesan). Grup yang baru mulai memakai
- * Normi ikut terindeks dokumen lamanya.
+ * Dijalankan scheduler tiap menit: konversi dokumen kanonik yang tertinggal (App\Services\Ai\Documents\DocumentStore)
+ * dan indeks isinya (DocumentIndex) untuk semua grup.
  */
 class IndexDocuments extends Command
 {
@@ -21,17 +23,24 @@ class IndexDocuments extends Command
 
     public function handle(): int
     {
-        $activeGroups = AiUsageLog::query()
-            ->where('created_at', '>=', now()->subDays((int) config('normchat.context.active_days', 30)))
-            ->where('charged_credits', '>', 0)
-            ->distinct()
-            ->pluck('group_id');
-        if ($activeGroups->isEmpty()) {
-            return self::SUCCESS;
-        }
+        // Jaring pengaman ConvertDocumentJob: dokumen yang belum punya dokumen kanonik (semua grup, keputusan user
+        // 24 Nov 2026), dan dokumen gagal yang belum dicoba tiga kali.
+        $converted = 0;
+        Message::query()->whereNotNull('attachment_path')->whereNull('deleted_at')->where('message_type', 'file')
+            ->where('created_at', '>=', now()->subDays(60))
+            ->where(fn ($query) => $query->whereNotExists(fn ($q) => $q->selectRaw('1')->from('message_documents')->whereColumn('message_documents.message_id', 'messages.id'))
+                ->orWhereExists(fn ($q) => $q->selectRaw('1')->from('message_documents')->whereColumn('message_documents.message_id', 'messages.id')
+                    ->where('status', MessageDocument::FAILED)->where('attempts', '<', 3)->where('error', '!=', 'page_limit')
+                    ->where('updated_at', '<', now()->subMinutes(10))))
+            ->orderByDesc('id')->limit((int) $this->option('limit'))->get()
+            ->filter(fn (Message $message) => DocumentStore::supports($message))
+            ->each(function (Message $message) use (&$converted) {
+                ConvertDocumentJob::dispatch((int) $message->id);
+                $converted++;
+            });
 
         $queued = 0;
-        DocumentIndex::pending()->whereIn('group_id', $activeGroups)->limit((int) $this->option('limit'))->pluck('id')
+        DocumentIndex::pending()->limit((int) $this->option('limit'))->pluck('id')
             ->each(function ($id) use (&$queued) {
                 // Satu job per dokumen; tanda ini mencegah dokumen yang sama diantrekan dua kali sebelum selesai.
                 if (Cache::add('doc-index-queued:' . $id, true, now()->addMinutes(30))) {
@@ -39,7 +48,7 @@ class IndexDocuments extends Command
                     $queued++;
                 }
             });
-        $this->info("Dokumen diantrekan: {$queued}.");
+        $this->info("Dokumen dikonversi: {$converted}. Dokumen diantrekan untuk indeks: {$queued}.");
 
         return self::SUCCESS;
     }

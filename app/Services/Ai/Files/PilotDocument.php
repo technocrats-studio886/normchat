@@ -12,6 +12,10 @@ use RuntimeException;
 
 final class PilotDocument
 {
+    public const READABLE_EXTENSIONS = ['pdf', 'docx', 'pptx', 'ppt', 'xlsx', 'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'log', 'xml', 'yaml', 'yml'];
+
+    public const MAX_BYTES = 8 * 1024 * 1024;
+
     public static function enabled(int $group): bool
     {
         return config('normchat.documents_all_groups') === true
@@ -31,18 +35,22 @@ final class PilotDocument
 
     public static function bytes(Message $source): string
     {
-        return app(StoredFiles::class)->get($source->attachment_disk, $source->attachment_path, 8 * 1024 * 1024)
-            ?: throw new RuntimeException('Sumber belum terbaca. Pilot mendukung unggahan hingga 8 MB.');
+        return app(StoredFiles::class)->get($source->attachment_disk, $source->attachment_path, self::MAX_BYTES)
+            ?: throw new RuntimeException('Sumber belum terbaca. Normi dapat membaca dokumen hingga 8 MB.');
     }
 
-    private static function convert(string $mode, string $binary): string
+    private static function convert(string $mode, string $binary, ?string $pages = null): string
     {
         $host = $mode === 'pdf' ? 'docling' : 'ppt-converter';
         try {
             $response = Http::connectTimeout(3)->timeout(100)->withBody($binary, 'application/octet-stream')
+                ->withHeaders($pages ? ['X-Document-Pages' => $pages] : [])
                 ->post("http://{$host}:8010/{$mode}");
         } catch (ConnectionException) {
             throw new RuntimeException('Pembaca lokal sedang sibuk atau belum tersedia. Coba ulang sebentar lagi.');
+        }
+        if ($response->status() === 409 && $mode === 'pdf' && (int) $response->json('pages') > 0) {
+            throw new DocumentPageLimit((int) $response->json('pages'));
         }
         if (!$response->successful()) {
             throw new RuntimeException('Pembaca lokal belum bisa membaca dokumen lengkap. Kirim bagian yang diperlukan saja.');
@@ -50,18 +58,32 @@ final class PilotDocument
         return $response->body();
     }
 
-    public static function read(Message $source): array
+    /**
+     * Dokumen utuh dibaca dari dokumen kanonik yang tersimpan permanen (App\Services\Ai\Documents\DocumentStore);
+     * rentang halaman PDF besar dibaca langsung dan disimpan sementara.
+     */
+    public static function read(Message $source, ?string $pages = null): array
     {
-        $key = 'document-pilot:v1:'.$source->group_id.':'.$source->id.':'.sha1($source->attachment_path);
-        return Cache::remember($key, now()->addHours(12), function () use ($source) {
+        if ($pages === null) {
+            return app(\App\Services\Ai\Documents\DocumentStore::class)->ensure($source);
+        }
+        $key = 'document-pilot:v2:'.$source->group_id.':'.$source->id.':'.sha1($source->attachment_path).':'.$pages;
+
+        return Cache::remember($key, now()->addHours(12), fn () => self::parse($source, $pages));
+    }
+
+    /** Baca dan konversi berkas sekarang juga (tanpa cache). */
+    public static function parse(Message $source, ?string $pages = null): array
+    {
+        return (function () use ($source, $pages) {
             $bytes = self::bytes($source);
             $ext = self::extension($source);
             $tables = [];
             if ($ext === 'pdf') {
-                $text = app(AttachmentTextExtractor::class)->rendered(['binary' => $bytes, 'ext' => 'pdf', 'mime' => 'application/pdf'], 100000);
+                $text = $pages ? null : app(AttachmentTextExtractor::class)->rendered(['binary' => $bytes, 'ext' => 'pdf', 'mime' => 'application/pdf'], 100000);
                 if (mb_strlen(trim($text ?? '')) < 60 || preg_match('/\b(?:tabel|anggaran|jumlah|total|rincian|volume|inventaris|subtotal|qty)\b|\d[ \t]+\d|\t.+\t/iu', $text ?? '')
                     || (preg_match('~/Subtype\s*/Image\b~', $bytes) && mb_strlen($text ?? '') < 1000)) {
-                    $parsed = json_decode(self::convert('pdf', $bytes), true);
+                    $parsed = json_decode(self::convert('pdf', $bytes, $pages), true);
                     $text = $parsed['text'] ?? '';
                     $tables = $parsed['tables'] ?? [];
                 }
@@ -76,8 +98,9 @@ final class PilotDocument
             if (!$sections || strlen(self::json($sections)) > 350000) {
                 throw new RuntimeException('Dokumen belum bisa dibaca lengkap. Kirim bagian yang diperlukan saja.');
             }
-            return ['version' => substr(hash('sha256', $bytes), 0, 16), 'sections' => $sections, 'tables' => $tables];
-        });
+            return ['page_count' => $parsed['page_count'] ?? null, 'pages' => $pages, 'version' => substr(hash('sha256', $bytes), 0, 16), 'sections' => $sections, 'tables' => $tables,
+                'converter' => $ext === 'pdf' ? (isset($parsed) ? 'docling' : 'pdf-text') : 'office'];
+        })();
     }
 
     public static function json(array $value): string
@@ -125,6 +148,6 @@ final class PilotDocument
             $sample = array_map(fn ($row) => implode(' | ', $row), $table['rows']);
             $rows[] = 'Tabel '.$table['table']."\n".implode("\n", $sample);
         }
-        return "Tolong periksa urutan kolom hasil pembacaan PDF. Balas “kolom benar” jika cocok. Jika keliru, unggah tabel yang sudah dikoreksi sebagai pesan baru bersama permintaan awal.\n\n".implode("\n\n", $rows);
+        return "Tolong periksa urutan kolom hasil pembacaan PDF. Balas “kolom benar” jika cocok. Untuk mengubah nama kolom, balas misalnya “Koreksi tabel 1: Barang | Jumlah”. Tuliskan nama semua kolom sesuai urutannya.\n\n".implode("\n\n", $rows);
     }
 }

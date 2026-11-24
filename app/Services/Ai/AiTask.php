@@ -179,6 +179,7 @@ final class AiTask
         $this->spendHold = $this->spend->reserve('chat', $providerUsd, (int) $this->group->id);
         try {
             $this->hold = $this->wallet->hold($this->group, $this->requester, $credits, $this->model, [
+                'request_message_id' => $this->message->id,
                 'pricing_version_id' => $this->pricingVersionId,
                 'exchange_rate_id' => $this->pricing->exchangeRateId(),
             ]);

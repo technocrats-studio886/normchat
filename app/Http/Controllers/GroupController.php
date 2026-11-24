@@ -188,22 +188,24 @@ class GroupController extends Controller
         }
 
         if ($group->freeSlotsLeft() > 0) {
-            // Slot dicek ulang di dalam kunci: dua orang yang bergabung bersamaan tidak memakai slot terakhir yang sama.
-            $joined = DB::transaction(function () use ($group, $user) {
+            // Cek keanggotaan dan kuota di bawah kunci yang sama, termasuk ketika satu akun mengirim dua kali.
+            return DB::transaction(function () use ($request, $group, $user, $shareId): RedirectResponse {
                 $locked = Group::query()->lockForUpdate()->findOrFail($group->id);
+                if ($locked->isOwnedBy($user) || $locked->hasActiveMember($user)) {
+                    return redirect()->route('chat.show', $locked)->with('info', 'Kamu sudah bergabung di grup ini.');
+                }
+                abort_unless($locked->status === 'active', 404);
+                if (! $this->joinVerified($request, $locked)) {
+                    return redirect()->route('groups.join.continue', $shareId)->withErrors(['password' => 'Masukkan kata sandi grup dulu.']);
+                }
                 if ($locked->freeSlotsLeft() < 1) {
-                    return false;
+                    return redirect()->route('groups.join.continue', $shareId)->with('info', 'Slot gratis baru saja habis. Ikut patungan untuk bergabung.');
                 }
                 $locked->increment('free_joins_used');
                 $this->membership->joinFree($locked, $user);
 
-                return true;
+                return redirect()->route('chat.show', $locked)->with('success', 'Kamu bergabung gratis di grup ' . $locked->name . '.');
             });
-            if ($joined) {
-                return redirect()->route('chat.show', $group)->with('success', 'Kamu bergabung gratis di grup ' . $group->name . '.');
-            }
-
-            return redirect()->route('groups.join.continue', $shareId)->with('info', 'Slot gratis baru saja habis. Ikut patungan untuk bergabung.');
         }
 
         $quote = $this->pricing->quotePackages($request->packages());

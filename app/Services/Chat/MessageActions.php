@@ -180,6 +180,7 @@ class MessageActions
         // Pesan yang dihapus tidak lagi disematkan, dan isi dokumennya tidak boleh dipakai Normi lagi.
         app(GroupPins::class)->unpin($group, (int) $message->id);
         \App\Services\Ai\Documents\DocumentIndex::forget($message);
+        app(\App\Services\Ai\Documents\DocumentStore::class)->forget($message);
 
         event(new MessageDeleted((int) $group->id, $this->presenter->present($message)));
         AuditLog::record('chat.delete_message', $user->id, $message, [

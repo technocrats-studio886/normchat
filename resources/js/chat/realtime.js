@@ -11,6 +11,7 @@ import { carryOverMedia, revokeLater } from './media-cache.js';
 import { avatarHtml, buildMessageNode, flashEditedMessage, replaceRenderedMessageByPayload } from './messages.js';
 import { mergePollStatsIntoCache, refreshPollCardsFromFeed } from './polls.js';
 import { markGroupRead, markGroupVisited, noteUnseenIncomingMessage, refreshScrollBottomButton, rememberLatestMessageId, syncScrollBottomCount } from './read-state.js';
+import { initRequestStatus } from './request-status.js';
 import { chatApiRequest, escapeHtml, scrollChatToBottom } from './utils.js';
 import { initVoicePlayers } from './voice-player.js';
 import { playNotifySound } from '../ui/notify-sound.js';
@@ -272,7 +273,9 @@ const findPendingFor = (message) => {
 const markAnswered = (message) => {
 	const questionId = Number(message?.reply_to?.id || 0);
 	if (message?.sender_type === 'ai' && questionId > 0) {
-		chatFeed?.querySelector(`[data-message-id="${questionId}"]`)?.removeAttribute('data-message-awaiting-ai');
+		const question = chatFeed?.querySelector(`[data-message-id="${questionId}"]`);
+		question?.removeAttribute('data-message-awaiting-ai');
+		question?.querySelector('[data-request-status]')?.remove();
 		if (!chatFeed?.querySelector('[data-message-awaiting-ai]')) {
 			window.clearTimeout(optimisticAiTimer);
 			updateTypingState('ai', null, false);
@@ -428,6 +431,7 @@ const onGroupDataChanged = (payload) => {
 };
 
 export const initRealtime = () => {
+	initRequestStatus(catchUpMessages);
 	resumeAfterBackForwardCache();
 	showPendingAiFromFeed();
 	// Halaman ini hasil prefetch (speculation rules): isinya bisa tertinggal beberapa saat, susulkan pesannya.

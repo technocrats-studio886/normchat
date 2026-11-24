@@ -140,9 +140,13 @@ class PaidGroupPromotionTest extends TestCase
         for ($i = 0; $i < 2; $i++) {
             $friend = User::factory()->create();
             $this->actingAs($friend)->post('/join/' . $group->share_id . '/sandi', ['password' => 'abcd']);
+            $this->get('/join/' . $group->share_id . '/lanjut')->assertOk()
+                ->assertSee('Masih ada ' . (2 - $i) . ' slot gratis')->assertDontSee('Bayar dan gabung');
             $this->post('/join/' . $group->share_id)->assertRedirect(route('chat.show', $group));
+            $this->assertTrue($group->fresh()->hasActiveMember($friend));
         }
         $this->assertSame(0, $group->fresh()->freeSlotsLeft());
+        $this->assertSame(0, PendingPayment::where('payment_type', PaymentPurpose::GroupJoin->value)->count());
         $this->post('/groups/' . $group->id . '/leave')->assertRedirect(route('groups.index'));
         $this->assertSame(0, $group->fresh()->freeSlotsLeft());
         $next = User::factory()->create();
@@ -167,7 +171,7 @@ class PaidGroupPromotionTest extends TestCase
         auth()->logout();
         $this->get('/')->assertOk()->assertSee('250 NC + bonus 50 NC')->assertSee('setelah pembayaran berhasil');
         foreach (['/home', '/pricing'] as $page) {
-            $this->get($page)->assertOk()->assertSee('50.00 bonus NC')->assertDontSee('Start your free group')->assertSee('2 friends');
+            $this->get($page)->assertOk()->assertSee($page === '/home' ? '50 bonus NC' : '50.00 bonus NC')->assertDontSee('Start your free group')->assertSee('2 friends');
         }
         $member = User::factory()->create();
         $this->actingAs($member)->get('/superadmin/promo')->assertForbidden();

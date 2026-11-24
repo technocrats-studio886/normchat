@@ -10,6 +10,8 @@ import { attachmentInput, chatForm } from './composer/elements.js';
 import { initFeedClicks } from './composer/feed-clicks.js';
 import { initEditMode } from './composer/edit-mode.js';
 import { initComposerInput } from './composer/input.js';
+import { initUploadDraft } from './composer/upload-draft.js';
+import { initLengthLimit } from './composer/length-limit.js';
 import { initDraft } from './composer/draft.js';
 import { initMessageActions } from './composer/message-actions.js';
 import { initReplyPreviewPicker } from './composer/quote-picker.js';
@@ -39,4 +41,6 @@ export const initComposer = () => {
 	initComposerInput();
 	initSend();
 	initDraft();
+	initUploadDraft();
+	initLengthLimit();
 };

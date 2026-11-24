@@ -304,19 +304,19 @@
         .btn.is-loading::after { content: ''; width: 14px; height: 14px; margin-left: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: nc-spin 0.7s linear infinite; display: inline-block; vertical-align: -2px; }
         @keyframes nc-spin { to { transform: rotate(360deg); } }
 
-        /* Hero /home: judul, CTA, dan penjelasan rata tengah memenuhi lebar; di bawahnya demo (kiri) dan manfaat (kanan). */
-        .hero-head { max-width: 920px; text-align: center; }
-        .hero-head h1 { font-size: clamp(2.75rem, 7.2vw, 5.25rem); line-height: 1.04; letter-spacing: -0.025em; }
-        .hero-head .btn-row { justify-content: center; margin-top: 32px; }
-        .hero-head .hero-lead { max-width: 680px; margin: 28px auto 0; font-size: 1.1875rem; }
-        .hero-head .chat-note { margin-top: 12px; }
-        .hero-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 56px; align-items: center; margin-top: 72px; }
-        .benefit-list { list-style: none; border-top: 1px solid var(--line); }
-        .benefit-list li { padding: 18px 0; border-bottom: 1px solid var(--line); }
-        .benefit-list h3 { margin-bottom: 4px; font-size: 1.125rem; }
-        .hero .benefit-list p { margin-top: 0; font-size: 1rem; }
+        .home-hero { --nav-height: 65px; padding: 0 0 clamp(48px, 7vw, 96px); }
+        .home-intro {
+            display: grid; align-items: center; justify-items: center; text-align: center;
+            min-height: calc(100vh - var(--nav-height)); min-height: calc(100svh - var(--nav-height));
+            padding-block: clamp(40px, 8vh, 96px);
+        }
+        .hero-copy h1 { max-width: 18ch; margin-inline: auto; font-size: clamp(2.75rem, 6vw, 5.5rem); line-height: 1.04; letter-spacing: -0.035em; text-wrap: balance; }
+        .home-hero .hero-lead { max-width: 53ch; margin: 20px auto 0; line-height: 1.55; text-wrap: pretty; }
+        .hero-copy .btn-row { justify-content: center; }
+        .home-demo { max-width: 760px; scroll-margin-top: calc(var(--nav-height) + 16px); }
         @media (max-width: 880px) {
-            .hero-body { grid-template-columns: 1fr; gap: 40px; margin-top: 48px; }
+            .home-hero { --nav-height: calc(77px + 1.5rem); }
+            .home-hero .hero-lead { font-size: 1.0625rem; }
         }
 
         @media (prefers-reduced-motion: reduce) {

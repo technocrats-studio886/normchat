@@ -14,7 +14,7 @@ class CreditHold extends Model
     public const SETTLED = 'settled';
     public const RELEASED = 'released';
 
-    protected $fillable = ['group_id', 'user_id', 'amount', 'status', 'pricing_version_id', 'exchange_rate_id'];
+    protected $fillable = ['group_id', 'user_id', 'request_message_id', 'amount', 'status', 'pricing_version_id', 'exchange_rate_id'];
 
     protected $casts = [
         'amount' => 'float',

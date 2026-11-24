@@ -41,6 +41,6 @@ class MidtransWebhookController extends Controller
             'transaction_status' => $transaction->gatewayStatus,
         ]);
 
-        return response()->json(['message' => 'processed', 'status' => $transaction->state]);
+        return response()->json(['message' => 'processed', 'status' => $pending->status]);
     }
 }

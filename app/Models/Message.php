@@ -50,6 +50,10 @@ class Message extends Model
     protected static function booted(): void
     {
         static::created(function (self $message) {
+            // Dokumen dikonversi dan disimpan begitu terkirim, untuk konteks Normi kapan pun dibutuhkan.
+            if (\App\Services\Ai\Documents\DocumentStore::supports($message)) {
+                \App\Jobs\ConvertDocumentJob::dispatch((int) $message->id)->afterCommit();
+            }
             if (in_array($message->sender_type, ['user', 'ai'], true) && \App\Services\Push\WebPush::fromConfig() !== null) {
                 \App\Jobs\SendMessagePushJob::dispatch((int) $message->id)
                     ->delay(now()->addSeconds((int) config('normchat.push.delay_seconds', 8)))
@@ -106,6 +110,15 @@ class Message extends Model
         return $query
             ->where(fn ($q) => $q->whereNull('visible_to_user_id')->orWhere('visible_to_user_id', $user->id))
             ->withinHistoryOf($user);
+    }
+
+    /**
+     * Satu pesan boleh dibaca $user (termasuk jejak pesan terhapus). Setiap endpoint yang menerima id pesan
+     * memakai ini: id berurutan mudah ditebak, jadi pesan yang tidak boleh dilihat diperlakukan seperti tidak ada.
+     */
+    public function isVisibleTo(User $user): bool
+    {
+        return static::withTrashed()->whereKey($this->id)->visibleTo($user)->exists();
     }
 
     /** Hanya bagian batas riwayat anggota baru dari visibleTo (dipakai juga oleh ekspor). */

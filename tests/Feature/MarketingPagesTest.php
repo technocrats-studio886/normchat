@@ -41,7 +41,7 @@ class MarketingPagesTest extends TestCase
     public function test_copy_explains_paid_groups_and_compares_ai_levels(): void
     {
         $this->get('/home')->assertSee('Create your group')->assertSee('Your first 2 friends join free')->assertSee('data-live-demo', false)
-            ->assertSee('One balance for the whole group')->assertSee('before joining')->assertDontSee('Start free')->assertSee(route('home'), false);
+            ->assertSee('One balance for the whole group')->assertSeeInOrder(['One AI for the whole group.', 'Mention', 'Create your group', 'Workshop planning', 'How to bring Normi into your group', 'One shared balance for Rp30,000'])->assertDontSee('Start free')->assertSee(route('home'), false);
         // Empat mode Normi dari menu + (App\Enums\AiMode), masing-masing dengan kegunaannya.
         $this->get('/home')->assertSeeInOrder(['Guided Learning', 'Learn a topic step by step', 'Use it when', 'Create image', 'Turn an idea into a picture', 'Use it for', 'Canvas', 'Get a finished document or web page', 'Use it when', 'Deep Research', 'Research with sources you can check', 'Use it before'])
             ->assertSee('#i-book-open', false)->assertSee('id="i-magnifying-glass-plus"', false);

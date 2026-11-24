@@ -5,6 +5,8 @@ services:
     entrypoint: ["/opt/app-root/bin/python", "/worker.py"]
     volumes:
       - ./docker/document-pilot/worker.py:/worker.py:ro
+      # OCR bahasa Indonesia (tessdata_fast, cocok untuk Tesseract 4.1 di image ini).
+      - ./docker/document-pilot/tessdata/ind.traineddata:/usr/share/tesseract/tessdata/ind.traineddata:ro
     environment:
       HF_HUB_OFFLINE: "1"
       OMP_NUM_THREADS: "2"
@@ -167,14 +169,27 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    # Orkestrator antrean: Horizon menjalankan supervisor per antrean (config/horizon.php,
+    # docs/rancangan-worker-dan-file-nov.md). Saat container dihentikan, Horizon menunggu job yang sedang
+    # berjalan; 3 menit cukup untuk hampir semua jawaban Normi. Kode baru dimuat dengan
+    # `php artisan horizon:terminate` (container keluar lalu dinyalakan ulang Docker).
+    stop_grace_period: 3m
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan horizon:status | grep -qi running"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
     # Worker berjalan sebagai www-data seperti PHP-FPM. Bila root, folder lampiran baru (mode 0700)
     # tidak bisa dibaca FPM sehingga gambar/canvas AI 404 sampai worker restart dan chown berjalan.
+    # memory_limit ditulis ke conf.d agar ikut ke proses worker anak yang dibuat Horizon.
     command: >
       sh -c "
         mkdir -p /opt/normchat/storage/attachments /opt/normchat/storage/exports /opt/normchat/storage/backups &&
         chown -R www-data:www-data /opt/normchat/storage &&
         chmod -R ug+rwX /opt/normchat/storage &&
-        exec setpriv --reuid=www-data --regid=www-data --init-groups php artisan queue:work redis --queue=default,maintenance --tries=3 --sleep=1 --timeout=600 --max-time=3600
+        echo memory_limit=384M > /usr/local/etc/php/conf.d/zz-worker-memory.ini &&
+        exec setpriv --reuid=www-data --regid=www-data --init-groups php artisan horizon
       "
 
   # Tugas terjadwal (routes/console.php): cadangan chat otomatis pukul 03.00, hapus cadangan

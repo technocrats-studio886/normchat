@@ -32,7 +32,7 @@ class GroupDraftController extends Controller
         $replyTo = (int) ($validated['reply_to_message_id'] ?? 0);
         $draft = GroupDraft::updateOrCreate($key, [
             'content' => $content,
-            'reply_to_message_id' => $replyTo > 0 && $group->messages()->whereKey($replyTo)->exists() ? $replyTo : null,
+            'reply_to_message_id' => $replyTo > 0 && $group->messages()->whereKey($replyTo)->visibleTo($request->user())->exists() ? $replyTo : null,
         ]);
         $draft->touch();
 

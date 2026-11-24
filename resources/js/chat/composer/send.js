@@ -17,13 +17,14 @@ import { clearReplyTarget, normalizeReplyQuote } from './reply.js';
 import { showActionToast } from './toast.js';
 import { whisperTyping } from './typing.js';
 
+import { checkFileLimits, uploadDraftBlock, uploadRequestKey, finishUploadRequest } from './upload-draft.js';
+import { refreshLengthNote } from './length-limit.js';
+
 let pendingLocalMessageCounter = 0;
 let chatSubmitInFlight = false;
 
 export const initSend = () => {
 	let retry = null;
-	let uploadVersion = 0;
-	for (const picker of [attachmentInput, cameraInput]) picker?.addEventListener('change', () => { uploadVersion++; });
 	const showSendError = (message) => {
 		for (const box of document.querySelectorAll('[data-send-error], [data-preview-send-error]')) {
 			const label = box.querySelector('[data-send-error-text]');
@@ -185,6 +186,12 @@ export const initSend = () => {
 			: '';
 		const selectedFile = attachmentInput.files?.[0] instanceof File ? attachmentInput.files?.[0] : null;
 
+		// Pesan kepanjangan ditolak di sini: tidak ada bubble "Mengirim…" untuk pesan yang pasti ditolak server.
+		if (refreshLengthNote()) {
+			mentionInput.focus();
+			return;
+		}
+
 		if (isEditing()) {
 			if (selectedFile) {
 				showActionToast('Lampiran tidak bisa ditambahkan saat mengedit');
@@ -235,10 +242,25 @@ export const initSend = () => {
 		}
 
 		const formData = new FormData(chatForm);
-		const signature = JSON.stringify([...formData].filter(([name]) => name !== '_token').map(([name, value]) => [name, value instanceof File ? [uploadVersion, value.name] : value]));
-		if (!retry || retry.signature !== signature) {
-			retry = {signature, key: crypto.randomUUID()};
-		}
+        const blocked = checkFileLimits() || uploadDraftBlock();
+        if (blocked) { showSendError(blocked); return; }
+        // A retry after reloading (or reselecting the same file) must use the same server key.
+        chatSubmitInFlight = true;
+        let digest = '';
+        try {
+            if (selectedFile) {
+                const hash = await crypto.subtle.digest('SHA-256', await selectedFile.arrayBuffer());
+                digest = Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2,'0')).join('');
+            }
+        } catch {
+            showSendError('Lampiran belum bisa dibaca. Pilih ulang file untuk mengirimnya.');
+            chatSubmitInFlight = false;
+            return;
+        }
+        const signature = JSON.stringify([...formData].filter(([name]) => name !== '_token').map(([name,value]) =>
+            [name, value instanceof File ? [value.name,value.size,digest] : value]));
+        const key = uploadRequestKey(signature);
+        if (retry?.key !== key) retry = {signature, key};
 		if (retry.failedNode) retry.failedNode.remove();
 		formData.set('client_message_id', retry.key);
 		showSendError('');
@@ -266,6 +288,7 @@ export const initSend = () => {
 
 			const result = await response.json();
 			if (!result?.message?.id) throw new Error('Penerimaan pesan belum terkonfirmasi.');
+			finishUploadRequest(key);
 			retry = null;
 			if (mentionInput.value.trim() === contentText && (attachmentInput.files?.[0] || null) === selectedFile) {
 				if (mentionInput instanceof HTMLTextAreaElement || mentionInput instanceof HTMLInputElement) {

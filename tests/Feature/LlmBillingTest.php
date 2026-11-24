@@ -237,6 +237,23 @@ class LlmBillingTest extends TestCase
         $this->assertSame(0.0, app(SpendGuard::class)->status()['reserved']);
     }
 
+    public function test_worker_cleanup_only_finishes_abandoned_queue_items(): void
+    {
+        $item = function () {
+            $request = Message::create(['group_id' => $this->group->id, 'sender_id' => $this->owner->id, 'sender_type' => 'user', 'content' => '@normi buat PDF']);
+            return ChatMessageQueue::create(['group_id' => $this->group->id, 'message_id' => $request->id, 'status' => 'processing', 'queued_at' => now()]);
+        };
+        $lost = $item();
+        $answered = $item();
+        Message::create(['group_id' => $this->group->id, 'sender_type' => 'ai', 'reply_to_message_id' => $answered->message_id, 'content' => 'Selesai']);
+        $this->travel(20)->minutes();
+        $recent = $item();
+        $this->artisan('normchat:release-stale-holds')->assertSuccessful();
+        $this->assertSame('failed', $lost->fresh()->status);
+        $this->assertSame('processed', $answered->fresh()->status);
+        $this->assertSame('processing', $recent->fresh()->status);
+    }
+
     public function test_stale_holds_are_released(): void
     {
         $wallet = app(CreditWallet::class);

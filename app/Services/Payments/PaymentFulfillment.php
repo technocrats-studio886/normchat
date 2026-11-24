@@ -54,10 +54,21 @@ class PaymentFulfillment
                 return;
             }
 
-            $group = $locked->group_id ? Group::find($locked->group_id) : null;
+            $meta = (array) ($locked->metadata_json ?? []);
+            $group = Group::withTrashed()->whereKey($locked->group_id)->lockForUpdate()->first();
+            if ($group?->trashed() && ($meta['archived_unpaid_group'] ?? false) && $group->status === 'pending_payment') {
+                $group->restore();
+            }
             $purpose = PaymentPurpose::tryFrom((string) $locked->payment_type);
+            if ($purpose && (! $group || $group->trashed())) {
+                Log::error('Confirmed payment requires reconciliation: destination group unavailable.', ['order_id' => $locked->order_id]);
+                $locked->update(['status' => 'needs_review', 'metadata_json' => array_merge($meta, [
+                    'gateway_transaction_id' => $reference, 'paid_amount' => $paidAmount,
+                ])]);
+
+                return;
+            }
             if ($group && $purpose) {
-                $meta = (array) ($locked->metadata_json ?? []);
                 $this->grant($purpose, $group, $user, new Funding(
                     (float) ($meta['credits'] ?? 0),
                     $paidAmount,
@@ -66,10 +77,12 @@ class PaymentFulfillment
                 ), (float) ($meta['bonus_credits'] ?? 0));
             }
 
+            unset($meta['archived_unpaid_group']);
             $locked->update([
                 'status' => 'paid',
                 'paid_at' => $paidAt ? Carbon::parse((string) $paidAt) : now(),
-                'metadata_json' => array_merge((array) ($locked->metadata_json ?? []), [
+                'metadata_json' => array_merge($meta, [
+                    'gateway_status' => 'paid',
                     'payment_method' => $paymentMethod,
                     'gateway_transaction_id' => $reference,
                     'paid_amount' => $paidAmount,
@@ -80,22 +93,28 @@ class PaymentFulfillment
         $pending->refresh();
     }
 
-    /** Tandai gagal; grup yang belum sempat aktif ikut dihapus. */
     public function markFailed(PendingPayment $pending, string $gatewayStatus, array $gatewayMetadata = []): void
     {
-        $pending->update([
-            'status' => 'failed',
-            'metadata_json' => array_merge((array) ($pending->metadata_json ?? []), $gatewayMetadata, [
-                'gateway_status' => $gatewayStatus,
-            ]),
-        ]);
-
-        if ($pending->payment_type === PaymentPurpose::GroupCreate->value) {
-            $group = $pending->group;
-            if ($group && $group->status === 'pending_payment') {
-                $group->forceDelete();
+        DB::transaction(function () use ($pending, $gatewayStatus, $gatewayMetadata) {
+            $locked = PendingPayment::whereKey($pending->id)->lockForUpdate()->firstOrFail();
+            if (in_array($locked->status, ['paid', 'needs_review'], true)) {
+                return;
             }
-        }
+
+            $metadata = array_merge((array) $locked->metadata_json, $gatewayMetadata, ['gateway_status' => $gatewayStatus]);
+            if ($locked->payment_type === PaymentPurpose::GroupCreate->value) {
+                $group = Group::whereKey($locked->group_id)->lockForUpdate()->first();
+                if ($group?->status === 'pending_payment') {
+                    // Simpan tujuan pembayaran jika konfirmasi lunas datang belakangan.
+                    $group->delete();
+                    $metadata['archived_unpaid_group'] = true;
+                }
+            }
+
+            $locked->update(['status' => 'failed', 'metadata_json' => $metadata]);
+        });
+
+        $pending->refresh();
     }
 
     /** Tanyakan status ke gateway untuk pembayaran yang masih pending, lalu tuntaskan. */

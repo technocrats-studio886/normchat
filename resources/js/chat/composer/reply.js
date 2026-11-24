@@ -15,6 +15,7 @@ export const clearReplyTarget = () => {
 		replyPreview.classList.add('hidden');
 		replyPreview.classList.remove('flex');
 	}
+	document.dispatchEvent(new Event('nc:reply-updated'));
 };
 
 export const normalizeReplyQuote = (value) => String(value || '')
@@ -67,6 +68,7 @@ export const setReplyTarget = (messageNode, quote = null) => {
 		window.getSelection()?.removeAllRanges();
 	}
 
+	document.dispatchEvent(new Event('nc:reply-updated'));
 	mentionInput?.focus();
 };
 

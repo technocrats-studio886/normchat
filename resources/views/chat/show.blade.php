@@ -167,6 +167,8 @@
                 <p class="nc-frozen-note" role="status">Grup ini dibekukan oleh admin Normi Chat. Pesan baru tidak bisa dikirim, riwayat tetap bisa dibaca.</p>
             @else
             <form method="POST" action="{{ route('chat.store', $group) }}" class="relative" enctype="multipart/form-data" data-chat-form="1"
+                  data-doc-extensions="{{ implode(' ', \App\Services\Ai\Files\PilotDocument::READABLE_EXTENSIONS) }}"
+                  data-doc-limit="{{ \App\Services\Ai\Files\PilotDocument::enabled($group->id) ? \App\Services\Ai\Files\PilotDocument::MAX_BYTES : 0 }}" data-upload-limit="{{ \App\Support\AttachmentRules::MAX_KILOBYTES * 1024 }}" data-max-length="{{ \App\Support\MessageRules::MAX_CONTENT }}"
                   data-group-id="{{ $group->id }}" data-draft-url="{{ route('groups.draft.beacon', $group) }}"
                   data-draft="{{ json_encode($draft ? ['content' => $draft->content, 'reply_to_message_id' => $draft->reply_to_message_id] : null) }}">
                 @csrf
@@ -212,6 +214,9 @@
                     </div>
                 </div>
 
+                <p hidden data-doc-limit-note role="status" class="text-sm text-danger-ink"></p>
+                <p hidden data-length-note role="status" aria-live="polite" class="text-sm tabular-nums"></p>
+                <div hidden data-upload-draft-note role="status" class="text-sm"><span></span> <button type="button" class="underline" data-forget-upload>Hapus lampiran dari draf</button></div>
                 <div hidden data-send-error role="alert" class="text-sm text-danger-ink">
                     <span data-send-error-text></span>
                     <button type="button" data-upload-retry class="ml-2 underline">Kirim ulang</button>

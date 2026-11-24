@@ -67,6 +67,8 @@ return [
         'api_key' => env('OPENAI_API_KEY'),
         'admin_key' => env('OPENAI_ADMIN_KEY'),
         'project_id' => env('OPENAI_PROJECT_ID'),
+        // Jeda (ms) percobaan ulang chat completions saat OpenAI membalas 5xx/429 (App\Services\Ai\OpenAiClient).
+        'retry_ms' => [2000, 5000],
     ],
 
 ];

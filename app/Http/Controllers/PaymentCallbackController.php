@@ -25,13 +25,15 @@ class PaymentCallbackController extends Controller
             return redirect()->route('groups.index')->with('info', 'Pembayaran tidak ditemukan.');
         }
 
-        if ($pending->status === 'pending') {
+        if (in_array($pending->status, ['pending', 'failed', 'expired'], true)) {
             $fulfillment->syncWithGateway($pending, $request->user());
             $pending->refresh();
         }
 
         return match ($pending->status) {
             'paid' => $this->redirectAfterPaid($pending),
+            'needs_review' => redirect()->route('groups.index')
+                ->with('info', 'Pembayaran diterima. Hubungi admin dengan nomor pesanan '.$pending->order_id.' untuk memeriksa tujuan pembayaran.'),
             'failed', 'expired' => redirect()->route('groups.index')
                 ->with('info', 'Pembayaran gagal atau sudah kedaluwarsa. Coba lagi.'),
             default => redirect()->route('groups.index')

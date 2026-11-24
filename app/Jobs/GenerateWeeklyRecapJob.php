@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use App\Models\Group;
 use App\Services\Chat\WeeklyRecap;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,7 +19,7 @@ class GenerateWeeklyRecapJob implements ShouldQueue
 
     public function __construct(public int $groupId)
     {
-        $this->onQueue('default');
+        $this->onQueue(Queues::DOCUMENTS);
     }
 
     public function handle(WeeklyRecap $recap): void

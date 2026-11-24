@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Support\Queues;
 use App\Models\Group;
 use App\Models\GroupContextSummary;
 use App\Models\Message;
@@ -35,7 +36,7 @@ class EmbedGroupMessagesJob implements ShouldQueue, ShouldBeUniqueUntilProcessin
     public function __construct(public int $groupId)
     {
         // Antrean terpisah yang dikerjakan setelah antrean jawaban (worker: --queue=default,maintenance).
-        $this->onQueue('maintenance');
+        $this->onQueue(Queues::MAINTENANCE);
     }
 
     public function uniqueId(): string

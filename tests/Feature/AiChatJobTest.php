@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -149,7 +150,46 @@ class AiChatJobTest extends TestCase
 
         $this->assertSame(0, AiUsageLog::count());
         $this->assertSame(300.0, $this->group->groupToken->fresh()->credits);
-        $this->assertStringContainsString('AI sedang sibuk', (string) Message::where('sender_type', 'ai')->value('content'));
+        $this->assertFalse(Message::where('sender_type', 'ai')->exists());
+        $item = ChatMessageQueue::sole();
+        $this->assertSame('failed', $item->status);
+        $this->assertTrue($item->publicState(true)['can_retry']);
+    }
+
+    public function test_recovered_model_request_posts_one_answer_and_charges_once(): void
+    {
+        Queue::fake();
+        $available = false;
+        Http::fake(function () use (&$available) {
+            return $available ? Http::response([
+                'choices' => [['message' => ['content' => 'Jawaban pulih']]],
+                'usage' => ['prompt_tokens' => 1000, 'completion_tokens' => 1000],
+            ]) : Http::response(['error' => 'unavailable'], 503);
+        });
+        $this->runAi(['content' => '@normi halo']);
+        $item = ChatMessageQueue::sole();
+        $this->assertSame('failed', $item->status);
+        $url = route('chat.retry', [$this->group, $item->message_id]);
+        $body = ['attempt' => $item->attempt, 'queue_id' => $item->id];
+        $this->actingAs($this->owner)->postJson($url, $body)->assertJsonPath('request.status', 'queued');
+        $this->postJson($url, $body)->assertJsonPath('request.attempt', 2);
+        Queue::assertPushed(ProcessGroupChatQueueJob::class, 1);
+
+        $available = true;
+        (new ProcessGroupChatQueueJob($this->group->id))->handle();
+        $this->postJson($url, $body)->assertJsonPath('request.status', 'processed');
+        $this->assertSame(1, Message::where('reply_to_message_id', $item->message_id)->where('sender_type', 'ai')->count());
+        $log = AiUsageLog::where('request_message_id', $item->message_id)->sole();
+        $this->assertGreaterThan(0, $log->charged_credits);
+        $this->assertEqualsWithDelta(300 - $log->charged_credits, $this->group->groupToken->fresh()->remaining_credits, 0.00001);
+    }
+
+    public function test_private_request_progress_only_reaches_the_requester(): void
+    {
+        \App\Services\Ai\AiActivity::report($this->group->id, 'file', 'sedang membaca dokumen privat', $this->owner->id);
+        Event::assertDispatched(TypingStatus::class, fn ($event) => $event->onlyUserId === $this->owner->id && $event->isTyping);
+        $this->assertNull(\App\Services\Ai\AiActivity::current($this->group->id));
+        \App\Services\Ai\AiActivity::stop($this->group->id, 'file', $this->owner->id);
     }
 
     private function runAi(array $attributes): void

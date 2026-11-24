@@ -48,14 +48,20 @@ class GroupMembership
 
     public function activateJoin(Group $group, User $member, Funding $funding): void
     {
-        $this->addMember($group, $member, Role::MEMBER, newcomer: true);
-        $this->events->record($group, SystemMessages::MEMBER_JOINED, $member);
-
-        $group->subscription?->increment('included_seats');
+        // Pembayaran yang lunas belakangan (VA dibayar setelah user masuk lewat slot gratis atau checkout lain) tidak
+        // boleh menurunkan peran admin, menutup lagi riwayat yang sudah dibuka pemilik, atau mengulang pesan bergabung.
+        // Uangnya tetap jadi saldo grup (audit 23 Nov 2026).
+        $alreadyMember = $group->isOwnedBy($member) || $group->hasActiveMember($member);
+        if (! $alreadyMember) {
+            $this->addMember($group, $member, Role::MEMBER, newcomer: true);
+            $this->events->record($group, SystemMessages::MEMBER_JOINED, $member);
+            $group->subscription?->increment('included_seats');
+        }
 
         $this->ledger->credit($group, $member, $funding, PaymentPurpose::GroupJoin->contributionSource());
 
-        AuditLog::record('group.member_joined', $member->id, $group, $this->auditMetadata($funding) + ['patungan' => true]);
+        AuditLog::record($alreadyMember ? 'group.contribution_after_join' : 'group.member_joined', $member->id, $group,
+            $this->auditMetadata($funding) + ['patungan' => true]);
     }
 
     /** Grup gratis: aktif tanpa pembayaran, saldo awalnya pemberian Normi Chat (bukan pendapatan). */

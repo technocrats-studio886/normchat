@@ -200,13 +200,14 @@ class GroupToolsController extends Controller
     {
         $this->authorize('chat', $group);
         $this->ensureWritable($group);
+        $request->merge(['content' => \App\Support\MessageRules::normalizeNewlines($request->input('content'))]);
         $data = $request->validate([
-            'content' => ['required', 'string', 'max:3000'],
+            'content' => ['required', 'string', 'max:'.\App\Support\MessageRules::MAX_CONTENT],
             'send_at' => ['required', 'date'],
             'reply_to_message_id' => ['nullable', 'integer'],
             'ai_mode' => ['nullable', 'string', 'max:30'],
             'ai_model' => ['nullable', 'string', 'max:80'],
-        ]);
+        ], ['content.max' => \App\Support\MessageRules::tooLongMessage()]);
         $scheduled->create($group, $request->user(), ['send_at' => CarbonImmutable::parse($data['send_at'])] + $data);
 
         return response()->json(['ok' => true, 'scheduled' => $scheduled->listFor($group, $request->user())], 201);

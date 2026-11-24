@@ -8,7 +8,31 @@ import { setPendingSkipReplySourceMessageId } from '../read-state.js';
 import { chatApiRequest, escapeAttr, escapeHtml } from '../utils.js';
 import { showActionToast } from './toast.js';
 
+import { chatForm, mentionInput, attachmentInput } from './elements.js';
+import { setReplyTarget } from './reply.js';
+
 export const initFeedClicks = () => {
+    chatFeed?.addEventListener('change', (event) => {
+        if (event.target.matches('[data-doc-table]')) {
+            event.target.closest('[data-doc-review]').querySelector('[data-doc-names]').value = event.target.selectedOptions[0].dataset.names;
+        }
+    });
+    chatFeed?.addEventListener('click', (event) => {
+        const action = event.target.closest('[data-doc-action]');
+        if (!action || !chatForm) return;
+        if (mentionInput.value.trim() || attachmentInput.files.length) {
+            showActionToast('Selesaikan atau kosongkan draf pesan sebelum menjawab konfirmasi.');
+            return;
+        }
+        const box = action.closest('[data-doc-review]');
+        let text = 'kolom benar';
+        if (action.dataset.docAction === 'pages') text = 'halaman ' + box.querySelector('[data-doc-range]').value.trim();
+        if (action.dataset.docAction === 'edit') text = 'Koreksi tabel ' + box.querySelector('[data-doc-table]').value + ': ' + box.querySelector('[data-doc-names]').value.trim();
+        setReplyTarget(action.closest('[data-message-id]'), '');
+        mentionInput.value = text;
+        mentionInput.dispatchEvent(new Event('input', {bubbles:true}));
+        chatForm.requestSubmit();
+    });
 	const inferAttachmentKind = (trigger, messageNode) => {
 		const explicitKind = String(trigger?.getAttribute('data-attachment-kind') || '').toLowerCase();
 		if (explicitKind) {

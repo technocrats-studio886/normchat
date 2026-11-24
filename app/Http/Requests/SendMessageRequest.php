@@ -4,17 +4,25 @@ namespace App\Http\Requests;
 
 use App\Enums\AiMode;
 use App\Support\AttachmentRules;
+use App\Support\MessageRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SendMessageRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('content')) {
+            $this->merge(['content' => MessageRules::normalizeNewlines($this->input('content'))]);
+        }
+    }
+
     public function rules(): array
     {
         return [
             'client_message_id' => ['nullable', 'uuid'],
-            'content' => ['nullable', 'string', 'max:3000'],
+            'content' => ['nullable', 'string', 'max:'.MessageRules::MAX_CONTENT],
             'attachment' => AttachmentRules::validation(),
             'reply_to_message_id' => ['nullable', 'integer'],
             'reply_quote_text' => ['nullable', 'string', 'max:500'],
@@ -26,6 +34,7 @@ class SendMessageRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'content.max' => MessageRules::tooLongMessage(),
             'attachment.extensions' => AttachmentRules::rejectionMessage(),
             'attachment.max' => 'Ukuran file maksimal 15 MB.',
             'ai_model.exists' => 'Model ini sudah tidak tersedia. Pilih model lain.',

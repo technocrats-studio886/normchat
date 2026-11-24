@@ -7,6 +7,7 @@ use App\Models\Group;
 use App\Models\Message;
 use App\Services\Ai\Context\MaintenanceAi;
 use App\Services\AttachmentTextExtractor;
+use App\Services\Ai\Documents\DocumentStore;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -46,7 +47,10 @@ class DocumentIndex
     public function index(Message $message): int
     {
         $group = Group::find($message->group_id);
-        $text = $group ? $this->extractor->extract($message, self::CHUNK_CHARS * self::MAX_CHUNKS) : null;
+        // Teks kanonik (DocumentStore) dipakai bila sudah ada, supaya berkas tidak dibaca dua kali dan tabel Docling ikut.
+        $canonical = $group ? app(DocumentStore::class)->get($message) : null;
+        $text = $canonical !== null ? mb_substr((string) $canonical['text'], 0, self::CHUNK_CHARS * self::MAX_CHUNKS)
+            : ($group ? $this->extractor->extract($message, self::CHUNK_CHARS * self::MAX_CHUNKS) : null);
         $chunks = $text !== null ? self::chunk($text) : [];
         if ($chunks === []) {
             $message->forceFill(['doc_indexed_at' => now()])->saveQuietly();

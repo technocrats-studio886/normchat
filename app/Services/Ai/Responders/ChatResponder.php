@@ -10,6 +10,7 @@ use App\Services\Ai\Context\ContextBundle;
 use App\Services\Ai\PromptBuilder;
 use App\Services\Ai\Files\FileEdit;
 use App\Services\Ai\Files\PilotDocument;
+use App\Services\Ai\Files\DocumentReview;
 
 /** Jawaban teks biasa; dengan $modeInstructions untuk mode seperti Guided Learning. */
 final class ChatResponder implements AiResponder
@@ -43,28 +44,27 @@ final class ChatResponder implements AiResponder
         $origin = $task->message;
         if (PilotDocument::enabled($task->group->id)) {
             $pending = $origin->replyToMessage;
-            $confirmed = false;
+            $reviewMeta = [];
             if ($pending?->sender_type === 'ai' && isset($pending->system_meta['pilot_chat_origin'])
                 && ($pending->system_meta['pilot_user'] ?? null) == $task->requester->id) {
                 $origin = FileEdit::visible($task, (int) $pending->system_meta['pilot_chat_origin']);
                 if (!$origin || $origin->sender_id != $task->requester->id) {
                     return AiReply::notice($this->kind, 'Balas langsung dokumen yang ingin dibaca.');
                 }
-                $confirmed = (bool) preg_match('/^(?:@normi\s+)?kolom benar[.! ]*$/iu', trim($task->message->content));
+                $reviewMeta = $pending->system_meta;
             }
             $source = PilotDocument::supports($origin) ? $origin : $origin->replyToMessage;
             if (PilotDocument::supports($source) && $source->group_id == $task->group->id) {
-                try {
-                    $doc = PilotDocument::read($source);
-                } catch (\RuntimeException $e) {
-                    return AiReply::notice($this->kind, $e->getMessage());
+                $resume = ['pilot_chat_origin' => $origin->id, 'pilot_user' => $task->requester->id];
+                $doc = DocumentReview::read($source, (string) $task->message->content, $reviewMeta, $resume, $this->kind);
+                if ($doc instanceof AiReply) {
+                    return $doc;
                 }
-                if ($doc['tables'] && (!$confirmed || ($pending->system_meta['pilot_version'] ?? null) !== $doc['version'])) {
-                    return AiReply::notice($this->kind, PilotDocument::tableQuestion($doc))->withMeta([
-                        'pilot_chat_origin' => $origin->id, 'pilot_user' => $task->requester->id, 'pilot_version' => $doc['version'],
-                    ]);
+                if ($doc['pages']) {
+                    $systemPrompt .= "\nGunakan dan sebutkan cakupan halaman ".$doc['pages']." dari PDF sumber.";
                 }
-                $task->prompts->prepareDocument($source, PilotDocument::json(PilotDocument::view($doc, (string) $origin->content, false)));
+                $task->prompts->prepareDocument($source, app(\App\Services\Ai\Documents\DocumentProjection::class)
+                    ->question($source, $doc, (string) $origin->content));
             }
         }
         $messages = $task->compose(fn (ContextBundle $context) => $task->prompts->conversation($systemPrompt, $context, $origin));

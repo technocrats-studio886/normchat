@@ -118,8 +118,21 @@ class MidtransGateway implements PaymentGateway
             (int) round((float) ($payload['gross_amount'] ?? 0)),
             (string) ($payload['transaction_id'] ?? $payload['order_id'] ?? ''),
             (string) ($payload['payment_type'] ?? 'midtrans'),
-            $payload['settlement_time'] ?? $payload['transaction_time'] ?? null,
+            self::wibTime($payload['settlement_time'] ?? $payload['transaction_time'] ?? null),
         );
+    }
+
+    /** Midtrans mengirim waktu tanpa zona dalam WIB (GMT+7); tanpa ini paid_at tersimpan 7 jam terlalu lambat. */
+    private static function wibTime(mixed $time): ?string
+    {
+        if (! is_string($time) || trim($time) === '') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($time, 'Asia/Jakarta')->utc()->toIso8601String();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function hasValidSignature(array $payload): bool

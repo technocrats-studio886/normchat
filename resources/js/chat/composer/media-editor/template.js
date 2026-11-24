@@ -82,7 +82,7 @@ export const mediaPreviewTemplate = `
 		<div class="relative px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-2">
 			<div class="flex items-center gap-2 rounded-2xl bg-white/12 px-3 py-2.5 backdrop-blur">
 				<button type="button" data-preview-make-file class="rounded-full bg-white/14 px-2 py-1 text-xs text-white">Buat file</button>
-				<input type="text" class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60" data-attachment-preview-caption-input placeholder="Tambah keterangan" />
+				<input type="text" class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/60" data-attachment-preview-caption-input placeholder="Tambah keterangan" maxlength="${Number(document.querySelector('[data-chat-form]')?.dataset.maxLength || 3000)}" />
 				<button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-navy-50 text-navy-950 hover:bg-navy-100" data-attachment-preview-caption-send aria-label="Kirim lampiran">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 3.105a.75.75 0 0 1 .818-.164l12 5.25a.75.75 0 0 1 0 1.374l-12 5.25A.75.75 0 0 1 2.9 14.18l1.2-4.18a.75.75 0 0 0 0-.4l-1.2-4.18a.75.75 0 0 1 .205-.815Z" /></svg>
 				</button>

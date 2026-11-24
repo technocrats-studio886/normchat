@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -30,7 +31,12 @@ class OpenAiClient
     {
         try {
             return ChatCompletion::fromResponse(
-                Http::withToken($this->token)->timeout($timeout)->post(self::BASE_URL . '/chat/completions', $payload)
+                // Error sesaat OpenAI (5xx, 429) dicoba ulang dengan jeda; batas waktu habis tidak diulang agar
+                // tetap di bawah batas job 600 detik (eval 23 Nov 2026: satu 500 membuat permintaan gagal).
+                Http::withToken($this->token)->timeout($timeout)
+                    ->retry((array) config('services.openai.retry_ms', [2000, 5000]), 0, fn (Throwable $e) => $e instanceof RequestException
+                        && ($e->response->serverError() || $e->response->status() === 429), false)
+                    ->post(self::BASE_URL . '/chat/completions', $payload)
             );
         } catch (Throwable $e) {
             Log::error('OpenAI chat request failed.', ['model' => $payload['model'] ?? null, 'error' => $e->getMessage()]);
